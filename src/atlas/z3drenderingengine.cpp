@@ -30,10 +30,15 @@
 #include "z3dfilter.h"
 #include "z3dmeshfilter.h"
 #include "zcancellation.h"
+#include "zcpuinfo.h"
 #include "z3dperfcollector.h"
 #include "zqtexecutor.h"
 #include "zrenderthreadexecutor_tls.h"
 #include <folly/OperationCancelled.h>
+#include <folly/executors/GlobalExecutor.h>
+#include <folly/coro/BlockingWait.h>
+#include <folly/coro/Collect.h>
+#include <folly/coro/Task.h>
 #include <glbinding/glbinding.h>
 #include <glbinding-aux/Meta.h>
 #include <QOffscreenSurface>
@@ -235,6 +240,120 @@ bool shouldFlipYWhenSaving(RenderBackend backend)
     return !FLAGS_atlas_vk_copy_yflip_in_shader;
   }
   return false;
+}
+
+folly::coro::Task<void> composeAnimationFrameAsync(const QString& tempDirPath,
+                                                   const QString& namePrefix,
+                                                   int fieldWidth,
+                                                   int frameIndex,
+                                                   int width,
+                                                   int height,
+                                                   int tileSize,
+                                                   int numCols,
+                                                   int numRows,
+                                                   bool flipYForSave,
+                                                   Z3DScreenShotType screenshotType,
+                                                   folly::CancellationToken cancellationToken)
+{
+  maybeCancel(cancellationToken);
+
+  QDir tmpdir(tempDirPath);
+  QString targetFilename = QString("%1%2.png").arg(namePrefix).arg(frameIndex, fieldWidth, 10, QChar('0'));
+  const QString targetFilepath = tmpdir.filePath(targetFilename);
+
+  ZImg img(ZImgInfo(width, height, 1, 4));
+  img.infoRef().lastChannelIsAlphaChannel = true;
+
+  ZImg rightImg;
+  if (screenshotType != Z3DScreenShotType::MonoView) {
+    rightImg = ZImg(ZImgInfo(width, height, 1, 4));
+    rightImg.infoRef().lastChannelIsAlphaChannel = true;
+  }
+
+  for (int c = 0; c < numCols; ++c) {
+    for (int r = 0; r < numRows; ++r) {
+      maybeCancel(cancellationToken);
+
+      const int tileStartX = c * tileSize;
+      const int tileStartY = r * tileSize;
+      const int tileTop = std::min(tileStartY + tileSize, height);
+      const int pasteY = flipYForSave ? tileStartY : (height - tileTop);
+
+      if (screenshotType == Z3DScreenShotType::MonoView) {
+        const QString filepath = tmpdir.filePath(QString("_%1%2_%3_%4.png")
+                                                   .arg(namePrefix)
+                                                   .arg(frameIndex, fieldWidth, 10, QChar('0'))
+                                                   .arg(tileStartX)
+                                                   .arg(tileStartY));
+        if (QFileInfo::exists(filepath)) {
+          img.pasteImg(ZImg(filepath), ZVoxelCoordinate(tileStartX, pasteY));
+        } else {
+          LOG(ERROR) << "Could not find file: " << filepath;
+        }
+        continue;
+      }
+
+      const QString leftFilepath = tmpdir.filePath(QString("_%1%2_%3_%4_left.png")
+                                                     .arg(namePrefix)
+                                                     .arg(frameIndex, fieldWidth, 10, QChar('0'))
+                                                     .arg(tileStartX)
+                                                     .arg(tileStartY));
+      if (QFileInfo::exists(leftFilepath)) {
+        img.pasteImg(ZImg(leftFilepath), ZVoxelCoordinate(tileStartX, pasteY));
+      } else {
+        LOG(ERROR) << "Could not find left file: " << leftFilepath;
+      }
+
+      const QString rightFilepath = tmpdir.filePath(QString("_%1%2_%3_%4_right.png")
+                                                      .arg(namePrefix)
+                                                      .arg(frameIndex, fieldWidth, 10, QChar('0'))
+                                                      .arg(tileStartX)
+                                                      .arg(tileStartY));
+      if (QFileInfo::exists(rightFilepath)) {
+        rightImg.pasteImg(ZImg(rightFilepath), ZVoxelCoordinate(tileStartX, pasteY));
+      } else {
+        LOG(ERROR) << "Could not find right file: " << rightFilepath;
+      }
+    }
+  }
+
+  maybeCancel(cancellationToken);
+
+  if (screenshotType == Z3DScreenShotType::MonoView) {
+    if (flipYForSave) {
+      img.flip(Dimension::Y).save(targetFilepath);
+    } else {
+      img.save(targetFilepath);
+    }
+    LOG(INFO) << fmt::format("Saved rendering ({}, {}) to file: {}", img.width(), img.height(), targetFilepath);
+    co_return;
+  }
+
+  if (screenshotType == Z3DScreenShotType::FullSideBySideStereoView) {
+    if (flipYForSave) {
+      ZImg::cat(std::vector<const ZImg*>{&img, &rightImg}, Dimension::X).flip(Dimension::Y).save(targetFilepath);
+    } else {
+      ZImg::cat(std::vector<const ZImg*>{&img, &rightImg}, Dimension::X).save(targetFilepath);
+    }
+    LOG(INFO) << fmt::format("Saved stereo rendering ({} x 2, {}) to file: {}",
+                             img.width(),
+                             img.height(),
+                             targetFilepath);
+    co_return;
+  }
+
+  if (flipYForSave) {
+    ZImg::cat(std::vector<const ZImg*>{&img, &rightImg}, Dimension::X)
+      .zoom(0.5, 1)
+      .flip(Dimension::Y)
+      .save(targetFilepath);
+  } else {
+    ZImg::cat(std::vector<const ZImg*>{&img, &rightImg}, Dimension::X).zoom(0.5, 1).save(targetFilepath);
+  }
+  LOG(INFO) << fmt::format("Saved half sbs stereo rendering ({}, {}) to file: {}",
+                           img.width(),
+                           img.height(),
+                           targetFilepath);
 }
 
 } // namespace
@@ -864,107 +983,42 @@ void Z3DRenderingEngine::exportFixedSize3DAnimation(const ZAnimation* animation,
         }
       }
 
-      // compose images
+      const auto backend = static_cast<RenderBackend>(m_globalParas->renderBackend.associatedData());
+      const bool flipYForSave = shouldFlipYWhenSaving(backend);
+      const size_t composeFrameCount = static_cast<size_t>(endFrame - startFrame);
+      const QString tmpdirPath = tmpdir.absolutePath();
+      auto cpuExecutor = folly::getGlobalCPUExecutor();
+      const uint64_t availableMemoryBytes = std::max<uint64_t>(1, ZCpuInfo::instance().nPhysicalRAM);
+      const uint64_t estimatedComposeTaskBytes =
+        uint64_t(width) * uint64_t(height) * 4ull * (sst == Z3DScreenShotType::MonoView ? 2ull : 4ull);
+      CHECK(estimatedComposeTaskBytes > 0);
+      // Use half of the effective Atlas memory budget for post-render frame
+      // stitching so rendering/export caches still have room to breathe.
+      const size_t composeWindow =
+        std::max<size_t>(1,
+                         std::min<size_t>(composeFrameCount, (availableMemoryBytes / 2) / estimatedComposeTaskBytes));
+
+      std::vector<folly::coro::TaskWithExecutor<void>> composeTasks;
+      composeTasks.reserve(composeFrameCount);
       for (int i = startFrame; i < endFrame; ++i) {
         maybeCancel(token);
-        Q_EMIT progressChanged(99);
-
-        const auto backend = static_cast<RenderBackend>(m_globalParas->renderBackend.associatedData());
-        const bool flipYForSave = shouldFlipYWhenSaving(backend);
-
-        QString targetFilename = QString("%1%2.png").arg(namePrefix).arg(i, fieldWidth, 10, QChar('0'));
-        auto targetFilepath = tmpdir.filePath(targetFilename);
-        ZImg img(ZImgInfo(width, height, 1, 4));
-        img.infoRef().lastChannelIsAlphaChannel = true;
-
-        ZImg rightImg;
-        if (sst != Z3DScreenShotType::MonoView) {
-          rightImg = ZImg(ZImgInfo(width, height, 1, 4));
-          rightImg.infoRef().lastChannelIsAlphaChannel = true;
-        }
-
-        for (auto c = 0; c < numCols; ++c) {
-          for (auto r = 0; r < numRows; ++r) {
-            auto tileStartX = c * tileSize;
-            auto tileStartY = r * tileSize;
-            const int tileTop = std::min(tileStartY + tileSize, height);
-            const int pasteY = flipYForSave ? tileStartY : (height - tileTop);
-
-            if (sst == Z3DScreenShotType::MonoView) {
-              QString filename = QString("_%1%2_%3_%4.png")
-                                   .arg(namePrefix)
-                                   .arg(i, fieldWidth, 10, QChar('0'))
-                                   .arg(tileStartX)
-                                   .arg(tileStartY);
-              QString filepath = tmpdir.filePath(filename);
-              if (tmpdir.exists(filename)) {
-                img.pasteImg(ZImg(filepath), ZVoxelCoordinate(tileStartX, pasteY));
-              } else {
-                LOG(ERROR) << "Could not find file: " << filepath;
-              }
-            } else {
-              QString filename = QString("_%1%2_%3_%4_left.png")
-                                   .arg(namePrefix)
-                                   .arg(i, fieldWidth, 10, QChar('0'))
-                                   .arg(tileStartX)
-                                   .arg(tileStartY);
-              QString filepath = tmpdir.filePath(filename);
-              if (tmpdir.exists(filename)) {
-                img.pasteImg(ZImg(filepath), ZVoxelCoordinate(tileStartX, pasteY));
-              } else {
-                LOG(ERROR) << "Could not find left file: " << filepath;
-              }
-
-              filename = QString("_%1%2_%3_%4_right.png")
-                           .arg(namePrefix)
-                           .arg(i, fieldWidth, 10, QChar('0'))
-                           .arg(tileStartX)
-                           .arg(tileStartY);
-              if (tmpdir.exists(filename)) {
-                rightImg.pasteImg(ZImg(filepath), ZVoxelCoordinate(tileStartX, pasteY));
-              } else {
-                LOG(ERROR) << "Could not find right file: " << filepath;
-              }
-            }
-          }
-        }
-
-        if (sst == Z3DScreenShotType::MonoView) {
-          if (flipYForSave) {
-            img.flip(Dimension::Y).save(targetFilepath);
-          } else {
-            img.save(targetFilepath);
-          }
-          LOG(INFO) << fmt::format("Saved rendering ({}, {}) to file: {}", img.width(), img.height(), targetFilepath);
-        } else {
-          if (sst == Z3DScreenShotType::FullSideBySideStereoView) {
-            if (flipYForSave) {
-              ZImg::cat(std::vector<const ZImg*>{&img, &rightImg}, Dimension::X)
-                .flip(Dimension::Y)
-                .save(targetFilepath);
-            } else {
-              ZImg::cat(std::vector<const ZImg*>{&img, &rightImg}, Dimension::X).save(targetFilepath);
-            }
-            LOG(INFO) << fmt::format("Saved stereo rendering ({} x 2, {}) to file: {}",
-                                     img.width(),
-                                     img.height(),
-                                     targetFilepath);
-          } else {
-            if (flipYForSave) {
-              ZImg::cat(std::vector<const ZImg*>{&img, &rightImg}, Dimension::X)
-                .zoom(0.5, 1)
-                .flip(Dimension::Y)
-                .save(targetFilepath);
-            } else {
-              ZImg::cat(std::vector<const ZImg*>{&img, &rightImg}, Dimension::X).zoom(0.5, 1).save(targetFilepath);
-            }
-            LOG(INFO) << fmt::format("Saved half sbs stereo rendering ({}, {}) to file: {}",
-                                     img.width(),
-                                     img.height(),
-                                     targetFilepath);
-          }
-        }
+        composeTasks.push_back(folly::coro::co_withExecutor(cpuExecutor,
+                                                            composeAnimationFrameAsync(tmpdirPath,
+                                                                                       namePrefix,
+                                                                                       fieldWidth,
+                                                                                       i,
+                                                                                       width,
+                                                                                       height,
+                                                                                       tileSize,
+                                                                                       numCols,
+                                                                                       numRows,
+                                                                                       flipYForSave,
+                                                                                       sst,
+                                                                                       token)));
       }
+      Q_EMIT progressChanged(99);
+      folly::coro::blockingWait(folly::coro::collectAllWindowed(std::move(composeTasks), composeWindow));
+      maybeCancel(token);
     }
     maybeCancel(token);
 

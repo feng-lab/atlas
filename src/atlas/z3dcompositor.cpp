@@ -1761,8 +1761,12 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
     };
 
     if (opaqueFilters.empty()) {
-      // Resolve directly to the final scene surface; preserve background
-      dispatchOIT(*sceneOutLease, {}, /*clearResolve=*/false);
+      // Without opaque geometry, the OIT resolve writes directly to the final
+      // scene target. Preserve the target only if the background pass actually
+      // initialized it; otherwise Vulkan must clear instead of loading from an
+      // undefined layout.
+      const bool backgroundDrawn = m_showBackground.get();
+      dispatchOIT(*sceneOutLease, {}, /*clearResolve=*/!backgroundDrawn);
     } else {
       const glm::uvec2 targetSize = sceneOutLease->descriptor.size;
       auto leaseOpaque = std::make_shared<Z3DScratchResourcePool::RenderTargetLease>(
