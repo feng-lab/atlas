@@ -56,6 +56,7 @@ Atlas User Guide
   - [8.2 3D Screenshots](#82-3d-screenshots)
   - [8.3 3D Animation Export in the GUI](#83-3d-animation-export-in-the-gui)
   - [8.4 Headless 3D Animation Export](#84-headless-3d-animation-export)
+  - [8.5 Headless 3D Scene Export](#85-headless-3d-scene-export)
 - [9. Workflow Recipes](#9-workflow-recipes)
   - [9.1 Explore a New Dataset](#91-explore-a-new-dataset)
   - [9.2 Create and Refine ROIs with a Mask Image](#92-create-and-refine-rois-with-a-mask-image)
@@ -1254,6 +1255,29 @@ For automation or cluster rendering:
    - On Linux: `--use_gpu_devices 0,1 --__use_EGL`
 4. Monitor CLI logs for progress updates and errors while the export is running.
 
+### 8.5 Headless 3D Scene Export
+
+For reproducible still-image capture from saved workspaces:
+
+1. Prepare a `.scene` file and ensure all referenced data paths are accessible.
+2. Run Atlas with the scene-export mode. The export uses the same headless width/height and overwrite flags as the
+   animation exporter, but captures exactly one frame after loading the scene and applying its saved 3D state.
+   ```bash
+   ./atlas \
+     --run_export_3d_scene \
+     --filename path/to/workspace.scene \
+     --output_filename path/to/output.png \
+     --output_width 8000 \
+     --output_height 8000 \
+     --overwrite
+   ```
+3. Optional flags:
+   - `--limit_memory_usage_in_gb_to 12`
+   - On Linux: `--use_gpu_devices 0 --__use_EGL`
+4. Atlas blocks until deferred `View3DGeneral` and per-object `View3D` scene settings finish applying, then captures
+   the image file. There is no scene-apply timeout in this mode; the export does not proceed until the saved scene
+   state is fully ready.
+
 ---
 
 ## 9. Workflow Recipes
@@ -1497,11 +1521,12 @@ Use **Help → Shortcuts** in either the 2D or 3D window to open this section di
 | --- | --- |
 | `--atlas_block_scene_3d_apply` | Block scene loading until 3D view settings finish applying. |
 | `--run_export_3d_animation` | Enter headless animation export mode; requires accompanying export flags. |
+| `--run_export_3d_scene` | Enter headless single-frame scene export mode; reuses the shared export filename/size flags. |
 | `--atlas_http_backend` | Select remote-dataset HTTP transport: `proxygen` or `curl`. |
 | `--atlas_http_ca_bundle` | Override the PEM CA bundle used for HTTPS remote-dataset requests. |
 | `--atlas_http_windows_trust_source` | On Windows, choose the default HTTPS trust source shared by both HTTP backends: `auto`, `windows_store`, or `bundled_pem`. |
-| `--filename` | Path to `.animation3d` file for CLI export. |
-| `--output_filename` | Output video path (mp4, etc.). |
+| `--filename` | Input path for headless export (`.animation3d` for animation export, `.scene` for scene export). |
+| `--output_filename` | Output path (`.mp4`/video for animation export, image path for scene export). |
 | `--output_fps`, `--output_start_frame`, `--output_end_frame` | Output frame timing. |
 | `--output_width`, `--output_height` | Frame size. |
 | `--overwrite` | Allow overwriting existing outputs. |

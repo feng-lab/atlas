@@ -14,8 +14,11 @@
 #include <QCoreApplication>
 
 DEFINE_bool(run_export_3d_animation, false, "Enable exporting 3D animation via command line");
-DEFINE_string(filename, "", "Input file name (.animation3d format)");
-DEFINE_string(output_filename, "", "Output video file name");
+DEFINE_string(filename,
+              "",
+              "Input file name (.animation3d for animation export, .scene for scene export depending on the selected "
+              "headless export mode)");
+DEFINE_string(output_filename, "", "Output file name (video for animation export, image for scene export)");
 DEFINE_int32(output_fps, 30, "Output video frame rate (FPS). Default: 30");
 DEFINE_double(output_start_time,
               0.,
@@ -25,9 +28,9 @@ DEFINE_double(output_end_time,
               "(deprecated, use output_end_frame) Output video end time in seconds. Default: -1.0 (end of animation)");
 DEFINE_int32(output_start_frame, 0, "Output video start frame. Default: 0");
 DEFINE_int32(output_end_frame, -1, "Output video end frame. Default: -1 (end of animation)");
-DEFINE_int32(output_width, 3840, "Output video width. Default: 3840");
-DEFINE_int32(output_height, 2160, "Output video height. Default: 2160");
-DEFINE_bool(overwrite, false, "Overwrite existing output file. Default: false");
+DEFINE_int32(output_width, 3840, "Export output width. Default: 3840");
+DEFINE_int32(output_height, 2160, "Export output height. Default: 2160");
+DEFINE_bool(overwrite, false, "Overwrite an existing output file. Default: false");
 DEFINE_string(output_image_folder_name, "", "Folder for output images. Uses temp folder if empty");
 DEFINE_bool(skip_video_compression, false, "Skip video compression. If true, specify --output_image_folder_name");
 DECLARE_string(output_image_name_prefix);

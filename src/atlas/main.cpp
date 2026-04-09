@@ -12,6 +12,7 @@
 #include "ztheme.h"
 
 #include "zrunexport3danimation.h"
+#include "zrunexport3dscene.h"
 #include "zrunneutucommand2.h"
 #include "zrundumpanimation3dschema.h"
 #include "zwindowsheader.h"
@@ -27,6 +28,7 @@
 
 DECLARE_string(flagfile);
 DECLARE_bool(run_export_3d_animation);
+DECLARE_bool(run_export_3d_scene);
 DECLARE_bool(run_dump_animation3d_schema);
 // Linux EGL headless switch for OpenGL context
 #if defined(__linux__)
@@ -174,7 +176,7 @@ int main(int argc, char* argv[])
   gflags::SetVersionString(GIT_VERSION);
   gflags::ParseCommandLineFlags(&argc, &argv, false);
 
-  bool isGUIMode = !(FLAGS_run_export_3d_animation || FLAGS_run_dump_animation3d_schema);
+  bool isGUIMode = !(FLAGS_run_export_3d_animation || FLAGS_run_export_3d_scene || FLAGS_run_dump_animation3d_schema);
 
   // init the logging mechanism
   QDir logDir = ZSystemInfo::logDir();
@@ -212,6 +214,9 @@ int main(int argc, char* argv[])
       if (FLAGS_run_export_3d_animation) {
         ZRunExport3DAnimation rea;
         return rea.run();
+      } else if (FLAGS_run_export_3d_scene) {
+        ZRunExport3DScene res;
+        return res.run();
       } else if (FLAGS_run_dump_animation3d_schema) {
         nim::ZRunDumpAnimation3DSchema dumper;
         return dumper.run();

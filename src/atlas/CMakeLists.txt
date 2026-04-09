@@ -842,6 +842,7 @@ set(SOURCES
     zcheckbox.cpp zcheckbox.h
     zapprestartcontroller.cpp zapprestartcontroller.h
     zrunexport3danimation.cpp zrunexport3danimation.h
+    zrunexport3dscene.cpp zrunexport3dscene.h
     zrundumpanimation3dschema.cpp zrundumpanimation3dschema.h
     zprocess.cpp zprocess.h
     zvulkan.h

@@ -30,6 +30,13 @@ Entry Points
 
 - CLI:
   - Atlas routes `--command` to the migrated runner in `src/img/zrunneutucommand2.*` (type-safe config parsing via `boost::json`).
+  - Headless 3D export modes live in `src/atlas/zrunexport3danimation.*` and `src/atlas/zrunexport3dscene.*`.
+    - `--run_export_3d_animation` exports a frame sequence / video from a `.animation3d`.
+    - `--run_export_3d_scene` exports a single image from a `.scene` after applying `View3DGeneral` plus per-object
+      `View3D` state and waiting for deferred object-view readiness to settle.
+    - Both modes share the core output-path and size flags (`--filename`, `--output_filename`, `--output_width`,
+      `--output_height`, `--overwrite`, `--limit_memory_usage_in_gb_to`) so benchmark scripts can swap between them
+      without reshaping the command line.
   - The `--trace` and `--auto_trace` subcommands use the `src/img/zneutube*` tracing stack.
   - The migrated trace CLI supports explicit tracing-selection arguments that bypass UI state:
     - `--channel <0-based>`
