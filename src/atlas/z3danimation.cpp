@@ -28,9 +28,9 @@ void Z3DAnimation::bindView(Z3DRenderingEngine* v)
   }
 }
 
-void Z3DAnimation::load(const QString& fn)
+void Z3DAnimation::load(const QString& fn, bool showLoadIssuesDialog)
 {
-  readContent(fn, "Animation3D");
+  readContent(fn, "Animation3D", showLoadIssuesDialog);
   m_cameraParameterAnimation = static_cast<ZCameraParameterAnimation*>(m_globalParaAnimations[0].get());
   LOG(INFO) << "Finish loading animation";
 }

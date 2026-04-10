@@ -132,7 +132,9 @@ bool loadSceneForExport(const QString& filename, ZDoc& doc, ZView& view, Z3DRend
 
   const bool waitFor3DApply = has3DGeneral || numView3DPerObject > 0;
   bool sceneApplyFinished = !waitFor3DApply;
+  bool sceneApplyFailed = false;
   QMetaObject::Connection sceneApplyConn;
+  QMetaObject::Connection renderErrorConn;
   if (waitFor3DApply) {
     sceneApplyConn = QObject::connect(
       &engine,
@@ -142,11 +144,28 @@ bool loadSceneForExport(const QString& filename, ZDoc& doc, ZView& view, Z3DRend
         sceneApplyFinished = true;
       },
       Qt::QueuedConnection);
+    renderErrorConn = QObject::connect(
+      &engine,
+      &Z3DRenderingEngine::renderingError,
+      &view,
+      [&sceneApplyFailed, &error](const QString& err) {
+        sceneApplyFailed = true;
+        if (!err.isEmpty()) {
+          if (!error.isEmpty()) {
+            error += '\n';
+          }
+          error += err;
+        }
+      },
+      Qt::QueuedConnection);
     engine.beginScene3DApply();
   }
-  auto disconnectSceneApplyGuard = folly::makeGuard([&sceneApplyConn]() {
+  auto disconnectSceneApplyGuard = folly::makeGuard([&sceneApplyConn, &renderErrorConn]() {
     if (sceneApplyConn) {
       QObject::disconnect(sceneApplyConn);
+    }
+    if (renderErrorConn) {
+      QObject::disconnect(renderErrorConn);
     }
   });
 
@@ -189,12 +208,19 @@ bool loadSceneForExport(const QString& filename, ZDoc& doc, ZView& view, Z3DRend
     return true;
   }
 
-  while (!sceneApplyFinished) {
+  while (!sceneApplyFinished && !sceneApplyFailed) {
     QCoreApplication::processEvents(QEventLoop::AllEvents, 50);
-    if (sceneApplyFinished) {
+    if (sceneApplyFinished || sceneApplyFailed) {
       break;
     }
     QThread::msleep(10);
+  }
+
+  if (sceneApplyFailed) {
+    if (error.isEmpty()) {
+      error = "3D scene apply failed";
+    }
+    return false;
   }
 
   LOG(INFO) << "Finish loading scene";
@@ -256,21 +282,29 @@ int ZRunExport3DScene::run()
   doc.animation2DDoc().bindView(&view);
 
   Z3DRenderingEngine engine(doc);
+  m_engine = &engine;
+  auto resetEngineGuard = folly::makeGuard([this]() {
+    m_engine = nullptr;
+  });
   engine.init();
   doc.animation3DDoc().bindView(&engine);
+  connect(&engine, &Z3DRenderingEngine::renderingError, this, &ZRunExport3DScene::logError);
 
   if (!loadSceneForExport(filename, doc, view, engine, errorMsg)) {
     LOG(ERROR) << "load scene file error: " << errorMsg;
     return 1;
   }
   if (!errorMsg.isEmpty()) {
-    LOG(WARNING) << errorMsg;
+    LOG(ERROR) << "load scene file error: " << errorMsg;
+    return 1;
   }
 
   doc.hideAnimation3DView();
   doc.deselectAllObjs();
+  if (m_hasError) {
+    return 1;
+  }
 
-  connect(&engine, &Z3DRenderingEngine::renderingError, this, &ZRunExport3DScene::logError);
   engine.takeFixedSizeScreenShot(outputFilename, FLAGS_output_width, FLAGS_output_height, Z3DScreenShotType::MonoView);
 
   if (!m_hasError && !QFile::exists(outputFilename)) {
@@ -285,6 +319,10 @@ void ZRunExport3DScene::logError(const QString& err)
 {
   LOG(ERROR) << err;
   m_hasError = true;
+  if (m_engine != nullptr) {
+    m_engine->cancelCapture();
+    m_engine->cancelLongRendering();
+  }
 }
 
 } // namespace nim

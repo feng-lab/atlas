@@ -876,6 +876,7 @@ struct ImgRaycasterPayload
   float localMIPThreshold = 0.8f;
   ImgCompositingMode compositingMode = ImgCompositingMode::DirectVolumeRendering;
   bool fastPathOnly = true;
+  bool interactiveProgressivePaging = true;
   std::vector<glm::vec3> entryPositions;
   std::vector<glm::vec3> entryTexCoords;
   std::vector<uint32_t> entryIndices;

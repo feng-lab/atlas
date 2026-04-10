@@ -996,7 +996,7 @@ size_t Z3DAnimationDoc::loadFile(const QString& fileName, QString& errorMsg)
   size_t id;
   try {
     auto animation = std::make_unique<Z3DAnimation>(m_doc);
-    animation->load(fileName);
+    animation->load(fileName, m_showLoadIssueDialogs);
     id = addAnimation(animation.release(), fileName);
     ZSystemInfo::instance().addFileToRecentFileList(fileName);
     setLastOpenedObjPath(fileName);
@@ -1028,7 +1028,7 @@ size_t Z3DAnimationDoc::loadFile(const json::value& jValue, QString& errorMsg)
     QString fileName = asQString(jValue);
 
     auto animation = std::make_unique<Z3DAnimation>(m_doc);
-    animation->load(fileName);
+    animation->load(fileName, m_showLoadIssueDialogs);
     id = addAnimation(animation.release(), fileName);
     ZSystemInfo::instance().addFileToRecentFileList(fileName);
     setLastOpenedObjPath(fileName);

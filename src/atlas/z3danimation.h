@@ -19,7 +19,7 @@ public:
 
   void bindView(Z3DRenderingEngine* v);
 
-  void load(const QString& fn);
+  void load(const QString& fn, bool showLoadIssuesDialog = true);
 
   void save(const QString& fn);
 

@@ -1154,175 +1154,211 @@ double Z3DImgFilter::process(Z3DEye eye)
       return 1.0;
     }
 
-    double imageProgress = 1.0;
-    double slicesProgress = 1.0;
-
-    // Prepare persistent per-eye output leases once; the script nodes will
-    // record into these surfaces.
-    Z3DScratchResourcePool::RenderTargetLease* transparentLease = nullptr;
-    Z3DScratchResourcePool::RenderTargetLease* opaqueLease = nullptr;
-
-    if (doImage || doBBoxOnly) {
-      auto& lease = m_transparentTargets[eye];
-      if (!lease || lease.descriptor.size != m_outputSize || !lease.hasVulkanImage()) {
-        lease.release();
-        m_rendererBase.acquirePersistentTempRenderTarget2D(lease,
-                                                           m_outputSize,
-                                                           ScratchFormat::RGBA16,
-                                                           ScratchFormat::Depth32F);
-      }
-      transparentLease = &lease;
-    }
-    if (doSlices) {
-      auto& lease = m_opaqueTargets[eye];
-      if (!lease || lease.descriptor.size != m_outputSize || !lease.hasVulkanImage()) {
-        lease.release();
-        m_rendererBase.acquirePersistentTempRenderTarget2D(lease,
-                                                           m_outputSize,
-                                                           ScratchFormat::RGBA16,
-                                                           ScratchFormat::Depth32F);
-      }
-      opaqueLease = &lease;
-    }
+    const bool blockImageCaptureToCompletion = doImage && !m_progressiveRendering && m_3dImg &&
+                                               m_3dImg->isVolumeDownsampled() &&
+                                               !m_imgRaycasterRenderer.isFastRendering();
+    const bool blockSliceCaptureToCompletion = doSlices && !m_progressiveRendering && m_3dImg &&
+                                               m_3dImg->isVolumeDownsampled() && !m_imgSliceRenderer.isFastRendering();
+    const bool blockCaptureToCompletion = blockImageCaptureToCompletion || blockSliceCaptureToCompletion;
+    const bool useProgressiveImage = m_progressiveRendering || blockImageCaptureToCompletion;
+    const bool useProgressiveSlices = m_progressiveRendering || blockSliceCaptureToCompletion;
 
     const char* eyeTag = (eye == MonoEye) ? "mono" : (eye == LeftEye) ? "left" : "right";
     const std::string frameLabel = std::string("img_filter_") + eyeTag;
 
-    try {
-      ZVulkanLinearScript script(m_rendererBase, *vulkanBackend, frameLabel);
+    bool imagePassComplete = !doImage;
+    bool transparentPassComplete = !(doImage || doBBoxOnly);
+    bool slicePassComplete = !doSlices;
 
-      ZVulkanLinearScript::SegmentHandle segRaycaster{};
+    const auto runOneVulkanPass = [&](bool runTransparentPass, bool runSlicePass) {
+      double imageProgress = imagePassComplete ? 1.0 : 0.0;
+      double slicesProgress = slicePassComplete ? 1.0 : 0.0;
 
-      if (doImage) {
-        // Geometry/state prep only on first progressive step of a cycle (GL parity).
-        const bool progressiveStep = (m_progressiveRendering && m_imgRaycasterRenderer.renderingStarted(eye));
-        if (!progressiveStep) {
-          prepareRaycasterInputs(eye, m_outputSize);
+      // Prepare persistent per-eye output leases once; the script nodes will
+      // record into these surfaces.
+      Z3DScratchResourcePool::RenderTargetLease* transparentLease = nullptr;
+      Z3DScratchResourcePool::RenderTargetLease* opaqueLease = nullptr;
+
+      if (runTransparentPass) {
+        auto& lease = m_transparentTargets[eye];
+        if (!lease || lease.descriptor.size != m_outputSize || !lease.hasVulkanImage()) {
+          lease.release();
+          m_rendererBase.acquirePersistentTempRenderTarget2D(lease,
+                                                             m_outputSize,
+                                                             ScratchFormat::RGBA16,
+                                                             ScratchFormat::Depth32F);
         }
+        transparentLease = &lease;
+      }
+      if (runSlicePass) {
+        auto& lease = m_opaqueTargets[eye];
+        if (!lease || lease.descriptor.size != m_outputSize || !lease.hasVulkanImage()) {
+          lease.release();
+          m_rendererBase.acquirePersistentTempRenderTarget2D(lease,
+                                                             m_outputSize,
+                                                             ScratchFormat::RGBA16,
+                                                             ScratchFormat::Depth32F);
+        }
+        opaqueLease = &lease;
+      }
 
-        CHECK(transparentLease != nullptr) << "ImgFilter Vulkan image path missing transparent lease";
+      try {
+        ZVulkanLinearScript script(m_rendererBase, *vulkanBackend, frameLabel);
 
-        // Raycaster pipeline: renderer owns stage→target mapping and emits fine-grained script nodes;
-        // Vulkan pipeline context records GPU work.
-        segRaycaster = m_imgRaycasterRenderer.recordVulkanStagesToScript(script, eye, *transparentLease);
+        ZVulkanLinearScript::SegmentHandle segRaycaster{};
 
-        // Bound box overlay (preserve, same surface).
-        auto recordBBox = [&]() {
-          const auto prevViewport = m_rendererBase.frameState().viewport;
-          const auto prevSurface = m_rendererBase.frameState().activeSurface;
-          auto guard = folly::makeGuard([&]() {
-            m_rendererBase.frameState().updateViewportData(prevViewport);
-            m_rendererBase.setActiveSurfaceWithLoadStore(prevSurface, Z3DRendererBase::Preserve);
+        if (runTransparentPass && doImage) {
+          // Geometry/state prep only on the first step of a progressive cycle.
+          // For blocking capture/export, reuse the same progressive machinery
+          // so Vulkan reaches the same full-resolution state as OpenGL before
+          // returning to the caller.
+          const bool progressiveStep = (useProgressiveImage && m_imgRaycasterRenderer.renderingStarted(eye));
+          if (!progressiveStep) {
+            prepareRaycasterInputs(eye, m_outputSize);
+          }
+
+          CHECK(transparentLease != nullptr) << "ImgFilter Vulkan image path missing transparent lease";
+
+          segRaycaster =
+            m_imgRaycasterRenderer.recordVulkanStagesToScript(script,
+                                                              eye,
+                                                              *transparentLease,
+                                                              {},
+                                                              /*interactiveProgressivePaging=*/m_progressiveRendering);
+
+          auto recordBBox = [&]() {
+            const auto prevViewport = m_rendererBase.frameState().viewport;
+            const auto prevSurface = m_rendererBase.frameState().activeSurface;
+            auto guard = folly::makeGuard([&]() {
+              m_rendererBase.frameState().updateViewportData(prevViewport);
+              m_rendererBase.setActiveSurfaceWithLoadStore(prevSurface, Z3DRendererBase::Preserve);
+            });
+
+            m_rendererBase.setActiveSurfaceWithLoadStore(*transparentLease, Z3DRendererBase::Preserve);
+            for (auto& att : m_rendererBase.frameState().activeSurface.colorAttachments) {
+              att.finalUse = AttachmentFinalUse::Sampled;
+            }
+            if (m_rendererBase.frameState().activeSurface.depthAttachment) {
+              m_rendererBase.frameState().activeSurface.depthAttachment->finalUse = AttachmentFinalUse::Sampled;
+            }
+            renderBoundBox(eye, Z3DBoundedFilter::BoundBoxRenderStyle::OverlayAlphaDepth);
+          };
+          if (segRaycaster) {
+            script.raster("bbox_overlay", {segRaycaster}, recordBBox);
+          } else {
+            script.raster("bbox_overlay", {}, recordBBox);
+          }
+        } else if (runTransparentPass && doBBoxOnly) {
+          CHECK(transparentLease != nullptr) << "ImgFilter Vulkan bbox-only path missing transparent lease";
+          script.raster("bbox_overlay", {}, [&]() {
+            const auto prevViewport = m_rendererBase.frameState().viewport;
+            const auto prevSurface = m_rendererBase.frameState().activeSurface;
+            auto guard = folly::makeGuard([&]() {
+              m_rendererBase.frameState().updateViewportData(prevViewport);
+              m_rendererBase.setActiveSurfaceWithLoadStore(prevSurface, Z3DRendererBase::Preserve);
+            });
+
+            m_rendererBase.setActiveSurfaceWithLoadStore(*transparentLease,
+                                                         LoadOp::Clear,
+                                                         StoreOp::Store,
+                                                         LoadOp::Clear,
+                                                         StoreOp::Store);
+            for (auto& att : m_rendererBase.frameState().activeSurface.colorAttachments) {
+              att.finalUse = AttachmentFinalUse::Sampled;
+            }
+            if (m_rendererBase.frameState().activeSurface.depthAttachment) {
+              m_rendererBase.frameState().activeSurface.depthAttachment->finalUse = AttachmentFinalUse::Sampled;
+            }
+
+            renderBoundBox(eye, Z3DBoundedFilter::BoundBoxRenderStyle::OverlayAlphaDepth);
           });
-
-          m_rendererBase.setActiveSurfaceWithLoadStore(*transparentLease, Z3DRendererBase::Preserve);
-          for (auto& att : m_rendererBase.frameState().activeSurface.colorAttachments) {
-            att.finalUse = AttachmentFinalUse::Sampled;
-          }
-          if (m_rendererBase.frameState().activeSurface.depthAttachment) {
-            m_rendererBase.frameState().activeSurface.depthAttachment->finalUse = AttachmentFinalUse::Sampled;
-          }
-          renderBoundBox(eye, Z3DBoundedFilter::BoundBoxRenderStyle::OverlayAlphaDepth);
-        };
-        if (segRaycaster) {
-          script.raster("bbox_overlay", {segRaycaster}, recordBBox);
-        } else {
-          script.raster("bbox_overlay", {}, recordBBox);
         }
+
+        if (runSlicePass) {
+          const bool progressiveStep = (useProgressiveSlices && m_imgSliceRenderer.renderingStarted(eye));
+          if (!progressiveStep) {
+            prepareSliceInputs(eye, m_outputSize);
+          }
+
+          CHECK(opaqueLease != nullptr) << "ImgFilter Vulkan slice path missing opaque lease";
+          [[maybe_unused]] const auto segSlices =
+            m_imgSliceRenderer.recordVulkanStagesToScript(script, eye, *opaqueLease);
+        }
+
+        script.flush("imgfilter_done");
+      }
+      catch (const ZCancellationException&) {
+        if (doImage) {
+          m_imgRaycasterRenderer.resetProgress(eye);
+        }
+        if (doSlices) {
+          m_imgSliceRenderer.resetProgress(eye);
+        }
+        throw;
+      }
+      catch (const folly::OperationCancelled&) {
+        if (doImage) {
+          m_imgRaycasterRenderer.resetProgress(eye);
+        }
+        if (doSlices) {
+          m_imgSliceRenderer.resetProgress(eye);
+        }
+        throw;
+      }
+
+      double currentProgress = 0.0;
+      double totalProgress = 0.0;
+      if (doImage) {
+        if (runTransparentPass) {
+          imageProgress = useProgressiveImage ? m_imgRaycasterRenderer.progressiveProgress(eye) : 1.0;
+        }
+        currentProgress += imageProgress;
+        totalProgress += 1.0;
+
+        if (useProgressiveImage && imageProgress >= 1.0) {
+          m_imgRaycasterRenderer.finalizePagingStatsIfDone(eye);
+        }
+        if (!useProgressiveImage || imageProgress >= 1.0) {
+          m_imgRaycasterRenderer.releaseEntryExit();
+          imagePassComplete = true;
+        }
+        m_transparentValid[eye] = true;
       } else if (doBBoxOnly) {
-        CHECK(transparentLease != nullptr) << "ImgFilter Vulkan bbox-only path missing transparent lease";
-        script.raster("bbox_overlay", {}, [&]() {
-          const auto prevViewport = m_rendererBase.frameState().viewport;
-          const auto prevSurface = m_rendererBase.frameState().activeSurface;
-          auto guard = folly::makeGuard([&]() {
-            m_rendererBase.frameState().updateViewportData(prevViewport);
-            m_rendererBase.setActiveSurfaceWithLoadStore(prevSurface, Z3DRendererBase::Preserve);
-          });
-
-          m_rendererBase.setActiveSurfaceWithLoadStore(*transparentLease,
-                                                       LoadOp::Clear,
-                                                       StoreOp::Store,
-                                                       LoadOp::Clear,
-                                                       StoreOp::Store);
-          for (auto& att : m_rendererBase.frameState().activeSurface.colorAttachments) {
-            att.finalUse = AttachmentFinalUse::Sampled;
-          }
-          if (m_rendererBase.frameState().activeSurface.depthAttachment) {
-            m_rendererBase.frameState().activeSurface.depthAttachment->finalUse = AttachmentFinalUse::Sampled;
-          }
-
-          renderBoundBox(eye, Z3DBoundedFilter::BoundBoxRenderStyle::OverlayAlphaDepth);
-        });
+        m_transparentValid[eye] = true;
+      }
+      if (runTransparentPass) {
+        transparentPassComplete = true;
       }
 
       if (doSlices) {
-        const bool progressiveStep = (m_progressiveRendering && m_imgSliceRenderer.renderingStarted(eye));
-        if (!progressiveStep) {
-          prepareSliceInputs(eye, m_outputSize);
+        if (runSlicePass) {
+          slicesProgress = useProgressiveSlices ? m_imgSliceRenderer.progressiveProgress(eye) : 1.0;
         }
-
-        CHECK(opaqueLease != nullptr) << "ImgFilter Vulkan slice path missing opaque lease";
-        // Slice pipeline: renderer owns stage→target mapping and emits script nodes;
-        // Vulkan pipeline context records GPU work.
-        [[maybe_unused]] const auto segSlices =
-          m_imgSliceRenderer.recordVulkanStagesToScript(script, eye, *opaqueLease);
+        currentProgress += slicesProgress;
+        totalProgress += 1.0;
+        if (!useProgressiveSlices || slicesProgress >= 1.0) {
+          slicePassComplete = true;
+        }
+        m_opaqueValid[eye] = true;
       }
 
-      // Explicit flush so cancellation exceptions propagate (do not rely on destructor).
-      script.flush("imgfilter_done");
-    }
-    catch (const ZCancellationException&) {
-      if (doImage) {
-        m_imgRaycasterRenderer.resetProgress(eye);
-      }
-      if (doSlices) {
-        m_imgSliceRenderer.resetProgress(eye);
-      }
-      throw;
-    }
-    catch (const folly::OperationCancelled&) {
-      if (doImage) {
-        m_imgRaycasterRenderer.resetProgress(eye);
-      }
-      if (doSlices) {
-        m_imgSliceRenderer.resetProgress(eye);
-      }
-      throw;
-    }
+      emitPendingPagingWarning();
 
-    // After flush, progressive bookkeeping has been advanced by Vulkan backend
-    // finalization callbacks; compute progress now.
-    double currentProgress = 0.0;
-    double totalProgress = 0.0;
-    if (doImage) {
-      imageProgress = m_progressiveRendering ? m_imgRaycasterRenderer.progressiveProgress(eye) : 1.0;
-      currentProgress += imageProgress;
-      totalProgress += 1.0;
-
-      if (m_progressiveRendering && imageProgress >= 1.0) {
-        m_imgRaycasterRenderer.finalizePagingStatsIfDone(eye);
+      const double overallProgress = totalProgress > 0.0 ? currentProgress / totalProgress : 1.0;
+      if (!m_progressiveRendering && !blockCaptureToCompletion) {
+        CHECK(currentProgress == totalProgress) << currentProgress << " " << totalProgress;
       }
-      if (!m_progressiveRendering || imageProgress >= 1.0) {
-        m_imgRaycasterRenderer.releaseEntryExit();
-      }
-      m_transparentValid[eye] = true;
-    } else if (doBBoxOnly) {
-      m_transparentValid[eye] = true;
-    }
+      return overallProgress;
+    };
 
-    if (doSlices) {
-      slicesProgress = m_progressiveRendering ? m_imgSliceRenderer.progressiveProgress(eye) : 1.0;
-      currentProgress += slicesProgress;
-      totalProgress += 1.0;
-      m_opaqueValid[eye] = true;
-    }
+    double overallProgress = 0.0;
+    do {
+      const bool runTransparentPass = !transparentPassComplete || !imagePassComplete;
+      const bool runSlicePass = !slicePassComplete;
+      overallProgress = runOneVulkanPass(runTransparentPass, runSlicePass);
+    } while (blockCaptureToCompletion && overallProgress < 1.0);
 
-    emitPendingPagingWarning();
-
-    if (!m_progressiveRendering) {
-      CHECK(currentProgress == totalProgress) << currentProgress << " " << totalProgress;
-    }
-    return totalProgress > 0.0 ? currentProgress / totalProgress : 1.0;
+    return overallProgress;
   }
 
   // ---------------------------------------------------------------------------

@@ -140,6 +140,11 @@ public:
 
   void setDuration(double duration);
 
+  [[nodiscard]] const QString& lastLoadIssues() const
+  {
+    return m_lastLoadIssues;
+  }
+
   void setCurrentTime(double time) const;
 
   void cancelRenderingAndSetCurrentTime(double time) const;
@@ -233,7 +238,7 @@ protected:
   bool bind(std::vector<std::unique_ptr<ZParameterAnimation>>& paraAnimationList,
             const std::vector<ZParameter*>& paraList);
 
-  void readContent(const QString& fn, const QString& jsonKey);
+  void readContent(const QString& fn, const QString& jsonKey, bool showLoadIssuesDialog = true);
 
   void writeContent(const QString& fn, const QString& jsonKey);
 
@@ -295,6 +300,8 @@ protected:
   ZVideoEncoder* m_videoEncoder;
 
   std::shared_ptr<QTemporaryDir> m_tempDir;
+
+  QString m_lastLoadIssues;
 };
 
 } // namespace nim

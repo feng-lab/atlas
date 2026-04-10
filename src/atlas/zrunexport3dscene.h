@@ -6,6 +6,8 @@ class QString;
 
 namespace nim {
 
+class Z3DRenderingEngine;
+
 class ZRunExport3DScene : public QObject
 {
   Q_OBJECT
@@ -20,6 +22,7 @@ protected:
 
 private:
   bool m_hasError = false;
+  Z3DRenderingEngine* m_engine = nullptr;
 };
 
 } // namespace nim

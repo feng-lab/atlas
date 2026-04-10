@@ -17,7 +17,7 @@ public:
 
   void bindView(ZView* v);
 
-  void load(const QString& fn);
+  void load(const QString& fn, bool showLoadIssuesDialog = true);
 
   void save(const QString& fn);
 

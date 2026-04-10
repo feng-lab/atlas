@@ -122,7 +122,8 @@ void Z3DImgRaycasterRenderer::setData(Z3DImg& img)
   compile();
 }
 
-std::vector<ImgRaycasterPayload> Z3DImgRaycasterRenderer::buildVulkanStagePayloads(Z3DEye eye)
+std::vector<ImgRaycasterPayload> Z3DImgRaycasterRenderer::buildVulkanStagePayloads(Z3DEye eye,
+                                                                                   bool interactiveProgressivePaging)
 {
   std::vector<ImgRaycasterPayload> stages;
   if (m_rendererBase.activeBackend() != RenderBackend::Vulkan) {
@@ -161,6 +162,7 @@ std::vector<ImgRaycasterPayload> Z3DImgRaycasterRenderer::buildVulkanStagePayloa
   common.roundsRemaining = FLAGS_atlas_volume_rendering_maximum_round;
   common.channelIndexRaw = m_channelIdx[eye];
   common.roundIndexRaw = m_round[eye];
+  common.interactiveProgressivePaging = interactiveProgressivePaging;
 
   // Progressive init parity with GL: if starting progressive (channelIdx < 0), bump
   // generation so the Vulkan path clears/refreshes progressive targets.
@@ -426,7 +428,9 @@ std::vector<ImgRaycasterPayload> Z3DImgRaycasterRenderer::buildVulkanStagePayloa
       auto blockLease =
         pool.acquireBlockIdRenderTarget(m_outputSize, -1, -1.0, std::optional<RenderBackend>(RenderBackend::Vulkan));
       common.blockIdAttachmentCount = blockLease.attachments;
-      common.blockIdEffectiveAttachmentCount = FLAGS_atlas_volume_rendering_progressive_blockid_effective_attachments;
+      common.blockIdEffectiveAttachmentCount =
+        common.interactiveProgressivePaging ? FLAGS_atlas_volume_rendering_progressive_blockid_effective_attachments
+                                            : 0u;
       common.blockIdLease = std::make_shared<Z3DScratchResourcePool::RenderTargetLease>(std::move(blockLease));
 
       ImgRaycasterPayload blockId = common;
@@ -469,14 +473,15 @@ ZVulkanLinearScript::SegmentHandle
 Z3DImgRaycasterRenderer::recordVulkanStagesToScript(ZVulkanLinearScript& script,
                                                     Z3DEye eye,
                                                     Z3DScratchResourcePool::RenderTargetLease& outputLease,
-                                                    ZVulkanLinearScript::SegmentHandle deps)
+                                                    ZVulkanLinearScript::SegmentHandle deps,
+                                                    bool interactiveProgressivePaging)
 {
   if (m_rendererBase.activeBackend() != RenderBackend::Vulkan) {
     return deps;
   }
   CHECK(outputLease.hasVulkanImage()) << "Raycaster script recording requires a Vulkan output lease";
 
-  auto stages = buildVulkanStagePayloads(eye);
+  auto stages = buildVulkanStagePayloads(eye, interactiveProgressivePaging);
   if (stages.empty()) {
     return deps;
   }
@@ -854,7 +859,7 @@ void Z3DImgRaycasterRenderer::enqueueRenderBatches(Z3DEye eye, RenderBackend bac
     return;
   }
 
-  auto stages = buildVulkanStagePayloads(eye);
+  auto stages = buildVulkanStagePayloads(eye, /*interactiveProgressivePaging=*/true);
   if (stages.empty()) {
     return;
   }

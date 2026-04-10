@@ -34,6 +34,8 @@ Entry Points
     - `--run_export_3d_animation` exports a frame sequence / video from a `.animation3d`.
     - `--run_export_3d_scene` exports a single image from a `.scene` after applying `View3DGeneral` plus per-object
       `View3D` state and waiting for deferred object-view readiness to settle.
+    - Both runners treat the first export/rendering error as fatal in CLI mode: they log the error, cancel any active
+      capture work, and return a non-zero exit code so automation does not report a false success.
     - Both modes share the core output-path and size flags (`--filename`, `--output_filename`, `--output_width`,
       `--output_height`, `--overwrite`, `--limit_memory_usage_in_gb_to`) so benchmark scripts can swap between them
       without reshaping the command line.

@@ -128,9 +128,14 @@ int ZRunExport3DAnimation::run()
     int totalEndFrame = FLAGS_output_end_frame;
     if (totalEndFrame <= 0) {
       ZDoc doc;
+      doc.animation3DDoc().setShowLoadIssueDialogs(false);
       QString errorMsg;
       if (size_t id = doc.animation3DDoc().loadFile(filename, errorMsg); id == 0) {
         LOG(ERROR) << "load animation file error: " << errorMsg;
+        return 1;
+      } else if (const QString& loadIssues = doc.animation3DDoc().animation(id).lastLoadIssues();
+                 !loadIssues.isEmpty()) {
+        LOG(ERROR) << "load animation file error: " << loadIssues;
         return 1;
       } else {
         totalEndFrame =
@@ -227,6 +232,13 @@ int ZRunExport3DAnimation::run()
                                  poolStats.activeThreadCount,
                                  poolStats.idleThreadCount);
       }
+      try {
+        std::move(f).get();
+      }
+      catch (const std::exception& e) {
+        LOG(ERROR) << fmt::format("multi-GPU export failed: {}", e.what());
+        return 1;
+      }
 
       return 0;
     }
@@ -240,7 +252,13 @@ int ZRunExport3DAnimation::run()
 #endif
 
   ZDoc doc;
+  doc.animation3DDoc().setShowLoadIssueDialogs(false);
   Z3DRenderingEngine engine(doc);
+  m_engine = &engine;
+  auto resetEngineGuard = folly::makeGuard([this]() {
+    m_engine = nullptr;
+  });
+  connect(&engine, &Z3DRenderingEngine::renderingError, this, &ZRunExport3DAnimation::logError);
   engine.init();
 
   QString errorMsg;
@@ -249,10 +267,15 @@ int ZRunExport3DAnimation::run()
     LOG(ERROR) << "load animation file error: " << errorMsg;
     return 1;
   }
+  if (const QString& loadIssues = doc.animation3DDoc().animation(id).lastLoadIssues(); !loadIssues.isEmpty()) {
+    LOG(ERROR) << "load animation file error: " << loadIssues;
+    return 1;
+  }
 
   doc.animation3DDoc().bindView(&engine);
-
-  connect(&engine, &Z3DRenderingEngine::renderingError, this, &ZRunExport3DAnimation::logError);
+  if (m_hasError) {
+    return 1;
+  }
 
   engine.exportFixedSize3DAnimation(&doc.animation3DDoc().animation(id),
                                     outputFilename,
@@ -275,6 +298,10 @@ void ZRunExport3DAnimation::logError(const QString& err)
 {
   LOG(ERROR) << err;
   m_hasError = true;
+  if (m_engine != nullptr) {
+    m_engine->cancelCapture();
+    m_engine->cancelLongRendering();
+  }
 }
 
 } // namespace nim

@@ -1254,6 +1254,8 @@ For automation or cluster rendering:
    - `--limit_memory_usage_in_gb_to 12`
    - On Linux: `--use_gpu_devices 0,1 --__use_EGL`
 4. Monitor CLI logs for progress updates and errors while the export is running.
+5. Atlas exits non-zero if the export reports an error. In headless mode the first rendering/export error aborts the
+   export instead of continuing and returning success.
 
 ### 8.5 Headless 3D Scene Export
 
@@ -1277,6 +1279,7 @@ For reproducible still-image capture from saved workspaces:
 4. Atlas blocks until deferred `View3DGeneral` and per-object `View3D` scene settings finish applying, then captures
    the image file. There is no scene-apply timeout in this mode; the export does not proceed until the saved scene
    state is fully ready.
+5. Atlas exits non-zero if scene loading or image capture reports an error.
 
 ---
 
@@ -1384,7 +1387,8 @@ For reproducible still-image capture from saved workspaces:
    done
    ```
 3. **Check logs** after each run for errors.
-4. **Review outputs**: verify video files (or frame folders if using image sequence mode).
+4. **Check the process exit code** in your script or scheduler. Headless export returns a non-zero status on failure.
+5. **Review outputs**: verify video files (or frame folders if using image sequence mode).
 
 ---
 
@@ -1520,8 +1524,8 @@ Use **Help → Shortcuts** in either the 2D or 3D window to open this section di
 | Flag | Description |
 | --- | --- |
 | `--atlas_block_scene_3d_apply` | Block scene loading until 3D view settings finish applying. |
-| `--run_export_3d_animation` | Enter headless animation export mode; requires accompanying export flags. |
-| `--run_export_3d_scene` | Enter headless single-frame scene export mode; reuses the shared export filename/size flags. |
+| `--run_export_3d_animation` | Enter headless animation export mode; requires accompanying export flags and returns non-zero on export failure. |
+| `--run_export_3d_scene` | Enter headless single-frame scene export mode; reuses the shared export filename/size flags and returns non-zero on export failure. |
 | `--atlas_http_backend` | Select remote-dataset HTTP transport: `proxygen` or `curl`. |
 | `--atlas_http_ca_bundle` | Override the PEM CA bundle used for HTTPS remote-dataset requests. |
 | `--atlas_http_windows_trust_source` | On Windows, choose the default HTTPS trust source shared by both HTTP backends: `auto`, `windows_store`, or `bundled_pem`. |

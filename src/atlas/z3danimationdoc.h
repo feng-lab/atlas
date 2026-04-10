@@ -12,6 +12,11 @@ class Z3DAnimationDoc : public ZObjDoc
 public:
   explicit Z3DAnimationDoc(ZDoc& doc);
 
+  void setShowLoadIssueDialogs(bool v)
+  {
+    m_showLoadIssueDialogs = v;
+  }
+
   void bindView(Z3DRenderingEngine* v);
 
   void createNewAnimation(const QString& name = "");
@@ -235,6 +240,7 @@ private:
   QAction* m_loadAnimationsAction = nullptr;
 
   Z3DRenderingEngine* m_view = nullptr;
+  bool m_showLoadIssueDialogs = true;
 
   // Used to group multi-step edits (e.g. batch RPC) into a single undo command.
   int m_undoSuppressionDepth = 0;

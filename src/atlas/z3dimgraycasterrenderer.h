@@ -92,7 +92,8 @@ public:
   //
   // Note: This method may update progressive bookkeeping (generation counters,
   // stats sinks) as part of preparing the per-frame payloads.
-  [[nodiscard]] std::vector<ImgRaycasterPayload> buildVulkanStagePayloads(Z3DEye eye);
+  [[nodiscard]] std::vector<ImgRaycasterPayload> buildVulkanStagePayloads(Z3DEye eye,
+                                                                          bool interactiveProgressivePaging = true);
 
   // Vulkan-only helper: record the raycaster's stage payloads into a linear
   // script as fine-grained nodes. This centralizes the mapping from stages to
@@ -109,7 +110,8 @@ public:
   recordVulkanStagesToScript(ZVulkanLinearScript& script,
                              Z3DEye eye,
                              Z3DScratchResourcePool::RenderTargetLease& outputLease,
-                             ZVulkanLinearScript::SegmentHandle deps = {});
+                             ZVulkanLinearScript::SegmentHandle deps = {},
+                             bool interactiveProgressivePaging = true);
 
   // quad or entry_exit texture should be set before rendering
 

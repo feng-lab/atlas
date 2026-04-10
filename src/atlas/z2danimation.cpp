@@ -36,9 +36,9 @@ void Z2DAnimation::bindView(ZView* v)
   }
 }
 
-void Z2DAnimation::load(const QString& fn)
+void Z2DAnimation::load(const QString& fn, bool showLoadIssuesDialog)
 {
-  readContent(fn, "Animation2D");
+  readContent(fn, "Animation2D", showLoadIssuesDialog);
   m_viewportAnimation = m_globalParaAnimations[0].get();
   m_sliceAnimation = m_globalParaAnimations[1].get();
   m_timeAnimation = m_globalParaAnimations[2].get();

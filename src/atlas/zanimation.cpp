@@ -1179,9 +1179,10 @@ bool ZAnimation::bind(std::vector<std::unique_ptr<ZParameterAnimation>>& paraAni
   return changed;
 }
 
-void ZAnimation::readContent(const QString& fn, const QString& jsonKey)
+void ZAnimation::readContent(const QString& fn, const QString& jsonKey, bool showLoadIssuesDialog)
 {
   try {
+    m_lastLoadIssues.clear();
     ZBenchTimer bt(fmt::format("ZAnimation::readContent('{}')", jsonKey.toStdString()));
     auto loadObj = loadJsonObject(fn);
     bt.recordEvent("loadJsonObject");
@@ -1306,7 +1307,10 @@ void ZAnimation::readContent(const QString& fn, const QString& jsonKey)
     }
 
     if (!err.isEmpty()) {
-      showCriticalWithDetails(QApplication::activeWindow(), tr("Can not load animation %1").arg(fn), err);
+      m_lastLoadIssues = err;
+      if (showLoadIssuesDialog) {
+        showCriticalWithDetails(QApplication::activeWindow(), tr("Can not load animation %1").arg(fn), err);
+      }
       LOG(ERROR) << err;
     }
 
