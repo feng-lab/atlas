@@ -89,7 +89,7 @@ def _normalize_remote_dir(value: str) -> str:
 
 
 def sync_static_target(*, target: str, dry_run: bool, allow_partial: bool) -> None:
-    config = atlas_r2.get_r2_config()
+    config = atlas_r2.get_r2_config_for_target("primary")
     client = atlas_r2.create_s3_client(config)
     source_dir = _static_source_dir(target)
     manifest = _static_manifest(target)
@@ -203,8 +203,10 @@ def _iter_publishable_files(root: Path) -> list[Path]:
     return files
 
 
-def sync_folder(*, source_dir: Path, remote_dir: str, dry_run: bool) -> None:
-    config = atlas_r2.get_r2_config()
+def sync_folder(
+    *, source_dir: Path, remote_dir: str, dry_run: bool, r2_target: str
+) -> None:
+    config = atlas_r2.get_r2_config_for_target(r2_target)
     client = atlas_r2.create_s3_client(config)
     source_dir = source_dir.expanduser().resolve()
     if not source_dir.exists():
@@ -233,7 +235,13 @@ def sync_folder(*, source_dir: Path, remote_dir: str, dry_run: bool) -> None:
         dry_run=dry_run,
     )
 
-    logger.info("Syncing folder %s to s3://%s/%s", source_dir, config.bucket, prefix)
+    logger.info(
+        "Syncing folder %s to %s R2 bucket s3://%s/%s",
+        source_dir,
+        config.target,
+        config.bucket,
+        prefix,
+    )
     for local_path in files:
         rel = local_path.relative_to(source_dir).as_posix()
         object_key = atlas_r2.build_static_object_key(config, remote_dir, rel)
@@ -253,8 +261,9 @@ def sync_folder(*, source_dir: Path, remote_dir: str, dry_run: bool) -> None:
             unchanged += 1
 
     logger.info(
-        "Folder sync complete for %s -> s3://%s/%s: uploaded=%d unchanged=%d deleted=%d",
+        "Folder sync complete for %s -> %s R2 bucket s3://%s/%s: uploaded=%d unchanged=%d deleted=%d",
         source_dir,
+        config.target,
         config.bucket,
         prefix,
         uploaded,
@@ -263,8 +272,8 @@ def sync_folder(*, source_dir: Path, remote_dir: str, dry_run: bool) -> None:
     )
 
 
-def publish_ifw(*, os_name: str, dry_run: bool) -> None:
-    config = atlas_r2.get_r2_config()
+def _publish_ifw_to_r2_target(*, os_name: str, dry_run: bool, r2_target: str) -> None:
+    config = atlas_r2.get_r2_config_for_target(r2_target)
     client = atlas_r2.create_s3_client(config)
     deploy_dir = Path(common_dirs.deploy_target_dir())
     repo_dir = deploy_dir / os_name
@@ -282,7 +291,12 @@ def publish_ifw(*, os_name: str, dry_run: bool) -> None:
     non_updates = [path for path in files if path.name != "Updates.xml"]
     updates = [path for path in files if path.name == "Updates.xml"]
 
-    logger.info("Publishing IFW repository for %s from %s", os_name, repo_dir)
+    logger.info(
+        "Publishing IFW repository for %s to %s R2 bucket from %s",
+        os_name,
+        config.target,
+        repo_dir,
+    )
     for local_path in non_updates + updates:
         rel = local_path.relative_to(repo_dir).as_posix()
         checksum = download_utils.calculate_checksum(str(local_path))
@@ -365,12 +379,22 @@ def publish_ifw(*, os_name: str, dry_run: bool) -> None:
             unchanged += 1
 
     logger.info(
-        "IFW publish for %s complete: uploaded=%d unchanged=%d deleted=%d",
+        "IFW publish for %s to %s R2 bucket complete: uploaded=%d unchanged=%d deleted=%d",
         os_name,
+        config.target,
         uploaded,
         unchanged,
         deleted,
     )
+
+
+def publish_ifw(*, os_name: str, dry_run: bool) -> None:
+    for r2_target in atlas_r2.target_choices():
+        _publish_ifw_to_r2_target(
+            os_name=os_name,
+            dry_run=dry_run,
+            r2_target=r2_target,
+        )
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -414,6 +438,12 @@ def _build_parser() -> argparse.ArgumentParser:
         "--dry-run",
         action="store_true",
         help="Log planned uploads/deletes without changing R2.",
+    )
+    sync_folder_parser.add_argument(
+        "--r2-target",
+        choices=atlas_r2.target_choices(),
+        default="primary",
+        help="R2 bucket target to sync to. Defaults to primary.",
     )
 
     publish_ifw_parser = subparsers.add_parser(
@@ -467,6 +497,7 @@ def main() -> None:
             source_dir=Path(args.source_dir),
             remote_dir=args.remote_dir,
             dry_run=args.dry_run,
+            r2_target=args.r2_target,
         )
         return
 

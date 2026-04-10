@@ -39,7 +39,9 @@ _NOTARY_API_KEY_ID_ENV_VAR = "MACOS_NOTARYTOOL_API_KEY_ID"
 _NOTARY_API_ISSUER_ID_ENV_VAR = "MACOS_NOTARYTOOL_API_ISSUER_ID"
 _PRODUCT_URL_ENV_VAR = "ATLAS_PRODUCT_URL"
 _IFW_REPO_PRIMARY_BASE_URL_ENV_VAR = "ATLAS_IFW_REPO_PRIMARY_BASE_URL"
+_IFW_REPO_SECONDARY_BASE_URL_ENV_VAR = "ATLAS_IFW_REPO_SECONDARY_BASE_URL"
 _IFW_REPO_BACKUP_BASE_URL_ENV_VAR = "ATLAS_IFW_REPO_BACKUP_BASE_URL"
+_IFW_EXPECTED_REPOSITORY_COUNT = 3
 
 # Only import the deployment-related variables from dotenv files to avoid surprising
 # side effects (e.g. altering subprocess behavior via unrelated env vars).
@@ -53,6 +55,7 @@ _DOTENV_KEYS: frozenset[str] = frozenset(
         _NOTARY_API_ISSUER_ID_ENV_VAR,
         _PRODUCT_URL_ENV_VAR,
         _IFW_REPO_PRIMARY_BASE_URL_ENV_VAR,
+        _IFW_REPO_SECONDARY_BASE_URL_ENV_VAR,
         _IFW_REPO_BACKUP_BASE_URL_ENV_VAR,
     }
 )
@@ -387,6 +390,7 @@ def _render_ifw_config_for_suffix(suffix: str) -> str:
 
     product_url = _required_url_env_var(_PRODUCT_URL_ENV_VAR)
     primary_repo_base = _required_url_env_var(_IFW_REPO_PRIMARY_BASE_URL_ENV_VAR)
+    secondary_repo_base = _required_url_env_var(_IFW_REPO_SECONDARY_BASE_URL_ENV_VAR)
     backup_repo_base = _optional_url_env_var(_IFW_REPO_BACKUP_BASE_URL_ENV_VAR)
 
     _required_child(root, "ProductUrl", context=template_path).text = product_url
@@ -395,13 +399,15 @@ def _render_ifw_config_for_suffix(suffix: str) -> str:
         root, "RemoteRepositories", context=template_path
     )
     repositories = remote_repositories.findall("Repository")
-    if len(repositories) != 2:
+    if len(repositories) != _IFW_EXPECTED_REPOSITORY_COUNT:
         raise RuntimeError(
-            f"Expected exactly 2 <Repository> entries in {template_path}, found {len(repositories)}"
+            "Expected exactly "
+            f"{_IFW_EXPECTED_REPOSITORY_COUNT} <Repository> entries in {template_path}, "
+            f"found {len(repositories)}"
         )
 
     primary_url = _join_url_path(primary_repo_base, suffix)
-    backup_enabled = backup_repo_base is not None
+    secondary_url = _join_url_path(secondary_repo_base, suffix)
     backup_url = (
         _join_url_path(backup_repo_base, suffix) if backup_repo_base else primary_url
     )
@@ -409,10 +415,11 @@ def _render_ifw_config_for_suffix(suffix: str) -> str:
     _required_child(repositories[0], "Url", context=template_path).text = primary_url
     _required_child(repositories[0], "Enabled", context=template_path).text = "1"
 
-    _required_child(repositories[1], "Url", context=template_path).text = backup_url
-    _required_child(repositories[1], "Enabled", context=template_path).text = (
-        "1" if backup_enabled else "0"
-    )
+    _required_child(repositories[1], "Url", context=template_path).text = secondary_url
+    _required_child(repositories[1], "Enabled", context=template_path).text = "1"
+
+    _required_child(repositories[2], "Url", context=template_path).text = backup_url
+    _required_child(repositories[2], "Enabled", context=template_path).text = "0"
 
     generated_dir = os.path.join(common_dirs.deploy_target_dir(), "generated", "config")
     os.makedirs(generated_dir, exist_ok=True)

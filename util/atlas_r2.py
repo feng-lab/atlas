@@ -21,12 +21,18 @@ except ImportError as e:
 
 logger = logging.getLogger(__name__)
 
-_BUCKET_ENV_VAR: Final[str] = "ATLAS_R2_BUCKET"
-_ENDPOINT_ENV_VAR: Final[str] = "ATLAS_R2_S3_ENDPOINT"
-_ACCESS_KEY_ID_ENV_VAR: Final[str] = "ATLAS_R2_ACCESS_KEY_ID"
-_SECRET_ACCESS_KEY_ENV_VAR: Final[str] = "ATLAS_R2_SECRET_ACCESS_KEY"
-_REGION_ENV_VAR: Final[str] = "ATLAS_R2_REGION"
-_STATIC_PREFIX_ENV_VAR: Final[str] = "ATLAS_R2_STATIC_PREFIX"
+_R2_TARGET_PRIMARY: Final[str] = "primary"
+_R2_TARGET_SECONDARY: Final[str] = "secondary"
+_R2_TARGETS: Final[frozenset[str]] = frozenset(
+    {_R2_TARGET_PRIMARY, _R2_TARGET_SECONDARY}
+)
+
+_BUCKET_ENV_VAR_BASE: Final[str] = "ATLAS_R2_BUCKET"
+_ENDPOINT_ENV_VAR_BASE: Final[str] = "ATLAS_R2_S3_ENDPOINT"
+_ACCESS_KEY_ID_ENV_VAR_BASE: Final[str] = "ATLAS_R2_ACCESS_KEY_ID"
+_SECRET_ACCESS_KEY_ENV_VAR_BASE: Final[str] = "ATLAS_R2_SECRET_ACCESS_KEY"
+_REGION_ENV_VAR_BASE: Final[str] = "ATLAS_R2_REGION"
+_STATIC_PREFIX_ENV_VAR_BASE: Final[str] = "ATLAS_R2_STATIC_PREFIX"
 
 _DEFAULT_REGION: Final[str] = "auto"
 _DEFAULT_STATIC_PREFIX: Final[str] = "static"
@@ -65,20 +71,43 @@ _RETRYABLE_HTTP_STATUS_CODES: Final[frozenset[int]] = frozenset(
     {429, 500, 502, 503, 504}
 )
 
+
+def _normalize_target(target: str) -> str:
+    target_norm = str(target).strip().lower()
+    if target_norm not in _R2_TARGETS:
+        choices = ", ".join(sorted(_R2_TARGETS))
+        raise ValueError(
+            f"Unsupported R2 target {target!r}. Expected one of: {choices}"
+        )
+    return target_norm
+
+
+def _target_env_var(base_name: str, *, target: str) -> str:
+    return f"{base_name}_{_normalize_target(target).upper()}"
+
+
 _DOTENV_KEYS: Final[frozenset[str]] = frozenset(
-    {
-        _BUCKET_ENV_VAR,
-        _ENDPOINT_ENV_VAR,
-        _ACCESS_KEY_ID_ENV_VAR,
-        _SECRET_ACCESS_KEY_ENV_VAR,
-        _REGION_ENV_VAR,
-        _STATIC_PREFIX_ENV_VAR,
+    {_target_env_var(_BUCKET_ENV_VAR_BASE, target=target) for target in _R2_TARGETS}
+    | {_target_env_var(_ENDPOINT_ENV_VAR_BASE, target=target) for target in _R2_TARGETS}
+    | {
+        _target_env_var(_ACCESS_KEY_ID_ENV_VAR_BASE, target=target)
+        for target in _R2_TARGETS
+    }
+    | {
+        _target_env_var(_SECRET_ACCESS_KEY_ENV_VAR_BASE, target=target)
+        for target in _R2_TARGETS
+    }
+    | {_target_env_var(_REGION_ENV_VAR_BASE, target=target) for target in _R2_TARGETS}
+    | {
+        _target_env_var(_STATIC_PREFIX_ENV_VAR_BASE, target=target)
+        for target in _R2_TARGETS
     }
 )
 
 
 @dataclass(frozen=True)
 class R2Config:
+    target: str
     bucket: str
     endpoint_url: str
     access_key_id: str
@@ -107,19 +136,35 @@ def load_r2_env_from_dotenv() -> None:
 
 
 def get_r2_config() -> R2Config:
+    return get_r2_config_for_target(_R2_TARGET_PRIMARY)
+
+
+def get_r2_config_for_target(target: str) -> R2Config:
+    target_norm = _normalize_target(target)
     load_r2_env_from_dotenv()
     return R2Config(
-        bucket=_required_env(_BUCKET_ENV_VAR),
+        target=target_norm,
+        bucket=_required_env(_target_env_var(_BUCKET_ENV_VAR_BASE, target=target_norm)),
         endpoint_url=_normalize_endpoint(
-            _required_env(_ENDPOINT_ENV_VAR), env_var=_ENDPOINT_ENV_VAR
+            _required_env(_target_env_var(_ENDPOINT_ENV_VAR_BASE, target=target_norm)),
+            env_var=_target_env_var(_ENDPOINT_ENV_VAR_BASE, target=target_norm),
         ),
-        access_key_id=_required_env(_ACCESS_KEY_ID_ENV_VAR),
-        secret_access_key=_required_env(_SECRET_ACCESS_KEY_ENV_VAR),
-        region=os.environ.get(_REGION_ENV_VAR, _DEFAULT_REGION).strip()
+        access_key_id=_required_env(
+            _target_env_var(_ACCESS_KEY_ID_ENV_VAR_BASE, target=target_norm)
+        ),
+        secret_access_key=_required_env(
+            _target_env_var(_SECRET_ACCESS_KEY_ENV_VAR_BASE, target=target_norm)
+        ),
+        region=os.environ.get(
+            _target_env_var(_REGION_ENV_VAR_BASE, target=target_norm), _DEFAULT_REGION
+        ).strip()
         or _DEFAULT_REGION,
         static_prefix=_normalize_path_prefix(
-            os.environ.get(_STATIC_PREFIX_ENV_VAR, _DEFAULT_STATIC_PREFIX),
-            env_var=_STATIC_PREFIX_ENV_VAR,
+            os.environ.get(
+                _target_env_var(_STATIC_PREFIX_ENV_VAR_BASE, target=target_norm),
+                _DEFAULT_STATIC_PREFIX,
+            ),
+            env_var=_target_env_var(_STATIC_PREFIX_ENV_VAR_BASE, target=target_norm),
         ),
     )
 
@@ -290,6 +335,14 @@ def delete_objects_not_in_set(
         if key not in expected
     ]
     return delete_objects(client, bucket=bucket, keys=to_delete, dry_run=dry_run)
+
+
+def normalize_target(target: str) -> str:
+    return _normalize_target(target)
+
+
+def target_choices() -> tuple[str, ...]:
+    return (_R2_TARGET_PRIMARY, _R2_TARGET_SECONDARY)
 
 
 def _required_env(name: str) -> str:

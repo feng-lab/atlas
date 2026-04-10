@@ -129,7 +129,7 @@ def is_correct_platform(filename):
 @retry_with_backoff()
 def download_file_with_resume(
     url,
-    backup_url,
+    fallback_url,
     target_path,
     expected_size=None,
     expected_sha256=None,
@@ -195,7 +195,7 @@ def download_file_with_resume(
     else:
         proxy_options = [(no_proxy, "")]
 
-    urls = [u for u in (url, backup_url, url, backup_url) if u]
+    urls = [u for u in (url, fallback_url, url, fallback_url) if u]
     for current_url in urls:
         for current_proxies, proxy_label in proxy_options:
             try:
@@ -425,7 +425,7 @@ def sync_files(
 
         success = download_file_with_resume(
             file_info["url"],
-            file_info["backup_url"],
+            file_info["fallback_url"],
             target_path,
             file_info["expected_size"],
             file_info["expected_sha256"],

@@ -30,7 +30,9 @@ def missing_schema_files(out_dir: Path) -> list[str]:
     return [name for name in _REQUIRED_SCHEMA_FILES if not (out_dir / name).exists()]
 
 
-def dump_schema_with_atlas(*, atlas_dir: Path, out_dir: Path) -> subprocess.CompletedProcess[bytes]:
+def dump_schema_with_atlas(
+    *, atlas_dir: Path, out_dir: Path
+) -> subprocess.CompletedProcess[bytes]:
     atlas_bin = atlas_binary_from_atlas_dir(atlas_dir)
     args: list[str] = [
         str(atlas_bin),
@@ -43,7 +45,7 @@ def dump_schema_with_atlas(*, atlas_dir: Path, out_dir: Path) -> subprocess.Comp
     return subprocess.run(args, check=False)
 
 
-def _download_json_file(*, url: str, backup_url: str, out_path: Path) -> None:
+def _download_json_file(*, url: str, fallback_url: str, out_path: Path) -> None:
     out_path.parent.mkdir(parents=True, exist_ok=True)
     tmp_path: Path | None = None
     try:
@@ -54,7 +56,7 @@ def _download_json_file(*, url: str, backup_url: str, out_path: Path) -> None:
 
         ok = download_utils.download_file_with_resume(
             url,
-            backup_url,
+            fallback_url,
             str(tmp_path),
             expected_size=None,
             expected_sha256=None,
@@ -74,7 +76,7 @@ def _download_json_file(*, url: str, backup_url: str, out_path: Path) -> None:
 
 
 def _download_missing_schema_files(*, out_dir: Path, missing: list[str]) -> None:
-    primary_host, backup_host = atlas_file_hosts.get_file_hosts()
+    primary_host, secondary_host = atlas_file_hosts.get_primary_and_secondary_hosts()
     for name in missing:
         _download_json_file(
             url=atlas_file_hosts.static_file_url(
@@ -82,8 +84,8 @@ def _download_missing_schema_files(*, out_dir: Path, missing: list[str]) -> None
                 static_subdir="installers",
                 relative_path=name,
             ),
-            backup_url=atlas_file_hosts.static_file_url(
-                host=backup_host,
+            fallback_url=atlas_file_hosts.static_file_url(
+                host=secondary_host,
                 static_subdir="installers",
                 relative_path=name,
             ),
