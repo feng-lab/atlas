@@ -510,14 +510,11 @@ def _is_valid_intel_sw_dir(candidate: str) -> bool:
 
 
 def intel_sw_dir() -> str:
-    candidates = installed_intel_sw_dir_candidates()
+    bundled_dir = os.path.join(ext_build_dir(), "oneapi")
+    candidates = [bundled_dir, *installed_intel_sw_dir_candidates()]
     for candidate in candidates:
         if _is_valid_intel_sw_dir(candidate):
             return candidate
-
-    bundled_dir = os.path.join(ext_build_dir(), "oneapi")
-    if _is_valid_intel_sw_dir(bundled_dir):
-        return bundled_dir
 
     package_patterns = []
     if is_mac():
@@ -525,7 +522,7 @@ def intel_sw_dir() -> str:
     elif is_windows():
         package_patterns = ["oneapi-mkl-*-windows-x64.7z"]
 
-    tried = candidates + [bundled_dir]
+    tried = list(candidates)
     last_exc = None
     for package_pattern in package_patterns:
         tried.append(os.path.join(src_package_dir(), package_pattern))
