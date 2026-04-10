@@ -159,6 +159,12 @@ void Z3DTexture::setWrap(GLint wrap) const
   glTexParameteri(m_textureTarget, GL_TEXTURE_WRAP_R, wrap);
 }
 
+void Z3DTexture::setBorderColor(const glm::vec4& color) const
+{
+  ScopedTextureBinding guard(m_textureTarget, m_id);
+  glTexParameterfv(m_textureTarget, GL_TEXTURE_BORDER_COLOR, &color[0]);
+}
+
 void Z3DTexture::generateMipmap() const
 {
   ScopedTextureBinding guard(m_textureTarget, m_id);

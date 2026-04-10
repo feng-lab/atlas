@@ -38,7 +38,7 @@ vec4 compositeDVR(in vec4 curResult, in vec4 color, in float currentRayLength, i
   vec4 result = vec4(0.0);
 
   result.a = curResult.a + (1.0 -curResult.a) * color.a;
-  result.rgb = (curResult.rgb * curResult.a + (1.0 - curResult.a) * color.a * color.rgb) / result.a;
+  result.rgb = (curResult.rgb * curResult.a + (1.0 - curResult.a) * color.a * color.rgb) / max(result.a, 1e-6);
 
   return result;
 }

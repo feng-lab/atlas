@@ -37,6 +37,8 @@ public:
   // note: openGL default is GL_REPEAT
   void setWrap(GLint wrap = GLint(GL_CLAMP_TO_EDGE)) const;
 
+  void setBorderColor(const glm::vec4& color) const;
+
   //
   void generateMipmap() const;
 

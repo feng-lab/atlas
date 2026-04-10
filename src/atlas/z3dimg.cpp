@@ -86,7 +86,16 @@ std::unique_ptr<Z3DTexture> createChannelTexture(const ZImg& image)
     return nullptr;
   }
 
-  return std::make_unique<Z3DTexture>(internalFormat, dimensions, format, dataType, image.channelData(0));
+  // Volume previews should clamp to the dataset edge rather than sample beyond the
+  // texture domain, which avoids driver-dependent edge interpolation artifacts.
+  return std::make_unique<Z3DTexture>(internalFormat,
+                                      dimensions,
+                                      format,
+                                      dataType,
+                                      image.channelData(0),
+                                      GLint(GL_LINEAR),
+                                      GLint(GL_LINEAR),
+                                      GLint(GL_CLAMP_TO_EDGE));
 }
 
 std::array<size_t, 3> bestRatioAtMost(const std::vector<std::array<size_t, 3>>& candidates,
@@ -2110,6 +2119,7 @@ void Z3DImg::ensureGLPagingTexturesForChannel(size_t c)
                                                                   GLint(GL_LINEAR),
                                                                   GLint(GL_LINEAR),
                                                                   GLint(GL_CLAMP_TO_BORDER));
+    m_channelImageCacheTextures[c]->setBorderColor(glm::vec4(0.0f));
     m_channelImageCacheTextures[c]->clearImage();
   }
 
@@ -2212,6 +2222,7 @@ void Z3DImg::rebuildGLPagingResources()
                                                                   GLint(GL_LINEAR),
                                                                   GLint(GL_LINEAR),
                                                                   GLint(GL_CLAMP_TO_BORDER));
+    m_channelImageCacheTextures[c]->setBorderColor(glm::vec4(0.0f));
     m_channelImageCacheTextures[c]->clearImage();
     m_glPagingTexturesDirty[c] = 0u;
   }

@@ -56,7 +56,10 @@ vec4 computeColorFromLight(const in vec3 normalDirection, const in int lightIdx,
       }
       else
       {
-        attenuation = attenuation * pow(clampedCosine, lights_spotExponent[lightIdx]);
+        // Avoid undefined pow(0, 0) which can produce NaNs on some drivers.
+        if (lights_spotExponent[lightIdx] > 0.0) {
+          attenuation = attenuation * pow(clampedCosine, lights_spotExponent[lightIdx]);
+        }
       }
     }
   }
@@ -67,7 +70,10 @@ vec4 computeColorFromLight(const in vec3 normalDirection, const in int lightIdx,
     retVal += attenuation * lights_diffuse[lightIdx] * NdotL * color;
     vec3 cameraDirection = normalize(-position);
     float NdotH = max(dot(reflect(-lightDirection,normalDirection), cameraDirection), 0.0);
-    retVal += attenuation * lights_specular[lightIdx] * materialSpecular * pow(NdotH, materialShininess);
+    // Avoid undefined pow(0, 0) which can produce NaNs on some drivers.
+    if (materialShininess > 0.0) {
+      retVal += attenuation * lights_specular[lightIdx] * materialSpecular * pow(NdotH, materialShininess);
+    }
   }
   return retVal;
 }
