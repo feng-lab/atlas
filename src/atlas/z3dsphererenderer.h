@@ -53,6 +53,13 @@ protected:
 
   [[nodiscard]] SpherePayload buildSpherePayload() const;
   [[nodiscard]] RenderBatch buildRenderBatch(Z3DEye eye, bool picking) const;
+  [[nodiscard]] SpherePayload
+  buildSpherePayload(size_t instanceStart, size_t instanceCount, uint32_t streamSegmentOrdinal) const;
+  [[nodiscard]] RenderBatch buildRenderBatch(Z3DEye eye,
+                                             bool picking,
+                                             size_t instanceStart,
+                                             size_t instanceCount,
+                                             uint32_t streamSegmentOrdinal) const;
 
   void enqueueRenderBatches(Z3DEye eye, RenderBackend backend, bool picking) override;
 
@@ -85,7 +92,6 @@ private:
   std::vector<std::unique_ptr<Z3DVertexBufferObject>> m_pickingVBOs;
   bool m_dataChanged;
   bool m_pickingDataChanged;
-  size_t m_oneBatchNumber;
 
   // Generation counters for Vulkan selective restaging
   uint32_t m_centersGen = 0;

@@ -100,9 +100,32 @@ protected:
   void enqueueRenderBatches(Z3DEye eye, RenderBackend backend, bool picking) override;
 
 private:
-  // Rebuilds the mesh pointer list, splitting oversized meshes while keeping
-  // payload spans referencing renderer-owned storage.
-  void prepareMesh();
+  struct MeshBatchSegment
+  {
+    size_t meshStart = 0;
+    size_t meshCount = 0;
+    uint32_t streamSegmentOrdinal = 0;
+  };
+
+  struct MeshSegmentationPlan
+  {
+    bool valid = false;
+    RenderBackend backend = RenderBackend::OpenGL;
+    size_t maxMonolithicGeometryStreamBytes = std::numeric_limits<size_t>::max();
+    MeshColorSource colorSource = MeshColorSource::MeshColor;
+    bool anyMeshSplit = false;
+    std::vector<ZMesh> ownedSplitMeshes;
+    std::vector<ZMesh*> activeMeshPtrs;
+    std::vector<size_t> activeMeshSourceIndices;
+    std::vector<MeshBatchSegment> batchSegments;
+  };
+
+  void invalidateMeshSegmentationPlan();
+  void ensureMeshSegmentationPlan(RenderBackend backend);
+  void prepareMeshTransforms();
+  [[nodiscard]] size_t maxMonolithicGeometryStreamBytesForBackend(RenderBackend backend) const;
+  [[nodiscard]] size_t textureStreamBytesForVertexCount(size_t vertexCount) const;
+  [[nodiscard]] bool rangeFitsMonolithicStreamLimit(size_t vertexCount, size_t indexCount, size_t maxStreamBytes) const;
 
   // Material/picking color helpers populate the lazily-evaluated span pointers
   // used by MeshPayload. They never allocate unless splitting requires it.
@@ -115,6 +138,9 @@ private:
   // spans they expose.
   [[nodiscard]] MeshPayload buildMeshPayload() const;
   [[nodiscard]] RenderBatch buildRenderBatch(Z3DEye eye, bool picking) const;
+  [[nodiscard]] MeshPayload buildMeshPayload(size_t meshStart, size_t meshCount, uint32_t streamSegmentOrdinal) const;
+  [[nodiscard]] RenderBatch
+  buildRenderBatch(Z3DEye eye, bool picking, size_t meshStart, size_t meshCount, uint32_t streamSegmentOrdinal) const;
 
 protected:
   void createResources(RenderBackend backend) override;
@@ -136,14 +162,11 @@ protected:
   SampledImageHandle m_textureHandle{};
 
 private:
-  std::vector<ZMesh> m_splitMeshes;
-  std::vector<ZMesh*> m_splitMeshesWrapper;
   std::vector<glm::vec4> m_splitMeshesColors;
   std::vector<glm::vec4> m_splitMeshesPickingColors;
   std::vector<glm::mat4> m_splitMeshesPosTransforms;
   std::vector<glm::mat3> m_splitMeshesPosTransformNormalMatrices;
-  bool m_meshNeedSplit = false;
-  std::vector<size_t> m_splitCount;
+  MeshSegmentationPlan m_segmentationPlan;
   bool m_meshColorReady;
   bool m_meshPickingColorReady;
 

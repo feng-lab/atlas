@@ -168,6 +168,36 @@ const std::vector<ZFlagSettingSpec>& atlasFlagSettingSpecs()
                                 ZFlagSettingEditorKind::Auto,
                                 {},
                                 true));
+    allSpecs.push_back(makeSpec("atlas_mesh_preferred_triangle_budget_per_segment",
+                                "Rendering",
+                                "Mesh preferred triangles per segment",
+                                ZFlagSettingEditorKind::Auto,
+                                {},
+                                true));
+    allSpecs.push_back(makeSpec("atlas_sphere_preferred_instance_budget_per_segment",
+                                "Rendering",
+                                "Sphere preferred instances per segment",
+                                ZFlagSettingEditorKind::Auto,
+                                {},
+                                true));
+    allSpecs.push_back(makeSpec("atlas_cone_preferred_instance_budget_per_segment",
+                                "Rendering",
+                                "Cone preferred instances per segment",
+                                ZFlagSettingEditorKind::Auto,
+                                {},
+                                true));
+    allSpecs.push_back(makeSpec("atlas_ellipsoid_preferred_instance_budget_per_segment",
+                                "Rendering",
+                                "Ellipsoid preferred instances per segment",
+                                ZFlagSettingEditorKind::Auto,
+                                {},
+                                true));
+    allSpecs.push_back(makeSpec("atlas_line_preferred_segment_budget_per_segment",
+                                "Rendering",
+                                "Line preferred logical segments per segment",
+                                ZFlagSettingEditorKind::Auto,
+                                {},
+                                true));
 
     allSpecs.push_back(makeSpec("atlas_log_folly_global_executor_status_interval_in_seconds",
                                 "Logging & Debugging",

@@ -58,10 +58,16 @@ bool clipPlanesEqual(const ClipPlanesState& a, const ClipPlanesState& b)
   return true;
 }
 
+size_t staticSliceBytes(const Z3DRendererVulkanBackend::StaticSlice& slice)
+{
+  return slice ? slice.size : 0u;
+}
+
 } // namespace
 
 ZVulkanSpherePipelineContext::ZVulkanSpherePipelineContext(Z3DRendererVulkanBackend& backend)
   : m_backend(backend)
+  , m_streamUsageTracker(Z3DRendererVulkanBackend::StaticCacheOwner::Sphere)
 {}
 
 ZVulkanSpherePipelineContext::~ZVulkanSpherePipelineContext() = default;
@@ -100,10 +106,8 @@ void ZVulkanSpherePipelineContext::resetFrame()
   // uniform arena; keep them across submissions to stabilize dynamic offsets.
   m_ddpArgsPrepared = false;
   m_ddpArgsOffset = 0;
-  m_geometryStaticCopyPendingKeys.clear();
-  m_appearanceStaticCopyPendingKeys.clear();
-  m_geometryStaticCopyPendingUploads.clear();
-  m_appearanceStaticCopyPendingUploads.clear();
+  m_geometryStreamCache.resetFrame();
+  m_appearanceStreamCache.resetFrame();
 }
 
 void ZVulkanSpherePipelineContext::evictStream(uint64_t streamKey)
@@ -112,60 +116,17 @@ void ZVulkanSpherePipelineContext::evictStream(uint64_t streamKey)
     return;
   }
 
-  for (auto it = m_geometryStaticCopyPendingKeys.begin(); it != m_geometryStaticCopyPendingKeys.end();) {
-    if (it->streamKey == streamKey) {
-      it = m_geometryStaticCopyPendingKeys.erase(it);
-    } else {
-      ++it;
-    }
-  }
+  m_streamUsageTracker.eraseStream(streamKey);
 
-  for (auto it = m_appearanceStaticCopyPendingKeys.begin(); it != m_appearanceStaticCopyPendingKeys.end();) {
-    if (it->streamKey == streamKey) {
-      it = m_appearanceStaticCopyPendingKeys.erase(it);
-    } else {
-      ++it;
-    }
-  }
-
-  for (auto it = m_geometryStaticCopyPendingUploads.begin(); it != m_geometryStaticCopyPendingUploads.end();) {
-    if (it->first.streamKey == streamKey) {
-      it = m_geometryStaticCopyPendingUploads.erase(it);
-    } else {
-      ++it;
-    }
-  }
-
-  for (auto it = m_appearanceStaticCopyPendingUploads.begin(); it != m_appearanceStaticCopyPendingUploads.end();) {
-    if (it->first.streamKey == streamKey) {
-      it = m_appearanceStaticCopyPendingUploads.erase(it);
-    } else {
-      ++it;
-    }
-  }
-
-  for (auto it = m_staticGeometryCache.begin(); it != m_staticGeometryCache.end();) {
-    if (it->first.streamKey != streamKey) {
-      ++it;
-      continue;
-    }
-    auto& entry = it->second;
+  m_geometryStreamCache.evictStream(streamKey, [this](GeometryCacheEntry& entry) {
     m_backend.releaseStaticSlice(entry.vbCenterRadius);
     m_backend.releaseStaticSlice(entry.vbFlags);
     m_backend.releaseStaticSlice(entry.ib);
-    it = m_staticGeometryCache.erase(it);
-  }
-
-  for (auto it = m_staticAppearanceCache.begin(); it != m_staticAppearanceCache.end();) {
-    if (it->first.streamKey != streamKey) {
-      ++it;
-      continue;
-    }
-    auto& entry = it->second;
+  });
+  m_appearanceStreamCache.evictStream(streamKey, [this](AppearanceCacheEntry& entry) {
     m_backend.releaseStaticSlice(entry.vbColor);
     m_backend.releaseStaticSlice(entry.vbSpecular);
-    it = m_staticAppearanceCache.erase(it);
-  }
+  });
 
   for (auto it = m_secondaryCache.begin(); it != m_secondaryCache.end();) {
     if (it->first.streamKey == streamKey) {
@@ -179,6 +140,54 @@ void ZVulkanSpherePipelineContext::evictStream(uint64_t streamKey)
     (void)frameKey;
     cache.byStream.erase(streamKey);
   }
+}
+
+void ZVulkanSpherePipelineContext::touchStaticStream(uint64_t streamKey)
+{
+  m_streamUsageTracker.touch(streamKey, m_backend.currentStaticCacheEpoch());
+}
+
+size_t ZVulkanSpherePipelineContext::staticBytesForStream(uint64_t streamKey,
+                                                          Z3DRendererVulkanBackend::StaticPressureDomain domain) const
+{
+  return m_geometryStreamCache.staticBytesForStream(
+           streamKey,
+           domain,
+           [](const GeometryCacheEntry& entry, Z3DRendererVulkanBackend::StaticPressureDomain cacheDomain) {
+             if (cacheDomain == Z3DRendererVulkanBackend::StaticPressureDomain::Vertex) {
+               return staticSliceBytes(entry.vbCenterRadius) + staticSliceBytes(entry.vbFlags);
+             }
+             return staticSliceBytes(entry.ib);
+           }) +
+         m_appearanceStreamCache.staticBytesForStream(
+           streamKey,
+           domain,
+           [](const AppearanceCacheEntry& entry, Z3DRendererVulkanBackend::StaticPressureDomain cacheDomain) {
+             if (cacheDomain == Z3DRendererVulkanBackend::StaticPressureDomain::Vertex) {
+               return staticSliceBytes(entry.vbColor) + staticSliceBytes(entry.vbSpecular);
+             }
+             return size_t{0};
+           });
+}
+
+std::optional<Z3DRendererVulkanBackend::StaticPressureEvictionCandidate>
+ZVulkanSpherePipelineContext::oldestEvictableStaticStream(Z3DRendererVulkanBackend::StaticPressureDomain domain,
+                                                          uint64_t protectedEpoch) const
+{
+  return m_streamUsageTracker.oldestEvictableStaticStream(
+    domain,
+    protectedEpoch,
+    [this](uint64_t streamKey, Z3DRendererVulkanBackend::StaticPressureDomain cacheDomain) {
+      return staticBytesForStream(streamKey, cacheDomain);
+    });
+}
+
+size_t ZVulkanSpherePipelineContext::evictStaticStreamForPressure(uint64_t streamKey)
+{
+  const size_t vbBytes = staticBytesForStream(streamKey, Z3DRendererVulkanBackend::StaticPressureDomain::Vertex);
+  const size_t ibBytes = staticBytesForStream(streamKey, Z3DRendererVulkanBackend::StaticPressureDomain::Index);
+  evictStream(streamKey);
+  return vbBytes + ibBytes;
 }
 
 void ZVulkanSpherePipelineContext::flushRetainedUbos()
@@ -369,6 +378,7 @@ void ZVulkanSpherePipelineContext::record(Z3DRendererBase& renderer,
     SecondaryCacheKey cacheKey{};
     cacheKey.frameKey = frameKey;
     cacheKey.streamKey = payload.streamKey;
+    cacheKey.streamSegmentOrdinal = payload.streamSegmentOrdinal;
     cacheKey.picking = pickingPass;
     cacheKey.dynamicMaterial = key.dynamicMaterial;
     cacheKey.shaderHookType = shaderHook;
@@ -936,8 +946,11 @@ void ZVulkanSpherePipelineContext::uploadGeometry(const SpherePayload& payload)
   const size_t flBytes = m_vertexCount * sizeof(float);
   const size_t idxBytes = m_indexCount * sizeof(uint32_t);
   const bool hasStreamKey = payload.streamKey != 0;
-  const GeometryCacheKey geometryKey{payload.streamKey};
-  const AppearanceCacheKey appearanceKey{payload.streamKey, payload.pickingPass, payload.useDynamicMaterial};
+  const GeometryCacheKey geometryKey{payload.streamKey, payload.streamSegmentOrdinal};
+  const AppearanceCacheKey appearanceKey{payload.streamKey,
+                                         payload.streamSegmentOrdinal,
+                                         payload.pickingPass,
+                                         payload.useDynamicMaterial};
   const bool dynamicSpecular = !payload.pickingPass && payload.useDynamicMaterial;
 
   GeometryCacheEntry* boundGeometryStaticEntry = nullptr;
@@ -970,23 +983,22 @@ void ZVulkanSpherePipelineContext::uploadGeometry(const SpherePayload& payload)
   };
 
   if (hasStreamKey) {
-    if (m_geometryStaticCopyPendingKeys.contains(geometryKey)) {
-      auto pendingIt = m_geometryStaticCopyPendingUploads.find(geometryKey);
-      if (pendingIt != m_geometryStaticCopyPendingUploads.end()) {
-        const PendingGeometryUploadBinding& pending = pendingIt->second;
-        const bool sizeSame = pending.vertexCount == m_vertexCount && pending.indexCount == m_indexCount;
-        const bool gensSame = pending.centersGen == payload.centersGen && pending.flagsGen == payload.flagsGen &&
-                              pending.indexGen == payload.indexGen;
+    if (m_geometryStreamCache.hasPendingCopy(geometryKey)) {
+      if (const PendingGeometryUploadBinding* pending = m_geometryStreamCache.findPendingUpload(geometryKey);
+          pending != nullptr) {
+        const bool sizeSame = pending->vertexCount == m_vertexCount && pending->indexCount == m_indexCount;
+        const bool gensSame = pending->centersGen == payload.centersGen && pending->flagsGen == payload.flagsGen &&
+                              pending->indexGen == payload.indexGen;
         const bool buffersOk =
-          pending.centerRadius.buffer && pending.flags.buffer && ((m_indexCount == 0) || pending.index.buffer);
+          pending->centerRadius.buffer && pending->flags.buffer && ((m_indexCount == 0) || pending->index.buffer);
         if (sizeSame && gensSame && buffersOk) {
-          m_centerRadiusBuffer = pending.centerRadius.buffer;
-          m_flagsBuffer = pending.flags.buffer;
-          m_centerRadiusOffset = pending.centerRadius.offset;
-          m_flagsOffset = pending.flags.offset;
+          m_centerRadiusBuffer = pending->centerRadius.buffer;
+          m_flagsBuffer = pending->flags.buffer;
+          m_centerRadiusOffset = pending->centerRadius.offset;
+          m_flagsOffset = pending->flags.offset;
           if (m_indexCount > 0) {
-            m_indexUploadBuffer = pending.index.buffer;
-            m_indexUploadOffset = pending.index.offset;
+            m_indexUploadBuffer = pending->index.buffer;
+            m_indexUploadOffset = pending->index.offset;
           } else {
             m_indexUploadBuffer = vk::Buffer{};
             m_indexUploadOffset = 0;
@@ -995,48 +1007,43 @@ void ZVulkanSpherePipelineContext::uploadGeometry(const SpherePayload& payload)
         }
       }
     }
-    if (!geometryBound && !m_geometryStaticCopyPendingKeys.contains(geometryKey)) {
-      auto it = m_staticGeometryCache.find(geometryKey);
-      if (it != m_staticGeometryCache.end()) {
-        GeometryCacheEntry& entry = it->second;
-        const bool sizeSame = (entry.vertexCount == m_vertexCount) && (entry.indexCount == m_indexCount);
-        const bool gensSame = (entry.centersGen == payload.centersGen) && (entry.flagsGen == payload.flagsGen) &&
-                              (entry.indexGen == payload.indexGen);
-        if (entry.promoted && sizeSame && gensSame && entry.vbCenterRadius && entry.vbFlags &&
-            (m_indexCount == 0 || entry.ib)) {
-          bindGeometryStatic(entry);
+    if (!geometryBound && !m_geometryStreamCache.hasPendingCopy(geometryKey)) {
+      if (GeometryCacheEntry* entry = m_geometryStreamCache.findEntry(geometryKey); entry != nullptr) {
+        const bool sizeSame = (entry->vertexCount == m_vertexCount) && (entry->indexCount == m_indexCount);
+        const bool gensSame = (entry->centersGen == payload.centersGen) && (entry->flagsGen == payload.flagsGen) &&
+                              (entry->indexGen == payload.indexGen);
+        if (entry->promoted && sizeSame && gensSame && entry->vbCenterRadius && entry->vbFlags &&
+            (m_indexCount == 0 || entry->ib)) {
+          bindGeometryStatic(*entry);
         }
       }
     }
 
-    if (m_appearanceStaticCopyPendingKeys.contains(appearanceKey)) {
-      auto pendingIt = m_appearanceStaticCopyPendingUploads.find(appearanceKey);
-      if (pendingIt != m_appearanceStaticCopyPendingUploads.end()) {
-        const PendingAppearanceUploadBinding& pending = pendingIt->second;
-        const bool sizeSame = pending.vertexCount == m_vertexCount;
-        const bool colorSame = payload.pickingPass ? (pending.pickingColorsGen == payload.pickingColorsGen)
-                                                   : (pending.colorsGen == payload.colorsGen);
-        const bool specularSame = !dynamicSpecular || (pending.specularGen == payload.specularGen);
-        const bool buffersOk = pending.color.buffer && pending.specular.buffer;
+    if (m_appearanceStreamCache.hasPendingCopy(appearanceKey)) {
+      if (const PendingAppearanceUploadBinding* pending = m_appearanceStreamCache.findPendingUpload(appearanceKey);
+          pending != nullptr) {
+        const bool sizeSame = pending->vertexCount == m_vertexCount;
+        const bool colorSame = payload.pickingPass ? (pending->pickingColorsGen == payload.pickingColorsGen)
+                                                   : (pending->colorsGen == payload.colorsGen);
+        const bool specularSame = !dynamicSpecular || (pending->specularGen == payload.specularGen);
+        const bool buffersOk = pending->color.buffer && pending->specular.buffer;
         if (sizeSame && colorSame && specularSame && buffersOk) {
-          m_colorBuffer = pending.color.buffer;
-          m_specularBuffer = pending.specular.buffer;
-          m_colorOffset = pending.color.offset;
-          m_specularOffset = pending.specular.offset;
+          m_colorBuffer = pending->color.buffer;
+          m_specularBuffer = pending->specular.buffer;
+          m_colorOffset = pending->color.offset;
+          m_specularOffset = pending->specular.offset;
           appearanceBound = true;
         }
       }
     }
-    if (!appearanceBound && !m_appearanceStaticCopyPendingKeys.contains(appearanceKey)) {
-      auto it = m_staticAppearanceCache.find(appearanceKey);
-      if (it != m_staticAppearanceCache.end()) {
-        AppearanceCacheEntry& entry = it->second;
-        const bool sizeSame = entry.vertexCount == m_vertexCount;
-        const bool colorSame = payload.pickingPass ? (entry.pickingColorsGen == payload.pickingColorsGen)
-                                                   : (entry.colorsGen == payload.colorsGen);
-        const bool specularSame = !dynamicSpecular || (entry.specularGen == payload.specularGen);
-        if (entry.promoted && sizeSame && colorSame && specularSame && entry.vbColor && entry.vbSpecular) {
-          bindAppearanceStatic(entry);
+    if (!appearanceBound && !m_appearanceStreamCache.hasPendingCopy(appearanceKey)) {
+      if (AppearanceCacheEntry* entry = m_appearanceStreamCache.findEntry(appearanceKey); entry != nullptr) {
+        const bool sizeSame = entry->vertexCount == m_vertexCount;
+        const bool colorSame = payload.pickingPass ? (entry->pickingColorsGen == payload.pickingColorsGen)
+                                                   : (entry->colorsGen == payload.colorsGen);
+        const bool specularSame = !dynamicSpecular || (entry->specularGen == payload.specularGen);
+        if (entry->promoted && sizeSame && colorSame && specularSame && entry->vbColor && entry->vbSpecular) {
+          bindAppearanceStatic(*entry);
         }
       }
     }
@@ -1048,12 +1055,14 @@ void ZVulkanSpherePipelineContext::uploadGeometry(const SpherePayload& payload)
         m_backend,
         {&boundGeometryStaticEntry->vbCenterRadius, &boundGeometryStaticEntry->vbFlags, &boundGeometryStaticEntry->ib});
       boundGeometryStaticEntry->usedStaticOnce = true;
+      touchStaticStream(geometryKey.streamKey);
     }
     if (boundAppearanceStaticEntry != nullptr) {
       vulkan::pinStaticSlicesForActiveSubmission(
         m_backend,
         {&boundAppearanceStaticEntry->vbColor, &boundAppearanceStaticEntry->vbSpecular});
       boundAppearanceStaticEntry->usedStaticOnce = true;
+      touchStaticStream(appearanceKey.streamKey);
     }
     m_usedStaticVBThisFrame = (boundGeometryStaticEntry != nullptr) && (boundAppearanceStaticEntry != nullptr);
     return;
@@ -1101,7 +1110,11 @@ void ZVulkanSpherePipelineContext::uploadGeometry(const SpherePayload& payload)
       fOut[i] = (i < payload.flags.size()) ? payload.flags[i] : 0.0f;
     }
     if (idxBytes > 0) {
-      std::memcpy(indexSlice.mapped, payload.indices.data(), idxBytes);
+      auto* dst = static_cast<uint32_t*>(indexSlice.mapped);
+      for (size_t i = 0; i < m_indexCount; ++i) {
+        CHECK(payload.indices[i] >= payload.indexValueBias) << "Sphere segment index rebasing underflow";
+        dst[i] = payload.indices[i] - payload.indexValueBias;
+      }
     }
     m_centerRadiusBuffer = crSlice.buffer;
     m_flagsBuffer = flSlice.buffer;
@@ -1155,7 +1168,7 @@ void ZVulkanSpherePipelineContext::uploadGeometry(const SpherePayload& payload)
       binding.centersGen = payload.centersGen;
       binding.flagsGen = payload.flagsGen;
       binding.indexGen = payload.indexGen;
-      m_geometryStaticCopyPendingUploads[geometryKey] = binding;
+      m_geometryStreamCache.rememberPendingUploadBinding(geometryKey, binding);
     };
     auto rememberPendingAppearanceUpload = [&]() {
       if (!needAppearanceUpload) {
@@ -1168,7 +1181,7 @@ void ZVulkanSpherePipelineContext::uploadGeometry(const SpherePayload& payload)
       binding.colorsGen = payload.colorsGen;
       binding.pickingColorsGen = payload.pickingColorsGen;
       binding.specularGen = payload.specularGen;
-      m_appearanceStaticCopyPendingUploads[appearanceKey] = binding;
+      m_appearanceStreamCache.rememberPendingUploadBinding(appearanceKey, binding);
     };
 
     const int kPromotionThreshold = 2;
@@ -1214,8 +1227,7 @@ void ZVulkanSpherePipelineContext::uploadGeometry(const SpherePayload& payload)
     };
 
     {
-      auto [it, inserted] = m_staticGeometryCache.try_emplace(geometryKey);
-      GeometryCacheEntry& entry = it->second;
+      auto [entry, inserted] = m_geometryStreamCache.tryEmplaceEntry(geometryKey);
       const uint32_t prevVertexCount = entry.vertexCount;
       const uint32_t prevIndexCount = entry.indexCount;
       const uint32_t prevCentersGen = entry.centersGen;
@@ -1227,13 +1239,13 @@ void ZVulkanSpherePipelineContext::uploadGeometry(const SpherePayload& payload)
       entry.unchangedFrames = (!inserted && sizeSame && gensSame) ? (entry.unchangedFrames + 1) : 0;
 
       if (needGeometryUpload) {
-        if (m_geometryStaticCopyPendingKeys.contains(geometryKey)) {
+        if (m_geometryStreamCache.hasPendingCopy(geometryKey)) {
           rememberPendingGeometryUpload();
         } else if (inserted) {
           if (promoteGeometryToStatics(entry)) {
             entry.promoted = true;
             entry.usedStaticOnce = false;
-            m_geometryStaticCopyPendingKeys.insert(geometryKey);
+            m_geometryStreamCache.markPendingCopy(geometryKey);
             rememberPendingGeometryUpload();
           }
         } else if (entry.promoted && !sizeSame) {
@@ -1244,7 +1256,7 @@ void ZVulkanSpherePipelineContext::uploadGeometry(const SpherePayload& payload)
           if (promoteGeometryToStatics(entry)) {
             entry.promoted = true;
             entry.usedStaticOnce = false;
-            m_geometryStaticCopyPendingKeys.insert(geometryKey);
+            m_geometryStreamCache.markPendingCopy(geometryKey);
             rememberPendingGeometryUpload();
           }
         } else if (entry.promoted && sizeSame) {
@@ -1258,23 +1270,30 @@ void ZVulkanSpherePipelineContext::uploadGeometry(const SpherePayload& payload)
             entry.usedStaticOnce = false;
             entry.unchangedFrames = 0;
           } else if (anyChanged) {
+            size_t restagedBytes = 0;
             if (centersChanged) {
               m_backend.scheduleStaticCopy(entry.vbCenterRadius.buffer, entry.vbCenterRadius.offset, crSlice, false);
+              restagedBytes += crBytes;
             }
             if (flagsChanged) {
               m_backend.scheduleStaticCopy(entry.vbFlags.buffer, entry.vbFlags.offset, flSlice, false);
+              restagedBytes += flBytes;
             }
             if (indexChanged) {
               m_backend.scheduleStaticCopy(entry.ib.buffer, entry.ib.offset, indexSlice, true);
+              restagedBytes += idxBytes;
             }
-            m_geometryStaticCopyPendingKeys.insert(geometryKey);
+            if (restagedBytes > 0) {
+              m_backend.addSphereBytesStaged(restagedBytes);
+            }
+            m_geometryStreamCache.markPendingCopy(geometryKey);
             rememberPendingGeometryUpload();
           }
         } else if (!entry.promoted && sizeSame && entry.unchangedFrames >= kPromotionThreshold) {
           if (promoteGeometryToStatics(entry)) {
             entry.promoted = true;
             entry.usedStaticOnce = false;
-            m_geometryStaticCopyPendingKeys.insert(geometryKey);
+            m_geometryStreamCache.markPendingCopy(geometryKey);
             rememberPendingGeometryUpload();
           }
         }
@@ -1288,8 +1307,7 @@ void ZVulkanSpherePipelineContext::uploadGeometry(const SpherePayload& payload)
     }
 
     {
-      auto [it, inserted] = m_staticAppearanceCache.try_emplace(appearanceKey);
-      AppearanceCacheEntry& entry = it->second;
+      auto [entry, inserted] = m_appearanceStreamCache.tryEmplaceEntry(appearanceKey);
       const uint32_t prevVertexCount = entry.vertexCount;
       const uint32_t prevColorsGen = entry.colorsGen;
       const uint32_t prevPickingColorsGen = entry.pickingColorsGen;
@@ -1301,13 +1319,13 @@ void ZVulkanSpherePipelineContext::uploadGeometry(const SpherePayload& payload)
       entry.unchangedFrames = (!inserted && sizeSame && colorSame && specularSame) ? (entry.unchangedFrames + 1) : 0;
 
       if (needAppearanceUpload) {
-        if (m_appearanceStaticCopyPendingKeys.contains(appearanceKey)) {
+        if (m_appearanceStreamCache.hasPendingCopy(appearanceKey)) {
           rememberPendingAppearanceUpload();
         } else if (inserted) {
           if (promoteAppearanceToStatics(entry)) {
             entry.promoted = true;
             entry.usedStaticOnce = false;
-            m_appearanceStaticCopyPendingKeys.insert(appearanceKey);
+            m_appearanceStreamCache.markPendingCopy(appearanceKey);
             rememberPendingAppearanceUpload();
           }
         } else if (entry.promoted && !sizeSame) {
@@ -1318,7 +1336,7 @@ void ZVulkanSpherePipelineContext::uploadGeometry(const SpherePayload& payload)
           if (promoteAppearanceToStatics(entry)) {
             entry.promoted = true;
             entry.usedStaticOnce = false;
-            m_appearanceStaticCopyPendingKeys.insert(appearanceKey);
+            m_appearanceStreamCache.markPendingCopy(appearanceKey);
             rememberPendingAppearanceUpload();
           }
         } else if (entry.promoted && sizeSame) {
@@ -1332,20 +1350,26 @@ void ZVulkanSpherePipelineContext::uploadGeometry(const SpherePayload& payload)
             entry.usedStaticOnce = false;
             entry.unchangedFrames = 0;
           } else if (anyChanged) {
+            size_t restagedBytes = 0;
             if (colorChanged) {
               m_backend.scheduleStaticCopy(entry.vbColor.buffer, entry.vbColor.offset, colSlice, false);
+              restagedBytes += colBytes;
             }
             if (specularChanged) {
               m_backend.scheduleStaticCopy(entry.vbSpecular.buffer, entry.vbSpecular.offset, spSlice, false);
+              restagedBytes += spBytes;
             }
-            m_appearanceStaticCopyPendingKeys.insert(appearanceKey);
+            if (restagedBytes > 0) {
+              m_backend.addSphereBytesStaged(restagedBytes);
+            }
+            m_appearanceStreamCache.markPendingCopy(appearanceKey);
             rememberPendingAppearanceUpload();
           }
         } else if (!entry.promoted && sizeSame && entry.unchangedFrames >= kPromotionThreshold) {
           if (promoteAppearanceToStatics(entry)) {
             entry.promoted = true;
             entry.usedStaticOnce = false;
-            m_appearanceStaticCopyPendingKeys.insert(appearanceKey);
+            m_appearanceStreamCache.markPendingCopy(appearanceKey);
             rememberPendingAppearanceUpload();
           }
         }
@@ -1362,12 +1386,14 @@ void ZVulkanSpherePipelineContext::uploadGeometry(const SpherePayload& payload)
         m_backend,
         {&boundGeometryStaticEntry->vbCenterRadius, &boundGeometryStaticEntry->vbFlags, &boundGeometryStaticEntry->ib});
       boundGeometryStaticEntry->usedStaticOnce = true;
+      touchStaticStream(geometryKey.streamKey);
     }
     if (boundAppearanceStaticEntry != nullptr) {
       vulkan::pinStaticSlicesForActiveSubmission(
         m_backend,
         {&boundAppearanceStaticEntry->vbColor, &boundAppearanceStaticEntry->vbSpecular});
       boundAppearanceStaticEntry->usedStaticOnce = true;
+      touchStaticStream(appearanceKey.streamKey);
     }
     m_usedStaticVBThisFrame = (boundGeometryStaticEntry != nullptr) && (boundAppearanceStaticEntry != nullptr);
   }

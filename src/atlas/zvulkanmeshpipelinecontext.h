@@ -4,6 +4,7 @@
 #include "z3drendererstates.h"
 #include "z3drendererbase.h"
 #include "z3drenderervulkanbackend.h"
+#include "zvulkanmeshstreamcoordinator.h"
 #include "zvulkan.h"
 #include "zglmutils.h"
 
@@ -42,6 +43,9 @@ public:
 
   void resetFrame();
   void evictStream(uint64_t streamKey);
+  [[nodiscard]] std::optional<Z3DRendererVulkanBackend::StaticPressureEvictionCandidate>
+  oldestEvictableStaticStream(Z3DRendererVulkanBackend::StaticPressureDomain domain, uint64_t protectedEpoch) const;
+  size_t evictStaticStreamForPressure(uint64_t streamKey);
 
   void record(Z3DRendererBase& renderer,
               const RenderBatch& batch,
@@ -109,91 +113,8 @@ private:
 
   Z3DRendererVulkanBackend& m_backend;
 
-  // Static SoA promotion cache (device-local)
-  struct CacheKey
-  {
-    uint64_t streamKey = 0;
-    MeshPayload::ColorSource colorSource = MeshPayload::ColorSource::MeshColor;
-    // Picking uses per-draw material overrides but the promoted mesh SoA
-    // streams themselves stay identical, so picking is intentionally excluded.
-    auto tie() const
-    {
-      return std::tuple(streamKey, static_cast<int>(colorSource));
-    }
-    bool operator<(const CacheKey& rhs) const
-    {
-      return tie() < rhs.tie();
-    }
-  };
-  struct CacheEntry
-  {
-    // Device-local static buffers per attribute (SoA)
-    Z3DRendererVulkanBackend::StaticSlice vbPos{};
-    Z3DRendererVulkanBackend::StaticSlice vbNorm{};
-    Z3DRendererVulkanBackend::StaticSlice vbColor{};
-    Z3DRendererVulkanBackend::StaticSlice vbTex{}; // optional
-    bool hasTex = false;
-    Z3DRendererVulkanBackend::StaticSlice ib{};
-
-    uint32_t vertexCount = 0;
-    uint32_t indexCount = 0;
-    // Active promoted static-buffer metadata.
-    uint32_t posGen = 0, normGen = 0, colorGen = 0, texGen = 0, indexGen = 0;
-    // Latest observed stream state. This can differ from the active static
-    // buffers while a larger replacement is being streamed in.
-    uint32_t latestVertexCount = 0;
-    uint32_t latestIndexCount = 0;
-    uint32_t latestPosGen = 0, latestNormGen = 0, latestColorGen = 0, latestTexGen = 0, latestIndexGen = 0;
-    // Promotion
-    int unchangedFrames = 0;
-    bool promoted = false;
-    bool usedStaticOnce = false;
-
-    struct PendingReplacement
-    {
-      Z3DRendererVulkanBackend::StaticSlice vbPos{};
-      Z3DRendererVulkanBackend::StaticSlice vbNorm{};
-      Z3DRendererVulkanBackend::StaticSlice vbColor{};
-      Z3DRendererVulkanBackend::StaticSlice vbTex{};
-      bool hasTex = false;
-      Z3DRendererVulkanBackend::StaticSlice ib{};
-
-      uint32_t vertexCount = 0;
-      uint32_t indexCount = 0;
-      uint32_t posGen = 0, normGen = 0, colorGen = 0, texGen = 0, indexGen = 0;
-
-      size_t posCopiedBytes = 0;
-      size_t normCopiedBytes = 0;
-      size_t colorCopiedBytes = 0;
-      size_t texCopiedBytes = 0;
-      size_t indexCopiedBytes = 0;
-
-      bool allocated = false;
-      bool readyToActivate = false;
-    } replacement;
-  };
-  std::map<CacheKey, CacheEntry> m_staticCache;
-  // Guard: if a stream is using upload slices in the current submission
-  // (because we just staged it, queued a static copy, or are building a
-  // replacement), later passes in the same submission must reuse those upload
-  // slices instead of rebinding stale statics or re-staging the stream.
-  std::set<CacheKey> m_staticCopyPendingKeys;
-  struct PendingUploadBinding
-  {
-    Z3DRendererVulkanBackend::UploadSlice pos{};
-    Z3DRendererVulkanBackend::UploadSlice norm{};
-    Z3DRendererVulkanBackend::UploadSlice color{};
-    Z3DRendererVulkanBackend::UploadSlice tex{};
-    Z3DRendererVulkanBackend::UploadSlice index{};
-    uint32_t vertexCount = 0;
-    uint32_t indexCount = 0;
-    uint32_t posGen = 0;
-    uint32_t normGen = 0;
-    uint32_t colorGen = 0;
-    uint32_t texGen = 0;
-    uint32_t indexGen = 0;
-  };
-  std::map<CacheKey, PendingUploadBinding> m_staticCopyPendingUploads;
+  // Static SoA promotion cache + same-submission upload reuse for mesh streams.
+  ZVulkanMeshStreamCoordinator m_streamCoordinator;
 
   std::map<PipelineKey, PipelineInstance> m_pipelineCache;
 
@@ -281,6 +202,7 @@ private:
   {
     void* frameKey = nullptr;
     uint64_t streamKey = 0;
+    uint32_t streamSegmentOrdinal = 0;
     bool picking = false;
     MeshPayload::ColorSource colorSource = MeshPayload::ColorSource::MeshColor;
     ZMesh::Type meshType = ZMesh::Type::TRIANGLES;
@@ -292,7 +214,8 @@ private:
 
     bool operator==(const SecondaryCacheKey& rhs) const
     {
-      return frameKey == rhs.frameKey && streamKey == rhs.streamKey && picking == rhs.picking &&
+      return frameKey == rhs.frameKey && streamKey == rhs.streamKey &&
+             streamSegmentOrdinal == rhs.streamSegmentOrdinal && picking == rhs.picking &&
              colorSource == rhs.colorSource && meshType == rhs.meshType && wireframe == rhs.wireframe &&
              fogMode == rhs.fogMode && shaderHookType == rhs.shaderHookType && eye == rhs.eye &&
              oitRingIndex == rhs.oitRingIndex;
@@ -305,6 +228,7 @@ private:
     {
       size_t h = std::hash<uintptr_t>{}(reinterpret_cast<uintptr_t>(key.frameKey));
       h ^= std::hash<uint64_t>{}(key.streamKey) + 0x9e3779b97f4a7c15ull + (h << 6) + (h >> 2);
+      h ^= std::hash<uint32_t>{}(key.streamSegmentOrdinal) + 0x9e3779b97f4a7c15ull + (h << 6) + (h >> 2);
       h ^= std::hash<uint8_t>{}(static_cast<uint8_t>(key.picking)) + 0x9e3779b97f4a7c15ull + (h << 6) + (h >> 2);
       h ^= std::hash<int>{}(static_cast<int>(key.colorSource)) + 0x9e3779b97f4a7c15ull + (h << 6) + (h >> 2);
       h ^= std::hash<int>{}(static_cast<int>(key.meshType)) + 0x9e3779b97f4a7c15ull + (h << 6) + (h >> 2);

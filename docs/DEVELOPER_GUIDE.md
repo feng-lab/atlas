@@ -548,6 +548,25 @@ Vulkan Pipeline Invariants
   - Upload pages are reused across later submissions on the same frame slot via a compact active prefix, and unused tail pages are trimmed at the next safe slot reuse so one pathological peak frame does not keep gigabytes of mapped staging buffers alive forever.
   - Page capacity is chosen with awareness of `VkPhysicalDeviceMaintenance3Properties::maxMemoryAllocationSize`; Atlas must not grow a single staging allocation past the device's per-allocation limit just because one frame briefly needs more upload space.
   - `reserveUploadSlices(...)` may prepare a fresh page so a known sequence of suballocations can stay contiguous within one page, but very large sequences are still allowed to span pages rather than forcing a monolithic growth step.
+  - Upload-page creation failure is treated as an external resource failure, not an engine invariant. `reserveUploadSlices(...)` degrades to a no-op hint, and actual geometry upload paths receive empty upload slices so they can skip the affected batch cleanly instead of crashing mid-recording.
+- Renderer-owned geometry segmentation: large geometry payloads should be segmented at the renderer / `RenderBatch` level, not re-chunked ad hoc inside Vulkan pipeline contexts.
+  - Backends publish a hard `maxMonolithicGeometryStreamBytes()` limit. This is a correctness guard, not the normal packing target.
+  - Renderers should own a lazy segmentation plan per active backend capability set. The canonical source data stays untouched; backend switch invalidates only the derived plan and rebuilds it on first use for the new backend.
+  - The common case must stay on a pass-through fast path: if no physical split is required and the full payload already fits one batch, renderers should keep using the original source vectors directly and emit exactly one segment with ordinal `0`.
+  - Physical mesh splitting and batch packing are one renderer-owned policy. The normal mesh target is a preferred triangle budget chosen for throughput/UX; if a single mesh unit is too large, split it once into preferred mesh units first, then pack those units into one or more `RenderBatch` segments toward that preferred budget.
+  - Preferred segment budgets are user-tunable gflags/settings, not cached renderer members. Current knobs are:
+    - `--atlas_mesh_preferred_triangle_budget_per_segment`
+    - `--atlas_sphere_preferred_instance_budget_per_segment`
+    - `--atlas_cone_preferred_instance_budget_per_segment`
+    - `--atlas_ellipsoid_preferred_instance_budget_per_segment`
+    - `--atlas_line_preferred_segment_budget_per_segment`
+  - Sphere / cone / ellipsoid budgets count logical instances, not expanded billboard vertices. Line budgets count logical line segments; the default `1,000,000` matches the historical wide-line OpenGL batching policy of `4,000,000` expanded vertices.
+  - The backend hard byte limit remains a validator/backstop. If a preferred mesh unit or packed batch would still exceed `maxMonolithicGeometryStreamBytes()`, the renderer must split further rather than hand Vulkan an oversized monolithic stream.
+  - Vulkan treats those renderer-emitted segments as the authoritative upload/promote unit. The backend may still validate that a segment fits its hard limit, but normal operation should not pay for a second round of backend-local splitting.
+  - Segmented payloads must carry a stable segment ordinal alongside `streamKey` so Vulkan static caches, pending upload reuse, and secondary caches do not alias different segments from the same renderer.
+- Shared geometry stream-cache policy (Vulkan): stream-cache lifetime, pending-upload reuse, in-flight static-copy tracking, and pressure-eviction epochs are centralized in `ZVulkanStreamCacheCoordinator` plus `ZVulkanStaticStreamUsageTracker`.
+  - Mesh builds its richer active/replacement static state on top of those shared utilities via `ZVulkanMeshStreamCoordinator`.
+  - Cone, sphere, ellipsoid, and line contexts use the same shared utilities directly for their geometry/appearance cache families. Keep new Vulkan geometry upload/promotion policy in the shared coordinators instead of reintroducing per-context ad hoc maps.
 - Mesh static promotion cache (Vulkan): promoted mesh SoA buffers are keyed by immutable stream identity (`streamKey`) plus vertex payload layout (`colorSource`), not by whether the current draw is a picking pass.
   - Picking changes per-draw material/fallback colors only. It must not duplicate device-local mesh vertex/index buffers or re-stage the same immutable geometry a second time in the same submission.
   - When one pass in the current submission has already staged upload slices for a promoted mesh stream, later passes with the same immutable stream reuse those upload slices until the deferred upload->static copies flush at submission end. This avoids double-staging the same mesh stream before the static buffers become bindable on the next submission.
@@ -558,6 +577,8 @@ Vulkan Pipeline Invariants
   - Appearance cache keys still keep `picking` and any material-layout dimension (for example `dynamicMaterial`) because those streams genuinely differ between passes.
   - Draws may bind mixed sources in one submission: static geometry with upload-backed appearance, upload-backed geometry with static appearance, or both static. This preserves correctness while avoiding duplicate geometry uploads during picking warmup.
   - If one pass in the current submission has already queued upload->static copies for a geometry or appearance key, later passes reuse the remembered upload slices for that key until the deferred copies flush. This avoids rebinding stale statics or restaging the same sub-stream twice before the next submission.
+  - Before growing a new device-local static arena segment, the backend consults the best-effort device-local heap budget and may evict cold cached `streamKey`s from the mesh/line/cone/sphere/ellipsoid static caches. Streams already touched in the current submission are protected from pressure eviction so recording does not invalidate work already bound this frame.
+  - Static-arena growth failure is also treated as an external resource failure. Promotion attempts simply fail and the pipelines continue from upload-backed geometry when possible; Atlas still does not have a fully general geometry residency/streaming policy comparable to paged image residency.
 - Backend validates that the pipeline’s attachment formats match the currently active dynamic rendering segment; mismatches are logged at VLOG(1) and the batch is skipped.
 
 Performance Instrumentation

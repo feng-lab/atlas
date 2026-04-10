@@ -57,6 +57,13 @@ protected:
 
   [[nodiscard]] ConePayload buildConePayload() const;
   [[nodiscard]] RenderBatch buildRenderBatch(Z3DEye eye, bool picking) const;
+  [[nodiscard]] ConePayload
+  buildConePayload(size_t instanceStart, size_t instanceCount, uint32_t streamSegmentOrdinal) const;
+  [[nodiscard]] RenderBatch buildRenderBatch(Z3DEye eye,
+                                             bool picking,
+                                             size_t instanceStart,
+                                             size_t instanceCount,
+                                             uint32_t streamSegmentOrdinal) const;
 
   void enqueueRenderBatches(Z3DEye eye, RenderBackend backend, bool picking) override;
 
@@ -84,10 +91,10 @@ private:
 
   bool m_useConeShader2 = true;
 
-  std::unique_ptr<Z3DVertexArrayObject> m_VAO;
-  std::unique_ptr<Z3DVertexArrayObject> m_pickingVAO;
-  std::unique_ptr<Z3DVertexBufferObject> m_VBOs;
-  std::unique_ptr<Z3DVertexBufferObject> m_pickingVBOs;
+  std::unique_ptr<Z3DVertexArrayObject> m_VAOs;
+  std::unique_ptr<Z3DVertexArrayObject> m_pickingVAOs;
+  std::vector<std::unique_ptr<Z3DVertexBufferObject>> m_VBOs;
+  std::vector<std::unique_ptr<Z3DVertexBufferObject>> m_pickingVBOs;
   bool m_dataChanged;
   bool m_pickingDataChanged;
 

@@ -884,6 +884,9 @@ set(SOURCES
     zvulkanlinepipelinecontext.cpp
     zvulkanmeshpipelinecontext.h
     zvulkanmeshpipelinecontext.cpp
+    zvulkanstreamcachecoordinator.h
+    zvulkanmeshstreamcoordinator.h
+    zvulkanmeshstreamcoordinator.cpp
     zvulkanellipsoidpipelinecontext.h
     zvulkanellipsoidpipelinecontext.cpp
     zvulkanspherepipelinecontext.h

@@ -9,7 +9,11 @@
 #include "zoptionparameter.h"
 #include "znumericparameter.h"
 
+#include <gflags/gflags.h>
+
+#include <algorithm>
 #include <utility>
+#include <limits>
 
 namespace nim {
 
@@ -21,11 +25,32 @@ template<typename T>
   return static_cast<GLsizeiptr>(values.size() * sizeof(T));
 }
 
+template<typename T>
+[[nodiscard]] std::span<T* const> subspanOrEmpty(const std::vector<T*>* ptr, size_t start, size_t count)
+{
+  if (ptr == nullptr || count == 0) {
+    return {};
+  }
+  CHECK(start + count <= ptr->size()) << "Mesh payload pointer subspan exceeds backing vector";
+  return std::span<T* const>(*ptr).subspan(start, count);
+}
+
 static_assert(sizeof(glm::vec2) == sizeof(GLfloat) * 2, "Z3DMeshRenderer assumes glm::vec2 is tightly packed");
 static_assert(sizeof(glm::vec3) == sizeof(GLfloat) * 3, "Z3DMeshRenderer assumes glm::vec3 is tightly packed");
 static_assert(sizeof(glm::vec4) == sizeof(GLfloat) * 4, "Z3DMeshRenderer assumes glm::vec4 is tightly packed");
 
+[[nodiscard]] constexpr size_t ceilDiv(size_t numerator, size_t denominator)
+{
+  return denominator == 0 ? 0 : (numerator + denominator - 1) / denominator;
+}
+
 } // namespace
+
+DEFINE_uint64(
+  atlas_mesh_preferred_triangle_budget_per_segment,
+  1000000,
+  "Preferred mesh triangle budget for one renderer-owned segment. This is the normal performance/UX target; "
+  "backends still enforce maxMonolithicGeometryStreamBytes as a hard safety guard.");
 
 Z3DMeshRenderer::Z3DMeshRenderer(Z3DRendererBase& rendererBase)
   : Z3DPrimitiveRenderer(rendererBase)
@@ -53,18 +78,13 @@ void Z3DMeshRenderer::setData(std::vector<ZMesh*>* meshInput)
 {
   m_origMeshPt = meshInput;
   m_meshPt = meshInput;
-  prepareMesh();
-  // Invalidate cached color/picking spans; they will be rebuilt on demand.
-  m_meshColorsPt = nullptr;
-  m_meshPickingColorsPt = nullptr;
+  invalidateMeshSegmentationPlan();
   // Per-mesh transforms are tied to the current mesh pointer list; clear them
   // so callers must explicitly re-provide matching arrays after setData().
   m_origMeshPosTransformsPt = nullptr;
   m_origMeshPosTransformNormalMatricesPt = nullptr;
   m_meshPosTransformsPt = nullptr;
   m_meshPosTransformNormalMatricesPt = nullptr;
-  m_splitMeshesPosTransforms.clear();
-  m_splitMeshesPosTransformNormalMatrices.clear();
 
 #if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
   invalidateOpenglRenderer();
@@ -117,10 +137,7 @@ void Z3DMeshRenderer::setPerMeshPosTransforms(std::vector<glm::mat4>* meshPosTra
   if (meshPosTransformsInput == nullptr || meshPosTransformNormalMatricesInput == nullptr) {
     m_origMeshPosTransformsPt = nullptr;
     m_origMeshPosTransformNormalMatricesPt = nullptr;
-    m_meshPosTransformsPt = nullptr;
-    m_meshPosTransformNormalMatricesPt = nullptr;
-    m_splitMeshesPosTransforms.clear();
-    m_splitMeshesPosTransformNormalMatrices.clear();
+    prepareMeshTransforms();
     return;
   }
 
@@ -133,26 +150,7 @@ void Z3DMeshRenderer::setPerMeshPosTransforms(std::vector<glm::mat4>* meshPosTra
 
   m_origMeshPosTransformsPt = meshPosTransformsInput;
   m_origMeshPosTransformNormalMatricesPt = meshPosTransformNormalMatricesInput;
-  m_meshPosTransformsPt = meshPosTransformsInput;
-  m_meshPosTransformNormalMatricesPt = meshPosTransformNormalMatricesInput;
-
-  if (m_meshNeedSplit) {
-    CHECK(m_splitCount.size() == meshPosTransformsInput->size()) << "Mesh split-count metadata mismatch";
-    m_splitMeshesPosTransforms.clear();
-    m_splitMeshesPosTransformNormalMatrices.clear();
-    m_splitMeshesPosTransforms.reserve(m_meshPt ? m_meshPt->size() : 0U);
-    m_splitMeshesPosTransformNormalMatrices.reserve(m_splitMeshesPosTransforms.capacity());
-    for (size_t i = 0; i < m_splitCount.size(); ++i) {
-      for (size_t j = 0; j < m_splitCount[i]; ++j) {
-        m_splitMeshesPosTransforms.push_back((*meshPosTransformsInput)[i]);
-        m_splitMeshesPosTransformNormalMatrices.push_back((*meshPosTransformNormalMatricesInput)[i]);
-      }
-    }
-    CHECK(m_meshPt != nullptr);
-    CHECK(m_splitMeshesPosTransforms.size() == m_meshPt->size());
-    m_meshPosTransformsPt = &m_splitMeshesPosTransforms;
-    m_meshPosTransformNormalMatricesPt = &m_splitMeshesPosTransformNormalMatrices;
-  }
+  prepareMeshTransforms();
 }
 
 void Z3DMeshRenderer::setColorSource(MeshColorSource source)
@@ -161,6 +159,8 @@ void Z3DMeshRenderer::setColorSource(MeshColorSource source)
     return;
   }
   m_colorSource = source;
+  invalidateMeshSegmentationPlan();
+  m_texGen++;
   compile();
 }
 
@@ -200,54 +200,237 @@ std::string Z3DMeshRenderer::generateHeader()
   return header;
 }
 
-void Z3DMeshRenderer::prepareMesh()
+void Z3DMeshRenderer::invalidateMeshSegmentationPlan()
 {
-  m_splitMeshes.clear();
-  m_splitCount.clear();
-  m_meshNeedSplit = false;
-
-  if (!m_meshPt || m_meshPt->empty()) {
-    return;
-  }
-  m_splitCount.resize(m_meshPt->size());
-  size_t numTriThre = 1000000;
-  for (auto mesh : *m_meshPt) {
-    if (mesh->numTriangles() > numTriThre) {
-      m_meshNeedSplit = true;
-      break;
-    }
-  }
-  if (m_meshNeedSplit) {
-    LOG(INFO) << "Number of meshes before spliting " << m_meshPt->size();
-    for (size_t i = 0; i < m_meshPt->size(); ++i) {
-      if ((*m_meshPt)[i]->numTriangles() <= numTriThre) {
-        m_splitMeshes.push_back(*((*m_meshPt)[i]));
-        m_splitCount[i] = 1;
-      } else {
-        std::vector<ZMesh> res = (*m_meshPt)[i]->split(numTriThre);
-        m_splitCount[i] = res.size();
-        if (i == 0) {
-          m_splitMeshes.swap(res);
-        } else {
-          size_t start = m_splitMeshes.size();
-          m_splitMeshes.resize(start + res.size());
-          for (size_t j = 0; j < res.size(); ++j) {
-            m_splitMeshes[j + start].swap(res[j]);
-          }
-        }
-      }
-    }
-    m_splitMeshesWrapper.clear();
-    for (size_t i = 0; i < m_splitMeshes.size(); ++i) {
-      m_splitMeshesWrapper.push_back(&m_splitMeshes[i]);
-    }
-    m_meshPt = &m_splitMeshesWrapper;
-    LOG(INFO) << "Number of meshes after spliting " << m_meshPt->size();
-  }
-
-  // Color and picking spans are rebuilt lazily to align with any split outcome.
+  m_segmentationPlan = {};
+  m_meshPt = m_origMeshPt;
   m_meshColorsPt = nullptr;
   m_meshPickingColorsPt = nullptr;
+  m_meshPosTransformsPt = m_origMeshPosTransformsPt;
+  m_meshPosTransformNormalMatricesPt = m_origMeshPosTransformNormalMatricesPt;
+  m_splitMeshesColors.clear();
+  m_splitMeshesPickingColors.clear();
+  m_splitMeshesPosTransforms.clear();
+  m_splitMeshesPosTransformNormalMatrices.clear();
+  m_meshColorReady = false;
+  m_meshPickingColorReady = false;
+}
+
+size_t Z3DMeshRenderer::maxMonolithicGeometryStreamBytesForBackend(RenderBackend backend) const
+{
+  CHECK(backend == m_rendererBase.activeBackend())
+    << "Mesh segmentation plan requires the active backend's geometry-stream limit";
+  const auto* renderBackend = m_rendererBase.backend();
+  CHECK(renderBackend != nullptr) << "Mesh segmentation plan requires an active backend";
+  return renderBackend->maxMonolithicGeometryStreamBytes();
+}
+
+size_t Z3DMeshRenderer::textureStreamBytesForVertexCount(size_t vertexCount) const
+{
+  switch (m_colorSource) {
+    case MeshColorSource::Mesh1DTexture:
+      return vertexCount * sizeof(float);
+    case MeshColorSource::Mesh2DTexture:
+      return vertexCount * sizeof(glm::vec2);
+    case MeshColorSource::Mesh3DTexture:
+      return vertexCount * sizeof(glm::vec3);
+    case MeshColorSource::MeshColor:
+    case MeshColorSource::CustomColor:
+    default:
+      return size_t{0};
+  }
+}
+
+bool Z3DMeshRenderer::rangeFitsMonolithicStreamLimit(size_t vertexCount, size_t indexCount, size_t maxStreamBytes) const
+{
+  if (maxStreamBytes == std::numeric_limits<size_t>::max()) {
+    return true;
+  }
+
+  return vertexCount * sizeof(glm::vec3) <= maxStreamBytes && vertexCount * sizeof(glm::vec3) <= maxStreamBytes &&
+         vertexCount * sizeof(glm::vec4) <= maxStreamBytes &&
+         textureStreamBytesForVertexCount(vertexCount) <= maxStreamBytes &&
+         indexCount * sizeof(uint32_t) <= maxStreamBytes;
+}
+
+void Z3DMeshRenderer::prepareMeshTransforms()
+{
+  m_splitMeshesPosTransforms.clear();
+  m_splitMeshesPosTransformNormalMatrices.clear();
+  m_meshPosTransformsPt = m_origMeshPosTransformsPt;
+  m_meshPosTransformNormalMatricesPt = m_origMeshPosTransformNormalMatricesPt;
+
+  if (m_origMeshPosTransformsPt == nullptr || m_origMeshPosTransformNormalMatricesPt == nullptr) {
+    return;
+  }
+
+  CHECK(m_origMeshPt != nullptr) << "Per-mesh transforms require a mesh list";
+  CHECK(m_origMeshPosTransformsPt->size() == m_origMeshPt->size())
+    << "Per-mesh transform arrays must match the original mesh list size";
+  CHECK(m_origMeshPosTransformNormalMatricesPt->size() == m_origMeshPt->size())
+    << "Per-mesh transform normal matrices must match the original mesh list size";
+
+  if (!m_segmentationPlan.valid || !m_segmentationPlan.anyMeshSplit) {
+    return;
+  }
+
+  CHECK(m_meshPt != nullptr) << "Split transform preparation requires an active mesh list";
+  CHECK(m_segmentationPlan.activeMeshSourceIndices.size() == m_meshPt->size())
+    << "Mesh segmentation source-index metadata must match active mesh count";
+  m_splitMeshesPosTransforms.reserve(m_meshPt->size());
+  m_splitMeshesPosTransformNormalMatrices.reserve(m_meshPt->size());
+  for (const size_t sourceIndex : m_segmentationPlan.activeMeshSourceIndices) {
+    CHECK(sourceIndex < m_origMeshPosTransformsPt->size());
+    CHECK(sourceIndex < m_origMeshPosTransformNormalMatricesPt->size());
+    m_splitMeshesPosTransforms.push_back((*m_origMeshPosTransformsPt)[sourceIndex]);
+    m_splitMeshesPosTransformNormalMatrices.push_back((*m_origMeshPosTransformNormalMatricesPt)[sourceIndex]);
+  }
+  m_meshPosTransformsPt = &m_splitMeshesPosTransforms;
+  m_meshPosTransformNormalMatricesPt = &m_splitMeshesPosTransformNormalMatrices;
+}
+
+void Z3DMeshRenderer::ensureMeshSegmentationPlan(RenderBackend backend)
+{
+  const size_t maxStreamBytes = maxMonolithicGeometryStreamBytesForBackend(backend);
+  const size_t preferredTriangleBudget =
+    std::max<size_t>(1, static_cast<size_t>(FLAGS_atlas_mesh_preferred_triangle_budget_per_segment));
+  if (m_segmentationPlan.valid && m_segmentationPlan.backend == backend &&
+      m_segmentationPlan.maxMonolithicGeometryStreamBytes == maxStreamBytes &&
+      m_segmentationPlan.colorSource == m_colorSource) {
+    return;
+  }
+
+  m_segmentationPlan = {};
+  m_segmentationPlan.valid = true;
+  m_segmentationPlan.backend = backend;
+  m_segmentationPlan.maxMonolithicGeometryStreamBytes = maxStreamBytes;
+  m_segmentationPlan.colorSource = m_colorSource;
+
+  m_meshPt = m_origMeshPt;
+  m_meshColorsPt = nullptr;
+  m_meshPickingColorsPt = nullptr;
+  m_meshColorReady = false;
+  m_meshPickingColorReady = false;
+  m_splitMeshesColors.clear();
+  m_splitMeshesPickingColors.clear();
+
+  if (m_origMeshPt == nullptr || m_origMeshPt->empty()) {
+    prepareMeshTransforms();
+    return;
+  }
+
+  size_t physicalSplitTriangleLimit = preferredTriangleBudget;
+  if (maxStreamBytes != std::numeric_limits<size_t>::max()) {
+    const size_t bytesPerSplitTriangle =
+      3 * sizeof(glm::vec3) + 3 * sizeof(glm::vec3) + 3 * sizeof(glm::vec4) + textureStreamBytesForVertexCount(3);
+    CHECK(bytesPerSplitTriangle > 0) << "Mesh split byte accounting must stay positive";
+    const size_t hardTriangleBudget = std::max(size_t{1}, maxStreamBytes / bytesPerSplitTriangle);
+    physicalSplitTriangleLimit = std::min(physicalSplitTriangleLimit, hardTriangleBudget);
+  }
+  physicalSplitTriangleLimit = std::max(size_t{1}, physicalSplitTriangleLimit);
+
+  auto requiresPhysicalSplit = [&](const ZMesh& mesh) {
+    return mesh.numTriangles() > physicalSplitTriangleLimit;
+  };
+
+  size_t activeMeshCount = 0;
+  size_t ownedSplitMeshCount = 0;
+  bool anyMeshSplit = false;
+  for (size_t meshIndex = 0; meshIndex < m_origMeshPt->size(); ++meshIndex) {
+    const ZMesh* mesh = (*m_origMeshPt)[meshIndex];
+    CHECK(mesh != nullptr) << "Mesh renderer expects non-null mesh pointers";
+    if (!requiresPhysicalSplit(*mesh)) {
+      ++activeMeshCount;
+      continue;
+    }
+
+    const size_t splitCount = std::max(size_t{1}, ceilDiv(mesh->numTriangles(), physicalSplitTriangleLimit));
+    activeMeshCount += splitCount;
+    ownedSplitMeshCount += splitCount;
+    anyMeshSplit = true;
+  }
+
+  m_segmentationPlan.anyMeshSplit = anyMeshSplit;
+  if (anyMeshSplit) {
+    m_segmentationPlan.ownedSplitMeshes.reserve(ownedSplitMeshCount);
+    m_segmentationPlan.activeMeshPtrs.reserve(activeMeshCount);
+    m_segmentationPlan.activeMeshSourceIndices.reserve(activeMeshCount);
+
+    for (size_t meshIndex = 0; meshIndex < m_origMeshPt->size(); ++meshIndex) {
+      ZMesh* mesh = (*m_origMeshPt)[meshIndex];
+      CHECK(mesh != nullptr) << "Mesh renderer expects non-null mesh pointers";
+      if (!requiresPhysicalSplit(*mesh)) {
+        m_segmentationPlan.activeMeshPtrs.push_back(mesh);
+        m_segmentationPlan.activeMeshSourceIndices.push_back(meshIndex);
+        continue;
+      }
+
+      std::vector<ZMesh> splitMeshes = mesh->split(physicalSplitTriangleLimit);
+      CHECK(!splitMeshes.empty()) << "Physical mesh split must produce at least one piece";
+      const size_t start = m_segmentationPlan.ownedSplitMeshes.size();
+      for (auto& splitMesh : splitMeshes) {
+        m_segmentationPlan.ownedSplitMeshes.push_back(std::move(splitMesh));
+      }
+      for (size_t splitIndex = 0; splitIndex < splitMeshes.size(); ++splitIndex) {
+        m_segmentationPlan.activeMeshPtrs.push_back(&m_segmentationPlan.ownedSplitMeshes[start + splitIndex]);
+        m_segmentationPlan.activeMeshSourceIndices.push_back(meshIndex);
+      }
+    }
+    m_meshPt = &m_segmentationPlan.activeMeshPtrs;
+    LOG(INFO) << fmt::format("Mesh renderer built a split segmentation plan: backend={} meshes_before={} "
+                             "meshes_after={} preferred_triangles={} hard_guard_bytes={}B",
+                             enumOrUnderlying(backend, 16),
+                             m_origMeshPt->size(),
+                             m_meshPt->size(),
+                             preferredTriangleBudget,
+                             maxStreamBytes);
+  }
+
+  const std::vector<ZMesh*>* activeMeshes = anyMeshSplit ? &m_segmentationPlan.activeMeshPtrs : m_origMeshPt;
+  CHECK(activeMeshes != nullptr) << "Mesh segmentation plan requires an active mesh list";
+  if (!activeMeshes->empty()) {
+    size_t rangeStart = 0;
+    size_t rangeTriangleCount = 0;
+    size_t rangeVertexCount = 0;
+    size_t rangeIndexCount = 0;
+    uint32_t segmentOrdinal = 0;
+
+    auto flushRange = [&](size_t rangeEnd) {
+      if (rangeEnd <= rangeStart) {
+        return;
+      }
+      m_segmentationPlan.batchSegments.push_back(MeshBatchSegment{rangeStart, rangeEnd - rangeStart, segmentOrdinal++});
+      rangeStart = rangeEnd;
+      rangeTriangleCount = 0;
+      rangeVertexCount = 0;
+      rangeIndexCount = 0;
+    };
+
+    for (size_t meshIndex = 0; meshIndex < activeMeshes->size(); ++meshIndex) {
+      const ZMesh* mesh = (*activeMeshes)[meshIndex];
+      CHECK(mesh != nullptr) << "Mesh segmentation plan expects non-null mesh pointers";
+      const size_t meshTriangleCount = mesh->numTriangles();
+      const size_t meshVertexCount = mesh->numVertices();
+      const size_t meshIndexCount = mesh->indices().size();
+      const size_t candidateTriangleCount = rangeTriangleCount + meshTriangleCount;
+      const size_t candidateVertexCount = rangeVertexCount + meshVertexCount;
+      const size_t candidateIndexCount = rangeIndexCount + meshIndexCount;
+      if (meshIndex > rangeStart &&
+          ((rangeTriangleCount > 0 && candidateTriangleCount > preferredTriangleBudget) ||
+           !rangeFitsMonolithicStreamLimit(candidateVertexCount, candidateIndexCount, maxStreamBytes))) {
+        flushRange(meshIndex);
+      }
+
+      rangeTriangleCount += meshTriangleCount;
+      rangeVertexCount += meshVertexCount;
+      rangeIndexCount += meshIndexCount;
+      CHECK(rangeFitsMonolithicStreamLimit(rangeVertexCount, rangeIndexCount, maxStreamBytes))
+        << "Renderer-owned mesh segmentation produced a batch that still exceeds the backend hard stream limit";
+    }
+    flushRange(activeMeshes->size());
+  }
+
+  prepareMeshTransforms();
 }
 
 void Z3DMeshRenderer::prepareMeshColor()
@@ -255,14 +438,17 @@ void Z3DMeshRenderer::prepareMeshColor()
   m_meshColorReady = true;
   m_splitMeshesColors.clear();
   m_meshColorsPt = m_origMeshColorsPt;
-  if (!m_origMeshColorsPt || m_origMeshColorsPt->size() < m_origMeshPt->size()) {
+  if (m_origMeshPt == nullptr || !m_origMeshColorsPt || m_origMeshColorsPt->size() < m_origMeshPt->size()) {
     return;
   }
-  if (m_meshNeedSplit) {
-    for (size_t i = 0; i < m_splitCount.size(); ++i) {
-      for (size_t j = 0; j < m_splitCount[i]; ++j) {
-        m_splitMeshesColors.push_back((*m_origMeshColorsPt)[i]);
-      }
+  if (m_segmentationPlan.valid && m_segmentationPlan.anyMeshSplit) {
+    CHECK(m_meshPt != nullptr) << "Split mesh colors require an active mesh list";
+    CHECK(m_segmentationPlan.activeMeshSourceIndices.size() == m_meshPt->size())
+      << "Mesh segmentation source-index metadata must match active mesh count";
+    m_splitMeshesColors.reserve(m_meshPt->size());
+    for (const size_t sourceIndex : m_segmentationPlan.activeMeshSourceIndices) {
+      CHECK(sourceIndex < m_origMeshColorsPt->size());
+      m_splitMeshesColors.push_back((*m_origMeshColorsPt)[sourceIndex]);
     }
     m_meshColorsPt = &m_splitMeshesColors;
   }
@@ -273,14 +459,18 @@ void Z3DMeshRenderer::prepareMeshPickingColor()
   m_meshPickingColorReady = true;
   m_splitMeshesPickingColors.clear();
   m_meshPickingColorsPt = m_origMeshPickingColorsPt;
-  if (!m_origMeshPickingColorsPt || m_origMeshPickingColorsPt->size() < m_origMeshPt->size()) {
+  if (m_origMeshPt == nullptr || !m_origMeshPickingColorsPt ||
+      m_origMeshPickingColorsPt->size() < m_origMeshPt->size()) {
     return;
   }
-  if (m_meshNeedSplit) {
-    for (size_t i = 0; i < m_splitCount.size(); ++i) {
-      for (size_t j = 0; j < m_splitCount[i]; ++j) {
-        m_splitMeshesPickingColors.push_back((*m_origMeshPickingColorsPt)[i]);
-      }
+  if (m_segmentationPlan.valid && m_segmentationPlan.anyMeshSplit) {
+    CHECK(m_meshPt != nullptr) << "Split mesh picking colors require an active mesh list";
+    CHECK(m_segmentationPlan.activeMeshSourceIndices.size() == m_meshPt->size())
+      << "Mesh segmentation source-index metadata must match active mesh count";
+    m_splitMeshesPickingColors.reserve(m_meshPt->size());
+    for (const size_t sourceIndex : m_segmentationPlan.activeMeshSourceIndices) {
+      CHECK(sourceIndex < m_origMeshPickingColorsPt->size());
+      m_splitMeshesPickingColors.push_back((*m_origMeshPickingColorsPt)[sourceIndex]);
     }
     m_meshPickingColorsPt = &m_splitMeshesPickingColors;
   }
@@ -288,20 +478,26 @@ void Z3DMeshRenderer::prepareMeshPickingColor()
 
 MeshPayload Z3DMeshRenderer::buildMeshPayload() const
 {
+  return buildMeshPayload(0, m_meshPt ? m_meshPt->size() : 0u, 0u);
+}
+
+MeshPayload Z3DMeshRenderer::buildMeshPayload(size_t meshStart, size_t meshCount, uint32_t streamSegmentOrdinal) const
+{
   MeshPayload payload;
   payload.streamKey = static_cast<uint64_t>(reinterpret_cast<uintptr_t>(this));
+  payload.streamSegmentOrdinal = streamSegmentOrdinal;
 
-  payload.meshes = spanOrEmpty(m_meshPt);
+  payload.meshes = subspanOrEmpty(m_meshPt, meshStart, meshCount);
   if (m_meshColorReady) {
-    payload.meshColors = spanOrEmpty(m_meshColorsPt);
+    payload.meshColors = subspanOrEmpty(m_meshColorsPt, meshStart, meshCount);
   }
   if (m_meshPickingColorReady) {
-    payload.meshPickingColors = spanOrEmpty(m_meshPickingColorsPt);
+    payload.meshPickingColors = subspanOrEmpty(m_meshPickingColorsPt, meshStart, meshCount);
   }
-  payload.perMeshPosTransforms = spanOrEmpty(m_meshPosTransformsPt);
-  payload.perMeshPosTransformNormalMatrices = spanOrEmpty(m_meshPosTransformNormalMatricesPt);
+  payload.perMeshPosTransforms = subspanOrEmpty(m_meshPosTransformsPt, meshStart, meshCount);
+  payload.perMeshPosTransformNormalMatrices = subspanOrEmpty(m_meshPosTransformNormalMatricesPt, meshStart, meshCount);
   payload.textureHandle = m_textureHandle;
-  payload.meshNeedsSplit = m_meshNeedSplit;
+  payload.meshNeedsSplit = m_segmentationPlan.anyMeshSplit;
   payload.meshColorReady = m_meshColorReady;
   payload.meshPickingColorReady = m_meshPickingColorReady;
 
@@ -356,6 +552,15 @@ MeshPayload Z3DMeshRenderer::buildMeshPayload() const
 
 RenderBatch Z3DMeshRenderer::buildRenderBatch(Z3DEye eye, bool picking) const
 {
+  return buildRenderBatch(eye, picking, 0, m_meshPt ? m_meshPt->size() : 0u, 0u);
+}
+
+RenderBatch Z3DMeshRenderer::buildRenderBatch(Z3DEye eye,
+                                              bool picking,
+                                              size_t meshStart,
+                                              size_t meshCount,
+                                              uint32_t streamSegmentOrdinal) const
+{
   RenderBatch batch;
 
   batch.eye = eye;
@@ -365,7 +570,9 @@ RenderBatch Z3DMeshRenderer::buildRenderBatch(Z3DEye eye, bool picking) const
   uint32_t vertexCount = 0u;
   uint32_t indexCount = 0u;
   if (m_meshPt) {
-    for (const auto* mesh : *m_meshPt) {
+    CHECK(meshStart + meshCount <= m_meshPt->size()) << "Mesh batch segment exceeds renderer mesh list";
+    for (size_t i = meshStart; i < meshStart + meshCount; ++i) {
+      const auto* mesh = (*m_meshPt)[i];
       if (!mesh) {
         continue;
       }
@@ -376,7 +583,7 @@ RenderBatch Z3DMeshRenderer::buildRenderBatch(Z3DEye eye, bool picking) const
   batch.draw.vertexCount = vertexCount;
   batch.draw.indexCount = indexCount;
 
-  auto payload = buildMeshPayload();
+  auto payload = buildMeshPayload(meshStart, meshCount, streamSegmentOrdinal);
   payload.pickingPass = picking;
   batch.geometry = std::move(payload);
 
@@ -386,20 +593,12 @@ RenderBatch Z3DMeshRenderer::buildRenderBatch(Z3DEye eye, bool picking) const
 #if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
 void Z3DMeshRenderer::renderUsingOpengl()
 {
+  ensureMeshSegmentationPlan(RenderBackend::OpenGL);
   if (!m_meshPt || m_meshPt->empty()) {
     return;
   }
 
-  if (picking) {
-    if (!m_meshPickingColorReady) {
-      prepareMeshPickingColor();
-    }
-    if (!m_meshPickingColorsPt || m_meshPickingColorsPt->empty() || m_meshPickingColorsPt->size() != m_meshPt->size()) {
-      return;
-    }
-  }
-
-  if (m_colorSource == MeshColorSource::CustomColor && !m_meshColorReady) {
+  if (m_colorSource == MeshColorSource::CustomColor && (!m_meshColorReady || m_meshColorsPt == nullptr)) {
     prepareMeshColor();
   }
 
@@ -593,11 +792,12 @@ void Z3DMeshRenderer::renderPickingUsingOpengl()
 
 void Z3DMeshRenderer::render(Z3DEye eye)
 {
+  ensureMeshSegmentationPlan(m_rendererBase.activeBackend());
   if (!m_meshPt || m_meshPt->empty()) {
     return;
   }
 
-  if (m_colorSource == MeshColorSource::CustomColor && !m_meshColorReady) {
+  if (m_colorSource == MeshColorSource::CustomColor && (!m_meshColorReady || m_meshColorsPt == nullptr)) {
     prepareMeshColor();
   }
 
@@ -993,11 +1193,12 @@ void Z3DMeshRenderer::render(Z3DEye eye)
 
 void Z3DMeshRenderer::renderPicking(Z3DEye eye)
 {
+  ensureMeshSegmentationPlan(m_rendererBase.activeBackend());
   if (!m_meshPt || m_meshPt->empty()) {
     return;
   }
 
-  if (!m_meshPickingColorReady) {
+  if (!m_meshPickingColorReady || m_meshPickingColorsPt == nullptr) {
     prepareMeshPickingColor();
   }
 
@@ -1235,12 +1436,13 @@ void Z3DMeshRenderer::enqueueRenderBatches(Z3DEye eye, RenderBackend backend, bo
     return;
   }
 
+  ensureMeshSegmentationPlan(backend);
   if (!m_meshPt || m_meshPt->empty()) {
     return;
   }
 
   if (picking) {
-    if (!m_meshPickingColorReady) {
+    if (!m_meshPickingColorReady || m_meshPickingColorsPt == nullptr) {
       prepareMeshPickingColor();
     }
     if (!m_meshPickingColorsPt || m_meshPickingColorsPt->empty() || m_meshPickingColorsPt->size() != m_meshPt->size()) {
@@ -1248,7 +1450,7 @@ void Z3DMeshRenderer::enqueueRenderBatches(Z3DEye eye, RenderBackend backend, bo
     }
   }
 
-  if (m_colorSource == MeshColorSource::CustomColor && !m_meshColorReady) {
+  if (m_colorSource == MeshColorSource::CustomColor && (!m_meshColorReady || m_meshColorsPt == nullptr)) {
     prepareMeshColor();
   }
 
@@ -1277,8 +1479,10 @@ void Z3DMeshRenderer::enqueueRenderBatches(Z3DEye eye, RenderBackend backend, bo
     }
   }
 
-  auto batch = buildRenderBatch(eye, picking);
-  m_rendererBase.appendBatch(std::move(batch));
+  for (const MeshBatchSegment& segment : m_segmentationPlan.batchSegments) {
+    auto batch = buildRenderBatch(eye, picking, segment.meshStart, segment.meshCount, segment.streamSegmentOrdinal);
+    m_rendererBase.appendBatch(std::move(batch));
+  }
 }
 
 void Z3DMeshRenderer::createResources(RenderBackend backend)

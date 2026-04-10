@@ -167,11 +167,17 @@ private:
   std::unique_ptr<Z3DVertexArrayObject> m_pickingVAOs;
   std::vector<std::unique_ptr<Z3DVertexBufferObject>> m_batchVBOs;
   std::vector<std::unique_ptr<Z3DVertexBufferObject>> m_batchPickingVBOs;
-  size_t m_oneBatchNumber = 4e6;
   bool m_useGeomLineShader = false;
 
   [[nodiscard]] LinePayload buildLinePayload(bool picking) const;
   [[nodiscard]] RenderBatch buildRenderBatch(Z3DEye eye, bool picking) const;
+  [[nodiscard]] LinePayload
+  buildLinePayload(bool picking, size_t segmentStart, size_t segmentCount, uint32_t streamSegmentOrdinal) const;
+  [[nodiscard]] RenderBatch buildRenderBatch(Z3DEye eye,
+                                             bool picking,
+                                             size_t segmentStart,
+                                             size_t segmentCount,
+                                             uint32_t streamSegmentOrdinal) const;
 
   void refreshSmoothLinePayloads();
   void ensureLineColorStorage();

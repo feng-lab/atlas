@@ -190,6 +190,8 @@ void Z3DPerfCollector::flush(uint64_t token)
     agg.fontsBytesStaged += sub.stats.fontsBytesStaged;
     agg.meshesBytesStaged += sub.stats.meshesBytesStaged;
     agg.spheresBytesStaged += sub.stats.spheresBytesStaged;
+    agg.conesBytesStaged += sub.stats.conesBytesStaged;
+    agg.ellipsoidsBytesStaged += sub.stats.ellipsoidsBytesStaged;
     agg.readbackBytesCopied += sub.stats.readbackBytesCopied;
     agg.readbackSlotsInFlight += sub.stats.readbackSlotsInFlight;
     if (sub.stats.preCpuStartSamples > 0) {
@@ -643,6 +645,12 @@ void Z3DPerfCollector::flush(uint64_t token)
         json::object st;
         st["upload_hi"] = agg.uploadHighWatermarkBytes;
         st["static_staged"] = agg.staticBytesStaged;
+        st["lines_staged"] = agg.linesBytesStaged;
+        st["fonts_staged"] = agg.fontsBytesStaged;
+        st["meshes_staged"] = agg.meshesBytesStaged;
+        st["spheres_staged"] = agg.spheresBytesStaged;
+        st["cones_staged"] = agg.conesBytesStaged;
+        st["ellipsoids_staged"] = agg.ellipsoidsBytesStaged;
         st["readback"] = agg.readbackBytesCopied;
         st["all_ms"] = agg.allMaxMs;
         st["all_samples"] = agg.allSamples;

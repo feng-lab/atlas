@@ -532,9 +532,37 @@ public:
   // Returns 0 when the buffer does not belong to the backend static arenas.
   [[nodiscard]] uint64_t staticArenaSegmentIdForBuffer(vk::Buffer buffer) const;
 
+  enum class StaticCacheOwner : uint8_t
+  {
+    Mesh = 0,
+    Line = 1,
+    Ellipsoid = 2,
+    Sphere = 3,
+    Cone = 4,
+  };
+
+  enum class StaticPressureDomain : uint8_t
+  {
+    Vertex = 0,
+    Index = 1,
+  };
+
+  struct StaticPressureEvictionCandidate
+  {
+    StaticCacheOwner owner = StaticCacheOwner::Mesh;
+    uint64_t streamKey = 0;
+    uint64_t lastUsedEpoch = 0;
+    size_t bytes = 0;
+  };
+
   // Request eviction of all cached static geometry for a given streamKey.
   // This is processed on the render thread during beginRender().
   void requestEvictStream(uint64_t streamKey);
+
+  [[nodiscard]] uint64_t currentStaticCacheEpoch() const
+  {
+    return m_staticCacheEpoch;
+  }
 
   // Record a copy from an upload slice into a device-local buffer at dst.
   // Inserts a barrier making the data visible to the appropriate pipeline stage.
@@ -759,6 +787,7 @@ public:
   [[nodiscard]] bool hasInFlightFrames() const override;
   [[nodiscard]] uint32_t inFlightCount() const override;
   [[nodiscard]] uint32_t maxFramesInFlight() const override;
+  [[nodiscard]] size_t maxMonolithicGeometryStreamBytes() const override;
 
   // Stage 4: Async Readback API (offscreen)
   // Enqueue end-of-frame GPU->CPU copies into a host-visible staging ring, then
@@ -1182,6 +1211,8 @@ private:
     size_t fontsBytesStaged = 0;
     size_t meshesBytesStaged = 0;
     size_t spheresBytesStaged = 0;
+    size_t conesBytesStaged = 0;
+    size_t ellipsoidsBytesStaged = 0;
 
     struct ScheduledCopy
     {
@@ -1382,6 +1413,18 @@ public:
       m_activeFrame->spheresBytesStaged += bytes;
     }
   }
+  void addConeBytesStaged(size_t bytes)
+  {
+    if (m_activeFrame) {
+      m_activeFrame->conesBytesStaged += bytes;
+    }
+  }
+  void addEllipsoidBytesStaged(size_t bytes)
+  {
+    if (m_activeFrame) {
+      m_activeFrame->ellipsoidsBytesStaged += bytes;
+    }
+  }
 
   ZVulkanDevice* m_sharedDevice = nullptr; // non-owning; provided by engine/scratch-pool
   uint64_t m_deviceRevision = 0;
@@ -1502,11 +1545,13 @@ public:
   // Static arena helpers
   std::unique_ptr<StaticArena::Segment> createStaticArenaSegment(StaticArena::Kind kind, size_t capacityBytes);
   void flushPendingFreesAndMaybeTrimStaticSegment(StaticArena::Segment* segment);
+  size_t evictColdStaticCacheForPressure(StaticPressureDomain domain, size_t growthBytes, bool force);
 
   // Pending per-stream static-geometry evictions requested from outside the
   // render thread (e.g., primitive renderer destruction). Drained in beginRender().
   std::mutex m_pendingEvictionsMutex;
   std::unordered_set<uint64_t> m_pendingEvictStreamKeys;
+  uint64_t m_staticCacheEpoch = 0;
 
   // PPLL (exact OIT): per-pixel fragment list resources are maintained in a
   // small ring keyed by the UI/perf frame token (not by Vulkan frame-executor

@@ -4,9 +4,24 @@
 #include "z3dgpuinfo.h"
 #include "z3dshaderprogram.h"
 
+#include <gflags/gflags.h>
+
+#include <limits>
 #include <utility>
 
 namespace nim {
+
+namespace {
+
+constexpr size_t kEllipsoidVerticesPerInstance = 4;
+constexpr size_t kEllipsoidIndicesPerInstance = 6;
+
+} // namespace
+
+DEFINE_uint64(atlas_ellipsoid_preferred_instance_budget_per_segment,
+              1000000,
+              "Preferred ellipsoid instance budget for one renderer-owned segment. This is the normal packing target; "
+              "backends still enforce maxMonolithicGeometryStreamBytes as a hard safety guard.");
 
 Z3DEllipsoidRenderer::Z3DEllipsoidRenderer(Z3DRendererBase& rendererBase)
   : Z3DPrimitiveRenderer(rendererBase)
@@ -220,10 +235,24 @@ void Z3DEllipsoidRenderer::render(Z3DEye eye)
   m_rendererBase.setGlobalShaderParameters(shader, eye);
   setShaderParameters(shader);
 
+  const size_t preferredInstanceBudget =
+    std::max<size_t>(1, static_cast<size_t>(FLAGS_atlas_ellipsoid_preferred_instance_budget_per_segment));
+  const size_t totalInstanceCount = m_centers.size() / kEllipsoidVerticesPerInstance;
+  const size_t numBatch = (totalInstanceCount + preferredInstanceBudget - 1) / preferredInstanceBudget;
+  const bool rebuildNormalBatches = m_dataChanged || (m_VBOs.size() != numBatch);
+
   if (m_useVAO) {
-    if (m_dataChanged) {
-      m_VAO->bind();
-      // set vertex data
+    if (rebuildNormalBatches) {
+      m_VAOs->resize(numBatch);
+      m_VBOs.resize(numBatch);
+      for (auto& vbo : m_VBOs) {
+        if (!vbo) {
+          vbo = std::make_unique<Z3DVertexBufferObject>(8);
+        } else {
+          vbo->resize(8);
+        }
+      }
+
       auto attr_T = shader.TAttributeLocation();
       GLint attr_a_specular_shininess = -1;
       if (m_useDynamicMaterial && !m_specularAndShininess.empty()) {
@@ -231,65 +260,88 @@ void Z3DEllipsoidRenderer::render(Z3DEye eye)
       }
       auto attr_color = shader.colorAttributeLocation();
       auto attr_flags = shader.flagsAttributeLocation();
+      for (size_t batchIndex = 0; batchIndex < numBatch; ++batchIndex) {
+        const size_t instanceStart = batchIndex * preferredInstanceBudget;
+        const size_t batchInstanceCount = std::min(preferredInstanceBudget, totalInstanceCount - instanceStart);
+        const size_t vertexStart = instanceStart * kEllipsoidVerticesPerInstance;
+        const size_t vertexCount = batchInstanceCount * kEllipsoidVerticesPerInstance;
+        const size_t indexCount = batchInstanceCount * kEllipsoidIndicesPerInstance;
 
-      glEnableVertexAttribArray(attr_T);
-      m_VBOs->bind(GL_ARRAY_BUFFER, 0);
-      glBufferData(GL_ARRAY_BUFFER, m_axis1.size() * 4 * sizeof(GLfloat), m_axis1.data(), GL_STATIC_DRAW);
-      glVertexAttribPointer(attr_T, 4, GL_FLOAT, GL_FALSE, 0, nullptr);
+        m_VAOs->bind(batchIndex);
 
-      glEnableVertexAttribArray(attr_T + 1);
-      m_VBOs->bind(GL_ARRAY_BUFFER, 1);
-      glBufferData(GL_ARRAY_BUFFER, m_axis2.size() * 4 * sizeof(GLfloat), m_axis2.data(), GL_STATIC_DRAW);
-      glVertexAttribPointer(attr_T + 1, 4, GL_FLOAT, GL_FALSE, 0, nullptr);
+        glEnableVertexAttribArray(attr_T);
+        m_VBOs[batchIndex]->bind(GL_ARRAY_BUFFER, 0);
+        glBufferData(GL_ARRAY_BUFFER, vertexCount * 4 * sizeof(GLfloat), &(m_axis1[vertexStart]), GL_STATIC_DRAW);
+        glVertexAttribPointer(attr_T, 4, GL_FLOAT, GL_FALSE, 0, nullptr);
 
-      glEnableVertexAttribArray(attr_T + 2);
-      m_VBOs->bind(GL_ARRAY_BUFFER, 2);
-      glBufferData(GL_ARRAY_BUFFER, m_axis3.size() * 4 * sizeof(GLfloat), m_axis3.data(), GL_STATIC_DRAW);
-      glVertexAttribPointer(attr_T + 2, 4, GL_FLOAT, GL_FALSE, 0, nullptr);
+        glEnableVertexAttribArray(attr_T + 1);
+        m_VBOs[batchIndex]->bind(GL_ARRAY_BUFFER, 1);
+        glBufferData(GL_ARRAY_BUFFER, vertexCount * 4 * sizeof(GLfloat), &(m_axis2[vertexStart]), GL_STATIC_DRAW);
+        glVertexAttribPointer(attr_T + 1, 4, GL_FLOAT, GL_FALSE, 0, nullptr);
 
-      glEnableVertexAttribArray(attr_T + 3);
-      m_VBOs->bind(GL_ARRAY_BUFFER, 3);
-      glBufferData(GL_ARRAY_BUFFER, m_centers.size() * 4 * sizeof(GLfloat), m_centers.data(), GL_STATIC_DRAW);
-      glVertexAttribPointer(attr_T + 3, 4, GL_FLOAT, GL_FALSE, 0, nullptr);
+        glEnableVertexAttribArray(attr_T + 2);
+        m_VBOs[batchIndex]->bind(GL_ARRAY_BUFFER, 2);
+        glBufferData(GL_ARRAY_BUFFER, vertexCount * 4 * sizeof(GLfloat), &(m_axis3[vertexStart]), GL_STATIC_DRAW);
+        glVertexAttribPointer(attr_T + 2, 4, GL_FLOAT, GL_FALSE, 0, nullptr);
 
-      if (m_useDynamicMaterial && !m_specularAndShininess.empty()) {
-        glEnableVertexAttribArray(attr_a_specular_shininess);
-        m_VBOs->bind(GL_ARRAY_BUFFER, 6);
+        glEnableVertexAttribArray(attr_T + 3);
+        m_VBOs[batchIndex]->bind(GL_ARRAY_BUFFER, 3);
+        glBufferData(GL_ARRAY_BUFFER, vertexCount * 4 * sizeof(GLfloat), &(m_centers[vertexStart]), GL_STATIC_DRAW);
+        glVertexAttribPointer(attr_T + 3, 4, GL_FLOAT, GL_FALSE, 0, nullptr);
+
+        if (m_useDynamicMaterial && !m_specularAndShininess.empty()) {
+          glEnableVertexAttribArray(attr_a_specular_shininess);
+          m_VBOs[batchIndex]->bind(GL_ARRAY_BUFFER, 6);
+          glBufferData(GL_ARRAY_BUFFER,
+                       vertexCount * 4 * sizeof(GLfloat),
+                       &(m_specularAndShininess[vertexStart]),
+                       GL_STATIC_DRAW);
+          glVertexAttribPointer(attr_a_specular_shininess, 4, GL_FLOAT, GL_FALSE, 0, nullptr);
+        }
+
+        glEnableVertexAttribArray(attr_color);
+        m_VBOs[batchIndex]->bind(GL_ARRAY_BUFFER, 7);
         glBufferData(GL_ARRAY_BUFFER,
-                     m_specularAndShininess.size() * 4 * sizeof(GLfloat),
-                     m_specularAndShininess.data(),
+                     vertexCount * 4 * sizeof(GLfloat),
+                     &(m_ellipsoidColors[vertexStart]),
                      GL_STATIC_DRAW);
-        glVertexAttribPointer(attr_a_specular_shininess, 4, GL_FLOAT, GL_FALSE, 0, nullptr);
+        glVertexAttribPointer(attr_color, 4, GL_FLOAT, GL_FALSE, 0, nullptr);
+
+        glEnableVertexAttribArray(attr_flags);
+        m_VBOs[batchIndex]->bind(GL_ARRAY_BUFFER, 4);
+        glBufferData(GL_ARRAY_BUFFER, vertexCount * sizeof(GLfloat), &(m_allFlags[vertexStart]), GL_STATIC_DRAW);
+        glVertexAttribPointer(attr_flags, 1, GL_FLOAT, GL_FALSE, 0, nullptr);
+
+        m_VBOs[batchIndex]->bind(GL_ELEMENT_ARRAY_BUFFER, 5);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, indexCount * sizeof(GLuint), m_indexs.data(), GL_STATIC_DRAW);
+
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
+        m_VAOs->release();
       }
-
-      glEnableVertexAttribArray(attr_color);
-      m_VBOs->bind(GL_ARRAY_BUFFER, 7);
-      glBufferData(GL_ARRAY_BUFFER,
-                   m_ellipsoidColors.size() * 4 * sizeof(GLfloat),
-                   m_ellipsoidColors.data(),
-                   GL_STATIC_DRAW);
-      glVertexAttribPointer(attr_color, 4, GL_FLOAT, GL_FALSE, 0, nullptr);
-
-      glEnableVertexAttribArray(attr_flags);
-      m_VBOs->bind(GL_ARRAY_BUFFER, 4);
-      glBufferData(GL_ARRAY_BUFFER, m_allFlags.size() * sizeof(GLfloat), m_allFlags.data(), GL_STATIC_DRAW);
-      glVertexAttribPointer(attr_flags, 1, GL_FLOAT, GL_FALSE, 0, nullptr);
-
-      m_VBOs->bind(GL_ELEMENT_ARRAY_BUFFER, 5);
-      glBufferData(GL_ELEMENT_ARRAY_BUFFER, m_indexs.size() * sizeof(GLuint), m_indexs.data(), GL_STATIC_DRAW);
-
-      glBindBuffer(GL_ARRAY_BUFFER, 0);
-      m_VAO->release();
-
       m_dataChanged = false;
     }
 
-    m_VAO->bind();
-    glDrawElements(GL_TRIANGLES, m_indexs.size(), GL_UNSIGNED_INT, nullptr);
-    m_VAO->release();
+    for (size_t batchIndex = 0; batchIndex < numBatch; ++batchIndex) {
+      const size_t instanceStart = batchIndex * preferredInstanceBudget;
+      const size_t batchInstanceCount = std::min(preferredInstanceBudget, totalInstanceCount - instanceStart);
+      const size_t indexCount = batchInstanceCount * kEllipsoidIndicesPerInstance;
+      m_VAOs->bind(batchIndex);
+      glDrawElements(GL_TRIANGLES, indexCount, GL_UNSIGNED_INT, nullptr);
+      m_VAOs->release();
+    }
 
   } else {
-    // set vertex data
+    if (rebuildNormalBatches) {
+      m_VBOs.resize(numBatch);
+      for (auto& vbo : m_VBOs) {
+        if (!vbo) {
+          vbo = std::make_unique<Z3DVertexBufferObject>(8);
+        } else {
+          vbo->resize(8);
+        }
+      }
+    }
+
     auto attr_T = shader.TAttributeLocation();
     GLint attr_a_specular_shininess = -1;
     if (m_useDynamicMaterial && !m_specularAndShininess.empty()) {
@@ -297,83 +349,89 @@ void Z3DEllipsoidRenderer::render(Z3DEye eye)
     }
     auto attr_color = shader.colorAttributeLocation();
     auto attr_flags = shader.flagsAttributeLocation();
+    for (size_t batchIndex = 0; batchIndex < numBatch; ++batchIndex) {
+      const size_t instanceStart = batchIndex * preferredInstanceBudget;
+      const size_t batchInstanceCount = std::min(preferredInstanceBudget, totalInstanceCount - instanceStart);
+      const size_t vertexStart = instanceStart * kEllipsoidVerticesPerInstance;
+      const size_t vertexCount = batchInstanceCount * kEllipsoidVerticesPerInstance;
+      const size_t indexCount = batchInstanceCount * kEllipsoidIndicesPerInstance;
 
-    glEnableVertexAttribArray(attr_T);
-    m_VBOs->bind(GL_ARRAY_BUFFER, 0);
-    if (m_dataChanged) {
-      glBufferData(GL_ARRAY_BUFFER, m_axis1.size() * 4 * sizeof(GLfloat), m_axis1.data(), GL_STATIC_DRAW);
-    }
-    glVertexAttribPointer(attr_T, 4, GL_FLOAT, GL_FALSE, 0, nullptr);
+      glEnableVertexAttribArray(attr_T);
+      m_VBOs[batchIndex]->bind(GL_ARRAY_BUFFER, 0);
+      if (rebuildNormalBatches) {
+        glBufferData(GL_ARRAY_BUFFER, vertexCount * 4 * sizeof(GLfloat), &(m_axis1[vertexStart]), GL_STATIC_DRAW);
+      }
+      glVertexAttribPointer(attr_T, 4, GL_FLOAT, GL_FALSE, 0, nullptr);
 
-    glEnableVertexAttribArray(attr_T + 1);
-    m_VBOs->bind(GL_ARRAY_BUFFER, 1);
-    if (m_dataChanged) {
-      glBufferData(GL_ARRAY_BUFFER, m_axis2.size() * 4 * sizeof(GLfloat), m_axis2.data(), GL_STATIC_DRAW);
-    }
-    glVertexAttribPointer(attr_T + 1, 4, GL_FLOAT, GL_FALSE, 0, nullptr);
+      glEnableVertexAttribArray(attr_T + 1);
+      m_VBOs[batchIndex]->bind(GL_ARRAY_BUFFER, 1);
+      if (rebuildNormalBatches) {
+        glBufferData(GL_ARRAY_BUFFER, vertexCount * 4 * sizeof(GLfloat), &(m_axis2[vertexStart]), GL_STATIC_DRAW);
+      }
+      glVertexAttribPointer(attr_T + 1, 4, GL_FLOAT, GL_FALSE, 0, nullptr);
 
-    glEnableVertexAttribArray(attr_T + 2);
-    m_VBOs->bind(GL_ARRAY_BUFFER, 2);
-    if (m_dataChanged) {
-      glBufferData(GL_ARRAY_BUFFER, m_axis3.size() * 4 * sizeof(GLfloat), m_axis3.data(), GL_STATIC_DRAW);
-    }
-    glVertexAttribPointer(attr_T + 2, 4, GL_FLOAT, GL_FALSE, 0, nullptr);
+      glEnableVertexAttribArray(attr_T + 2);
+      m_VBOs[batchIndex]->bind(GL_ARRAY_BUFFER, 2);
+      if (rebuildNormalBatches) {
+        glBufferData(GL_ARRAY_BUFFER, vertexCount * 4 * sizeof(GLfloat), &(m_axis3[vertexStart]), GL_STATIC_DRAW);
+      }
+      glVertexAttribPointer(attr_T + 2, 4, GL_FLOAT, GL_FALSE, 0, nullptr);
 
-    glEnableVertexAttribArray(attr_T + 3);
-    m_VBOs->bind(GL_ARRAY_BUFFER, 3);
-    if (m_dataChanged) {
-      glBufferData(GL_ARRAY_BUFFER, m_centers.size() * 4 * sizeof(GLfloat), m_centers.data(), GL_STATIC_DRAW);
-    }
-    glVertexAttribPointer(attr_T + 3, 4, GL_FLOAT, GL_FALSE, 0, nullptr);
+      glEnableVertexAttribArray(attr_T + 3);
+      m_VBOs[batchIndex]->bind(GL_ARRAY_BUFFER, 3);
+      if (rebuildNormalBatches) {
+        glBufferData(GL_ARRAY_BUFFER, vertexCount * 4 * sizeof(GLfloat), &(m_centers[vertexStart]), GL_STATIC_DRAW);
+      }
+      glVertexAttribPointer(attr_T + 3, 4, GL_FLOAT, GL_FALSE, 0, nullptr);
 
-    if (m_useDynamicMaterial && !m_specularAndShininess.empty()) {
-      glEnableVertexAttribArray(attr_a_specular_shininess);
-      m_VBOs->bind(GL_ARRAY_BUFFER, 6);
-      if (m_dataChanged) {
+      if (m_useDynamicMaterial && !m_specularAndShininess.empty()) {
+        glEnableVertexAttribArray(attr_a_specular_shininess);
+        m_VBOs[batchIndex]->bind(GL_ARRAY_BUFFER, 6);
+        if (rebuildNormalBatches) {
+          glBufferData(GL_ARRAY_BUFFER,
+                       vertexCount * 4 * sizeof(GLfloat),
+                       &(m_specularAndShininess[vertexStart]),
+                       GL_STATIC_DRAW);
+        }
+        glVertexAttribPointer(attr_a_specular_shininess, 4, GL_FLOAT, GL_FALSE, 0, nullptr);
+      }
+
+      glEnableVertexAttribArray(attr_color);
+      m_VBOs[batchIndex]->bind(GL_ARRAY_BUFFER, 7);
+      if (rebuildNormalBatches) {
         glBufferData(GL_ARRAY_BUFFER,
-                     m_specularAndShininess.size() * 4 * sizeof(GLfloat),
-                     m_specularAndShininess.data(),
+                     vertexCount * 4 * sizeof(GLfloat),
+                     &(m_ellipsoidColors[vertexStart]),
                      GL_STATIC_DRAW);
       }
-      glVertexAttribPointer(attr_a_specular_shininess, 4, GL_FLOAT, GL_FALSE, 0, nullptr);
+      glVertexAttribPointer(attr_color, 4, GL_FLOAT, GL_FALSE, 0, nullptr);
+
+      glEnableVertexAttribArray(attr_flags);
+      m_VBOs[batchIndex]->bind(GL_ARRAY_BUFFER, 4);
+      if (rebuildNormalBatches) {
+        glBufferData(GL_ARRAY_BUFFER, vertexCount * sizeof(GLfloat), &(m_allFlags[vertexStart]), GL_STATIC_DRAW);
+      }
+      glVertexAttribPointer(attr_flags, 1, GL_FLOAT, GL_FALSE, 0, nullptr);
+
+      m_VBOs[batchIndex]->bind(GL_ELEMENT_ARRAY_BUFFER, 5);
+      if (rebuildNormalBatches) {
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, indexCount * sizeof(GLuint), m_indexs.data(), GL_STATIC_DRAW);
+      }
+
+      glDrawElements(GL_TRIANGLES, indexCount, GL_UNSIGNED_INT, nullptr);
+
+      glBindBuffer(GL_ARRAY_BUFFER, 0);
+      glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+      glDisableVertexAttribArray(attr_T);
+      glDisableVertexAttribArray(attr_T + 1);
+      glDisableVertexAttribArray(attr_T + 2);
+      glDisableVertexAttribArray(attr_T + 3);
+      if (m_useDynamicMaterial && !m_specularAndShininess.empty()) {
+        glDisableVertexAttribArray(attr_a_specular_shininess);
+      }
+      glDisableVertexAttribArray(attr_color);
+      glDisableVertexAttribArray(attr_flags);
     }
-
-    glEnableVertexAttribArray(attr_color);
-    m_VBOs->bind(GL_ARRAY_BUFFER, 7);
-    if (m_dataChanged) {
-      glBufferData(GL_ARRAY_BUFFER,
-                   m_ellipsoidColors.size() * 4 * sizeof(GLfloat),
-                   m_ellipsoidColors.data(),
-                   GL_STATIC_DRAW);
-    }
-    glVertexAttribPointer(attr_color, 4, GL_FLOAT, GL_FALSE, 0, nullptr);
-
-    glEnableVertexAttribArray(attr_flags);
-    m_VBOs->bind(GL_ARRAY_BUFFER, 4);
-    if (m_dataChanged) {
-      glBufferData(GL_ARRAY_BUFFER, m_allFlags.size() * sizeof(GLfloat), m_allFlags.data(), GL_STATIC_DRAW);
-    }
-    glVertexAttribPointer(attr_flags, 1, GL_FLOAT, GL_FALSE, 0, nullptr);
-
-    m_VBOs->bind(GL_ELEMENT_ARRAY_BUFFER, 5);
-    if (m_dataChanged) {
-      glBufferData(GL_ELEMENT_ARRAY_BUFFER, m_indexs.size() * sizeof(GLuint), m_indexs.data(), GL_STATIC_DRAW);
-    }
-
-    glDrawElements(GL_TRIANGLES, m_indexs.size(), GL_UNSIGNED_INT, nullptr);
-
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-    glDisableVertexAttribArray(attr_T);
-    glDisableVertexAttribArray(attr_T + 1);
-    glDisableVertexAttribArray(attr_T + 2);
-    glDisableVertexAttribArray(attr_T + 3);
-    if (m_useDynamicMaterial && !m_specularAndShininess.empty()) {
-      glDisableVertexAttribArray(attr_a_specular_shininess);
-    }
-    glDisableVertexAttribArray(attr_color);
-    glDisableVertexAttribArray(attr_flags);
-
     m_dataChanged = false;
   }
 
@@ -395,175 +453,207 @@ void Z3DEllipsoidRenderer::renderPicking(Z3DEye eye)
   m_rendererBase.setGlobalShaderParameters(shader, eye);
   setPickingShaderParameters(shader);
 
+  const size_t preferredInstanceBudget =
+    std::max<size_t>(1, static_cast<size_t>(FLAGS_atlas_ellipsoid_preferred_instance_budget_per_segment));
+  const size_t totalInstanceCount = m_centers.size() / kEllipsoidVerticesPerInstance;
+  const size_t numBatch = (totalInstanceCount + preferredInstanceBudget - 1) / preferredInstanceBudget;
+  const bool rebuildNormalBatches = m_dataChanged || (m_VBOs.size() != numBatch);
+  const bool rebuildPickingBatches = m_pickingDataChanged || (m_pickingVBOs.size() != numBatch);
+
   if (m_useVAO) {
-    if (m_pickingDataChanged) {
-      m_pickingVAO->bind();
-      // set vertex data
+    if (rebuildPickingBatches || rebuildNormalBatches) {
+      m_pickingVAOs->resize(numBatch);
+      m_pickingVBOs.resize(numBatch);
+      for (auto& vbo : m_pickingVBOs) {
+        if (!vbo) {
+          vbo = std::make_unique<Z3DVertexBufferObject>(7);
+        } else {
+          vbo->resize(7);
+        }
+      }
+
       auto attr_T = shader.TAttributeLocation();
       auto attr_color = shader.colorAttributeLocation();
       auto attr_flags = shader.flagsAttributeLocation();
+      for (size_t batchIndex = 0; batchIndex < numBatch; ++batchIndex) {
+        const size_t instanceStart = batchIndex * preferredInstanceBudget;
+        const size_t batchInstanceCount = std::min(preferredInstanceBudget, totalInstanceCount - instanceStart);
+        const size_t vertexStart = instanceStart * kEllipsoidVerticesPerInstance;
+        const size_t vertexCount = batchInstanceCount * kEllipsoidVerticesPerInstance;
+        const size_t indexCount = batchInstanceCount * kEllipsoidIndicesPerInstance;
+
+        m_pickingVAOs->bind(batchIndex);
+
+        glEnableVertexAttribArray(attr_T);
+        if (rebuildNormalBatches) {
+          m_pickingVBOs[batchIndex]->bind(GL_ARRAY_BUFFER, 0);
+          glBufferData(GL_ARRAY_BUFFER, vertexCount * 4 * sizeof(GLfloat), &(m_axis1[vertexStart]), GL_STATIC_DRAW);
+        } else {
+          m_VBOs[batchIndex]->bind(GL_ARRAY_BUFFER, 0);
+        }
+        glVertexAttribPointer(attr_T, 4, GL_FLOAT, GL_FALSE, 0, nullptr);
+
+        glEnableVertexAttribArray(attr_T + 1);
+        if (rebuildNormalBatches) {
+          m_pickingVBOs[batchIndex]->bind(GL_ARRAY_BUFFER, 1);
+          glBufferData(GL_ARRAY_BUFFER, vertexCount * 4 * sizeof(GLfloat), &(m_axis2[vertexStart]), GL_STATIC_DRAW);
+        } else {
+          m_VBOs[batchIndex]->bind(GL_ARRAY_BUFFER, 1);
+        }
+        glVertexAttribPointer(attr_T + 1, 4, GL_FLOAT, GL_FALSE, 0, nullptr);
+
+        glEnableVertexAttribArray(attr_T + 2);
+        if (rebuildNormalBatches) {
+          m_pickingVBOs[batchIndex]->bind(GL_ARRAY_BUFFER, 2);
+          glBufferData(GL_ARRAY_BUFFER, vertexCount * 4 * sizeof(GLfloat), &(m_axis3[vertexStart]), GL_STATIC_DRAW);
+        } else {
+          m_VBOs[batchIndex]->bind(GL_ARRAY_BUFFER, 2);
+        }
+        glVertexAttribPointer(attr_T + 2, 4, GL_FLOAT, GL_FALSE, 0, nullptr);
+
+        glEnableVertexAttribArray(attr_T + 3);
+        if (rebuildNormalBatches) {
+          m_pickingVBOs[batchIndex]->bind(GL_ARRAY_BUFFER, 3);
+          glBufferData(GL_ARRAY_BUFFER, vertexCount * 4 * sizeof(GLfloat), &(m_centers[vertexStart]), GL_STATIC_DRAW);
+        } else {
+          m_VBOs[batchIndex]->bind(GL_ARRAY_BUFFER, 3);
+        }
+        glVertexAttribPointer(attr_T + 3, 4, GL_FLOAT, GL_FALSE, 0, nullptr);
+
+        glEnableVertexAttribArray(attr_color);
+        m_pickingVBOs[batchIndex]->bind(GL_ARRAY_BUFFER, 6);
+        glBufferData(GL_ARRAY_BUFFER,
+                     vertexCount * 4 * sizeof(GLfloat),
+                     &(m_ellipsoidPickingColors[vertexStart]),
+                     GL_STATIC_DRAW);
+        glVertexAttribPointer(attr_color, 4, GL_FLOAT, GL_FALSE, 0, nullptr);
+
+        glEnableVertexAttribArray(attr_flags);
+        if (rebuildNormalBatches) {
+          m_pickingVBOs[batchIndex]->bind(GL_ARRAY_BUFFER, 4);
+          glBufferData(GL_ARRAY_BUFFER, vertexCount * sizeof(GLfloat), &(m_allFlags[vertexStart]), GL_STATIC_DRAW);
+        } else {
+          m_VBOs[batchIndex]->bind(GL_ARRAY_BUFFER, 4);
+        }
+        glVertexAttribPointer(attr_flags, 1, GL_FLOAT, GL_FALSE, 0, nullptr);
+
+        if (rebuildNormalBatches) {
+          m_pickingVBOs[batchIndex]->bind(GL_ELEMENT_ARRAY_BUFFER, 5);
+          glBufferData(GL_ELEMENT_ARRAY_BUFFER, indexCount * sizeof(GLuint), m_indexs.data(), GL_STATIC_DRAW);
+        } else {
+          m_VBOs[batchIndex]->bind(GL_ELEMENT_ARRAY_BUFFER, 5);
+        }
+
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
+        m_pickingVAOs->release();
+      }
+      m_pickingDataChanged = false;
+    }
+
+    for (size_t batchIndex = 0; batchIndex < numBatch; ++batchIndex) {
+      const size_t instanceStart = batchIndex * preferredInstanceBudget;
+      const size_t batchInstanceCount = std::min(preferredInstanceBudget, totalInstanceCount - instanceStart);
+      const size_t indexCount = batchInstanceCount * kEllipsoidIndicesPerInstance;
+      m_pickingVAOs->bind(batchIndex);
+      glDrawElements(GL_TRIANGLES, indexCount, GL_UNSIGNED_INT, nullptr);
+      m_pickingVAOs->release();
+    }
+
+  } else {
+    if (rebuildPickingBatches || rebuildNormalBatches) {
+      m_pickingVBOs.resize(numBatch);
+      for (auto& vbo : m_pickingVBOs) {
+        if (!vbo) {
+          vbo = std::make_unique<Z3DVertexBufferObject>(7);
+        } else {
+          vbo->resize(7);
+        }
+      }
+    }
+
+    auto attr_T = shader.TAttributeLocation();
+    auto attr_color = shader.colorAttributeLocation();
+    auto attr_flags = shader.flagsAttributeLocation();
+    for (size_t batchIndex = 0; batchIndex < numBatch; ++batchIndex) {
+      const size_t instanceStart = batchIndex * preferredInstanceBudget;
+      const size_t batchInstanceCount = std::min(preferredInstanceBudget, totalInstanceCount - instanceStart);
+      const size_t vertexStart = instanceStart * kEllipsoidVerticesPerInstance;
+      const size_t vertexCount = batchInstanceCount * kEllipsoidVerticesPerInstance;
+      const size_t indexCount = batchInstanceCount * kEllipsoidIndicesPerInstance;
 
       glEnableVertexAttribArray(attr_T);
-      if (m_dataChanged) {
-        m_pickingVBOs->bind(GL_ARRAY_BUFFER, 0);
-        glBufferData(GL_ARRAY_BUFFER, m_axis1.size() * 4 * sizeof(GLfloat), m_axis1.data(), GL_STATIC_DRAW);
+      if (rebuildNormalBatches) {
+        m_pickingVBOs[batchIndex]->bind(GL_ARRAY_BUFFER, 0);
+        glBufferData(GL_ARRAY_BUFFER, vertexCount * 4 * sizeof(GLfloat), &(m_axis1[vertexStart]), GL_STATIC_DRAW);
       } else {
-        m_VBOs->bind(GL_ARRAY_BUFFER, 0);
+        m_VBOs[batchIndex]->bind(GL_ARRAY_BUFFER, 0);
       }
       glVertexAttribPointer(attr_T, 4, GL_FLOAT, GL_FALSE, 0, nullptr);
 
       glEnableVertexAttribArray(attr_T + 1);
-      if (m_dataChanged) {
-        m_pickingVBOs->bind(GL_ARRAY_BUFFER, 1);
-        glBufferData(GL_ARRAY_BUFFER, m_axis2.size() * 4 * sizeof(GLfloat), m_axis2.data(), GL_STATIC_DRAW);
+      if (rebuildNormalBatches) {
+        m_pickingVBOs[batchIndex]->bind(GL_ARRAY_BUFFER, 1);
+        glBufferData(GL_ARRAY_BUFFER, vertexCount * 4 * sizeof(GLfloat), &(m_axis2[vertexStart]), GL_STATIC_DRAW);
       } else {
-        m_VBOs->bind(GL_ARRAY_BUFFER, 1);
+        m_VBOs[batchIndex]->bind(GL_ARRAY_BUFFER, 1);
       }
       glVertexAttribPointer(attr_T + 1, 4, GL_FLOAT, GL_FALSE, 0, nullptr);
 
       glEnableVertexAttribArray(attr_T + 2);
-      if (m_dataChanged) {
-        m_pickingVBOs->bind(GL_ARRAY_BUFFER, 2);
-        glBufferData(GL_ARRAY_BUFFER, m_axis3.size() * 4 * sizeof(GLfloat), m_axis3.data(), GL_STATIC_DRAW);
+      if (rebuildNormalBatches) {
+        m_pickingVBOs[batchIndex]->bind(GL_ARRAY_BUFFER, 2);
+        glBufferData(GL_ARRAY_BUFFER, vertexCount * 4 * sizeof(GLfloat), &(m_axis3[vertexStart]), GL_STATIC_DRAW);
       } else {
-        m_VBOs->bind(GL_ARRAY_BUFFER, 2);
+        m_VBOs[batchIndex]->bind(GL_ARRAY_BUFFER, 2);
       }
       glVertexAttribPointer(attr_T + 2, 4, GL_FLOAT, GL_FALSE, 0, nullptr);
 
       glEnableVertexAttribArray(attr_T + 3);
-      if (m_dataChanged) {
-        m_pickingVBOs->bind(GL_ARRAY_BUFFER, 3);
-        glBufferData(GL_ARRAY_BUFFER, m_centers.size() * 4 * sizeof(GLfloat), m_centers.data(), GL_STATIC_DRAW);
+      if (rebuildNormalBatches) {
+        m_pickingVBOs[batchIndex]->bind(GL_ARRAY_BUFFER, 3);
+        glBufferData(GL_ARRAY_BUFFER, vertexCount * 4 * sizeof(GLfloat), &(m_centers[vertexStart]), GL_STATIC_DRAW);
       } else {
-        m_VBOs->bind(GL_ARRAY_BUFFER, 3);
+        m_VBOs[batchIndex]->bind(GL_ARRAY_BUFFER, 3);
       }
       glVertexAttribPointer(attr_T + 3, 4, GL_FLOAT, GL_FALSE, 0, nullptr);
 
       glEnableVertexAttribArray(attr_color);
-      m_pickingVBOs->bind(GL_ARRAY_BUFFER, 6);
-      glBufferData(GL_ARRAY_BUFFER,
-                   m_ellipsoidPickingColors.size() * 4 * sizeof(GLfloat),
-                   m_ellipsoidPickingColors.data(),
-                   GL_STATIC_DRAW);
+      m_pickingVBOs[batchIndex]->bind(GL_ARRAY_BUFFER, 6);
+      if (rebuildPickingBatches) {
+        glBufferData(GL_ARRAY_BUFFER,
+                     vertexCount * 4 * sizeof(GLfloat),
+                     &(m_ellipsoidPickingColors[vertexStart]),
+                     GL_STATIC_DRAW);
+      }
       glVertexAttribPointer(attr_color, 4, GL_FLOAT, GL_FALSE, 0, nullptr);
 
       glEnableVertexAttribArray(attr_flags);
-      if (m_dataChanged) {
-        m_pickingVBOs->bind(GL_ARRAY_BUFFER, 4);
-        glBufferData(GL_ARRAY_BUFFER, m_allFlags.size() * sizeof(GLfloat), m_allFlags.data(), GL_STATIC_DRAW);
+      if (rebuildNormalBatches) {
+        m_pickingVBOs[batchIndex]->bind(GL_ARRAY_BUFFER, 4);
+        glBufferData(GL_ARRAY_BUFFER, vertexCount * sizeof(GLfloat), &(m_allFlags[vertexStart]), GL_STATIC_DRAW);
       } else {
-        m_VBOs->bind(GL_ARRAY_BUFFER, 4);
+        m_VBOs[batchIndex]->bind(GL_ARRAY_BUFFER, 4);
       }
       glVertexAttribPointer(attr_flags, 1, GL_FLOAT, GL_FALSE, 0, nullptr);
 
-      if (m_dataChanged) {
-        m_pickingVBOs->bind(GL_ELEMENT_ARRAY_BUFFER, 5);
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, m_indexs.size() * sizeof(GLuint), m_indexs.data(), GL_STATIC_DRAW);
+      if (rebuildNormalBatches) {
+        m_pickingVBOs[batchIndex]->bind(GL_ELEMENT_ARRAY_BUFFER, 5);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, indexCount * sizeof(GLuint), m_indexs.data(), GL_STATIC_DRAW);
       } else {
-        m_VBOs->bind(GL_ELEMENT_ARRAY_BUFFER, 5);
+        m_VBOs[batchIndex]->bind(GL_ELEMENT_ARRAY_BUFFER, 5);
       }
+
+      glDrawElements(GL_TRIANGLES, indexCount, GL_UNSIGNED_INT, nullptr);
 
       glBindBuffer(GL_ARRAY_BUFFER, 0);
-      m_pickingVAO->release();
-
-      m_pickingDataChanged = false;
+      glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+      glDisableVertexAttribArray(attr_T + 0);
+      glDisableVertexAttribArray(attr_T + 1);
+      glDisableVertexAttribArray(attr_T + 2);
+      glDisableVertexAttribArray(attr_T + 3);
+      glDisableVertexAttribArray(attr_color);
+      glDisableVertexAttribArray(attr_flags);
     }
-
-    m_pickingVAO->bind();
-    glDrawElements(GL_TRIANGLES, m_indexs.size(), GL_UNSIGNED_INT, nullptr);
-    m_pickingVAO->release();
-
-  } else {
-    // set vertex data
-    auto attr_T = shader.TAttributeLocation();
-    auto attr_color = shader.colorAttributeLocation();
-    auto attr_flags = shader.flagsAttributeLocation();
-
-    glEnableVertexAttribArray(attr_T);
-    if (m_dataChanged) {
-      m_pickingVBOs->bind(GL_ARRAY_BUFFER, 0);
-      if (m_pickingDataChanged) {
-        glBufferData(GL_ARRAY_BUFFER, m_axis1.size() * 4 * sizeof(GLfloat), m_axis1.data(), GL_STATIC_DRAW);
-      }
-    } else {
-      m_VBOs->bind(GL_ARRAY_BUFFER, 0);
-    }
-    glVertexAttribPointer(attr_T, 4, GL_FLOAT, GL_FALSE, 0, nullptr);
-
-    glEnableVertexAttribArray(attr_T + 1);
-    if (m_dataChanged) {
-      m_pickingVBOs->bind(GL_ARRAY_BUFFER, 1);
-      if (m_pickingDataChanged) {
-        glBufferData(GL_ARRAY_BUFFER, m_axis2.size() * 4 * sizeof(GLfloat), m_axis2.data(), GL_STATIC_DRAW);
-      }
-    } else {
-      m_VBOs->bind(GL_ARRAY_BUFFER, 1);
-    }
-    glVertexAttribPointer(attr_T + 1, 4, GL_FLOAT, GL_FALSE, 0, nullptr);
-
-    glEnableVertexAttribArray(attr_T + 2);
-    if (m_dataChanged) {
-      m_pickingVBOs->bind(GL_ARRAY_BUFFER, 2);
-      if (m_pickingDataChanged) {
-        glBufferData(GL_ARRAY_BUFFER, m_axis3.size() * 4 * sizeof(GLfloat), m_axis3.data(), GL_STATIC_DRAW);
-      }
-    } else {
-      m_VBOs->bind(GL_ARRAY_BUFFER, 2);
-    }
-    glVertexAttribPointer(attr_T + 2, 4, GL_FLOAT, GL_FALSE, 0, nullptr);
-
-    glEnableVertexAttribArray(attr_T + 3);
-    if (m_dataChanged) {
-      m_pickingVBOs->bind(GL_ARRAY_BUFFER, 3);
-      if (m_pickingDataChanged) {
-        glBufferData(GL_ARRAY_BUFFER, m_centers.size() * 4 * sizeof(GLfloat), m_centers.data(), GL_STATIC_DRAW);
-      }
-    } else {
-      m_VBOs->bind(GL_ARRAY_BUFFER, 3);
-    }
-    glVertexAttribPointer(attr_T + 3, 4, GL_FLOAT, GL_FALSE, 0, nullptr);
-
-    glEnableVertexAttribArray(attr_color);
-    m_pickingVBOs->bind(GL_ARRAY_BUFFER, 6);
-    if (m_pickingDataChanged) {
-      glBufferData(GL_ARRAY_BUFFER,
-                   m_ellipsoidPickingColors.size() * 4 * sizeof(GLfloat),
-                   m_ellipsoidPickingColors.data(),
-                   GL_STATIC_DRAW);
-    }
-    glVertexAttribPointer(attr_color, 4, GL_FLOAT, GL_FALSE, 0, nullptr);
-
-    glEnableVertexAttribArray(attr_flags);
-    if (m_dataChanged) {
-      m_pickingVBOs->bind(GL_ARRAY_BUFFER, 4);
-      if (m_pickingDataChanged) {
-        glBufferData(GL_ARRAY_BUFFER, m_allFlags.size() * sizeof(GLfloat), m_allFlags.data(), GL_STATIC_DRAW);
-      }
-    } else {
-      m_VBOs->bind(GL_ARRAY_BUFFER, 4);
-    }
-    glVertexAttribPointer(attr_flags, 1, GL_FLOAT, GL_FALSE, 0, nullptr);
-
-    if (m_dataChanged) {
-      m_pickingVBOs->bind(GL_ELEMENT_ARRAY_BUFFER, 5);
-      if (m_pickingDataChanged) {
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, m_indexs.size() * sizeof(GLuint), m_indexs.data(), GL_STATIC_DRAW);
-      }
-    } else {
-      m_VBOs->bind(GL_ELEMENT_ARRAY_BUFFER, 5);
-    }
-
-    glDrawElements(GL_TRIANGLES, m_indexs.size(), GL_UNSIGNED_INT, nullptr);
-
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-    glDisableVertexAttribArray(attr_T + 0);
-    glDisableVertexAttribArray(attr_T + 1);
-    glDisableVertexAttribArray(attr_T + 2);
-    glDisableVertexAttribArray(attr_T + 3);
-    glDisableVertexAttribArray(attr_color);
-    glDisableVertexAttribArray(attr_flags);
-
     m_pickingDataChanged = false;
   }
 
@@ -585,9 +675,52 @@ void Z3DEllipsoidRenderer::enqueueRenderBatches(Z3DEye eye, RenderBackend backen
   }
 
   appendDefaultColors();
+  const auto* renderBackend = m_rendererBase.backend();
+  CHECK(renderBackend != nullptr) << "Ellipsoid segmentation requires an active backend";
+  const size_t maxStreamBytes = renderBackend->maxMonolithicGeometryStreamBytes();
+  const size_t preferredInstanceBudget =
+    std::max<size_t>(1, static_cast<size_t>(FLAGS_atlas_ellipsoid_preferred_instance_budget_per_segment));
+  const size_t totalInstanceCount = m_centers.size() / kEllipsoidVerticesPerInstance;
 
-  auto batch = buildRenderBatch(eye, picking);
-  m_rendererBase.appendBatch(std::move(batch));
+  auto rangeFitsHardLimit = [&](size_t instanceCount) {
+    if (maxStreamBytes == std::numeric_limits<size_t>::max()) {
+      return true;
+    }
+    const size_t vertexCount = instanceCount * kEllipsoidVerticesPerInstance;
+    const size_t indexCount = instanceCount * kEllipsoidIndicesPerInstance;
+    return vertexCount * sizeof(glm::vec4) <= maxStreamBytes && indexCount * sizeof(uint32_t) <= maxStreamBytes;
+  };
+
+  if (totalInstanceCount <= preferredInstanceBudget && rangeFitsHardLimit(totalInstanceCount)) {
+    auto batch = buildRenderBatch(eye, picking);
+    m_rendererBase.appendBatch(std::move(batch));
+    return;
+  }
+
+  size_t rangeStart = 0;
+  size_t rangeCount = 0;
+  uint32_t streamSegmentOrdinal = 0;
+  auto flushRange = [&](size_t rangeEnd) {
+    if (rangeEnd <= rangeStart) {
+      return;
+    }
+    auto batch = buildRenderBatch(eye, picking, rangeStart, rangeEnd - rangeStart, streamSegmentOrdinal++);
+    m_rendererBase.appendBatch(std::move(batch));
+    rangeStart = rangeEnd;
+    rangeCount = 0;
+  };
+
+  for (size_t instanceIndex = 0; instanceIndex < totalInstanceCount; ++instanceIndex) {
+    const size_t candidateCount = rangeCount + 1;
+    if (instanceIndex > rangeStart &&
+        (candidateCount > preferredInstanceBudget || !rangeFitsHardLimit(candidateCount))) {
+      flushRange(instanceIndex);
+    }
+    rangeCount++;
+    CHECK(rangeFitsHardLimit(rangeCount))
+      << "Renderer-owned ellipsoid segmentation produced a segment that still exceeds the backend hard stream limit";
+  }
+  flushRange(totalInstanceCount);
 }
 
 void Z3DEllipsoidRenderer::appendDefaultColors()
@@ -604,17 +737,42 @@ void Z3DEllipsoidRenderer::appendDefaultColors()
 
 EllipsoidPayload Z3DEllipsoidRenderer::buildEllipsoidPayload() const
 {
+  return buildEllipsoidPayload(0, m_centers.size() / kEllipsoidVerticesPerInstance, 0u);
+}
+
+EllipsoidPayload Z3DEllipsoidRenderer::buildEllipsoidPayload(size_t instanceStart,
+                                                             size_t instanceCount,
+                                                             uint32_t streamSegmentOrdinal) const
+{
+  const size_t vertexStart = instanceStart * kEllipsoidVerticesPerInstance;
+  const size_t vertexCount = instanceCount * kEllipsoidVerticesPerInstance;
+  const size_t indexStart = instanceStart * kEllipsoidIndicesPerInstance;
+  const size_t indexCount = instanceCount * kEllipsoidIndicesPerInstance;
+
   EllipsoidPayload payload;
   payload.streamKey = static_cast<uint64_t>(reinterpret_cast<uintptr_t>(this));
-  payload.centers = spanOrEmpty(m_centers);
-  payload.axis1 = spanOrEmpty(m_axis1);
-  payload.axis2 = spanOrEmpty(m_axis2);
-  payload.axis3 = spanOrEmpty(m_axis3);
-  payload.specularAndShininess = spanOrEmpty(m_specularAndShininess);
-  payload.colors = spanOrEmpty(m_ellipsoidColors);
-  payload.pickingColors = spanOrEmpty(m_ellipsoidPickingColors);
-  payload.flags = spanFromGLfloats(m_allFlags);
-  payload.indices = spanFromGLuints(m_indexs);
+  payload.streamSegmentOrdinal = streamSegmentOrdinal;
+  payload.indexValueBias = static_cast<uint32_t>(vertexStart);
+  payload.centers = subspanOrEmpty(m_centers, vertexStart, vertexCount);
+  payload.axis1 = subspanOrEmpty(m_axis1, vertexStart, vertexCount);
+  payload.axis2 = subspanOrEmpty(m_axis2, vertexStart, vertexCount);
+  payload.axis3 = subspanOrEmpty(m_axis3, vertexStart, vertexCount);
+  if (m_specularAndShininess.size() >= vertexStart + vertexCount) {
+    payload.specularAndShininess = subspanOrEmpty(m_specularAndShininess, vertexStart, vertexCount);
+  }
+  if (m_ellipsoidColors.size() >= vertexStart + vertexCount) {
+    payload.colors = subspanOrEmpty(m_ellipsoidColors, vertexStart, vertexCount);
+  }
+  if (m_ellipsoidPickingColors.size() >= vertexStart + vertexCount) {
+    payload.pickingColors = subspanOrEmpty(m_ellipsoidPickingColors, vertexStart, vertexCount);
+  }
+  if (m_allFlags.size() >= vertexStart + vertexCount) {
+    payload.flags = subspanOrEmpty(m_allFlags, vertexStart, vertexCount);
+  }
+  if (indexCount > 0) {
+    CHECK(indexStart + indexCount <= m_indexs.size()) << "Ellipsoid segment index range exceeds backing storage";
+    payload.indices = spanFromGLuints(m_indexs).subspan(indexStart, indexCount);
+  }
   payload.params = m_rendererBase.parameterState();
   payload.paramsCaptured = true;
   payload.wantsLighting = needLighting();
@@ -631,6 +789,15 @@ EllipsoidPayload Z3DEllipsoidRenderer::buildEllipsoidPayload() const
 
 RenderBatch Z3DEllipsoidRenderer::buildRenderBatch(Z3DEye eye, bool picking) const
 {
+  return buildRenderBatch(eye, picking, 0, m_centers.size() / kEllipsoidVerticesPerInstance, 0u);
+}
+
+RenderBatch Z3DEllipsoidRenderer::buildRenderBatch(Z3DEye eye,
+                                                   bool picking,
+                                                   size_t instanceStart,
+                                                   size_t instanceCount,
+                                                   uint32_t streamSegmentOrdinal) const
+{
   RenderBatch batch;
 
   batch.eye = eye;
@@ -646,10 +813,9 @@ RenderBatch Z3DEllipsoidRenderer::buildRenderBatch(Z3DEye eye, bool picking) con
   batch.pass.depthAttachment = surface.depthAttachment;
 
   batch.draw.topology = PrimitiveTopology::TriangleList;
-  batch.draw.vertexCount = static_cast<uint32_t>(m_axis1.size());
-  batch.draw.indexCount = static_cast<uint32_t>(m_indexs.size());
-
-  auto payload = buildEllipsoidPayload();
+  auto payload = buildEllipsoidPayload(instanceStart, instanceCount, streamSegmentOrdinal);
+  batch.draw.vertexCount = static_cast<uint32_t>(payload.axis1.size());
+  batch.draw.indexCount = static_cast<uint32_t>(payload.indices.size());
   payload.pickingPass = picking;
   batch.geometry = std::move(payload);
   return batch;
@@ -669,10 +835,10 @@ void Z3DEllipsoidRenderer::createResources(RenderBackend backend)
   m_ellipsoidShaderGrp->addAllSupportedPostShaders();
   CHECK_GL_ERROR
 
-  m_VAO = std::make_unique<Z3DVertexArrayObject>(1);
-  m_pickingVAO = std::make_unique<Z3DVertexArrayObject>(1);
-  m_VBOs = std::make_unique<Z3DVertexBufferObject>(8);
-  m_pickingVBOs = std::make_unique<Z3DVertexBufferObject>(7);
+  m_VAOs = std::make_unique<Z3DVertexArrayObject>(1);
+  m_pickingVAOs = std::make_unique<Z3DVertexArrayObject>(1);
+  m_VBOs.clear();
+  m_pickingVBOs.clear();
 
   m_dataChanged = true;
   m_pickingDataChanged = true;
@@ -681,10 +847,10 @@ void Z3DEllipsoidRenderer::createResources(RenderBackend backend)
 void Z3DEllipsoidRenderer::destroyResources()
 {
   m_ellipsoidShaderGrp.reset();
-  m_VAO.reset();
-  m_pickingVAO.reset();
-  m_VBOs.reset();
-  m_pickingVBOs.reset();
+  m_VAOs.reset();
+  m_pickingVAOs.reset();
+  m_VBOs.clear();
+  m_pickingVBOs.clear();
 }
 
 void Z3DEllipsoidRenderer::setUseDynamicMaterial(bool enabled)

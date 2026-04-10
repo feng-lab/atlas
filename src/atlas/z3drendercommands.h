@@ -4,6 +4,7 @@
 #include "zglmutils.h"
 #include "zmesh.h"
 #include "z3dscratchresourcepool.h"
+#include "zlog.h"
 
 #include <cstddef>
 #include <array>
@@ -519,6 +520,8 @@ struct DrawCommand
 struct LinePayload
 {
   uint64_t streamKey = 0;
+  uint32_t streamSegmentOrdinal = 0;
+  uint32_t indexValueBias = 0;
   // Raw polyline data
   std::span<const glm::vec3> positions;
   std::span<const glm::vec4> colors;
@@ -579,6 +582,7 @@ struct LineWideVertex
 struct MeshPayload
 {
   uint64_t streamKey = 0;
+  uint32_t streamSegmentOrdinal = 0;
   std::span<ZMesh* const> meshes;
   std::span<const glm::vec4> meshColors;
   std::span<const glm::vec4> meshPickingColors;
@@ -633,6 +637,8 @@ struct MeshPayload
 struct SpherePayload
 {
   uint64_t streamKey = 0;
+  uint32_t streamSegmentOrdinal = 0;
+  uint32_t indexValueBias = 0;
   std::span<const glm::vec4> pointsAndRadius;
   std::span<const glm::vec4> colors;
   std::span<const glm::vec4> pickingColors;
@@ -902,6 +908,8 @@ struct ImgRaycasterPayload
 struct EllipsoidPayload
 {
   uint64_t streamKey = 0;
+  uint32_t streamSegmentOrdinal = 0;
+  uint32_t indexValueBias = 0;
   std::span<const glm::vec4> centers;
   std::span<const glm::vec4> axis1;
   std::span<const glm::vec4> axis2;
@@ -930,6 +938,8 @@ struct EllipsoidPayload
 struct ConePayload
 {
   uint64_t streamKey = 0;
+  uint32_t streamSegmentOrdinal = 0;
+  uint32_t indexValueBias = 0;
   std::span<const glm::vec4> baseAndRadius;
   std::span<const glm::vec4> axisAndTopRadius;
   std::span<const glm::vec4> baseColors;
@@ -1077,6 +1087,26 @@ inline std::span<const T> spanOrEmpty(const std::vector<T>* ptr)
     return std::span<const T>(ptr->data(), ptr->size());
   }
   return std::span<const T>();
+}
+
+template<typename T>
+inline std::span<const T> subspanOrEmpty(const std::vector<T>& vec, size_t start, size_t count)
+{
+  if (count == 0) {
+    return std::span<const T>();
+  }
+  CHECK(start + count <= vec.size()) << "Render payload subspan exceeds backing vector";
+  return std::span<const T>(vec.data() + start, count);
+}
+
+template<typename T>
+inline std::span<const T> subspanOrEmpty(const std::vector<T>* ptr, size_t start, size_t count)
+{
+  if (ptr == nullptr || count == 0) {
+    return std::span<const T>();
+  }
+  CHECK(start + count <= ptr->size()) << "Render payload subspan exceeds backing vector";
+  return std::span<const T>(ptr->data() + start, count);
 }
 
 } // namespace nim

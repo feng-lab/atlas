@@ -4,13 +4,13 @@
 #include "z3drendererstates.h"
 #include "z3drendererbase.h"
 #include "z3drenderervulkanbackend.h"
+#include "zvulkanstreamcachecoordinator.h"
 #include "zvulkan.h"
 
 #include <array>
 #include <map>
 #include <memory>
 #include <optional>
-#include <set>
 #include <tuple>
 #include <unordered_map>
 #include <vector>
@@ -36,6 +36,9 @@ public:
 
   void resetFrame();
   void evictStream(uint64_t streamKey);
+  [[nodiscard]] std::optional<Z3DRendererVulkanBackend::StaticPressureEvictionCandidate>
+  oldestEvictableStaticStream(Z3DRendererVulkanBackend::StaticPressureDomain domain, uint64_t protectedEpoch) const;
+  size_t evictStaticStreamForPressure(uint64_t streamKey);
 
   void record(Z3DRendererBase& renderer,
               const RenderBatch& batch,
@@ -145,13 +148,18 @@ private:
   };
   std::unordered_map<void*, FrameUboCache> m_uboCacheByFrameKey;
 
+  void touchStaticStream(uint64_t streamKey);
+  [[nodiscard]] size_t staticBytesForStream(uint64_t streamKey,
+                                            Z3DRendererVulkanBackend::StaticPressureDomain domain) const;
+
   // Static promotion cache
   struct GeometryCacheKey
   {
     uint64_t streamKey = 0;
+    uint32_t streamSegmentOrdinal = 0;
     auto tie() const
     {
-      return std::tuple(streamKey);
+      return std::tuple(streamKey, streamSegmentOrdinal);
     }
     bool operator<(const GeometryCacheKey& rhs) const
     {
@@ -179,11 +187,12 @@ private:
   struct AppearanceCacheKey
   {
     uint64_t streamKey = 0;
+    uint32_t streamSegmentOrdinal = 0;
     bool picking = false;
     bool dynamicMaterial = false;
     auto tie() const
     {
-      return std::tuple(streamKey, picking, dynamicMaterial);
+      return std::tuple(streamKey, streamSegmentOrdinal, picking, dynamicMaterial);
     }
     bool operator<(const AppearanceCacheKey& rhs) const
     {
@@ -226,15 +235,13 @@ private:
     uint32_t pickingColorsGen = 0;
     uint32_t specularGen = 0;
   };
-  std::map<GeometryCacheKey, GeometryCacheEntry> m_staticGeometryCache;
-  std::map<AppearanceCacheKey, AppearanceCacheEntry> m_staticAppearanceCache;
-  // Guard: if we scheduled upload->static copies for a stream within the
-  // current submission, later draws in the same submission must keep reusing
-  // those upload slices instead of rebinding stale statics.
-  std::set<GeometryCacheKey> m_geometryStaticCopyPendingKeys;
-  std::set<AppearanceCacheKey> m_appearanceStaticCopyPendingKeys;
-  std::map<GeometryCacheKey, PendingGeometryUploadBinding> m_geometryStaticCopyPendingUploads;
-  std::map<AppearanceCacheKey, PendingAppearanceUploadBinding> m_appearanceStaticCopyPendingUploads;
+  using GeometryStreamCacheCoordinator =
+    ZVulkanStreamCacheCoordinator<GeometryCacheKey, GeometryCacheEntry, PendingGeometryUploadBinding>;
+  using AppearanceStreamCacheCoordinator =
+    ZVulkanStreamCacheCoordinator<AppearanceCacheKey, AppearanceCacheEntry, PendingAppearanceUploadBinding>;
+  ZVulkanStaticStreamUsageTracker m_streamUsageTracker;
+  GeometryStreamCacheCoordinator m_geometryStreamCache;
+  AppearanceStreamCacheCoordinator m_appearanceStreamCache;
 
   // Cached per-draw secondary command buffers (steady-state optimization).
   // Keyed by frame-slot identity + stream identity, since descriptor sets
@@ -243,6 +250,7 @@ private:
   {
     void* frameKey = nullptr;
     uint64_t streamKey = 0;
+    uint32_t streamSegmentOrdinal = 0;
     bool picking = false;
     bool dynamicMaterial = false;
     Z3DRendererBase::ShaderHookType shaderHookType = Z3DRendererBase::ShaderHookType::Normal;
@@ -251,7 +259,8 @@ private:
 
     bool operator==(const SecondaryCacheKey& rhs) const
     {
-      return frameKey == rhs.frameKey && streamKey == rhs.streamKey && picking == rhs.picking &&
+      return frameKey == rhs.frameKey && streamKey == rhs.streamKey &&
+             streamSegmentOrdinal == rhs.streamSegmentOrdinal && picking == rhs.picking &&
              dynamicMaterial == rhs.dynamicMaterial && shaderHookType == rhs.shaderHookType && eye == rhs.eye &&
              oitRingIndex == rhs.oitRingIndex;
     }
@@ -263,6 +272,7 @@ private:
     {
       size_t h = std::hash<uintptr_t>{}(reinterpret_cast<uintptr_t>(key.frameKey));
       h ^= std::hash<uint64_t>{}(key.streamKey) + 0x9e3779b97f4a7c15ull + (h << 6) + (h >> 2);
+      h ^= std::hash<uint32_t>{}(key.streamSegmentOrdinal) + 0x9e3779b97f4a7c15ull + (h << 6) + (h >> 2);
       h ^= std::hash<uint8_t>{}(static_cast<uint8_t>(key.picking)) + 0x9e3779b97f4a7c15ull + (h << 6) + (h >> 2);
       h ^=
         std::hash<uint8_t>{}(static_cast<uint8_t>(key.dynamicMaterial)) + 0x9e3779b97f4a7c15ull + (h << 6) + (h >> 2);

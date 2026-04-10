@@ -137,6 +137,23 @@ size_t chooseUploadArenaPageCapacity(const ZVulkanDevice& device, size_t minCapa
   return capacity;
 }
 
+std::string_view staticCacheOwnerName(Z3DRendererVulkanBackend::StaticCacheOwner owner)
+{
+  switch (owner) {
+    case Z3DRendererVulkanBackend::StaticCacheOwner::Mesh:
+      return "mesh";
+    case Z3DRendererVulkanBackend::StaticCacheOwner::Line:
+      return "line";
+    case Z3DRendererVulkanBackend::StaticCacheOwner::Ellipsoid:
+      return "ellipsoid";
+    case Z3DRendererVulkanBackend::StaticCacheOwner::Sphere:
+      return "sphere";
+    case Z3DRendererVulkanBackend::StaticCacheOwner::Cone:
+      return "cone";
+  }
+  return "<unknown>";
+}
+
 } // namespace
 
 namespace vulkan {
@@ -662,6 +679,8 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
   }
 
   auto& frameResources = ensureFrameResourcesForKey(m_activeFrameHandle->key());
+  CHECK(m_staticCacheEpoch < std::numeric_limits<uint64_t>::max()) << "Static cache epoch overflow";
+  ++m_staticCacheEpoch;
 
   // Populate script stats (if provided by ZVulkanLinearScript) early so they're
   // available for per-frame logging even if later code returns early.
@@ -860,6 +879,8 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
   frameResources.fontsBytesStaged = 0;
   frameResources.meshesBytesStaged = 0;
   frameResources.spheresBytesStaged = 0;
+  frameResources.conesBytesStaged = 0;
+  frameResources.ellipsoidsBytesStaged = 0;
   frameResources.scheduledCopies.clear();
   // Reset DDP device-args arena for this submission.
   frameResources.ddpArgsDevice.cursor = 0;
@@ -1390,7 +1411,7 @@ void Z3DRendererVulkanBackend::endRender(Z3DRendererBase& renderer)
 
   // Stage 3: VLOG instrumentation for dynamic rendering segments and pipeline stats
   VLOG(1) << fmt::format(
-    "VK segments: frame='{}' token={} submit#{} began={} clears={} loads={} pipelines_created={} pipelines_bound_unique={} skipped_format_mismatch={} descriptor_writes_while_recording={} bound_set_rewrite_attempts={} readback_bytes_copied={} readback_slots_in_flight={} static_bytes_staged={} static_stream_restaged={} lines_bytes_staged={} fonts_bytes_staged={} meshes_bytes_staged={} spheres_bytes_staged={}",
+    "VK segments: frame='{}' token={} submit#{} began={} clears={} loads={} pipelines_created={} pipelines_bound_unique={} skipped_format_mismatch={} descriptor_writes_while_recording={} bound_set_rewrite_attempts={} readback_bytes_copied={} readback_slots_in_flight={} static_bytes_staged={} static_stream_restaged={} lines_bytes_staged={} fonts_bytes_staged={} meshes_bytes_staged={} spheres_bytes_staged={} cones_bytes_staged={} ellipsoids_bytes_staged={}",
     frame.frameName.empty() ? std::string("<unlabeled-frame>") : frame.frameName,
     frame.realFrameToken,
     frame.submissionId,
@@ -1409,7 +1430,9 @@ void Z3DRendererVulkanBackend::endRender(Z3DRendererBase& renderer)
     frame.linesBytesStaged,
     frame.fontsBytesStaged,
     frame.meshesBytesStaged,
-    frame.spheresBytesStaged);
+    frame.spheresBytesStaged,
+    frame.conesBytesStaged,
+    frame.ellipsoidsBytesStaged);
 
   // Stage 5: VLOG(1) static/upload/uniform arena usage
   VLOG(1) << fmt::format(
@@ -3258,16 +3281,36 @@ Z3DRendererVulkanBackend::activateUploadPage(FrameResources::UploadArena& arena,
 
   const size_t newIndex = arena.pages.size();
   arena.pages.emplace_back();
-  auto& newPage = arena.pages.back();
-  newPage.buffer = m_sharedDevice->createBufferInPool(
-    pageCapacity,
-    vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eIndexBuffer |
-      vk::BufferUsageFlagBits::eTransferSrc,
-    vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent,
-    m_sharedDevice->uploadTransientPool());
-  newPage.capacity = pageCapacity;
-  newPage.mapped = newPage.buffer->map(0, pageCapacity);
-  newPage.cursor = 0;
+  try {
+    auto& newPage = arena.pages.back();
+    newPage.buffer = m_sharedDevice->createBufferInPool(
+      pageCapacity,
+      vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eIndexBuffer |
+        vk::BufferUsageFlagBits::eTransferSrc,
+      vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent,
+      m_sharedDevice->uploadTransientPool());
+    CHECK(newPage.buffer != nullptr) << "Upload arena page allocation returned null buffer";
+    newPage.capacity = pageCapacity;
+    newPage.mapped = newPage.buffer->map(0, pageCapacity);
+    newPage.cursor = 0;
+  }
+  catch (const std::exception& e) {
+    arena.pages.resize(newIndex);
+    LOG(ERROR) << fmt::format("Upload arena page allocation failed: request={}B size={}B ({}) error={}",
+                              minCapacity,
+                              pageCapacity,
+                              debugLabel,
+                              e.what());
+    return nullptr;
+  }
+  catch (...) {
+    arena.pages.resize(newIndex);
+    LOG(ERROR) << fmt::format("Upload arena page allocation failed: request={}B size={}B ({}) error=<unknown>",
+                              minCapacity,
+                              pageCapacity,
+                              debugLabel);
+    return nullptr;
+  }
   if (newIndex != targetIndex) {
     std::swap(arena.pages[targetIndex], arena.pages.back());
   }
@@ -3409,7 +3452,10 @@ void Z3DRendererVulkanBackend::reserveUploadSlices(std::initializer_list<std::pa
   }
 
   auto* page = activateUploadPage(arena, required, "reserveUploadSlices");
-  CHECK(page != nullptr) << "reserveUploadSlices failed to activate a page for " << required << " bytes";
+  if (page == nullptr) {
+    VLOG(1) << fmt::format("reserveUploadSlices: failed to prepare page for {} slices ({}B)", slices.size(), required);
+    return;
+  }
   VLOG(2) << fmt::format("reserveUploadSlices: prepared page={} size={}B for {} slices ({}B)",
                          arena.activePageIndex,
                          page->capacity,
@@ -3445,7 +3491,22 @@ Z3DRendererVulkanBackend::createStaticArenaSegment(StaticArena::Kind kind, size_
   seg->kind = kind;
   seg->id = m_staticArena.nextSegmentId++;
   seg->capacity = capacityBytes;
-  seg->buffer = m_sharedDevice->createBuffer(capacityBytes, usage, vk::MemoryPropertyFlagBits::eDeviceLocal);
+  try {
+    seg->buffer = m_sharedDevice->createBuffer(capacityBytes, usage, vk::MemoryPropertyFlagBits::eDeviceLocal);
+  }
+  catch (const std::exception& e) {
+    LOG(ERROR) << fmt::format("Failed to allocate static arena segment: kind={} capacity={}B error={}",
+                              kind == StaticArena::Kind::Vertex ? "VB" : "IB",
+                              capacityBytes,
+                              e.what());
+    return {};
+  }
+  catch (...) {
+    LOG(ERROR) << fmt::format("Failed to allocate static arena segment: kind={} capacity={}B error=<unknown>",
+                              kind == StaticArena::Kind::Vertex ? "VB" : "IB",
+                              capacityBytes);
+    return {};
+  }
   if (!seg->buffer) {
     LOG(ERROR) << fmt::format("Failed to allocate static arena segment: kind={} capacity={}B",
                               kind == StaticArena::Kind::Vertex ? "VB" : "IB",
@@ -4564,6 +4625,19 @@ Z3DRendererVulkanBackend::StaticSlice Z3DRendererVulkanBackend::allocateStaticVB
     return true;
   };
 
+  size_t requiredBytes = std::max(bytes, align);
+  auto tryPressureEviction = [&](bool force) -> bool {
+    if (evictColdStaticCacheForPressure(StaticPressureDomain::Vertex, requiredBytes, force) == 0) {
+      return false;
+    }
+    for (const auto& seg : m_staticArena.vb) {
+      if (tryAlloc(seg.get())) {
+        return true;
+      }
+    }
+    return false;
+  };
+
   // First try existing segments (reusing freed ranges).
   for (const auto& seg : m_staticArena.vb) {
     if (tryAlloc(seg.get())) {
@@ -4571,10 +4645,13 @@ Z3DRendererVulkanBackend::StaticSlice Z3DRendererVulkanBackend::allocateStaticVB
     }
   }
 
+  if (tryPressureEviction(false)) {
+    return slice;
+  }
+
   // Need a new segment. Size it to fit this allocation and grow by powers of two
   // to avoid pathological churn while preserving correctness.
   constexpr size_t kDefaultSegment = static_cast<size_t>(32) * 1024 * 1024; // 32 MiB
-  size_t requiredBytes = std::max(bytes, align);
   size_t cap = kDefaultSegment;
   while (cap < requiredBytes) {
     CHECK(cap <= std::numeric_limits<size_t>::max() / 2) << "Static VB segment capacity overflow";
@@ -4583,6 +4660,9 @@ Z3DRendererVulkanBackend::StaticSlice Z3DRendererVulkanBackend::allocateStaticVB
 
   auto newSeg = createStaticArenaSegment(StaticArena::Kind::Vertex, cap);
   if (!newSeg) {
+    if (tryPressureEviction(true)) {
+      return slice;
+    }
     return {};
   }
   StaticArena::Segment* newSegPtr = newSeg.get();
@@ -4645,14 +4725,30 @@ Z3DRendererVulkanBackend::StaticSlice Z3DRendererVulkanBackend::allocateStaticIB
     return true;
   };
 
+  size_t requiredBytes = std::max(bytes, align);
+  auto tryPressureEviction = [&](bool force) -> bool {
+    if (evictColdStaticCacheForPressure(StaticPressureDomain::Index, requiredBytes, force) == 0) {
+      return false;
+    }
+    for (const auto& seg : m_staticArena.ib) {
+      if (tryAlloc(seg.get())) {
+        return true;
+      }
+    }
+    return false;
+  };
+
   for (const auto& seg : m_staticArena.ib) {
     if (tryAlloc(seg.get())) {
       return slice;
     }
   }
 
+  if (tryPressureEviction(false)) {
+    return slice;
+  }
+
   constexpr size_t kDefaultSegment = static_cast<size_t>(8) * 1024 * 1024; // 8 MiB
-  size_t requiredBytes = std::max(bytes, align);
   size_t cap = kDefaultSegment;
   while (cap < requiredBytes) {
     CHECK(cap <= std::numeric_limits<size_t>::max() / 2) << "Static IB segment capacity overflow";
@@ -4661,6 +4757,9 @@ Z3DRendererVulkanBackend::StaticSlice Z3DRendererVulkanBackend::allocateStaticIB
 
   auto newSeg = createStaticArenaSegment(StaticArena::Kind::Index, cap);
   if (!newSeg) {
+    if (tryPressureEviction(true)) {
+      return slice;
+    }
     return {};
   }
   StaticArena::Segment* newSegPtr = newSeg.get();
@@ -4753,6 +4852,131 @@ void Z3DRendererVulkanBackend::requestEvictStream(uint64_t streamKey)
   }
   std::lock_guard<std::mutex> lock(m_pendingEvictionsMutex);
   m_pendingEvictStreamKeys.insert(streamKey);
+}
+
+size_t
+Z3DRendererVulkanBackend::evictColdStaticCacheForPressure(StaticPressureDomain domain, size_t growthBytes, bool force)
+{
+  if (growthBytes == 0 || m_sharedDevice == nullptr || m_staticCacheEpoch == 0) {
+    return 0;
+  }
+
+  const auto budget = m_sharedDevice->deviceLocalBudget();
+  const uint64_t cappedGrowthBytes = growthBytes > std::numeric_limits<uint64_t>::max()
+                                       ? std::numeric_limits<uint64_t>::max()
+                                       : static_cast<uint64_t>(growthBytes);
+  const uint64_t projectedUsage = budget.usageBytes > std::numeric_limits<uint64_t>::max() - cappedGrowthBytes
+                                    ? std::numeric_limits<uint64_t>::max()
+                                    : budget.usageBytes + cappedGrowthBytes;
+  if (!force) {
+    if (budget.budgetBytes == 0 || projectedUsage <= budget.budgetBytes) {
+      return 0;
+    }
+  }
+
+  const uint64_t pressureBytes64 =
+    (budget.budgetBytes != 0 && projectedUsage > budget.budgetBytes) ? (projectedUsage - budget.budgetBytes) : 0;
+  const size_t pressureBytes = pressureBytes64 >= std::numeric_limits<size_t>::max()
+                                 ? std::numeric_limits<size_t>::max()
+                                 : static_cast<size_t>(pressureBytes64);
+  const size_t targetBytes = std::max(growthBytes, pressureBytes);
+  const uint64_t protectedEpoch = m_staticCacheEpoch;
+
+  size_t releasedBytes = 0;
+  size_t evictedStreams = 0;
+  while (releasedBytes < targetBytes) {
+    std::vector<StaticPressureEvictionCandidate> candidates;
+    if (m_meshContext) {
+      if (auto candidate = m_meshContext->oldestEvictableStaticStream(domain, protectedEpoch)) {
+        candidates.push_back(*candidate);
+      }
+    }
+    if (m_lineContext) {
+      if (auto candidate = m_lineContext->oldestEvictableStaticStream(domain, protectedEpoch)) {
+        candidates.push_back(*candidate);
+      }
+    }
+    if (m_ellipsoidContext) {
+      if (auto candidate = m_ellipsoidContext->oldestEvictableStaticStream(domain, protectedEpoch)) {
+        candidates.push_back(*candidate);
+      }
+    }
+    if (m_sphereContext) {
+      if (auto candidate = m_sphereContext->oldestEvictableStaticStream(domain, protectedEpoch)) {
+        candidates.push_back(*candidate);
+      }
+    }
+    if (m_coneContext) {
+      if (auto candidate = m_coneContext->oldestEvictableStaticStream(domain, protectedEpoch)) {
+        candidates.push_back(*candidate);
+      }
+    }
+    if (candidates.empty()) {
+      break;
+    }
+
+    std::sort(candidates.begin(), candidates.end(), [](const auto& a, const auto& b) {
+      if (a.lastUsedEpoch != b.lastUsedEpoch) {
+        return a.lastUsedEpoch < b.lastUsedEpoch;
+      }
+      if (a.bytes != b.bytes) {
+        return a.bytes > b.bytes;
+      }
+      return a.streamKey < b.streamKey;
+    });
+
+    const auto candidate = candidates.front();
+    size_t bytesFreed = 0;
+    switch (candidate.owner) {
+      case StaticCacheOwner::Mesh:
+        CHECK(m_meshContext != nullptr);
+        bytesFreed = m_meshContext->evictStaticStreamForPressure(candidate.streamKey);
+        break;
+      case StaticCacheOwner::Line:
+        CHECK(m_lineContext != nullptr);
+        bytesFreed = m_lineContext->evictStaticStreamForPressure(candidate.streamKey);
+        break;
+      case StaticCacheOwner::Ellipsoid:
+        CHECK(m_ellipsoidContext != nullptr);
+        bytesFreed = m_ellipsoidContext->evictStaticStreamForPressure(candidate.streamKey);
+        break;
+      case StaticCacheOwner::Sphere:
+        CHECK(m_sphereContext != nullptr);
+        bytesFreed = m_sphereContext->evictStaticStreamForPressure(candidate.streamKey);
+        break;
+      case StaticCacheOwner::Cone:
+        CHECK(m_coneContext != nullptr);
+        bytesFreed = m_coneContext->evictStaticStreamForPressure(candidate.streamKey);
+        break;
+    }
+    if (bytesFreed == 0) {
+      break;
+    }
+    releasedBytes += bytesFreed;
+    ++evictedStreams;
+    VLOG(1) << fmt::format(
+      "VK static pressure eviction: owner={} domain={} streamKey={} age={} released={}B estimated={}B progress={}/{}B usage={}B budget={}B",
+      staticCacheOwnerName(candidate.owner),
+      domain == StaticPressureDomain::Vertex ? "VB" : "IB",
+      candidate.streamKey,
+      protectedEpoch - candidate.lastUsedEpoch,
+      bytesFreed,
+      candidate.bytes,
+      releasedBytes,
+      targetBytes,
+      budget.usageBytes,
+      budget.budgetBytes);
+  }
+
+  if (releasedBytes > 0) {
+    VLOG(1) << fmt::format("VK static pressure eviction summary: domain={} streams={} released={}B target={}B force={}",
+                           domain == StaticPressureDomain::Vertex ? "VB" : "IB",
+                           evictedStreams,
+                           releasedBytes,
+                           targetBytes,
+                           force);
+  }
+  return releasedBytes;
 }
 
 void Z3DRendererVulkanBackend::stageCopy(vk::Buffer dst,
@@ -4922,6 +5146,24 @@ uint32_t Z3DRendererVulkanBackend::inFlightCount() const
 uint32_t Z3DRendererVulkanBackend::maxFramesInFlight() const
 {
   return m_sharedDevice != nullptr ? m_sharedDevice->frameExecutor().maxFramesInFlight() : 0u;
+}
+
+size_t Z3DRendererVulkanBackend::maxMonolithicGeometryStreamBytes() const
+{
+  // Mesh/geometry segmentation can query this before beginRender() has latched
+  // m_sharedDevice on the backend instance. Fall back to the shared scratch-pool
+  // device so the hard guard still reflects the real Vulkan limit.
+  auto* dev = m_sharedDevice;
+  if (dev == nullptr) {
+    dev = Z3DRenderGlobalState::instance().scratchPool().vulkanDevice();
+  }
+  CHECK(dev != nullptr) << "Shared Vulkan device missing in maxMonolithicGeometryStreamBytes";
+
+  const vk::DeviceSize limit = dev->maxMemoryAllocationSize();
+  if (limit == 0 || limit >= static_cast<vk::DeviceSize>(std::numeric_limits<size_t>::max())) {
+    return std::numeric_limits<size_t>::max();
+  }
+  return static_cast<size_t>(limit);
 }
 
 Z3DRendererVulkanBackend::ActiveSubmissionFenceAwaiter
@@ -6340,6 +6582,8 @@ void Z3DRendererVulkanBackend::collectFrameTimings(FrameResources& frame)
     stats.fontsBytesStaged = frame.fontsBytesStaged;
     stats.meshesBytesStaged = frame.meshesBytesStaged;
     stats.spheresBytesStaged = frame.spheresBytesStaged;
+    stats.conesBytesStaged = frame.conesBytesStaged;
+    stats.ellipsoidsBytesStaged = frame.ellipsoidsBytesStaged;
     stats.readbackBytesCopied = frame.readbackBytesCopied;
     stats.readbackSlotsInFlight = frame.readbackSlotsInFlight;
     if (frame.preCpuStartMs.has_value() && *frame.preCpuStartMs >= 0.0) {

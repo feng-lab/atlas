@@ -48,6 +48,8 @@ public:
     size_t fontsBytesStaged = 0;
     size_t meshesBytesStaged = 0;
     size_t spheresBytesStaged = 0;
+    size_t conesBytesStaged = 0;
+    size_t ellipsoidsBytesStaged = 0;
     size_t readbackBytesCopied = 0;
     uint32_t readbackSlotsInFlight = 0;
     // Perf-frame-start → first Vulkan submission CPU-scope start.

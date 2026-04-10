@@ -4,15 +4,28 @@
 #include "z3dgpuinfo.h"
 #include "z3dshaderprogram.h"
 
+#include <gflags/gflags.h>
+
 #include <utility>
 
 namespace nim {
+
+namespace {
+
+constexpr size_t kSphereVerticesPerInstance = 4;
+constexpr size_t kSphereIndicesPerInstance = 6;
+
+} // namespace
+
+DEFINE_uint64(atlas_sphere_preferred_instance_budget_per_segment,
+              1000000,
+              "Preferred sphere instance budget for one renderer-owned segment. This is the normal packing target; "
+              "backends still enforce maxMonolithicGeometryStreamBytes as a hard safety guard.");
 
 Z3DSphereRenderer::Z3DSphereRenderer(Z3DRendererBase& rendererBase)
   : Z3DPrimitiveRenderer(rendererBase)
   , m_dataChanged(false)
   , m_pickingDataChanged(false)
-  , m_oneBatchNumber(4e6)
 {
 #if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
   setUseDisplayList(true);
@@ -206,7 +219,10 @@ void Z3DSphereRenderer::render(Z3DEye eye)
   }
   shader.setBoxCorrectionUniform(adj);
 
-  size_t numBatch = std::ceil(m_pointAndRadius.size() * 1.0 / m_oneBatchNumber);
+  const size_t batchVertexBudget =
+    std::max<size_t>(1, static_cast<size_t>(FLAGS_atlas_sphere_preferred_instance_budget_per_segment)) *
+    kSphereVerticesPerInstance;
+  size_t numBatch = std::ceil(m_pointAndRadius.size() * 1.0 / batchVertexBudget);
 
   if (m_useVAO) {
     if (m_dataChanged) {
@@ -232,11 +248,11 @@ void Z3DSphereRenderer::render(Z3DEye eye)
 
       for (size_t i = 0; i < numBatch; ++i) {
         m_VAOs->bind(i);
-        size_t size = m_oneBatchNumber;
+        size_t size = batchVertexBudget;
         if (i == numBatch - 1) {
-          size = m_pointAndRadius.size() - (numBatch - 1) * m_oneBatchNumber;
+          size = m_pointAndRadius.size() - (numBatch - 1) * batchVertexBudget;
         }
-        size_t start = m_oneBatchNumber * i;
+        size_t start = batchVertexBudget * i;
 
         glEnableVertexAttribArray(attr_a_vertex_radius);
         m_VBOs[i]->bind(GL_ARRAY_BUFFER, 0);
@@ -271,9 +287,9 @@ void Z3DSphereRenderer::render(Z3DEye eye)
     }
 
     for (size_t i = 0; i < numBatch; ++i) {
-      size_t size = m_oneBatchNumber;
+      size_t size = batchVertexBudget;
       if (i == numBatch - 1) {
-        size = m_pointAndRadius.size() - (numBatch - 1) * m_oneBatchNumber;
+        size = m_pointAndRadius.size() - (numBatch - 1) * batchVertexBudget;
       }
       m_VAOs->bind(i);
       glDrawElements(GL_TRIANGLES, size * 6 / 4, GL_UNSIGNED_INT, nullptr);
@@ -301,11 +317,11 @@ void Z3DSphereRenderer::render(Z3DEye eye)
     auto attr_flags = shader.flagsAttributeLocation();
 
     for (size_t i = 0; i < numBatch; ++i) {
-      size_t size = m_oneBatchNumber;
+      size_t size = batchVertexBudget;
       if (i == numBatch - 1) {
-        size = m_pointAndRadius.size() - (numBatch - 1) * m_oneBatchNumber;
+        size = m_pointAndRadius.size() - (numBatch - 1) * batchVertexBudget;
       }
-      size_t start = m_oneBatchNumber * i;
+      size_t start = batchVertexBudget * i;
 
       glEnableVertexAttribArray(attr_a_vertex_radius);
       m_VBOs[i]->bind(GL_ARRAY_BUFFER, 0);
@@ -386,7 +402,10 @@ void Z3DSphereRenderer::renderPicking(Z3DEye eye)
   }
   shader.setBoxCorrectionUniform(adj);
 
-  size_t numBatch = std::ceil(m_pointAndRadius.size() * 1.0 / m_oneBatchNumber);
+  const size_t batchVertexBudget =
+    std::max<size_t>(1, static_cast<size_t>(FLAGS_atlas_sphere_preferred_instance_budget_per_segment)) *
+    kSphereVerticesPerInstance;
+  size_t numBatch = std::ceil(m_pointAndRadius.size() * 1.0 / batchVertexBudget);
 
   if (m_useVAO) {
     if (m_pickingDataChanged) {
@@ -408,11 +427,11 @@ void Z3DSphereRenderer::renderPicking(Z3DEye eye)
 
       for (size_t i = 0; i < numBatch; ++i) {
         m_pickingVAOs->bind(i);
-        size_t size = m_oneBatchNumber;
+        size_t size = batchVertexBudget;
         if (i == numBatch - 1) {
-          size = m_pointAndRadius.size() - (numBatch - 1) * m_oneBatchNumber;
+          size = m_pointAndRadius.size() - (numBatch - 1) * batchVertexBudget;
         }
-        size_t start = m_oneBatchNumber * i;
+        size_t start = batchVertexBudget * i;
 
         glEnableVertexAttribArray(attr_a_vertex_radius);
         if (m_dataChanged) {
@@ -453,9 +472,9 @@ void Z3DSphereRenderer::renderPicking(Z3DEye eye)
     }
 
     for (size_t i = 0; i < numBatch; ++i) {
-      size_t size = m_oneBatchNumber;
+      size_t size = batchVertexBudget;
       if (i == numBatch - 1) {
-        size = m_pointAndRadius.size() - (numBatch - 1) * m_oneBatchNumber;
+        size = m_pointAndRadius.size() - (numBatch - 1) * batchVertexBudget;
       }
       m_pickingVAOs->bind(i);
       glDrawElements(GL_TRIANGLES, size * 6 / 4, GL_UNSIGNED_INT, nullptr);
@@ -479,11 +498,11 @@ void Z3DSphereRenderer::renderPicking(Z3DEye eye)
     auto attr_flags = shader.flagsAttributeLocation();
 
     for (size_t i = 0; i < numBatch; ++i) {
-      size_t size = m_oneBatchNumber;
+      size_t size = batchVertexBudget;
       if (i == numBatch - 1) {
-        size = m_pointAndRadius.size() - (numBatch - 1) * m_oneBatchNumber;
+        size = m_pointAndRadius.size() - (numBatch - 1) * batchVertexBudget;
       }
-      size_t start = m_oneBatchNumber * i;
+      size_t start = batchVertexBudget * i;
 
       glEnableVertexAttribArray(attr_a_vertex_radius);
       if (m_dataChanged) {
@@ -540,15 +559,38 @@ void Z3DSphereRenderer::renderPicking(Z3DEye eye)
 
 SpherePayload Z3DSphereRenderer::buildSpherePayload() const
 {
-  SpherePayload payload;
+  return buildSpherePayload(0, m_pointAndRadius.size() / kSphereVerticesPerInstance, 0u);
+}
 
+SpherePayload
+Z3DSphereRenderer::buildSpherePayload(size_t instanceStart, size_t instanceCount, uint32_t streamSegmentOrdinal) const
+{
+  const size_t vertexStart = instanceStart * kSphereVerticesPerInstance;
+  const size_t vertexCount = instanceCount * kSphereVerticesPerInstance;
+  const size_t indexStart = instanceStart * kSphereIndicesPerInstance;
+  const size_t indexCount = instanceCount * kSphereIndicesPerInstance;
+
+  SpherePayload payload;
   payload.streamKey = static_cast<uint64_t>(reinterpret_cast<uintptr_t>(this));
-  payload.pointsAndRadius = spanOrEmpty(m_pointAndRadius);
-  payload.colors = spanOrEmpty(m_pointColors);
-  payload.pickingColors = spanOrEmpty(m_pointPickingColors);
-  payload.specularAndShininess = spanOrEmpty(m_specularAndShininess);
-  payload.flags = spanFromGLfloats(m_allFlags);
-  payload.indices = spanFromGLuints(m_indexs);
+  payload.streamSegmentOrdinal = streamSegmentOrdinal;
+  payload.indexValueBias = static_cast<uint32_t>(vertexStart);
+  payload.pointsAndRadius = subspanOrEmpty(m_pointAndRadius, vertexStart, vertexCount);
+  if (m_pointColors.size() >= vertexStart + vertexCount) {
+    payload.colors = subspanOrEmpty(m_pointColors, vertexStart, vertexCount);
+  }
+  if (m_pointPickingColors.size() >= vertexStart + vertexCount) {
+    payload.pickingColors = subspanOrEmpty(m_pointPickingColors, vertexStart, vertexCount);
+  }
+  if (m_specularAndShininess.size() >= vertexStart + vertexCount) {
+    payload.specularAndShininess = subspanOrEmpty(m_specularAndShininess, vertexStart, vertexCount);
+  }
+  if (m_allFlags.size() >= vertexStart + vertexCount) {
+    payload.flags = subspanOrEmpty(m_allFlags, vertexStart, vertexCount);
+  }
+  if (indexCount > 0) {
+    CHECK(indexStart + indexCount <= m_indexs.size()) << "Sphere segment index range exceeds backing storage";
+    payload.indices = spanFromGLuints(m_indexs).subspan(indexStart, indexCount);
+  }
   payload.useDynamicMaterial = m_useDynamicMaterial;
   payload.wantsLighting = needLighting();
   payload.params = m_rendererBase.parameterState();
@@ -564,6 +606,15 @@ SpherePayload Z3DSphereRenderer::buildSpherePayload() const
 }
 
 RenderBatch Z3DSphereRenderer::buildRenderBatch(Z3DEye eye, bool picking) const
+{
+  return buildRenderBatch(eye, picking, 0, m_pointAndRadius.size() / kSphereVerticesPerInstance, 0u);
+}
+
+RenderBatch Z3DSphereRenderer::buildRenderBatch(Z3DEye eye,
+                                                bool picking,
+                                                size_t instanceStart,
+                                                size_t instanceCount,
+                                                uint32_t streamSegmentOrdinal) const
 {
   RenderBatch batch;
 
@@ -581,7 +632,7 @@ RenderBatch Z3DSphereRenderer::buildRenderBatch(Z3DEye eye, bool picking) const
 
   batch.draw.topology = PrimitiveTopology::TriangleList;
 
-  auto payload = buildSpherePayload();
+  auto payload = buildSpherePayload(instanceStart, instanceCount, streamSegmentOrdinal);
   payload.pickingPass = picking;
   // GL parity: carry follow flags so Vulkan respects per-renderer toggles
   payload.followCoordTransform = m_followCoordTransform;
@@ -614,9 +665,52 @@ void Z3DSphereRenderer::enqueueRenderBatches(Z3DEye eye, RenderBackend backend, 
   }
 
   appendDefaultColors();
+  const auto* renderBackend = m_rendererBase.backend();
+  CHECK(renderBackend != nullptr) << "Sphere segmentation requires an active backend";
+  const size_t maxStreamBytes = renderBackend->maxMonolithicGeometryStreamBytes();
+  const size_t preferredInstanceBudget =
+    std::max<size_t>(1, static_cast<size_t>(FLAGS_atlas_sphere_preferred_instance_budget_per_segment));
+  const size_t totalInstanceCount = m_pointAndRadius.size() / kSphereVerticesPerInstance;
 
-  auto batch = buildRenderBatch(eye, picking);
-  m_rendererBase.appendBatch(std::move(batch));
+  auto rangeFitsHardLimit = [&](size_t instanceCount) {
+    if (maxStreamBytes == std::numeric_limits<size_t>::max()) {
+      return true;
+    }
+    const size_t vertexCount = instanceCount * kSphereVerticesPerInstance;
+    const size_t indexCount = instanceCount * kSphereIndicesPerInstance;
+    return vertexCount * sizeof(glm::vec4) <= maxStreamBytes && indexCount * sizeof(uint32_t) <= maxStreamBytes;
+  };
+
+  if (totalInstanceCount <= preferredInstanceBudget && rangeFitsHardLimit(totalInstanceCount)) {
+    auto batch = buildRenderBatch(eye, picking);
+    m_rendererBase.appendBatch(std::move(batch));
+    return;
+  }
+
+  size_t rangeStart = 0;
+  size_t rangeCount = 0;
+  uint32_t streamSegmentOrdinal = 0;
+  auto flushRange = [&](size_t rangeEnd) {
+    if (rangeEnd <= rangeStart) {
+      return;
+    }
+    auto batch = buildRenderBatch(eye, picking, rangeStart, rangeEnd - rangeStart, streamSegmentOrdinal++);
+    m_rendererBase.appendBatch(std::move(batch));
+    rangeStart = rangeEnd;
+    rangeCount = 0;
+  };
+
+  for (size_t instanceIndex = 0; instanceIndex < totalInstanceCount; ++instanceIndex) {
+    const size_t candidateCount = rangeCount + 1;
+    if (instanceIndex > rangeStart &&
+        (candidateCount > preferredInstanceBudget || !rangeFitsHardLimit(candidateCount))) {
+      flushRange(instanceIndex);
+    }
+    rangeCount++;
+    CHECK(rangeFitsHardLimit(rangeCount))
+      << "Renderer-owned sphere segmentation produced a segment that still exceeds the backend hard stream limit";
+  }
+  flushRange(totalInstanceCount);
 }
 
 void Z3DSphereRenderer::appendDefaultColors()

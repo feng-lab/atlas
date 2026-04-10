@@ -6,9 +6,25 @@
 #include "z3dtexture.h"
 #include "zlog.h"
 
+#include <gflags/gflags.h>
+
 #include <utility>
 
 namespace nim {
+
+namespace {
+
+constexpr size_t kWideLineVerticesPerSegment = 4;
+constexpr size_t kWideLineIndicesPerSegment = 6;
+
+} // namespace
+
+DEFINE_uint64(
+  atlas_line_preferred_segment_budget_per_segment,
+  1000000,
+  "Preferred logical line-segment budget for one renderer-owned segment. The default matches the historical "
+  "wide-line batching policy of 4,000,000 expanded vertices (1,000,000 actual segments); backends still enforce "
+  "maxMonolithicGeometryStreamBytes as a hard safety guard.");
 
 Z3DLineRenderer::Z3DLineRenderer(Z3DRendererBase& rendererBase)
   : Z3DPrimitiveRenderer(rendererBase)
@@ -437,28 +453,63 @@ void Z3DLineRenderer::buildWideLineGeometry(std::vector<LineWideVertex>& outVert
 
 LinePayload Z3DLineRenderer::buildLinePayload(bool picking) const
 {
+  const size_t totalSegmentCount =
+    m_isLineStrip ? (m_linePositions.size() > 1 ? (m_linePositions.size() - 1) : 0u) : (m_linePositions.size() / 2);
+  return buildLinePayload(picking, 0, totalSegmentCount, 0u);
+}
+
+LinePayload Z3DLineRenderer::buildLinePayload(bool picking,
+                                              size_t segmentStart,
+                                              size_t segmentCount,
+                                              uint32_t streamSegmentOrdinal) const
+{
+  const size_t thinVertexStart = m_isLineStrip ? segmentStart : (segmentStart * 2);
+  const size_t thinVertexCount = m_isLineStrip ? (segmentCount > 0 ? segmentCount + 1 : 0u) : (segmentCount * 2);
+  const size_t wideVertexStart = segmentStart * kWideLineVerticesPerSegment;
+  const size_t wideVertexCount = segmentCount * kWideLineVerticesPerSegment;
+  const size_t wideIndexStart = segmentStart * kWideLineIndicesPerSegment;
+  const size_t wideIndexCount = segmentCount * kWideLineIndicesPerSegment;
+
   LinePayload payload;
   payload.streamKey = static_cast<uint64_t>(reinterpret_cast<uintptr_t>(this));
+  payload.streamSegmentOrdinal = streamSegmentOrdinal;
+  payload.indexValueBias = static_cast<uint32_t>(wideVertexStart);
+  payload.positions = subspanOrEmpty(m_linePositions, thinVertexStart, thinVertexCount);
 
-  payload.positions = spanOrEmpty(m_linePositions);
-
-  if (!m_linePositions.empty()) {
+  if (thinVertexCount > 0) {
     auto& colors = const_cast<Z3DLineRenderer*>(this)->lineColors();
-    payload.colors = spanOrEmpty(colors);
+    if (colors.size() >= thinVertexStart + thinVertexCount) {
+      payload.colors = subspanOrEmpty(colors, thinVertexStart, thinVertexCount);
+    }
   }
 
-  payload.pickingColors = spanOrEmpty(m_linePickingColors);
-  payload.perSegmentWidths = spanOrEmpty(m_lineWidthArray);
+  if (m_linePickingColors.size() >= thinVertexStart + thinVertexCount) {
+    payload.pickingColors = subspanOrEmpty(m_linePickingColors, thinVertexStart, thinVertexCount);
+  }
+  if (m_lineWidthArray.size() >= segmentStart + segmentCount) {
+    payload.perSegmentWidths = subspanOrEmpty(m_lineWidthArray, segmentStart, segmentCount);
+  }
   payload.params = m_rendererBase.parameterState();
   payload.paramsCaptured = true;
 
-  payload.smoothP0Positions = spanOrEmpty(m_smoothLineP0s);
-  payload.smoothP1Positions = spanOrEmpty(m_smoothLineP1s);
-  payload.smoothP0Colors = spanOrEmpty(m_smoothLineP0Colors);
-  payload.smoothP1Colors = spanOrEmpty(m_smoothLineP1Colors);
-  payload.smoothPickingColors = spanOrEmpty(m_smoothLinePickingColors);
-  payload.smoothFlags = spanFromGLfloats(m_allFlags);
-  payload.smoothIndices = spanFromGLuints(m_indexs);
+  payload.smoothP0Positions = subspanOrEmpty(m_smoothLineP0s, wideVertexStart, wideVertexCount);
+  payload.smoothP1Positions = subspanOrEmpty(m_smoothLineP1s, wideVertexStart, wideVertexCount);
+  if (m_smoothLineP0Colors.size() >= wideVertexStart + wideVertexCount) {
+    payload.smoothP0Colors = subspanOrEmpty(m_smoothLineP0Colors, wideVertexStart, wideVertexCount);
+  }
+  if (m_smoothLineP1Colors.size() >= wideVertexStart + wideVertexCount) {
+    payload.smoothP1Colors = subspanOrEmpty(m_smoothLineP1Colors, wideVertexStart, wideVertexCount);
+  }
+  if (m_smoothLinePickingColors.size() >= wideVertexStart + wideVertexCount) {
+    payload.smoothPickingColors = subspanOrEmpty(m_smoothLinePickingColors, wideVertexStart, wideVertexCount);
+  }
+  if (m_allFlags.size() >= wideVertexStart + wideVertexCount) {
+    payload.smoothFlags = subspanOrEmpty(m_allFlags, wideVertexStart, wideVertexCount);
+  }
+  if (wideIndexCount > 0) {
+    CHECK(wideIndexStart + wideIndexCount <= m_indexs.size()) << "Line segment index range exceeds backing storage";
+    payload.smoothIndices = spanFromGLuints(m_indexs).subspan(wideIndexStart, wideIndexCount);
+  }
   payload.useSmoothLine = m_useSmoothLine;
   payload.useTextureColor = m_useTextureColor;
   payload.screenAligned = m_screenAligned;
@@ -492,13 +543,24 @@ LinePayload Z3DLineRenderer::buildLinePayload(bool picking) const
 
 RenderBatch Z3DLineRenderer::buildRenderBatch(Z3DEye eye, bool picking) const
 {
+  const size_t totalSegmentCount =
+    m_isLineStrip ? (m_linePositions.size() > 1 ? (m_linePositions.size() - 1) : 0u) : (m_linePositions.size() / 2);
+  return buildRenderBatch(eye, picking, 0, totalSegmentCount, 0u);
+}
+
+RenderBatch Z3DLineRenderer::buildRenderBatch(Z3DEye eye,
+                                              bool picking,
+                                              size_t segmentStart,
+                                              size_t segmentCount,
+                                              uint32_t streamSegmentOrdinal) const
+{
   RenderBatch batch;
 
   batch.eye = eye;
 
   batch.draw.topology = m_isLineStrip ? PrimitiveTopology::LineStrip : PrimitiveTopology::LineList;
 
-  auto payload = buildLinePayload(picking);
+  auto payload = buildLinePayload(picking, segmentStart, segmentCount, streamSegmentOrdinal);
   batch.draw.vertexCount = static_cast<uint32_t>(payload.positions.size());
   batch.draw.indexCount = static_cast<uint32_t>(payload.smoothIndices.size());
   batch.geometry = std::move(payload);
@@ -871,13 +933,67 @@ void Z3DLineRenderer::enqueueRenderBatches(Z3DEye eye, RenderBackend backend, bo
   }
 
   updateLineWidth();
+  const auto* renderBackend = m_rendererBase.backend();
+  CHECK(renderBackend != nullptr) << "Line segmentation requires an active backend";
+  const size_t maxStreamBytes = renderBackend->maxMonolithicGeometryStreamBytes();
+  const size_t preferredSegmentBudget =
+    std::max<size_t>(1, static_cast<size_t>(FLAGS_atlas_line_preferred_segment_budget_per_segment));
+  const size_t totalSegmentCount =
+    m_isLineStrip ? (m_linePositions.size() > 1 ? (m_linePositions.size() - 1) : 0u) : (m_linePositions.size() / 2);
 
-  auto batch = buildRenderBatch(eye, picking);
-  m_rendererBase.appendBatch(std::move(batch));
+  auto rangeFitsHardLimit = [&](size_t segmentCount) {
+    if (maxStreamBytes == std::numeric_limits<size_t>::max()) {
+      return true;
+    }
+    if (m_useSmoothLine) {
+      const size_t vertexCount = segmentCount * kWideLineVerticesPerSegment;
+      const size_t indexCount = segmentCount * kWideLineIndicesPerSegment;
+      return vertexCount * sizeof(glm::vec4) <= maxStreamBytes && vertexCount * sizeof(glm::vec3) <= maxStreamBytes &&
+             indexCount * sizeof(uint32_t) <= maxStreamBytes;
+    }
+
+    const size_t thinVertexCount = m_isLineStrip ? (segmentCount > 0 ? segmentCount + 1 : 0u) : (segmentCount * 2);
+    const size_t indexCount = m_isLineStrip ? thinVertexCount : 0u;
+    return thinVertexCount * sizeof(glm::vec4) <= maxStreamBytes &&
+           thinVertexCount * sizeof(glm::vec3) <= maxStreamBytes && indexCount * sizeof(uint32_t) <= maxStreamBytes;
+  };
+
+  if (totalSegmentCount <= preferredSegmentBudget && rangeFitsHardLimit(totalSegmentCount)) {
+    auto batch = buildRenderBatch(eye, picking);
+    m_rendererBase.appendBatch(std::move(batch));
+    return;
+  }
+
+  size_t rangeStart = 0;
+  size_t rangeCount = 0;
+  uint32_t streamSegmentOrdinal = 0;
+  auto flushRange = [&](size_t rangeEnd) {
+    if (rangeEnd <= rangeStart) {
+      return;
+    }
+    auto batch = buildRenderBatch(eye, picking, rangeStart, rangeEnd - rangeStart, streamSegmentOrdinal++);
+    m_rendererBase.appendBatch(std::move(batch));
+    rangeStart = rangeEnd;
+    rangeCount = 0;
+  };
+
+  for (size_t segmentIndex = 0; segmentIndex < totalSegmentCount; ++segmentIndex) {
+    const size_t candidateCount = rangeCount + 1;
+    if (segmentIndex > rangeStart && (candidateCount > preferredSegmentBudget || !rangeFitsHardLimit(candidateCount))) {
+      flushRange(segmentIndex);
+    }
+    rangeCount++;
+    CHECK(rangeFitsHardLimit(rangeCount))
+      << "Renderer-owned line segmentation produced a segment that still exceeds the backend hard stream limit";
+  }
+  flushRange(totalSegmentCount);
 }
 
 void Z3DLineRenderer::renderSmooth(Z3DEye eye)
 {
+  const size_t batchVertexBudget =
+    std::max<size_t>(1, static_cast<size_t>(FLAGS_atlas_line_preferred_segment_budget_per_segment)) *
+    kWideLineVerticesPerSegment;
   updateLineWidth();
 
   if (m_smoothLineP0Colors.size() < m_smoothLineP0s.size()) {
@@ -896,7 +1012,7 @@ void Z3DLineRenderer::renderSmooth(Z3DEye eye)
     shader.bindTexture("texture", m_texture);
   }
 
-  size_t numBatch = std::ceil(m_smoothLineP0s.size() * 1.0 / m_oneBatchNumber);
+  size_t numBatch = std::ceil(m_smoothLineP0s.size() * 1.0 / batchVertexBudget);
 
   if (m_useVAO) {
     if (m_dataChanged) {
@@ -924,11 +1040,11 @@ void Z3DLineRenderer::renderSmooth(Z3DEye eye)
 
       for (size_t i = 0; i < numBatch; ++i) {
         m_VAOs->bind(i);
-        size_t size = m_oneBatchNumber;
+        size_t size = batchVertexBudget;
         if (i == numBatch - 1) {
-          size = m_smoothLineP0s.size() - (numBatch - 1) * m_oneBatchNumber;
+          size = m_smoothLineP0s.size() - (numBatch - 1) * batchVertexBudget;
         }
-        size_t start = m_oneBatchNumber * i;
+        size_t start = batchVertexBudget * i;
 
         glEnableVertexAttribArray(attr_p0);
         m_batchVBOs[i]->bind(GL_ARRAY_BUFFER, 0);
@@ -968,9 +1084,9 @@ void Z3DLineRenderer::renderSmooth(Z3DEye eye)
     }
 
     for (size_t i = 0; i < numBatch; ++i) {
-      size_t size = m_oneBatchNumber;
+      size_t size = batchVertexBudget;
       if (i == numBatch - 1) {
-        size = m_smoothLineP0s.size() - (numBatch - 1) * m_oneBatchNumber;
+        size = m_smoothLineP0s.size() - (numBatch - 1) * batchVertexBudget;
       }
       m_VAOs->bind(i);
       glDrawElements(GL_TRIANGLES, size * 6 / 4, GL_UNSIGNED_INT, nullptr);
@@ -1000,11 +1116,11 @@ void Z3DLineRenderer::renderSmooth(Z3DEye eye)
     auto attr_flags = shader.flagsAttributeLocation();
 
     for (size_t i = 0; i < numBatch; ++i) {
-      size_t size = m_oneBatchNumber;
+      size_t size = batchVertexBudget;
       if (i == numBatch - 1) {
-        size = m_smoothLineP0s.size() - (numBatch - 1) * m_oneBatchNumber;
+        size = m_smoothLineP0s.size() - (numBatch - 1) * batchVertexBudget;
       }
-      size_t start = m_oneBatchNumber * i;
+      size_t start = batchVertexBudget * i;
 
       glEnableVertexAttribArray(attr_p0);
       m_batchVBOs[i]->bind(GL_ARRAY_BUFFER, 0);
@@ -1069,6 +1185,9 @@ void Z3DLineRenderer::renderSmooth(Z3DEye eye)
 
 void Z3DLineRenderer::renderSmoothPicking(Z3DEye eye)
 {
+  const size_t batchVertexBudget =
+    std::max<size_t>(1, static_cast<size_t>(FLAGS_atlas_line_preferred_segment_budget_per_segment)) *
+    kWideLineVerticesPerSegment;
   updateLineWidth();
 
   m_smoothLineShaderGrp1->bind();
@@ -1077,7 +1196,7 @@ void Z3DLineRenderer::renderSmoothPicking(Z3DEye eye)
   setPickingShaderParameters(shader);
   shader.setLineWidthUniform(m_lineWidth);
 
-  size_t numBatch = std::ceil(m_smoothLineP0s.size() * 1.0 / m_oneBatchNumber);
+  size_t numBatch = std::ceil(m_smoothLineP0s.size() * 1.0 / batchVertexBudget);
 
   if (m_useVAO) {
     if (m_pickingDataChanged) {
@@ -1101,11 +1220,11 @@ void Z3DLineRenderer::renderSmoothPicking(Z3DEye eye)
 
       for (size_t i = 0; i < numBatch; ++i) {
         m_pickingVAOs->bind(i);
-        size_t size = m_oneBatchNumber;
+        size_t size = batchVertexBudget;
         if (i == numBatch - 1) {
-          size = m_smoothLineP0s.size() - (numBatch - 1) * m_oneBatchNumber;
+          size = m_smoothLineP0s.size() - (numBatch - 1) * batchVertexBudget;
         }
-        size_t start = m_oneBatchNumber * i;
+        size_t start = batchVertexBudget * i;
 
         glEnableVertexAttribArray(attr_p0);
         if (m_dataChanged) {
@@ -1157,9 +1276,9 @@ void Z3DLineRenderer::renderSmoothPicking(Z3DEye eye)
     }
 
     for (size_t i = 0; i < numBatch; ++i) {
-      size_t size = m_oneBatchNumber;
+      size_t size = batchVertexBudget;
       if (i == numBatch - 1) {
-        size = m_smoothLineP0s.size() - (numBatch - 1) * m_oneBatchNumber;
+        size = m_smoothLineP0s.size() - (numBatch - 1) * batchVertexBudget;
       }
       m_pickingVAOs->bind(i);
       glDrawElements(GL_TRIANGLES, size * 6 / 4, GL_UNSIGNED_INT, nullptr);
@@ -1186,11 +1305,11 @@ void Z3DLineRenderer::renderSmoothPicking(Z3DEye eye)
     auto attr_flags = shader.flagsAttributeLocation();
 
     for (size_t i = 0; i < numBatch; ++i) {
-      size_t size = m_oneBatchNumber;
+      size_t size = batchVertexBudget;
       if (i == numBatch - 1) {
-        size = m_smoothLineP0s.size() - (numBatch - 1) * m_oneBatchNumber;
+        size = m_smoothLineP0s.size() - (numBatch - 1) * batchVertexBudget;
       }
-      size_t start = m_oneBatchNumber * i;
+      size_t start = batchVertexBudget * i;
 
       glEnableVertexAttribArray(attr_p0);
       if (m_dataChanged) {

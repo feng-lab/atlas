@@ -3,13 +3,13 @@
 #include "z3drendercommands.h"
 #include "z3drendererbase.h"
 #include "z3drenderervulkanbackend.h"
+#include "zvulkanstreamcachecoordinator.h"
 #include "zvulkan.h"
 
 #include <array>
 #include <memory>
 #include <map>
 #include <optional>
-#include <set>
 #include <tuple>
 #include <unordered_map>
 #include <vector>
@@ -42,6 +42,9 @@ public:
 
   void resetFrame();
   void evictStream(uint64_t streamKey);
+  [[nodiscard]] std::optional<Z3DRendererVulkanBackend::StaticPressureEvictionCandidate>
+  oldestEvictableStaticStream(Z3DRendererVulkanBackend::StaticPressureDomain domain, uint64_t protectedEpoch) const;
+  size_t evictStaticStreamForPressure(uint64_t streamKey);
 
   void record(Z3DRendererBase& renderer,
               const RenderBatch& batch,
@@ -111,8 +114,13 @@ private:
   Z3DRendererVulkanBackend& m_backend;
 
   std::map<PipelineKey, PipelineInstance> m_pipelineCache;
+  ZVulkanStaticStreamUsageTracker m_streamUsageTracker;
 
   // All line geometry uses the per-frame upload arena; no per-context VBOs
+
+  void touchStaticStream(uint64_t streamKey);
+  [[nodiscard]] size_t staticBytesForStream(uint64_t streamKey,
+                                            Z3DRendererVulkanBackend::StaticPressureDomain domain) const;
 
   // Upload arena-backed SoA for thin line (per-draw, per-attribute buffers)
   vk::Buffer m_thinPosBuffer{};
@@ -145,10 +153,11 @@ private:
   struct ThinGeometryCacheKey
   {
     uint64_t streamKey = 0;
+    uint32_t streamSegmentOrdinal = 0;
     bool lineStrip = false;
     auto tie() const
     {
-      return std::tuple(streamKey, lineStrip);
+      return std::tuple(streamKey, streamSegmentOrdinal, lineStrip);
     }
     bool operator<(const ThinGeometryCacheKey& rhs) const
     {
@@ -170,11 +179,12 @@ private:
   struct ThinAppearanceCacheKey
   {
     uint64_t streamKey = 0;
+    uint32_t streamSegmentOrdinal = 0;
     bool picking = false;
     bool lineStrip = false;
     auto tie() const
     {
-      return std::tuple(streamKey, picking, lineStrip);
+      return std::tuple(streamKey, streamSegmentOrdinal, picking, lineStrip);
     }
     bool operator<(const ThinAppearanceCacheKey& rhs) const
     {
@@ -205,19 +215,20 @@ private:
     uint32_t vertexCount = 0;
     uint32_t colorsGen = 0;
   };
-  std::map<ThinGeometryCacheKey, ThinGeometryCacheEntry> m_thinGeometryStaticCache;
-  std::map<ThinAppearanceCacheKey, ThinAppearanceCacheEntry> m_thinAppearanceStaticCache;
-  std::set<ThinGeometryCacheKey> m_thinGeometryStaticCopyPendingKeys;
-  std::set<ThinAppearanceCacheKey> m_thinAppearanceStaticCopyPendingKeys;
-  std::map<ThinGeometryCacheKey, ThinPendingGeometryUploadBinding> m_thinGeometryStaticCopyPendingUploads;
-  std::map<ThinAppearanceCacheKey, ThinPendingAppearanceUploadBinding> m_thinAppearanceStaticCopyPendingUploads;
+  using ThinGeometryStreamCacheCoordinator =
+    ZVulkanStreamCacheCoordinator<ThinGeometryCacheKey, ThinGeometryCacheEntry, ThinPendingGeometryUploadBinding>;
+  using ThinAppearanceStreamCacheCoordinator =
+    ZVulkanStreamCacheCoordinator<ThinAppearanceCacheKey, ThinAppearanceCacheEntry, ThinPendingAppearanceUploadBinding>;
+  ThinGeometryStreamCacheCoordinator m_thinGeometryStreamCache;
+  ThinAppearanceStreamCacheCoordinator m_thinAppearanceStreamCache;
 
   struct WideGeometryCacheKey
   {
     uint64_t streamKey = 0;
+    uint32_t streamSegmentOrdinal = 0;
     auto tie() const
     {
-      return std::tuple(streamKey);
+      return std::tuple(streamKey, streamSegmentOrdinal);
     }
     bool operator<(const WideGeometryCacheKey& rhs) const
     {
@@ -243,10 +254,11 @@ private:
   struct WideAppearanceCacheKey
   {
     uint64_t streamKey = 0;
+    uint32_t streamSegmentOrdinal = 0;
     bool picking = false;
     auto tie() const
     {
-      return std::tuple(streamKey, picking);
+      return std::tuple(streamKey, streamSegmentOrdinal, picking);
     }
     bool operator<(const WideAppearanceCacheKey& rhs) const
     {
@@ -287,18 +299,19 @@ private:
     uint32_t c1Gen = 0;
     uint32_t pickGen = 0;
   };
-  std::map<WideGeometryCacheKey, WideGeometryCacheEntry> m_wideGeometryStaticCache;
-  std::map<WideAppearanceCacheKey, WideAppearanceCacheEntry> m_wideAppearanceStaticCache;
-  std::set<WideGeometryCacheKey> m_wideGeometryStaticCopyPendingKeys;
-  std::set<WideAppearanceCacheKey> m_wideAppearanceStaticCopyPendingKeys;
-  std::map<WideGeometryCacheKey, WidePendingGeometryUploadBinding> m_wideGeometryStaticCopyPendingUploads;
-  std::map<WideAppearanceCacheKey, WidePendingAppearanceUploadBinding> m_wideAppearanceStaticCopyPendingUploads;
+  using WideGeometryStreamCacheCoordinator =
+    ZVulkanStreamCacheCoordinator<WideGeometryCacheKey, WideGeometryCacheEntry, WidePendingGeometryUploadBinding>;
+  using WideAppearanceStreamCacheCoordinator =
+    ZVulkanStreamCacheCoordinator<WideAppearanceCacheKey, WideAppearanceCacheEntry, WidePendingAppearanceUploadBinding>;
+  WideGeometryStreamCacheCoordinator m_wideGeometryStreamCache;
+  WideAppearanceStreamCacheCoordinator m_wideAppearanceStreamCache;
 
   // Cached per-draw secondary command buffers (steady-state optimization).
   struct ThinSecondaryCacheKey
   {
     void* frameKey = nullptr;
     uint64_t streamKey = 0;
+    uint32_t streamSegmentOrdinal = 0;
     bool picking = false;
     bool lineStrip = false;
     Z3DRendererBase::ShaderHookType shaderHookType = Z3DRendererBase::ShaderHookType::Normal;
@@ -308,9 +321,10 @@ private:
 
     bool operator==(const ThinSecondaryCacheKey& rhs) const
     {
-      return frameKey == rhs.frameKey && streamKey == rhs.streamKey && picking == rhs.picking &&
-             lineStrip == rhs.lineStrip && shaderHookType == rhs.shaderHookType && eye == rhs.eye &&
-             hasOit == rhs.hasOit && oitRingIndex == rhs.oitRingIndex;
+      return frameKey == rhs.frameKey && streamKey == rhs.streamKey &&
+             streamSegmentOrdinal == rhs.streamSegmentOrdinal && picking == rhs.picking && lineStrip == rhs.lineStrip &&
+             shaderHookType == rhs.shaderHookType && eye == rhs.eye && hasOit == rhs.hasOit &&
+             oitRingIndex == rhs.oitRingIndex;
     }
   };
 
@@ -320,6 +334,7 @@ private:
     {
       size_t h = std::hash<uintptr_t>{}(reinterpret_cast<uintptr_t>(key.frameKey));
       h ^= std::hash<uint64_t>{}(key.streamKey) + 0x9e3779b97f4a7c15ull + (h << 6) + (h >> 2);
+      h ^= std::hash<uint32_t>{}(key.streamSegmentOrdinal) + 0x9e3779b97f4a7c15ull + (h << 6) + (h >> 2);
       h ^= std::hash<uint8_t>{}(static_cast<uint8_t>(key.picking)) + 0x9e3779b97f4a7c15ull + (h << 6) + (h >> 2);
       h ^= std::hash<uint8_t>{}(static_cast<uint8_t>(key.lineStrip)) + 0x9e3779b97f4a7c15ull + (h << 6) + (h >> 2);
       h ^= std::hash<int>{}(static_cast<int>(key.shaderHookType)) + 0x9e3779b97f4a7c15ull + (h << 6) + (h >> 2);
@@ -433,7 +448,26 @@ private:
     uint32_t thinVertexCount = 0;
     uint32_t thinIndexCount = 0;
   };
-  std::unordered_map<uint64_t, DDPArgs> m_ddpArgsByStream;
+  struct DDPStreamKey
+  {
+    uint64_t streamKey = 0;
+    uint32_t streamSegmentOrdinal = 0;
+
+    bool operator==(const DDPStreamKey& rhs) const
+    {
+      return streamKey == rhs.streamKey && streamSegmentOrdinal == rhs.streamSegmentOrdinal;
+    }
+  };
+  struct DDPStreamKeyHash
+  {
+    size_t operator()(const DDPStreamKey& key) const noexcept
+    {
+      size_t h = std::hash<uint64_t>{}(key.streamKey);
+      h ^= std::hash<uint32_t>{}(key.streamSegmentOrdinal) + 0x9e3779b97f4a7c15ull + (h << 6) + (h >> 2);
+      return h;
+    }
+  };
+  std::unordered_map<DDPStreamKey, DDPArgs, DDPStreamKeyHash> m_ddpArgsByStream;
 
   void updateUBOs(Z3DRendererBase& renderer, const RenderBatch& batch, const LinePayload& payload);
   PipelineInstance&

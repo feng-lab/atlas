@@ -59,6 +59,13 @@ protected:
 
   [[nodiscard]] EllipsoidPayload buildEllipsoidPayload() const;
   [[nodiscard]] RenderBatch buildRenderBatch(Z3DEye eye, bool picking) const;
+  [[nodiscard]] EllipsoidPayload
+  buildEllipsoidPayload(size_t instanceStart, size_t instanceCount, uint32_t streamSegmentOrdinal) const;
+  [[nodiscard]] RenderBatch buildRenderBatch(Z3DEye eye,
+                                             bool picking,
+                                             size_t instanceStart,
+                                             size_t instanceCount,
+                                             uint32_t streamSegmentOrdinal) const;
 
 protected:
   void createResources(RenderBackend backend) override;
@@ -85,10 +92,10 @@ private:
   std::vector<GLfloat> m_allFlags;
   std::vector<GLuint> m_indexs;
 
-  std::unique_ptr<Z3DVertexArrayObject> m_VAO;
-  std::unique_ptr<Z3DVertexArrayObject> m_pickingVAO;
-  std::unique_ptr<Z3DVertexBufferObject> m_VBOs;
-  std::unique_ptr<Z3DVertexBufferObject> m_pickingVBOs;
+  std::unique_ptr<Z3DVertexArrayObject> m_VAOs;
+  std::unique_ptr<Z3DVertexArrayObject> m_pickingVAOs;
+  std::vector<std::unique_ptr<Z3DVertexBufferObject>> m_VBOs;
+  std::vector<std::unique_ptr<Z3DVertexBufferObject>> m_pickingVBOs;
   bool m_dataChanged;
   bool m_pickingDataChanged;
 

@@ -7,6 +7,7 @@
 
 #include <memory>
 #include <cstdint>
+#include <limits>
 #include <string>
 #include <string_view>
 
@@ -80,6 +81,15 @@ public:
   [[nodiscard]] virtual uint32_t maxFramesInFlight() const
   {
     return 0;
+  }
+
+  // Hard byte limit for one monolithic geometry attribute/index stream emitted
+  // by renderers before a backend would need a second level of chunking.
+  // Backends that can accept arbitrarily large monolithic streams can keep the
+  // default.
+  [[nodiscard]] virtual size_t maxMonolithicGeometryStreamBytes() const
+  {
+    return std::numeric_limits<size_t>::max();
   }
 };
 
