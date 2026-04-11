@@ -1042,6 +1042,12 @@ double Z3DCompositor::processGL(Z3DEye eye)
         Z3DScratchResourcePool::RenderTargetLease temp2Lease =
           Z3DRenderGlobalState::instance().scratchPool().acquireTempRenderTarget2D(tempSize);
         // VLOG(1) << "lease acquired";
+        Z3DScratchResourcePool::RenderTargetLease tempCompositeLease;
+        Z3DRenderTarget* blendTarget = &currentOutRenderTarget;
+        if (supersample2x2) {
+          tempCompositeLease = Z3DRenderGlobalState::instance().scratchPool().acquireTempRenderTarget2D(tempSize);
+          blendTarget = tempCompositeLease.renderTarget;
+        }
 
         // render normal geometries to tempport
         renderGeometries(normalOpaqueFilters, normalTransparentFilters, temp1Lease, eye);
@@ -1049,12 +1055,13 @@ double Z3DCompositor::processGL(Z3DEye eye)
         // render on top geometries to tempport2
         renderGeometries(onTopOpaqueFilters, onTopTransparentFilters, temp2Lease, eye);
 
-        // blend to output
-        currentOutRenderTarget.bind();
-        currentOutRenderTarget.clear();
-        setViewport(currentOutRenderTarget.size());
+        // Blend in supersampled space first when AA=2x2, then resolve once
+        // into the final output to match Vulkan ordering.
+        blendTarget->bind();
+        blendTarget->clear();
+        setViewport(blendTarget->size());
 
-        if (m_showBackground.get()) {
+        if (!supersample2x2 && m_showBackground.get()) {
           m_rendererBase.render(eye, m_backgroundRenderer);
           glEnable(GL_BLEND);
           glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
@@ -1064,6 +1071,25 @@ double Z3DCompositor::processGL(Z3DEye eye)
         m_firstOnTopBlendRenderer.setColorTexture2(temp1Lease.renderTarget->colorTexture());
         m_firstOnTopBlendRenderer.setDepthTexture2(temp1Lease.renderTarget->depthTexture());
         m_rendererBase.render(eye, m_firstOnTopBlendRenderer);
+        blendTarget->release();
+
+        if (supersample2x2) {
+          currentOutRenderTarget.bind();
+          currentOutRenderTarget.clear();
+          setViewport(currentOutRenderTarget.size());
+
+          if (m_showBackground.get()) {
+            m_rendererBase.render(eye, m_backgroundRenderer);
+            glEnable(GL_BLEND);
+            glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+          }
+          glDepthFunc(GL_ALWAYS);
+          m_textureCopyRenderer.setColorTexture(tempCompositeLease.renderTarget->colorTexture());
+          m_textureCopyRenderer.setDepthTexture(tempCompositeLease.renderTarget->depthTexture());
+          m_rendererBase.render(eye, m_textureCopyRenderer);
+          glDepthFunc(GL_LESS);
+        }
+
         if (m_showBackground.get() || m_showAxis.get()) {
           glBlendFunc(GL_ONE, GL_ZERO);
           glDisable(GL_BLEND);
@@ -1159,6 +1185,12 @@ double Z3DCompositor::processGL(Z3DEye eye)
         Z3DScratchResourcePool::RenderTargetLease temp2LeaseA =
           Z3DRenderGlobalState::instance().scratchPool().acquireTempRenderTarget2D(tempSize2);
         // VLOG(1) << "lease acquired";
+        Z3DScratchResourcePool::RenderTargetLease tempCompositeLeaseA;
+        Z3DRenderTarget* blendTargetA = &currentOutRenderTarget;
+        if (supersample2x2) {
+          tempCompositeLeaseA = Z3DRenderGlobalState::instance().scratchPool().acquireTempRenderTarget2D(tempSize2);
+          blendTargetA = tempCompositeLeaseA.renderTarget;
+        }
 
         // render normal geometries into tempport
         renderGeometries(normalOpaqueFilters, normalTransparentFilters, temp1LeaseA, eye);
@@ -1180,12 +1212,13 @@ double Z3DCompositor::processGL(Z3DEye eye)
         // render on top geometries into tempport
         renderGeometries(onTopOpaqueFilters, onTopTransparentFilters, temp1LeaseA, eye);
 
-        // blend into out
-        currentOutRenderTarget.bind();
-        currentOutRenderTarget.clear();
-        setViewport(currentOutRenderTarget.size());
+        // Blend the supersampled intermediate scene and on-top overlays in
+        // supersampled space first, then resolve once into the final output.
+        blendTargetA->bind();
+        blendTargetA->clear();
+        setViewport(blendTargetA->size());
 
-        if (m_showBackground.get()) {
+        if (!supersample2x2 && m_showBackground.get()) {
           m_rendererBase.render(eye, m_backgroundRenderer);
           glEnable(GL_BLEND);
           glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
@@ -1195,6 +1228,24 @@ double Z3DCompositor::processGL(Z3DEye eye)
         m_firstOnTopBlendRenderer.setColorTexture2(temp2LeaseA.renderTarget->colorTexture());
         m_firstOnTopBlendRenderer.setDepthTexture2(temp2LeaseA.renderTarget->depthTexture());
         m_rendererBase.render(eye, m_firstOnTopBlendRenderer);
+        blendTargetA->release();
+
+        if (supersample2x2) {
+          currentOutRenderTarget.bind();
+          currentOutRenderTarget.clear();
+          setViewport(currentOutRenderTarget.size());
+
+          if (m_showBackground.get()) {
+            m_rendererBase.render(eye, m_backgroundRenderer);
+            glEnable(GL_BLEND);
+            glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+          }
+          glDepthFunc(GL_ALWAYS);
+          m_textureCopyRenderer.setColorTexture(tempCompositeLeaseA.renderTarget->colorTexture());
+          m_textureCopyRenderer.setDepthTexture(tempCompositeLeaseA.renderTarget->depthTexture());
+          m_rendererBase.render(eye, m_textureCopyRenderer);
+          glDepthFunc(GL_LESS);
+        }
 
         if (m_showBackground.get() || m_showAxis.get()) {
           glBlendFunc(GL_ONE, GL_ZERO);
@@ -1255,6 +1306,12 @@ double Z3DCompositor::processGL(Z3DEye eye)
       Z3DScratchResourcePool::RenderTargetLease temp2Lease2 =
         Z3DRenderGlobalState::instance().scratchPool().acquireTempRenderTarget2D(tempSize);
       // VLOG(1) << "lease acquired";
+      Z3DScratchResourcePool::RenderTargetLease tempCompositeLease2;
+      Z3DRenderTarget* blendTarget = &currentOutRenderTarget;
+      if (supersample2x2) {
+        tempCompositeLease2 = Z3DRenderGlobalState::instance().scratchPool().acquireTempRenderTarget2D(tempSize);
+        blendTarget = tempCompositeLease2.renderTarget;
+      }
 
       // render normal geometries to tempport
       renderGeometries(normalOpaqueFilters, normalTransparentFilters, temp1Lease2, eye);
@@ -1262,12 +1319,14 @@ double Z3DCompositor::processGL(Z3DEye eye)
       // render on top geometries to tempport2
       renderGeometries(onTopOpaqueFilters, onTopTransparentFilters, temp2Lease2, eye);
 
-      // blend to output
-      currentOutRenderTarget.bind();
-      currentOutRenderTarget.clear();
-      setViewport(currentOutRenderTarget.size());
+      // Blend in supersampled space first when AA=2x2, then resolve once into
+      // the final output. This matches the Vulkan ordering and avoids
+      // backend-specific downsampling during the on-top blend itself.
+      blendTarget->bind();
+      blendTarget->clear();
+      setViewport(blendTarget->size());
 
-      if (m_showBackground.get()) {
+      if (!supersample2x2 && m_showBackground.get()) {
         m_rendererBase.render(eye, m_backgroundRenderer);
         glEnable(GL_BLEND);
         glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
@@ -1277,6 +1336,25 @@ double Z3DCompositor::processGL(Z3DEye eye)
       m_firstOnTopBlendRenderer.setColorTexture2(temp1Lease2.renderTarget->colorTexture());
       m_firstOnTopBlendRenderer.setDepthTexture2(temp1Lease2.renderTarget->depthTexture());
       m_rendererBase.render(eye, m_firstOnTopBlendRenderer);
+      blendTarget->release();
+
+      if (supersample2x2) {
+        currentOutRenderTarget.bind();
+        currentOutRenderTarget.clear();
+        setViewport(currentOutRenderTarget.size());
+
+        if (m_showBackground.get()) {
+          m_rendererBase.render(eye, m_backgroundRenderer);
+          glEnable(GL_BLEND);
+          glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+        }
+        glDepthFunc(GL_ALWAYS);
+        m_textureCopyRenderer.setColorTexture(tempCompositeLease2.renderTarget->colorTexture());
+        m_textureCopyRenderer.setDepthTexture(tempCompositeLease2.renderTarget->depthTexture());
+        m_rendererBase.render(eye, m_textureCopyRenderer);
+        glDepthFunc(GL_LESS);
+      }
+
       if (m_showBackground.get() || m_showAxis.get()) {
         glBlendFunc(GL_ONE, GL_ZERO);
         glDisable(GL_BLEND);

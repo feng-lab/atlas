@@ -47,8 +47,12 @@ void Z3DTextureCopyRenderer::render(Z3DEye eye)
   shader.setUniform("discard_transparent", m_discardTransparent);
 
   // pass texture parameters to the shader
-  shader.bindTexture("color_texture", m_colorTexture);
-  shader.bindTexture("depth_texture", m_depthTexture);
+  // Match Vulkan's bindless linear-clamp sampling for fullscreen copy/resolve
+  // passes. Scratch render targets are created with NEAREST filtering for
+  // generic intermediate use, but the AA resolve path expects filtered
+  // downsampling when sampling a larger source into a smaller output.
+  shader.bindTexture("color_texture", m_colorTexture, GLint(GL_LINEAR), GLint(GL_LINEAR));
+  shader.bindTexture("depth_texture", m_depthTexture, GLint(GL_LINEAR), GLint(GL_LINEAR));
 
   renderScreenQuad(*m_VAO, shader);
   m_copyTextureShaderGrp->release();
