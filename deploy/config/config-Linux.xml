@@ -13,6 +13,8 @@
     <RunProgram>@TargetDir@/Atlas.AppDir/Atlas</RunProgram>
     <RunProgramDescription>Run Atlas now.</RunProgramDescription>
     <MaintenanceToolName>MaintenanceTool</MaintenanceToolName>
+    <ControlScript>controlscript.qs</ControlScript>
+    <RepositorySettingsPageVisible>false</RepositorySettingsPageVisible>
     <AllowNonAsciiCharacters>true</AllowNonAsciiCharacters>
 
     <RemoteRepositories>

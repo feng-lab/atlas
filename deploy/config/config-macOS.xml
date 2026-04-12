@@ -12,6 +12,8 @@
     <RunProgram>@TargetDir@/Atlas.app/Contents/MacOS/Atlas</RunProgram>
     <RunProgramDescription>Run Atlas now.</RunProgramDescription>
     <MaintenanceToolName>MaintenanceTool</MaintenanceToolName>
+    <ControlScript>controlscript.qs</ControlScript>
+    <RepositorySettingsPageVisible>false</RepositorySettingsPageVisible>
     <AllowNonAsciiCharacters>true</AllowNonAsciiCharacters>
 
     <RemoteRepositories>

@@ -362,6 +362,16 @@ def _copy_ifw_config_sidecar_assets(
 
         assets_to_copy.update(matching_assets)
 
+    control_script = root.find("ControlScript")
+    if control_script is not None and control_script.text:
+        rel_path = control_script.text.strip()
+        source_path = os.path.join(template_dir, rel_path)
+        if not os.path.isfile(source_path):
+            raise RuntimeError(
+                f"Expected script file for <ControlScript>{rel_path}</ControlScript> next to {template_path}"
+            )
+        assets_to_copy.add((source_path, rel_path))
+
     for tag in ("Logo", "Watermark", "Banner", "Background"):
         child = root.find(tag)
         if child is None or not child.text:
@@ -1718,8 +1728,8 @@ def update_maintenance_pacakge_xml_version(template_file: str, file: str):
     tree = eTree.parse(template_file)
     tree.find(
         "Version"
-    ).text = "4.7.7"  # todo: get version and date from qt components.xml
-    tree.find("ReleaseDate").text = "2024-02-21"
+    ).text = "4.7.8"  # todo: get version and date from qt components.xml
+    tree.find("ReleaseDate").text = "2026-04-12"
     # Write back to file
     tree.write(file, encoding="utf-8", xml_declaration=True)
 
