@@ -744,8 +744,7 @@ void ZVulkanLinearScript::flushNodes(std::string_view reason, /*nullable*/ const
                   }
                 }
 
-                const bool hasIndices = payload.entryHasIndices && !payload.entryIndices.empty();
-                const bool planarGeometry = !hasIndices;
+                const bool planarGeometry = payload.planarGeometry;
 
                 bool needsWarmup = false;
                 bool wants2D = false;
@@ -950,8 +949,7 @@ void ZVulkanLinearScript::flushNodes(std::string_view reason, /*nullable*/ const
                   }
                 }
 
-                const bool hasIndices = payload.entryHasIndices && !payload.entryIndices.empty();
-                const bool planarGeometry = !hasIndices;
+                const bool planarGeometry = payload.planarGeometry;
 
                 bool needsWarmup = false;
                 bool wants2D = false;

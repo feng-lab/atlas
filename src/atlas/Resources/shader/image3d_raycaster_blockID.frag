@@ -11,7 +11,9 @@ uniform uvec3 pos_to_block_ids[LEVEL_COUNT];
 uniform float sampling_rate;
 uniform float ze_to_screen_pixel_voxel_size;
 
+#ifndef ATLAS_ANALYTIC_RAY_SETUP
 uniform sampler2DArray ray_entry_exit_tex_coord;
+#endif
 
 uniform sampler2D last_ray_depth;
 
@@ -35,12 +37,19 @@ void main()
     discard;
   }
 
-  vec4 entryTexCoordAndZ = texelFetch(ray_entry_exit_tex_coord, ivec3(gl_FragCoord.xy, 0), 0);
-  vec4 exitTexCoordAndZ = texelFetch(ray_entry_exit_tex_coord, ivec3(gl_FragCoord.xy, 1), 0);
+  vec4 entryTexCoordAndZ;
+  vec4 exitTexCoordAndZ;
+#ifdef ATLAS_ANALYTIC_RAY_SETUP
+  bool hasRaySegment = atlasComputeAnalyticRaySegment(gl_FragCoord.xy, entryTexCoordAndZ, exitTexCoordAndZ);
+#else
+  entryTexCoordAndZ = texelFetch(ray_entry_exit_tex_coord, ivec3(gl_FragCoord.xy, 0), 0);
+  exitTexCoordAndZ = texelFetch(ray_entry_exit_tex_coord, ivec3(gl_FragCoord.xy, 1), 0);
+  bool hasRaySegment = !all(equal(entryTexCoordAndZ.xyz, exitTexCoordAndZ.xyz));
+#endif
   vec3 startRayPosition = entryTexCoordAndZ.xyz;
   vec3 exitRayPosition = exitTexCoordAndZ.xyz;
 
-  if (startRayPosition == exitRayPosition) {
+  if (!hasRaySegment) {
     discard;   // background
   } else {
     //http://www.opengl.org/archives/resources/faq/technical/depthbuffer.htm
@@ -147,4 +156,3 @@ void main()
 //    FragData7 = uvec4(usedBlockIDs[12], usedBlockIDs[13], usedBlockIDs[14], usedBlockIDs[15]);
   }
 }
-

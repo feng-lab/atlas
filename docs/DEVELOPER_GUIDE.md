@@ -19,6 +19,13 @@ Key References
 - Image Paging & Progressive Rendering: [Atlas_Image_Paging_and_Progressive_Rendering.md](Atlas_Image_Paging_and_Progressive_Rendering.md)
 - Agents Overview and Tools: [AGENTS_GUIDE.md](AGENTS_GUIDE.md)
 
+Volume Ray Setup
+
+- Atlas now defaults to an analytic per-pixel ray-setup path for 3D image raycasting (`--atlas_volume_rendering_analytic_ray_setup=true`).
+- The analytic path reconstructs the view ray per fragment, intersects it against the local-cut texture-space box, and then clips that interval against the active global XYZ cut planes transformed into texture space.
+- Both paged and non-paged volume raycasters consume the same analytic `startRayPosition` / `exitRayPosition` contract, which keeps the OpenGL and Vulkan backends aligned.
+- The legacy clipped-mesh entry/exit workflow is still available behind `--atlas_volume_rendering_analytic_ray_setup=false` so export parity and cut behavior can be compared before the old path is removed.
+
 Tracing (Seeded + Auto)
 
 - User-facing workflow documentation lives in `docs/USER_GUIDE.md`:

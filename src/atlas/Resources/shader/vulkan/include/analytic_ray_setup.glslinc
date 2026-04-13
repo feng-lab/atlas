@@ -1,0 +1,114 @@
+layout(std140, set = 1, binding = 0) uniform RaySetup {
+  mat4 ndc_to_tex;
+  mat4 ndc_to_eye;
+  vec4 box_min_tex;
+  vec4 box_max_tex;
+  vec4 ndc_z_range;
+  uvec4 clip_params;
+  vec4 clip_planes[ATLAS_ANALYTIC_MAX_CLIP_PLANES];
+} rs;
+
+bool atlasClipSegmentAgainstAxis(float origin,
+                                 float direction,
+                                 float minValue,
+                                 float maxValue,
+                                 inout float tEnter,
+                                 inout float tExit)
+{
+  const float epsilon = 1e-6;
+  if (abs(direction) <= epsilon) {
+    return origin >= minValue && origin <= maxValue;
+  }
+
+  float t0 = (minValue - origin) / direction;
+  float t1 = (maxValue - origin) / direction;
+  if (t0 > t1) {
+    float tmp = t0;
+    t0 = t1;
+    t1 = tmp;
+  }
+
+  tEnter = max(tEnter, t0);
+  tExit = min(tExit, t1);
+  return tEnter <= tExit;
+}
+
+bool atlasClipSegmentAgainstPlane(vec4 plane, vec3 origin, vec3 direction, inout float tEnter, inout float tExit)
+{
+  const float epsilon = 1e-6;
+  float numerator = dot(plane.xyz, origin) + plane.w;
+  float denominator = dot(plane.xyz, direction);
+  if (abs(denominator) <= epsilon) {
+    return numerator >= 0.0;
+  }
+
+  float t = -numerator / denominator;
+  if (denominator > 0.0) {
+    tEnter = max(tEnter, t);
+  } else {
+    tExit = min(tExit, t);
+  }
+  return tEnter <= tExit;
+}
+
+bool atlasComputeAnalyticRaySegment(out vec4 entryTexCoordAndZ, out vec4 exitTexCoordAndZ)
+{
+  vec4 ndcNear = vec4(gl_FragCoord.xy, rs.ndc_z_range.x, 1.0);
+  vec4 ndcFar = vec4(gl_FragCoord.xy, rs.ndc_z_range.y, 1.0);
+
+  vec4 eyeNearH = rs.ndc_to_eye * ndcNear;
+  vec4 eyeFarH = rs.ndc_to_eye * ndcFar;
+  vec3 eyeNear = eyeNearH.xyz / max(abs(eyeNearH.w), 1e-6);
+  vec3 eyeFar = eyeFarH.xyz / max(abs(eyeFarH.w), 1e-6);
+
+  vec4 texNearH = rs.ndc_to_tex * ndcNear;
+  vec4 texFarH = rs.ndc_to_tex * ndcFar;
+  vec3 texNear = texNearH.xyz / max(abs(texNearH.w), 1e-6);
+  vec3 texFar = texFarH.xyz / max(abs(texFarH.w), 1e-6);
+  vec3 texDirection = texFar - texNear;
+
+  float tEnter = 0.0;
+  float tExit = 1.0;
+  if (!atlasClipSegmentAgainstAxis(texNear.x, texDirection.x, rs.box_min_tex.x, rs.box_max_tex.x, tEnter, tExit)) {
+    return false;
+  }
+  if (!atlasClipSegmentAgainstAxis(texNear.y, texDirection.y, rs.box_min_tex.y, rs.box_max_tex.y, tEnter, tExit)) {
+    return false;
+  }
+  if (!atlasClipSegmentAgainstAxis(texNear.z, texDirection.z, rs.box_min_tex.z, rs.box_max_tex.z, tEnter, tExit)) {
+    return false;
+  }
+
+  const uint planeCount = min(rs.clip_params.x, uint(ATLAS_ANALYTIC_MAX_CLIP_PLANES));
+  for (uint i = 0u; i < planeCount; ++i) {
+    if (!atlasClipSegmentAgainstPlane(rs.clip_planes[i], texNear, texDirection, tEnter, tExit)) {
+      return false;
+    }
+  }
+
+  if (!(tEnter < tExit)) {
+    return false;
+  }
+
+  vec3 startRayPosition = mix(texNear, texFar, tEnter);
+  vec3 exitRayPosition = mix(texNear, texFar, tExit);
+  float zeFront = mix(eyeNear.z, eyeFar.z, tEnter);
+  float zeBack = mix(eyeNear.z, eyeFar.z, tExit);
+
+  entryTexCoordAndZ = vec4(startRayPosition, zeFront);
+  exitTexCoordAndZ = vec4(exitRayPosition, zeBack);
+  return true;
+}
+
+bool atlasFetchRaySegment(out vec4 entryTexCoordAndZ, out vec4 exitTexCoordAndZ, uint entryExitTexture)
+{
+  if (rs.clip_params.w != 0u) {
+    return atlasComputeAnalyticRaySegment(entryTexCoordAndZ, exitTexCoordAndZ);
+  }
+
+  entryTexCoordAndZ =
+    texelFetch(atlas_bindlessSampler2DArrayNearest(entryExitTexture), ivec3(gl_FragCoord.xy, 0), 0);
+  exitTexCoordAndZ =
+    texelFetch(atlas_bindlessSampler2DArrayNearest(entryExitTexture), ivec3(gl_FragCoord.xy, 1), 0);
+  return !all(equal(entryTexCoordAndZ.xyz, exitTexCoordAndZ.xyz));
+}

@@ -34,6 +34,11 @@ DEFINE_uint32(atlas_volume_rendering_progressive_blockid_effective_attachments,
               "Lower values reduce per-round latency (more frequent refinement updates) but may require more rounds "
               "to converge. Set to 0 to disable the cap and use all available attachments.");
 
+DEFINE_bool(atlas_volume_rendering_analytic_ray_setup,
+            true,
+            "Use analytic per-pixel volume ray setup by default instead of the legacy clipped-mesh entry/exit path. "
+            "Disable this to fall back to the old entry/exit render target workflow.");
+
 DEFINE_bool(atlas_enable_benchmark_raw_mip_export,
             false,
             "Enable benchmark-only raw MIP export support. Disabled by default so the normal rendering path "
@@ -91,6 +96,114 @@ namespace {
 [[nodiscard]] bool benchmarkScreenSpaceAuditEnabled()
 {
   return FLAGS_atlas_enable_benchmark_screen_space_sufficiency_audit;
+}
+
+void appendAnalyticRaySetupHeader(std::string& header)
+{
+  fmt::format_to(std::back_inserter(header),
+                 "#define ATLAS_ANALYTIC_MAX_CLIP_PLANES {}\n",
+                 kZ3DAnalyticRaySetupMaxClipPlanes);
+  absl::StrAppend(&header,
+                  R"(uniform mat4 atlas_ndc_to_tex;
+uniform mat4 atlas_ndc_to_eye;
+uniform vec3 atlas_box_min_tex;
+uniform vec3 atlas_box_max_tex;
+uniform vec2 atlas_ndc_z_range;
+uniform int atlas_clip_plane_count;
+uniform vec4 atlas_clip_planes[ATLAS_ANALYTIC_MAX_CLIP_PLANES];
+
+bool atlasClipSegmentAgainstAxis(float origin,
+                                 float direction,
+                                 float minValue,
+                                 float maxValue,
+                                 inout float tEnter,
+                                 inout float tExit)
+{
+  const float epsilon = 1e-6;
+  if (abs(direction) <= epsilon) {
+    return origin >= minValue && origin <= maxValue;
+  }
+
+  float t0 = (minValue - origin) / direction;
+  float t1 = (maxValue - origin) / direction;
+  if (t0 > t1) {
+    float tmp = t0;
+    t0 = t1;
+    t1 = tmp;
+  }
+
+  tEnter = max(tEnter, t0);
+  tExit = min(tExit, t1);
+  return tEnter <= tExit;
+}
+
+bool atlasClipSegmentAgainstPlane(vec4 plane, vec3 origin, vec3 direction, inout float tEnter, inout float tExit)
+{
+  const float epsilon = 1e-6;
+  float numerator = dot(plane.xyz, origin) + plane.w;
+  float denominator = dot(plane.xyz, direction);
+  if (abs(denominator) <= epsilon) {
+    return numerator >= 0.0;
+  }
+
+  float t = -numerator / denominator;
+  if (denominator > 0.0) {
+    tEnter = max(tEnter, t);
+  } else {
+    tExit = min(tExit, t);
+  }
+  return tEnter <= tExit;
+}
+
+bool atlasComputeAnalyticRaySegment(vec2 fragCoord, out vec4 entryTexCoordAndZ, out vec4 exitTexCoordAndZ)
+{
+  vec4 ndcNear = vec4(fragCoord.xy, atlas_ndc_z_range.x, 1.0);
+  vec4 ndcFar = vec4(fragCoord.xy, atlas_ndc_z_range.y, 1.0);
+
+  vec4 eyeNearH = atlas_ndc_to_eye * ndcNear;
+  vec4 eyeFarH = atlas_ndc_to_eye * ndcFar;
+  vec3 eyeNear = eyeNearH.xyz / max(abs(eyeNearH.w), 1e-6);
+  vec3 eyeFar = eyeFarH.xyz / max(abs(eyeFarH.w), 1e-6);
+
+  vec4 texNearH = atlas_ndc_to_tex * ndcNear;
+  vec4 texFarH = atlas_ndc_to_tex * ndcFar;
+  vec3 texNear = texNearH.xyz / max(abs(texNearH.w), 1e-6);
+  vec3 texFar = texFarH.xyz / max(abs(texFarH.w), 1e-6);
+  vec3 texDirection = texFar - texNear;
+
+  float tEnter = 0.0;
+  float tExit = 1.0;
+  if (!atlasClipSegmentAgainstAxis(texNear.x, texDirection.x, atlas_box_min_tex.x, atlas_box_max_tex.x, tEnter, tExit)) {
+    return false;
+  }
+  if (!atlasClipSegmentAgainstAxis(texNear.y, texDirection.y, atlas_box_min_tex.y, atlas_box_max_tex.y, tEnter, tExit)) {
+    return false;
+  }
+  if (!atlasClipSegmentAgainstAxis(texNear.z, texDirection.z, atlas_box_min_tex.z, atlas_box_max_tex.z, tEnter, tExit)) {
+    return false;
+  }
+
+  int planeCount = min(atlas_clip_plane_count, ATLAS_ANALYTIC_MAX_CLIP_PLANES);
+  for (int i = 0; i < planeCount; ++i) {
+    if (!atlasClipSegmentAgainstPlane(atlas_clip_planes[i], texNear, texDirection, tEnter, tExit)) {
+      return false;
+    }
+  }
+
+  if (!(tEnter < tExit)) {
+    return false;
+  }
+
+  vec3 startRayPosition = mix(texNear, texFar, tEnter);
+  vec3 exitRayPosition = mix(texNear, texFar, tExit);
+  float zeFront = mix(eyeNear.z, eyeFar.z, tEnter);
+  float zeBack = mix(eyeNear.z, eyeFar.z, tExit);
+
+  entryTexCoordAndZ = vec4(startRayPosition, zeFront);
+  exitTexCoordAndZ = vec4(exitRayPosition, zeBack);
+  return true;
+}
+)");
 }
 
 } // namespace
@@ -163,6 +276,8 @@ std::vector<ImgRaycasterPayload> Z3DImgRaycasterRenderer::buildVulkanStagePayloa
   common.channelIndexRaw = m_channelIdx[eye];
   common.roundIndexRaw = m_round[eye];
   common.interactiveProgressivePaging = interactiveProgressivePaging;
+  common.planarGeometry = !m_quads.empty();
+  common.analyticRaySetup = m_analyticRaySetup;
 
   // Progressive init parity with GL: if starting progressive (channelIdx < 0), bump
   // generation so the Vulkan path clears/refreshes progressive targets.
@@ -197,7 +312,7 @@ std::vector<ImgRaycasterPayload> Z3DImgRaycasterRenderer::buildVulkanStagePayloa
     }
   }
 
-  // Entry geometry: either indexed entry/exit mesh (volumetric) or expanded quads (planar).
+  // Entry geometry is needed only for planar draws and for the legacy entry/exit stage.
   std::vector<glm::vec3> entryPositions;
   std::vector<glm::vec3> entryTexCoords;
 
@@ -291,17 +406,19 @@ std::vector<ImgRaycasterPayload> Z3DImgRaycasterRenderer::buildVulkanStagePayloa
     }
   };
 
-  if (m_entryExitMeshValid && m_quads.empty() && !m_entryExitMesh.vertices().empty()) {
+  if (!common.planarGeometry && !common.analyticRaySetup.enabled && m_entryExitMeshValid &&
+      !m_entryExitMesh.vertices().empty()) {
     populateFromEntryExitMesh();
-  } else if (!m_quads.empty()) {
+  } else if (common.planarGeometry) {
     populateFromQuads();
   }
 
-  CHECK(!entryPositions.empty()) << "Vulkan img raycaster is missing entry geometry for the current draw.";
+  if (common.planarGeometry || !common.analyticRaySetup.enabled) {
+    CHECK(!entryPositions.empty()) << "Vulkan img raycaster is missing entry geometry for the current draw.";
+  }
 
-  const bool hasIndices = common.entryHasIndices && !common.entryIndices.empty();
-  const bool planarGeometry = !hasIndices;
-  const bool needsEntryExit = !planarGeometry;
+  const bool planarGeometry = common.planarGeometry;
+  const bool needsEntryExit = !planarGeometry && !common.analyticRaySetup.enabled;
   // GL parity for progressive: render entry/exit exactly once per progressive cycle.
   // For fast-only rendering, render every frame.
   const bool entryExitThisFrame = needsEntryExit && (common.fastPathOnly || common.channelIndexRaw < 0);
@@ -320,15 +437,17 @@ std::vector<ImgRaycasterPayload> Z3DImgRaycasterRenderer::buildVulkanStagePayloa
     return view;
   };
 
-  // Ensure a persistent Vulkan entry/exit lease of the correct size.
-  if (!m_entryExitLease.hasVulkanImage() || m_entryExitLease.descriptor.size != m_outputSize) {
-    m_entryExitLease.release();
-    m_entryExitLease = pool.acquireEntryExitRenderTarget(m_outputSize,
-                                                         2u,
-                                                         ScratchFormat::RGBA32F,
-                                                         std::optional<RenderBackend>(RenderBackend::Vulkan));
+  if (needsEntryExit) {
+    // Ensure a persistent Vulkan entry/exit lease of the correct size.
+    if (!m_entryExitLease.hasVulkanImage() || m_entryExitLease.descriptor.size != m_outputSize) {
+      m_entryExitLease.release();
+      m_entryExitLease = pool.acquireEntryExitRenderTarget(m_outputSize,
+                                                           2u,
+                                                           ScratchFormat::RGBA32F,
+                                                           std::optional<RenderBackend>(RenderBackend::Vulkan));
+    }
+    common.entryExitLease = shareLease(m_entryExitLease);
   }
-  common.entryExitLease = shareLease(m_entryExitLease);
 
   if (!common.fastPathOnly) {
     ensureRaycastAccumulators(eye);
@@ -1296,7 +1415,34 @@ std::string Z3DImgRaycasterRenderer::generateHeader()
     absl::StrAppend(&header, "#define MAX_PROJ_MERGE\n");
   }
 
+  if (FLAGS_atlas_volume_rendering_analytic_ray_setup) {
+    absl::StrAppend(&header, "#define ATLAS_ANALYTIC_RAY_SETUP\n");
+    appendAnalyticRaySetupHeader(header);
+  }
+
   return header;
+}
+
+void Z3DImgRaycasterRenderer::bindAnalyticRaySetupGL(Z3DShaderProgram& shader) const
+{
+  const bool prevLogSetting = shader.logUniformLocationError();
+  shader.setLogUniformLocationError(false);
+  if (!FLAGS_atlas_volume_rendering_analytic_ray_setup) {
+    shader.setLogUniformLocationError(prevLogSetting);
+    return;
+  }
+  CHECK(m_analyticRaySetup.enabled) << "Analytic GL raycaster shader was built without an analytic ray setup";
+
+  shader.setUniform("atlas_ndc_to_tex", m_analyticRaySetup.ndcToTex);
+  shader.setUniform("atlas_ndc_to_eye", m_analyticRaySetup.ndcToEye);
+  shader.setUniform("atlas_box_min_tex", m_analyticRaySetup.boxMinTex);
+  shader.setUniform("atlas_box_max_tex", m_analyticRaySetup.boxMaxTex);
+  shader.setUniform("atlas_ndc_z_range", m_analyticRaySetup.ndcZRange);
+  shader.setUniform("atlas_clip_plane_count", static_cast<GLint>(m_analyticRaySetup.clipPlaneCount));
+  for (uint32_t i = 0; i < kZ3DAnalyticRaySetupMaxClipPlanes; ++i) {
+    shader.setUniform(fmt::format("atlas_clip_planes[{}]", i), m_analyticRaySetup.clipPlanes[i]);
+  }
+  shader.setLogUniformLocationError(prevLogSetting);
 }
 
 double Z3DImgRaycasterRenderer::renderProgressively(Z3DEye eye)
@@ -1322,7 +1468,7 @@ double Z3DImgRaycasterRenderer::renderProgressively(Z3DEye eye)
   }
 
   if (m_quads.empty()) {
-    if (!m_entryExitLease) {
+    if (!hasAnalyticRaySetup() && !m_entryExitLease) {
       VLOG(1) << "no entry exit texture";
       return progress;
     }
@@ -1402,7 +1548,7 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
   });
 
   if (m_quads.empty()) {
-    if (!m_entryExitLease) {
+    if (!hasAnalyticRaySetup() && !m_entryExitLease) {
       return;
     }
   } else {
@@ -1810,12 +1956,13 @@ double Z3DImgRaycasterRenderer::render3DImage(Z3DEye eye, const std::vector<size
       float b = 0.5f * (f + n) / (f - n) + 0.5f;
       m_scRaycasterShader->setUniform("ze_to_zw_b", b);
       m_scRaycasterShader->setUniform("ze_to_zw_a", a);
-
-      // entry/exit points
-      CHECK(m_entryExitLease);
-      CHECK(m_entryExitLease.renderTarget != nullptr);
-      m_scRaycasterShader->bindTexture("ray_entry_exit_tex_coord",
-                                       m_entryExitLease.renderTarget->attachment(GL_COLOR_ATTACHMENT0));
+      bindAnalyticRaySetupGL(*m_scRaycasterShader);
+      if (!hasAnalyticRaySetup()) {
+        CHECK(m_entryExitLease);
+        CHECK(m_entryExitLease.renderTarget != nullptr);
+        m_scRaycasterShader->bindTexture("ray_entry_exit_tex_coord",
+                                         m_entryExitLease.renderTarget->attachment(GL_COLOR_ATTACHMENT0));
+      }
 
       if (m_compositingModeValue == ImgCompositingMode::IsoSurface) {
         m_scRaycasterShader->setUniform("iso_value", m_isoValue);
@@ -2001,7 +2148,7 @@ double Z3DImgRaycasterRenderer::render3DImage(Z3DEye eye, const std::vector<size
             filen =
               QString::fromStdString(fmt::format("/data/testoutput/tex_{}_ch{}_round{}_att1.tif", dummyidx, c, round));
             debugTarget->attachment(GL_COLOR_ATTACHMENT1)->saveAsRGBFloatImage(filen);
-            if (round == 0) {
+            if (round == 0 && !hasAnalyticRaySetup() && m_entryExitLease && m_entryExitLease.renderTarget != nullptr) {
               filen = QString::fromStdString(fmt::format("/data/testoutput/tex_{}_ch{}_entry.tif", dummyidx, c));
               m_entryExitLease.renderTarget->attachment(GL_COLOR_ATTACHMENT0)->saveAsRGBAFloatImage(filen);
             }
@@ -2129,10 +2276,13 @@ bool Z3DImgRaycasterRenderer::render3DImageForOneRound(Z3DEye eye,
   //          m_image3DRaycasterBlockIDsShader->setUniform("screen_dim_RCP",
   //                                                      1.f / glm::vec2(m_blockIDsRenderTarget->size()));
   m_image3DRaycasterBlockIDsShader->setUniform("ze_to_screen_pixel_voxel_size", ze_to_screen_pixel_voxel_size);
-
-  // entry exit points
-  m_image3DRaycasterBlockIDsShader->bindTexture("ray_entry_exit_tex_coord",
-                                                m_entryExitLease.renderTarget->attachment(GL_COLOR_ATTACHMENT0));
+  bindAnalyticRaySetupGL(*m_image3DRaycasterBlockIDsShader);
+  if (!hasAnalyticRaySetup()) {
+    CHECK(m_entryExitLease);
+    CHECK(m_entryExitLease.renderTarget != nullptr);
+    m_image3DRaycasterBlockIDsShader->bindTexture("ray_entry_exit_tex_coord",
+                                                  m_entryExitLease.renderTarget->attachment(GL_COLOR_ATTACHMENT0));
+  }
 
   m_image3DRaycasterBlockIDsShader->setUniform("sampling_rate", m_samplingRateValue);
 
@@ -2291,9 +2441,13 @@ bool Z3DImgRaycasterRenderer::render3DImageForOneRound(Z3DEye eye,
   raycasterShader.setUniform("ze_to_zw_a", ze_to_zw_a);
   raycasterShader.setUniform("ze_to_screen_pixel_voxel_size", ze_to_screen_pixel_voxel_size);
 
-  // entry exit points
-  raycasterShader.bindTexture("ray_entry_exit_tex_coord",
-                              m_entryExitLease.renderTarget->attachment(GL_COLOR_ATTACHMENT0));
+  bindAnalyticRaySetupGL(raycasterShader);
+  if (!hasAnalyticRaySetup()) {
+    CHECK(m_entryExitLease);
+    CHECK(m_entryExitLease.renderTarget != nullptr);
+    raycasterShader.bindTexture("ray_entry_exit_tex_coord",
+                                m_entryExitLease.renderTarget->attachment(GL_COLOR_ATTACHMENT0));
+  }
 
   raycasterShader.bindTexture("last_color", lastTarget->attachment(GL_COLOR_ATTACHMENT0));
   raycasterShader.bindTexture("last_ray_depth", lastTarget->attachment(GL_COLOR_ATTACHMENT1));
@@ -2388,10 +2542,13 @@ void Z3DImgRaycasterRenderer::render3DImageFast(Z3DEye /*eye*/, const std::vecto
   float b = 0.5f * (f + n) / (f - n) + 0.5f;
   m_scRaycasterShader->setUniform("ze_to_zw_b", b);
   m_scRaycasterShader->setUniform("ze_to_zw_a", a);
-
-  // entry exit points
-  m_scRaycasterShader->bindTexture("ray_entry_exit_tex_coord",
-                                   m_entryExitLease.renderTarget->attachment(GL_COLOR_ATTACHMENT0));
+  bindAnalyticRaySetupGL(*m_scRaycasterShader);
+  if (!hasAnalyticRaySetup()) {
+    CHECK(m_entryExitLease);
+    CHECK(m_entryExitLease.renderTarget != nullptr);
+    m_scRaycasterShader->bindTexture("ray_entry_exit_tex_coord",
+                                     m_entryExitLease.renderTarget->attachment(GL_COLOR_ATTACHMENT0));
+  }
   // m_entryExitLease.renderTarget->attachment(GL_COLOR_ATTACHMENT0)->saveAsRGBAFloatImage("~/Downloads/abcd_entryexit.tif");
 
   if (m_compositingModeValue == ImgCompositingMode::IsoSurface) {
@@ -2455,8 +2612,8 @@ bool Z3DImgRaycasterRenderer::render3DImageFastRawMIP(Z3DEye /*eye*/,
     error = "raw MIP export shader is not initialized";
     return false;
   }
-  if (!m_entryExitLease || m_entryExitLease.renderTarget == nullptr) {
-    error = "raw MIP export requires prepared entry/exit geometry";
+  if (!hasAnalyticRaySetup() && (!m_entryExitLease || m_entryExitLease.renderTarget == nullptr)) {
+    error = "raw MIP export requires prepared ray setup";
     return false;
   }
 
@@ -2482,8 +2639,13 @@ bool Z3DImgRaycasterRenderer::render3DImageFastRawMIP(Z3DEye /*eye*/,
   m_scBenchmarkRawMIPShader->bind();
   m_scBenchmarkRawMIPShader->setUniform("ze_to_zw_b", b);
   m_scBenchmarkRawMIPShader->setUniform("ze_to_zw_a", a);
-  m_scBenchmarkRawMIPShader->bindTexture("ray_entry_exit_tex_coord",
-                                         m_entryExitLease.renderTarget->attachment(GL_COLOR_ATTACHMENT0));
+  bindAnalyticRaySetupGL(*m_scBenchmarkRawMIPShader);
+  if (!hasAnalyticRaySetup()) {
+    CHECK(m_entryExitLease);
+    CHECK(m_entryExitLease.renderTarget != nullptr);
+    m_scBenchmarkRawMIPShader->bindTexture("ray_entry_exit_tex_coord",
+                                           m_entryExitLease.renderTarget->attachment(GL_COLOR_ATTACHMENT0));
+  }
 
   if (m_compositingModeValue == ImgCompositingMode::IsoSurface) {
     m_scBenchmarkRawMIPShader->setUniform("iso_value", m_isoValue);
@@ -2556,8 +2718,8 @@ bool Z3DImgRaycasterRenderer::render3DImageFastScreenSpaceAudit(Z3DEye /*eye*/,
     error = "screen-space audit shader is not initialized";
     return false;
   }
-  if (!m_entryExitLease || m_entryExitLease.renderTarget == nullptr) {
-    error = "screen-space audit requires prepared entry/exit geometry";
+  if (!hasAnalyticRaySetup() && (!m_entryExitLease || m_entryExitLease.renderTarget == nullptr)) {
+    error = "screen-space audit requires prepared ray setup";
     return false;
   }
   auto& scratchPool = Z3DRenderGlobalState::instance().scratchPool();
@@ -2587,8 +2749,13 @@ bool Z3DImgRaycasterRenderer::render3DImageFastScreenSpaceAudit(Z3DEye /*eye*/,
   m_scBenchmarkScreenSpaceAuditShader->setUniform("ze_to_zw_a", a);
   m_scBenchmarkScreenSpaceAuditShader->setUniform("ze_to_screen_pixel_voxel_size", zeToScreenPixelVoxelSize);
   m_scBenchmarkScreenSpaceAuditShader->setUniform("selected_voxel_world_size", benchmarkSelectedVoxelWorldSize());
-  m_scBenchmarkScreenSpaceAuditShader->bindTexture("ray_entry_exit_tex_coord",
-                                                   m_entryExitLease.renderTarget->attachment(GL_COLOR_ATTACHMENT0));
+  bindAnalyticRaySetupGL(*m_scBenchmarkScreenSpaceAuditShader);
+  if (!hasAnalyticRaySetup()) {
+    CHECK(m_entryExitLease);
+    CHECK(m_entryExitLease.renderTarget != nullptr);
+    m_scBenchmarkScreenSpaceAuditShader->bindTexture("ray_entry_exit_tex_coord",
+                                                     m_entryExitLease.renderTarget->attachment(GL_COLOR_ATTACHMENT0));
+  }
 
   if (m_compositingModeValue == ImgCompositingMode::IsoSurface) {
     m_scBenchmarkScreenSpaceAuditShader->setUniform("iso_value", m_isoValue);

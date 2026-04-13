@@ -11,7 +11,9 @@ uniform float local_MIP_threshold;
 uniform float ze_to_zw_a;
 uniform float ze_to_zw_b;
 
+#ifndef ATLAS_ANALYTIC_RAY_SETUP
 uniform sampler2DArray ray_entry_exit_tex_coord;
+#endif
 
 uniform sampler3D volume_1;
 uniform vec3 volume_dimensions_1;
@@ -60,12 +62,19 @@ vec4 compositeXRay(in vec4 curResult, in vec4 color, in float currentRayLength, 
 
 void main()
 {
-  vec4 entryTexCoordAndZ = texelFetch(ray_entry_exit_tex_coord, ivec3(gl_FragCoord.xy, 0), 0);
-  vec4 exitTexCoordAndZ = texelFetch(ray_entry_exit_tex_coord, ivec3(gl_FragCoord.xy, 1), 0);
+  vec4 entryTexCoordAndZ;
+  vec4 exitTexCoordAndZ;
+#ifdef ATLAS_ANALYTIC_RAY_SETUP
+  bool hasRaySegment = atlasComputeAnalyticRaySegment(gl_FragCoord.xy, entryTexCoordAndZ, exitTexCoordAndZ);
+#else
+  entryTexCoordAndZ = texelFetch(ray_entry_exit_tex_coord, ivec3(gl_FragCoord.xy, 0), 0);
+  exitTexCoordAndZ = texelFetch(ray_entry_exit_tex_coord, ivec3(gl_FragCoord.xy, 1), 0);
+  bool hasRaySegment = !all(equal(entryTexCoordAndZ.xyz, exitTexCoordAndZ.xyz));
+#endif
   vec3 startRayPosition = entryTexCoordAndZ.xyz;
   vec3 exitRayPosition = exitTexCoordAndZ.xyz;
 
-  if (startRayPosition == exitRayPosition) {
+  if (!hasRaySegment) {
     discard;   // background
   } else {
     vec4 result = vec4(0.0);

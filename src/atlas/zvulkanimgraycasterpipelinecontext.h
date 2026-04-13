@@ -367,6 +367,7 @@ private:
     float zeToZW_b = 0.0f;
     float zeToScreenPixelVoxelSize = 0.0f;
     uint32_t levelCount = 1u;
+    uint32_t raySetupDynOffset = 0u;
     uint32_t pageDataDynOffset = 0u;
     ZVulkanTexture* entryTexture = nullptr;
     ZVulkanTexture* lastColor = nullptr;

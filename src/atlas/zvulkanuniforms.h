@@ -6,6 +6,8 @@
 
 namespace nim {
 
+inline constexpr size_t kVulkanAnalyticRaySetupMaxClipPlanes = 6;
+
 // Vulkan clip planes are used to implement the same local/global XYZ cut
 // features as the OpenGL backend. Local cuts (object-space AABB) and global
 // cuts (world-space AABB) are both applied, so the combined region can require
@@ -109,6 +111,17 @@ struct MaterialUBOStd140
   int use_custom_color = 0;
   float _pad0 = 0.0f;
   glm::vec4 custom_color{1.0f};
+};
+
+struct ImgRaySetupUBOStd140
+{
+  glm::mat4 ndc_to_tex{1.0f};
+  glm::mat4 ndc_to_eye{1.0f};
+  glm::vec4 box_min_tex{0.0f};
+  glm::vec4 box_max_tex{1.0f};
+  glm::vec4 ndc_z_range{-1.0f, 1.0f, 0.0f, 0.0f};
+  glm::uvec4 clip_params{0u, 0u, 0u, 0u}; // x=count, w=enabled
+  std::array<glm::vec4, kVulkanAnalyticRaySetupMaxClipPlanes> clip_planes{};
 };
 
 } // namespace nim

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "z3dtypes.h"
+#include "z3draysetup.h"
 #include "zglmutils.h"
 #include "zmesh.h"
 #include "z3dscratchresourcepool.h"
@@ -877,6 +878,8 @@ struct ImgRaycasterPayload
   ImgCompositingMode compositingMode = ImgCompositingMode::DirectVolumeRendering;
   bool fastPathOnly = true;
   bool interactiveProgressivePaging = true;
+  bool planarGeometry = false;
+  Z3DAnalyticRaySetup analyticRaySetup;
   std::vector<glm::vec3> entryPositions;
   std::vector<glm::vec3> entryTexCoords;
   std::vector<uint32_t> entryIndices;

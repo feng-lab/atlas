@@ -68,7 +68,6 @@ void ZVulkanTextureCopyPipelineContext::record(Z3DRendererBase& renderer,
 
   // Fullscreen quad with UVs
   m_vertexCount = 4;
-
   const bool ddpPeel = (batch.shaderHook.type == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel);
   CopyImagePushConstants copyPC{};
   copyPC.colorTex = m_backend.bindlessLookupSampledImageAutoOrCrash(colorTexture, "texture_copy color");

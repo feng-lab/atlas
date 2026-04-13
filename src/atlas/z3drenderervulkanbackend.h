@@ -324,8 +324,10 @@ public:
   vk::DescriptorSetLayout oitDescriptorSetLayout();
   vk::DescriptorSetLayout emptyDescriptorSetLayout();
   // Image renderer helper descriptor set layouts:
+  // - set 1 (binding 0): analytic ray-setup UBO (dynamic) for volumetric raycasters
   // - set 1 (binding 0): indices UBO (dynamic)
   // - set 2 (binding 2): page-data UBO (dynamic)
+  vk::DescriptorSetLayout imgRaySetupDescriptorSetLayout();
   vk::DescriptorSetLayout imgIndicesDescriptorSetLayout();
   vk::DescriptorSetLayout imgPageDataDescriptorSetLayout();
 
@@ -348,6 +350,7 @@ public:
   // Ring slot index used to select the shared OIT descriptor set for the
   // current submission (0 when PPLL ring is inactive).
   [[nodiscard]] uint32_t sharedOITDescriptorSetRingIndex() const noexcept;
+  [[nodiscard]] vk::DescriptorSet sharedImgRaySetupDescriptorSet() const;
   [[nodiscard]] vk::DescriptorSet sharedImgIndicesDescriptorSet() const;
   [[nodiscard]] vk::DescriptorSet sharedImgPageDataDescriptorSet() const;
 
@@ -1037,6 +1040,7 @@ private:
     // previously recorded secondary command buffers and trigger validation
     // errors like VUID-vkCmdExecuteCommands-pCommandBuffers-00089).
     std::vector<std::unique_ptr<ZVulkanDescriptorSet>> sharedOITByRing;
+    std::unique_ptr<ZVulkanDescriptorSet> sharedImgRaySetup;
     std::unique_ptr<ZVulkanDescriptorSet> sharedImgIndices;
     std::unique_ptr<ZVulkanDescriptorSet> sharedImgPageData;
     uint32_t descriptorSetsAllocated = 0; // VLOG(1) counter per frame
@@ -1485,6 +1489,7 @@ public:
     std::optional<vk::raii::DescriptorSetLayout> oitParams;
     std::optional<vk::raii::DescriptorSetLayout> empty;
     // Image renderer helper layouts (slice/raycaster).
+    std::optional<vk::raii::DescriptorSetLayout> imgRaySetup; // set 1 (binding 0)
     std::optional<vk::raii::DescriptorSetLayout> imgIndices; // set 1 (binding 0)
     std::optional<vk::raii::DescriptorSetLayout> imgPageData; // set 2 (binding 2)
   } m_sharedDescriptorLayouts;

@@ -167,10 +167,10 @@ size_t UniformArenaBudgetTraits<ImgRaycasterPayload>::estimateAdditionalBytes(co
   //
   // Keep this conservative: higher-level schedulers rely on it to pre-size the
   // per-frame uniform arena before recording begins.
-  const bool hasIndices = payload.entryHasIndices && !payload.entryIndices.empty();
-  const bool planarGeometry = !hasIndices;
+  const bool planarGeometry = payload.planarGeometry;
   // Shared image indices descriptor set has a fixed 32B std140 range.
   const size_t szIndices = alignUp(sizeof(uint32_t) * 8u, uniformAlignment); // 32B std140 padded
+  const size_t szRaySetup = alignUp(sizeof(ImgRaySetupUBOStd140), uniformAlignment);
 
   auto estimatePageDataBytes = [&]() -> size_t {
     if (!payload.image) {
@@ -187,12 +187,15 @@ size_t UniformArenaBudgetTraits<ImgRaycasterPayload>::estimateAdditionalBytes(co
   switch (payload.stage) {
     case ImgRaycasterPayload::Stage::FastDirect:
     case ImgRaycasterPayload::Stage::FastLayers:
-      return planarGeometry ? szIndices : 0u;
+      return planarGeometry ? szIndices : szRaySetup;
+    case ImgRaycasterPayload::Stage::ProgressivePreviewLayers:
+      return szRaySetup;
     case ImgRaycasterPayload::Stage::ProgressiveBlockId:
     case ImgRaycasterPayload::Stage::ProgressiveRaycast:
+      return szRaySetup + estimatePageDataBytes();
     case ImgRaycasterPayload::Stage::ProgressiveCopyToLayers:
     case ImgRaycasterPayload::Stage::ProgressiveMerge:
-      return estimatePageDataBytes();
+      return 0u;
     default:
       return 0u;
   }
@@ -2697,6 +2700,15 @@ void Z3DRendererVulkanBackend::ensureSharedDescriptorLayouts()
     m_sharedDescriptorLayouts.empty.emplace(vkDevice, info);
   }
 
+  if (!m_sharedDescriptorLayouts.imgRaySetup) {
+    vk::DescriptorSetLayoutBinding binding{.binding = 0,
+                                           .descriptorType = vk::DescriptorType::eUniformBufferDynamic,
+                                           .descriptorCount = 1,
+                                           .stageFlags = vk::ShaderStageFlagBits::eFragment};
+    vk::DescriptorSetLayoutCreateInfo info{.bindingCount = 1, .pBindings = &binding};
+    m_sharedDescriptorLayouts.imgRaySetup.emplace(vkDevice, info);
+  }
+
   if (!m_sharedDescriptorLayouts.imgIndices) {
     vk::DescriptorSetLayoutBinding binding{.binding = 0,
                                            .descriptorType = vk::DescriptorType::eUniformBufferDynamic,
@@ -2745,6 +2757,12 @@ vk::DescriptorSetLayout Z3DRendererVulkanBackend::emptyDescriptorSetLayout()
 {
   ensureSharedDescriptorLayouts();
   return m_sharedDescriptorLayouts.empty ? **m_sharedDescriptorLayouts.empty : vk::DescriptorSetLayout{};
+}
+
+vk::DescriptorSetLayout Z3DRendererVulkanBackend::imgRaySetupDescriptorSetLayout()
+{
+  ensureSharedDescriptorLayouts();
+  return m_sharedDescriptorLayouts.imgRaySetup ? **m_sharedDescriptorLayouts.imgRaySetup : vk::DescriptorSetLayout{};
 }
 
 vk::DescriptorSetLayout Z3DRendererVulkanBackend::imgIndicesDescriptorSetLayout()
@@ -2882,6 +2900,16 @@ uint32_t Z3DRendererVulkanBackend::sharedOITDescriptorSetRingIndex() const noexc
   }
   CHECK(*m_activePPLLIndex < m_ppllFrameRing.size()) << "Active PPLL ring index out of range for OIT descriptor set";
   return static_cast<uint32_t>(*m_activePPLLIndex);
+}
+
+vk::DescriptorSet Z3DRendererVulkanBackend::sharedImgRaySetupDescriptorSet() const
+{
+  if (!m_activeFrame || !m_activeFrameHandle || !m_activeFrameHandle->valid()) {
+    return vk::DescriptorSet{};
+  }
+  CHECK(m_activeFrame->sharedImgRaySetup != nullptr)
+    << "Shared image ray-setup descriptor set missing on active frame-slot";
+  return m_activeFrame->sharedImgRaySetup->descriptorSet();
 }
 
 vk::DescriptorSet Z3DRendererVulkanBackend::sharedImgIndicesDescriptorSet() const
@@ -5536,6 +5564,13 @@ void Z3DRendererVulkanBackend::ensureSharedDescriptorSetsOnFrame(FrameResources&
     CHECK(frame.sharedOITByRing[i] != nullptr) << "Failed to allocate shared OIT descriptor set";
   }
 
+  const vk::DescriptorSetLayout imgRaySetupLayout = imgRaySetupDescriptorSetLayout();
+  CHECK(imgRaySetupLayout) << "Shared image ray-setup descriptor set layout missing";
+  if (!frame.sharedImgRaySetup) {
+    frame.sharedImgRaySetup = allocatePersistentDescriptorSet(imgRaySetupLayout);
+    CHECK(frame.sharedImgRaySetup != nullptr) << "Failed to allocate shared image ray-setup descriptor set";
+  }
+
   const vk::DescriptorSetLayout imgIndicesLayout = imgIndicesDescriptorSetLayout();
   CHECK(imgIndicesLayout) << "Shared image indices descriptor set layout missing";
   if (!frame.sharedImgIndices) {
@@ -5586,6 +5621,8 @@ void Z3DRendererVulkanBackend::ensureSharedDescriptorSetsOnFrame(FrameResources&
   // users of the backend-shared image-indices descriptor bind through one 32B
   // std140 dynamic UBO range. Some fast shaders only read the leading fields,
   // but suballocations and budgets must still satisfy the full 32B range.
+  frame.sharedImgRaySetup->updateUniformBufferDynamic(0, uniformArenaBuffer(), sizeof(ImgRaySetupUBOStd140));
+
   constexpr vk::DeviceSize kIndicesRange = sizeof(uint32_t) * 8u; // std140 padded (32B)
   frame.sharedImgIndices->updateUniformBufferDynamic(0, uniformArenaBuffer(), kIndicesRange);
 

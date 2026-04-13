@@ -24,13 +24,13 @@ void main()
   if (currentRayLength >= 1.0) { FragData0 = result; FragData1.xy = last; return; }
   if (currentRayLength == 0.0) { rayDepth = -1.0; }
 
-  vec4 entryTexCoordAndZ =
-    texelFetch(atlas_bindlessSampler2DArrayNearest(rp.ray_entry_exit_tex_coord), ivec3(gl_FragCoord.xy, 0), 0);
-  vec4 exitTexCoordAndZ =
-    texelFetch(atlas_bindlessSampler2DArrayNearest(rp.ray_entry_exit_tex_coord), ivec3(gl_FragCoord.xy, 1), 0);
+  vec4 entryTexCoordAndZ;
+  vec4 exitTexCoordAndZ;
+  if (!atlasFetchRaySegment(entryTexCoordAndZ, exitTexCoordAndZ, rp.ray_entry_exit_tex_coord)) {
+    discard;
+  }
   vec3 startRayPosition = entryTexCoordAndZ.xyz;
   vec3 exitRayPosition  = exitTexCoordAndZ.xyz;
-  if (all(equal(startRayPosition, exitRayPosition))) { discard; }
 
   float zeFront = entryTexCoordAndZ.w;
   float zeBack  = exitTexCoordAndZ.w;

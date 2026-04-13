@@ -181,6 +181,22 @@ struct RaycasterSingleChannelBindlessUBOStd140
 
 static_assert(sizeof(RaycasterSingleChannelBindlessUBOStd140) == 32u,
               "Bindless indices UBO must match backend-shared imgIndices descriptor range (8 uints / 32B)");
+static_assert(kVulkanAnalyticRaySetupMaxClipPlanes == kZ3DAnalyticRaySetupMaxClipPlanes);
+
+ImgRaySetupUBOStd140 buildRaySetupUBO(const Z3DAnalyticRaySetup& setup)
+{
+  ImgRaySetupUBOStd140 ubo{};
+  ubo.ndc_to_tex = setup.ndcToTex;
+  ubo.ndc_to_eye = setup.ndcToEye;
+  ubo.box_min_tex = glm::vec4(setup.boxMinTex, 0.0f);
+  ubo.box_max_tex = glm::vec4(setup.boxMaxTex, 0.0f);
+  ubo.ndc_z_range = glm::vec4(setup.ndcZRange, 0.0f, 0.0f);
+  ubo.clip_params = glm::uvec4(setup.clipPlaneCount, 0u, 0u, setup.enabled ? 1u : 0u);
+  for (size_t i = 0; i < kVulkanAnalyticRaySetupMaxClipPlanes; ++i) {
+    ubo.clip_planes[i] = setup.clipPlanes[i];
+  }
+  return ubo;
+}
 
 // Block-ID compaction table parameters (must match GLSL)
 constexpr uint32_t kEmptyBlockID = 0xFFFFFFFFu;
@@ -739,10 +755,10 @@ ZVulkanImgRaycasterPipelineContext::ensurePreparedProgressiveRound(Z3DRendererBa
   }
 
   ensureQuadVertexBuffer();
-  const vk::DescriptorSet dsEmpty = m_backend.sharedEmptyDescriptorSet();
   const vk::DescriptorSet dsPageData = m_backend.sharedImgPageDataDescriptorSet();
-  CHECK(dsEmpty && dsPageData)
-    << "Raycaster progressive path missing backend-shared page-data descriptor sets (unexpected)";
+  const vk::DescriptorSet dsRaySetup = m_backend.sharedImgRaySetupDescriptorSet();
+  CHECK(dsPageData && dsRaySetup)
+    << "Raycaster progressive path missing backend-shared ray-setup/page-data descriptor sets (unexpected)";
 
   ProgressivePrepKey key;
   key.streamKey = streamKey;
@@ -766,12 +782,12 @@ ZVulkanImgRaycasterPipelineContext::ensurePreparedProgressiveRound(Z3DRendererBa
   CHECK(!payload.fastPathOnly) << "ensurePreparedProgressiveRound called for fast-only payload";
   CHECK(payload.image) << "Raycaster progressive path: payload missing image pointer.";
 
-  const bool hasIndices = payload.entryHasIndices && !payload.entryIndices.empty();
-  const bool planarGeometry = !hasIndices;
-  CHECK(!planarGeometry) << "Progressive raycaster path only supports volumetric rendering.";
+  CHECK(!payload.planarGeometry) << "Progressive raycaster path only supports volumetric rendering.";
 
-  CHECK(payload.entryExitLease && payload.entryExitLease->hasVulkanImage())
-    << "Vulkan raycaster progressive path missing entry/exit lease.";
+  if (!payload.analyticRaySetup.enabled) {
+    CHECK(payload.entryExitLease && payload.entryExitLease->hasVulkanImage())
+      << "Vulkan raycaster progressive path missing entry/exit lease.";
+  }
   CHECK(payload.lastAccumLease && payload.currentAccumLease)
     << "Vulkan raycaster progressive path missing accum leases.";
 
@@ -800,6 +816,14 @@ ZVulkanImgRaycasterPipelineContext::ensurePreparedProgressiveRound(Z3DRendererBa
   prep.volumeTexture = &volumeTex;
   prep.transferTexture = &transferTex;
 
+  const ImgRaySetupUBOStd140 raySetup = buildRaySetupUBO(payload.analyticRaySetup);
+  const auto raySetupSlice = m_backend.suballocateUniformFor(payload, sizeof(raySetup));
+  CHECK(raySetupSlice.mapped != nullptr) << "Raycaster analytic ray-setup uniform slice mapping missing";
+  std::memcpy(raySetupSlice.mapped, &raySetup, sizeof(raySetup));
+  CHECK(raySetupSlice.offset <= std::numeric_limits<uint32_t>::max())
+    << "Raycaster analytic ray-setup dynamic offset exceeds uint32 range: " << raySetupSlice.offset;
+  prep.raySetupDynOffset = static_cast<uint32_t>(raySetupSlice.offset);
+
   // Ensure paging caches (page directory + page table) are uploaded before Block-ID / raycast.
   {
     ZBenchTimer uploadTimer("vulkan_upload_page_caches");
@@ -822,7 +846,8 @@ ZVulkanImgRaycasterPipelineContext::ensurePreparedProgressiveRound(Z3DRendererBa
   prep.lastDepth = payload.lastAccumLease->colorAttachment(1);
   prep.currentColor = payload.currentAccumLease->colorAttachment(0);
   prep.currentDepth = payload.currentAccumLease->colorAttachment(1);
-  CHECK(prep.entryTexture && prep.lastColor && prep.lastDepth && prep.currentColor && prep.currentDepth)
+  CHECK((payload.analyticRaySetup.enabled || prep.entryTexture != nullptr) && prep.lastColor && prep.lastDepth &&
+        prep.currentColor && prep.currentDepth)
     << "Vulkan raycaster progressive path missing required textures.";
 
   prep.pageDirectory = m_imageBlockUploader->pageDirectoryTexture(*payload.image, prep.channelIndex);
@@ -923,8 +948,7 @@ void ZVulkanImgRaycasterPipelineContext::recordStageEntryExit(Z3DRendererBase& r
     return;
   }
 
-  const bool hasIndices = payload.entryHasIndices && !payload.entryIndices.empty();
-  const bool planarGeometry = !hasIndices;
+  const bool planarGeometry = payload.planarGeometry;
   const bool needsEntryExit = !planarGeometry;
   if (!needsEntryExit) {
     return;
@@ -1105,8 +1129,7 @@ void ZVulkanImgRaycasterPipelineContext::recordStageFastDirect(Z3DRendererBase& 
     return;
   }
 
-  const bool hasIndices = payload.entryHasIndices && !payload.entryIndices.empty();
-  const bool planarGeometry = !hasIndices;
+  const bool planarGeometry = payload.planarGeometry;
   const CompositingConfig composite = evaluateCompositing(payload.compositingMode);
 
   ensureQuadVertexBuffer();
@@ -1139,16 +1162,25 @@ void ZVulkanImgRaycasterPipelineContext::recordStageFastDirect(Z3DRendererBase& 
   });
 
   if (!planarGeometry) {
-    CHECK(payload.entryExitLease && payload.entryExitLease->hasVulkanImage())
-      << "Raycaster fast volume stage missing entry/exit lease.";
-    auto* entryTexture = payload.entryExitLease->colorAttachment(0);
-    CHECK(entryTexture != nullptr) << "Entry/exit texture unavailable";
+    if (!payload.analyticRaySetup.enabled) {
+      CHECK(payload.entryExitLease && payload.entryExitLease->hasVulkanImage())
+        << "Raycaster fast volume stage missing entry/exit lease.";
+    }
+    auto* entryTexture = payload.entryExitLease ? payload.entryExitLease->colorAttachment(0) : nullptr;
+    CHECK(payload.analyticRaySetup.enabled || entryTexture != nullptr) << "Entry/exit texture unavailable";
 
     ChannelResources& resources = ensureChannelResources(channelIndex);
     const ZImg& channelImage = *payload.image->channelImageShared(channelIndex);
     const uint64_t volGen = payload.image->volumeGeneration(channelIndex);
     ZVulkanTexture& volumeTex = ensureVolumeTexture(resources, channelImage, channelIndex, volGen);
     ZVulkanTexture& transferTex = ensureTransferTexture(resources, *transferFunctions[channelIndex]);
+    const ImgRaySetupUBOStd140 raySetup = buildRaySetupUBO(payload.analyticRaySetup);
+    const auto raySetupSlice = m_backend.suballocateUniformFor(payload, sizeof(raySetup));
+    CHECK(raySetupSlice.mapped != nullptr) << "Raycaster fast volume ray-setup uniform slice mapping missing";
+    std::memcpy(raySetupSlice.mapped, &raySetup, sizeof(raySetup));
+    CHECK(raySetupSlice.offset <= std::numeric_limits<uint32_t>::max())
+      << "Raycaster fast volume ray-setup dynamic offset exceeds uint32 range: " << raySetupSlice.offset;
+    const uint32_t raySetupDynOffset = static_cast<uint32_t>(raySetupSlice.offset);
 
     const auto& viewState = renderer.viewState();
     const float nearClip = std::abs(viewState.nearClip) < 1e-6f ? 1e-6f : viewState.nearClip;
@@ -1162,7 +1194,8 @@ void ZVulkanImgRaycasterPipelineContext::recordStageFastDirect(Z3DRendererBase& 
     pc.local_MIP_threshold = payload.localMIPThreshold;
     pc.ze_to_zw_a = zeToZW_a;
     pc.ze_to_zw_b = zeToZW_b;
-    pc.ray_entry_exit_tex_coord = m_backend.bindlessLookupSampledImageAutoOrCrash(*entryTexture, "ray_fast_entry_exit");
+    pc.ray_entry_exit_tex_coord =
+      entryTexture ? m_backend.bindlessLookupSampledImageAutoOrCrash(*entryTexture, "ray_fast_entry_exit") : 0u;
     pc.volume_1 = m_backend.bindlessLookupSampledImageAutoOrCrash(volumeTex, "ray_fast_volume");
     pc.transfer_function_1 = m_backend.bindlessLookupSampledImageAutoOrCrash(transferTex, "ray_fast_transfer");
 
@@ -1175,7 +1208,10 @@ void ZVulkanImgRaycasterPipelineContext::recordStageFastDirect(Z3DRendererBase& 
     pipelineKey.depthFormat = formats.depthFormat;
     PipelineInstance& pipeline = ensureFastPipeline(pipelineKey);
 
-    const std::array<vk::DescriptorSet, 1> descriptorSets{m_backend.bindlessSampledImageDescriptorSet()};
+    const vk::DescriptorSet dsRaySetup = m_backend.sharedImgRaySetupDescriptorSet();
+    CHECK(dsRaySetup) << "Raycaster fast volume stage missing backend-shared ray-setup descriptor set";
+    const std::array<vk::DescriptorSet, 2> descriptorSets{m_backend.bindlessSampledImageDescriptorSet(), dsRaySetup};
+    const std::array<uint32_t, 1> dynamicOffsets{raySetupDynOffset};
 
     ZVulkanGraphicsDrawSpec drawSpec{};
     drawSpec.viewports = std::span<const vk::Viewport>(&viewport, 1);
@@ -1183,8 +1219,9 @@ void ZVulkanImgRaycasterPipelineContext::recordStageFastDirect(Z3DRendererBase& 
     drawSpec.pipelineHandle = pipeline.pipeline->pipelineHandle();
     drawSpec.pipelineLayoutHandle = pipeline.pipeline->pipelineLayoutHandle();
     drawSpec.descriptorSets = descriptorSets;
+    drawSpec.dynamicOffsets = dynamicOffsets;
     drawSpec.descriptorSetFirst = 0;
-    drawSpec.expectedDescriptorSetCount = 1;
+    drawSpec.expectedDescriptorSetCount = 2;
     const std::array<vk::Buffer, 1> vertexBuffers{m_quadVertexBuffer->buffer()};
     const std::array<vk::DeviceSize, 1> vertexOffsets{0};
     drawSpec.vertexBuffers = vertexBuffers;
@@ -1386,8 +1423,7 @@ void ZVulkanImgRaycasterPipelineContext::recordStageFastLayers(Z3DRendererBase& 
   ensureQuadVertexBuffer();
 
   const CompositingConfig composite = evaluateCompositing(payload.compositingMode);
-  const bool hasIndices = payload.entryHasIndices && !payload.entryIndices.empty();
-  const bool planarGeometry = !hasIndices;
+  const bool planarGeometry = payload.planarGeometry;
   if (auto t = m_backend.beginGpuScope("ray_fast_layers")) {
     if (planarGeometry) {
       recordFastPlanarLayersOnly(renderer, batch, payload, viewport, scissor, cmd, composite);
@@ -1568,7 +1604,9 @@ void ZVulkanImgRaycasterPipelineContext::recordStageProgressiveBlockId(Z3DRender
   pc.transfer_function =
     m_backend.bindlessLookupSampledImageAutoOrCrash(*prep.transferTexture, "ray_prog_blockid_transfer");
   pc.ray_entry_exit_tex_coord =
-    m_backend.bindlessLookupSampledImageAutoOrCrash(*prep.entryTexture, "ray_prog_blockid_entry_exit");
+    prep.entryTexture
+      ? m_backend.bindlessLookupSampledImageAutoOrCrash(*prep.entryTexture, "ray_prog_blockid_entry_exit")
+      : 0u;
   pc.last_ray_depth_tex =
     m_backend.bindlessLookupSampledImageAutoOrCrash(*prep.lastDepth, "ray_prog_blockid_last_depth");
   pc.last_color_tex = m_backend.bindlessLookupSampledImageAutoOrCrash(*prep.lastColor, "ray_prog_blockid_last_color");
@@ -1644,12 +1682,14 @@ void ZVulkanImgRaycasterPipelineContext::recordStageProgressiveBlockId(Z3DRender
   drawSpec.pipelineHandle = blockPipeline.pipeline->pipelineHandle();
   drawSpec.pipelineLayoutHandle = blockPipeline.pipeline->pipelineLayoutHandle();
 
-  const vk::DescriptorSet dsEmpty = m_backend.sharedEmptyDescriptorSet();
+  const vk::DescriptorSet dsRaySetup = m_backend.sharedImgRaySetupDescriptorSet();
   const vk::DescriptorSet dsPageData = m_backend.sharedImgPageDataDescriptorSet();
+  CHECK(dsRaySetup && dsPageData)
+    << "Vulkan raycaster progressive Block-ID stage missing shared ray-setup/page-data descriptor sets";
   const std::array<vk::DescriptorSet, 3> descriptorSets{m_backend.bindlessSampledImageDescriptorSet(),
-                                                        dsEmpty,
+                                                        dsRaySetup,
                                                         dsPageData};
-  const std::array<uint32_t, 1> dynamicOffsets{prep.pageDataDynOffset};
+  const std::array<uint32_t, 2> dynamicOffsets{prep.raySetupDynOffset, prep.pageDataDynOffset};
   drawSpec.descriptorSets = descriptorSets;
   drawSpec.dynamicOffsets = dynamicOffsets;
   drawSpec.descriptorSetFirst = 0;
@@ -1751,7 +1791,9 @@ void ZVulkanImgRaycasterPipelineContext::recordStageProgressiveRaycast(Z3DRender
   pc.transfer_function =
     m_backend.bindlessLookupSampledImageAutoOrCrash(*prep.transferTexture, "ray_prog_raycast_transfer");
   pc.ray_entry_exit_tex_coord =
-    m_backend.bindlessLookupSampledImageAutoOrCrash(*prep.entryTexture, "ray_prog_raycast_entry_exit");
+    prep.entryTexture
+      ? m_backend.bindlessLookupSampledImageAutoOrCrash(*prep.entryTexture, "ray_prog_raycast_entry_exit")
+      : 0u;
   pc.last_ray_depth_tex =
     m_backend.bindlessLookupSampledImageAutoOrCrash(*prep.lastDepth, "ray_prog_raycast_last_depth");
   pc.last_color_tex = m_backend.bindlessLookupSampledImageAutoOrCrash(*prep.lastColor, "ray_prog_raycast_last_color");
@@ -1763,12 +1805,14 @@ void ZVulkanImgRaycasterPipelineContext::recordStageProgressiveRaycast(Z3DRender
   drawSpec.pipelineHandle = progressivePipeline.pipeline->pipelineHandle();
   drawSpec.pipelineLayoutHandle = progressivePipeline.pipeline->pipelineLayoutHandle();
 
-  const vk::DescriptorSet dsEmpty = m_backend.sharedEmptyDescriptorSet();
+  const vk::DescriptorSet dsRaySetup = m_backend.sharedImgRaySetupDescriptorSet();
   const vk::DescriptorSet dsPageData = m_backend.sharedImgPageDataDescriptorSet();
+  CHECK(dsRaySetup && dsPageData)
+    << "Vulkan raycaster progressive raycast stage missing shared ray-setup/page-data descriptor sets";
   const std::array<vk::DescriptorSet, 3> descriptorSets{m_backend.bindlessSampledImageDescriptorSet(),
-                                                        dsEmpty,
+                                                        dsRaySetup,
                                                         dsPageData};
-  const std::array<uint32_t, 1> dynamicOffsets{prep.pageDataDynOffset};
+  const std::array<uint32_t, 2> dynamicOffsets{prep.raySetupDynOffset, prep.pageDataDynOffset};
   drawSpec.descriptorSets = descriptorSets;
   drawSpec.dynamicOffsets = dynamicOffsets;
   drawSpec.descriptorSetFirst = 0;
@@ -1941,15 +1985,17 @@ void ZVulkanImgRaycasterPipelineContext::recordFastVolumeLayersOnly(Z3DRendererB
   const size_t channelCount = payload.visibleChannels.size();
   CHECK_GT(channelCount, 0u) << "recordFastVolumeLayersOnly requires at least one visible channel";
   CHECK(payload.image) << "Vulkan img raycaster missing image context.";
-  CHECK(payload.entryExitLease && payload.entryExitLease->hasVulkanImage())
-    << "Raycaster fast layers stage missing entry/exit lease.";
+  if (!payload.analyticRaySetup.enabled) {
+    CHECK(payload.entryExitLease && payload.entryExitLease->hasVulkanImage())
+      << "Raycaster fast layers stage missing entry/exit lease.";
+  }
 
   CHECK(payload.transferFunctions != nullptr)
     << "Raycaster fast path: payload missing transferFunctions vector (fatal)";
   const auto& transferFunctions = *payload.transferFunctions;
 
-  auto* entryTexture = payload.entryExitLease->colorAttachment(0);
-  CHECK(entryTexture) << "Entry/exit texture unavailable.";
+  auto* entryTexture = payload.entryExitLease ? payload.entryExitLease->colorAttachment(0) : nullptr;
+  CHECK(payload.analyticRaySetup.enabled || entryTexture) << "Entry/exit texture unavailable.";
   // Entry/exit is produced by the EntryExit stage and must be transitioned by the backend
   // via attachment finalUse + externalImageUses metadata (no barriers inside dynamic rendering).
 
@@ -1975,6 +2021,13 @@ void ZVulkanImgRaycasterPipelineContext::recordFastVolumeLayersOnly(Z3DRendererB
   const uint64_t volGen = payload.image->volumeGeneration(channelIndex);
   ZVulkanTexture& volumeTex = ensureVolumeTexture(resources, channelImage, channelIndex, volGen);
   ZVulkanTexture& transferTex = ensureTransferTexture(resources, *transferFunctions[channelIndex]);
+  const ImgRaySetupUBOStd140 raySetup = buildRaySetupUBO(payload.analyticRaySetup);
+  const auto raySetupSlice = m_backend.suballocateUniformFor(payload, sizeof(raySetup));
+  CHECK(raySetupSlice.mapped != nullptr) << "Raycaster fast layers ray-setup uniform slice mapping missing";
+  std::memcpy(raySetupSlice.mapped, &raySetup, sizeof(raySetup));
+  CHECK(raySetupSlice.offset <= std::numeric_limits<uint32_t>::max())
+    << "Raycaster fast layers ray-setup dynamic offset exceeds uint32 range: " << raySetupSlice.offset;
+  const uint32_t raySetupDynOffset = static_cast<uint32_t>(raySetupSlice.offset);
 
   RaycasterFastVolumePushConstants pcL{};
   pcL.sampling_rate = payload.samplingRate;
@@ -1983,7 +2036,7 @@ void ZVulkanImgRaycasterPipelineContext::recordFastVolumeLayersOnly(Z3DRendererB
   pcL.ze_to_zw_a = zeToZW_a;
   pcL.ze_to_zw_b = zeToZW_b;
   pcL.ray_entry_exit_tex_coord =
-    m_backend.bindlessLookupSampledImageAutoOrCrash(*entryTexture, "ray_fast_layers_entry_exit");
+    entryTexture ? m_backend.bindlessLookupSampledImageAutoOrCrash(*entryTexture, "ray_fast_layers_entry_exit") : 0u;
   pcL.volume_1 = m_backend.bindlessLookupSampledImageAutoOrCrash(volumeTex, "ray_fast_layers_volume");
   pcL.transfer_function_1 = m_backend.bindlessLookupSampledImageAutoOrCrash(transferTex, "ray_fast_layers_transfer");
 
@@ -1998,7 +2051,10 @@ void ZVulkanImgRaycasterPipelineContext::recordFastVolumeLayersOnly(Z3DRendererB
   layerKey.depthFormat = layerFormats.depthFormat;
   PipelineInstance& layerPipeline = ensureFastPipeline(layerKey);
 
-  const std::array<vk::DescriptorSet, 1> descriptorSets{m_backend.bindlessSampledImageDescriptorSet()};
+  const vk::DescriptorSet dsRaySetup = m_backend.sharedImgRaySetupDescriptorSet();
+  CHECK(dsRaySetup) << "Raycaster fast layers stage missing backend-shared ray-setup descriptor set";
+  const std::array<vk::DescriptorSet, 2> descriptorSets{m_backend.bindlessSampledImageDescriptorSet(), dsRaySetup};
+  const std::array<uint32_t, 1> dynamicOffsets{raySetupDynOffset};
 
   ZVulkanGraphicsDrawSpec drawSpec{};
   drawSpec.viewports = std::span<const vk::Viewport>(&viewport, 1);
@@ -2006,8 +2062,9 @@ void ZVulkanImgRaycasterPipelineContext::recordFastVolumeLayersOnly(Z3DRendererB
   drawSpec.pipelineHandle = layerPipeline.pipeline->pipelineHandle();
   drawSpec.pipelineLayoutHandle = layerPipeline.pipeline->pipelineLayoutHandle();
   drawSpec.descriptorSets = descriptorSets;
+  drawSpec.dynamicOffsets = dynamicOffsets;
   drawSpec.descriptorSetFirst = 0;
-  drawSpec.expectedDescriptorSetCount = 1;
+  drawSpec.expectedDescriptorSetCount = 2;
   const std::array<vk::Buffer, 1> vertexBuffers{m_quadVertexBuffer->buffer()};
   const std::array<vk::DeviceSize, 1> vertexOffsets{0};
   drawSpec.vertexBuffers = vertexBuffers;
@@ -3137,8 +3194,8 @@ ZVulkanImgRaycasterPipelineContext::ensureBlockIdPipeline(const BlockIdPipelineK
 
   const vk::DescriptorSetLayout bindlessLayout = m_backend.bindlessSampledImageDescriptorSetLayout();
   CHECK(bindlessLayout) << "Block-ID pipeline requires backend bindless descriptor set layout";
-  const vk::DescriptorSetLayout emptyLayout = m_backend.emptyDescriptorSetLayout();
-  CHECK(emptyLayout) << "Block-ID pipeline requires backend empty descriptor set layout";
+  const vk::DescriptorSetLayout raySetupLayout = m_backend.imgRaySetupDescriptorSetLayout();
+  CHECK(raySetupLayout) << "Block-ID pipeline requires backend ray-setup descriptor set layout";
   const vk::DescriptorSetLayout pageDataLayout = m_backend.imgPageDataDescriptorSetLayout();
   CHECK(pageDataLayout) << "Block-ID pipeline requires backend page-data descriptor set layout";
 
@@ -3165,7 +3222,7 @@ ZVulkanImgRaycasterPipelineContext::ensureBlockIdPipeline(const BlockIdPipelineK
   vertexInput.pVertexAttributeDescriptions = &attr;
 
   instance.pipeline = device.createPipeline(*instance.shader, vertexInput, vk::PrimitiveTopology::eTriangleStrip);
-  instance.pipeline->setDescriptorSetLayouts({bindlessLayout, emptyLayout, pageDataLayout});
+  instance.pipeline->setDescriptorSetLayouts({bindlessLayout, raySetupLayout, pageDataLayout});
   std::vector<vk::Format> colorFormats(std::max(1u, key.attachmentCount), colorFormat);
   instance.pipeline->setAttachmentFormats(colorFormats, std::nullopt);
   // Disable blending for block-ID outputs (integer formats are not blendable).
@@ -3223,8 +3280,8 @@ ZVulkanImgRaycasterPipelineContext::ensureProgressivePipeline(const ProgressiveP
 
   const vk::DescriptorSetLayout bindlessLayout = m_backend.bindlessSampledImageDescriptorSetLayout();
   CHECK(bindlessLayout) << "Progressive raycaster pipeline requires backend bindless descriptor set layout";
-  const vk::DescriptorSetLayout emptyLayout = m_backend.emptyDescriptorSetLayout();
-  CHECK(emptyLayout) << "Progressive raycaster pipeline requires backend empty descriptor set layout";
+  const vk::DescriptorSetLayout raySetupLayout = m_backend.imgRaySetupDescriptorSetLayout();
+  CHECK(raySetupLayout) << "Progressive raycaster pipeline requires backend ray-setup descriptor set layout";
   const vk::DescriptorSetLayout pageDataLayout = m_backend.imgPageDataDescriptorSetLayout();
   CHECK(pageDataLayout) << "Progressive raycaster pipeline requires backend page-data descriptor set layout";
 
@@ -3251,7 +3308,7 @@ ZVulkanImgRaycasterPipelineContext::ensureProgressivePipeline(const ProgressiveP
   vertexInput.pVertexAttributeDescriptions = &attr;
 
   instance.pipeline = device.createPipeline(*instance.shader, vertexInput, vk::PrimitiveTopology::eTriangleStrip);
-  instance.pipeline->setDescriptorSetLayouts({bindlessLayout, emptyLayout, pageDataLayout});
+  instance.pipeline->setDescriptorSetLayouts({bindlessLayout, raySetupLayout, pageDataLayout});
   instance.pipeline->setAttachmentFormats(formats.colorFormats, formats.depthFormat);
   instance.colorFormats = formats.colorFormats;
   instance.depthFormat = formats.depthFormat;
@@ -3653,6 +3710,8 @@ ZVulkanImgRaycasterPipelineContext::ensureFastPipeline(const FastPipelineKey& ke
   CHECK(bindlessLayout) << "Fast pipeline requires backend bindless descriptor set layout";
   const vk::DescriptorSetLayout indicesLayout = m_backend.imgIndicesDescriptorSetLayout();
   CHECK(indicesLayout) << "Fast pipeline requires backend indices descriptor set layout";
+  const vk::DescriptorSetLayout raySetupLayout = m_backend.imgRaySetupDescriptorSetLayout();
+  CHECK(raySetupLayout) << "Fast pipeline requires backend ray-setup descriptor set layout";
 
   auto& device = m_backend.device();
   static const std::string shaderBase = ZSystemInfo::resourcesDirPath().toStdString() + "/shader/vulkan/spv/";
@@ -3747,7 +3806,7 @@ ZVulkanImgRaycasterPipelineContext::ensureFastPipeline(const FastPipelineKey& ke
                      std::span(&pcRange, 1),
                      key.colorFormats,
                      key.depthFormat,
-                     {bindlessLayout},
+                     {bindlessLayout, raySetupLayout},
                      vk::PrimitiveTopology::eTriangleStrip,
                      key.depthEnabled);
       instance.pipeline->create();

@@ -3,6 +3,7 @@
 layout(constant_id = 80) const int RAY_MODE = 0;
 layout(constant_id = 81) const bool LOCAL_MIP = false;
 layout(constant_id = 70) const int LEVEL_COUNT = 1; // also used by PageData
+#define ATLAS_ANALYTIC_MAX_CLIP_PLANES 6
 
 #include "bindless.glslinc"
 
@@ -43,6 +44,8 @@ layout(push_constant) uniform RayParams {
   uint last_ray_depth_tex;
   uint last_color_tex;
 } rp;
+
+#include "analytic_ray_setup.glslinc"
 
 // Compositors
 vec4 compositeDVR(in vec4 curResult, in vec4 color, in float currentRayLength, inout float rayDepth)

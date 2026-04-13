@@ -26,6 +26,7 @@
 
 DECLARE_bool(atlas_enable_benchmark_raw_mip_export);
 DECLARE_bool(atlas_enable_benchmark_screen_space_sufficiency_audit);
+DECLARE_bool(atlas_volume_rendering_analytic_ray_setup);
 
 namespace nim {
 
@@ -57,6 +58,30 @@ constexpr double kEmPresetOpaqueThreshold = 4.5 / 255.0;
   return {ZColorMapKey(kPresetDomainMin, transparentBlack),
           ZColorMapKey(threshold, transparentBlack, opaqueBlack),
           ZColorMapKey(kPresetDomainMax, glm::col4(channelColor.r, channelColor.g, channelColor.b, 255))};
+}
+
+[[nodiscard]] glm::mat4 localToTexMatrix(const glm::vec3& coordLuf, const glm::vec3& coordRdb)
+{
+  const glm::vec3 extent = coordRdb - coordLuf;
+  CHECK(std::abs(extent.x) > 1e-6f && std::abs(extent.y) > 1e-6f && std::abs(extent.z) > 1e-6f)
+    << "Invalid image physical extent for analytic ray setup: (" << extent.x << ", " << extent.y << ", " << extent.z
+    << ")";
+  const glm::vec3 invExtent = 1.0f / extent;
+
+  glm::mat4 transform(1.0f);
+  transform[0][0] = invExtent.x;
+  transform[1][1] = invExtent.y;
+  transform[2][2] = invExtent.z;
+  transform[3] = glm::vec4(-coordLuf * invExtent, 1.0f);
+  return transform;
+}
+
+[[nodiscard]] glm::mat4 fragCoordToNdcMatrix(const glm::uvec2& outputSize)
+{
+  CHECK(outputSize.x > 0u && outputSize.y > 0u)
+    << "Analytic ray setup requires a non-zero output size for fragCoord reconstruction";
+  const glm::vec3 scale(2.0f / static_cast<float>(outputSize.x), 2.0f / static_cast<float>(outputSize.y), 1.0f);
+  return glm::translate(glm::mat4(1.0f), glm::vec3(-1.0f, -1.0f, 0.0f)) * glm::scale(glm::mat4(1.0f), scale);
 }
 
 } // namespace
@@ -1603,6 +1628,8 @@ void Z3DImgFilter::prepareRaycasterInputs(Z3DEye eye, const glm::uvec2& outputSi
   float zCoordEnd = glm::mix(coordLuf.z, coordRdb.z, zTexCoordEnd);
 
   if (m_3dImg->is2DData()) { // for 2d image
+    m_imgRaycasterRenderer.clearAnalyticRaySetup();
+    m_imgRaycasterRenderer.releaseEntryExit();
     ZMesh quad = ZMesh::createImageSlice(0,
                                          glm::vec2(xCoordStart, yCoordStart),
                                          glm::vec2(xCoordEnd, yCoordEnd),
@@ -1615,6 +1642,8 @@ void Z3DImgFilter::prepareRaycasterInputs(Z3DEye eye, const glm::uvec2& outputSi
   }
 
   if (m_zCut.lowerValue() == m_zCut.upperValue()) { // slice of 3d image
+    m_imgRaycasterRenderer.clearAnalyticRaySetup();
+    m_imgRaycasterRenderer.releaseEntryExit();
     ZMesh quad = ZMesh::createCubeSlice(zCoordStart,
                                         zTexCoordStart,
                                         2,
@@ -1629,6 +1658,8 @@ void Z3DImgFilter::prepareRaycasterInputs(Z3DEye eye, const glm::uvec2& outputSi
   }
 
   if (m_yCut.lowerValue() == m_yCut.upperValue()) { // slice of 3d image
+    m_imgRaycasterRenderer.clearAnalyticRaySetup();
+    m_imgRaycasterRenderer.releaseEntryExit();
     ZMesh quad = ZMesh::createCubeSlice(yCoordStart,
                                         yTexCoordStart,
                                         1,
@@ -1643,6 +1674,8 @@ void Z3DImgFilter::prepareRaycasterInputs(Z3DEye eye, const glm::uvec2& outputSi
   }
 
   if (m_xCut.lowerValue() == m_xCut.upperValue()) { // slice of 3d image
+    m_imgRaycasterRenderer.clearAnalyticRaySetup();
+    m_imgRaycasterRenderer.releaseEntryExit();
     ZMesh quad = ZMesh::createCubeSlice(xCoordStart,
                                         xTexCoordStart,
                                         0,
@@ -1656,20 +1689,85 @@ void Z3DImgFilter::prepareRaycasterInputs(Z3DEye eye, const glm::uvec2& outputSi
     return;
   }
 
+  // Keep viewport state consistent for subsequent batch capture.
+  setViewport(outputSize);
+  if (m_rendererBase.activeBackend() != RenderBackend::Vulkan) {
+    CHECK_GL_ERROR
+  }
+
+  const glm::mat4 coordTransform = m_rendererParameters.coordTransform.get();
+
+  m_imgRaycasterRenderer.clearQuads();
+
+  if (FLAGS_atlas_volume_rendering_analytic_ray_setup) {
+    const float coordDeterminant = glm::determinant(glm::mat3(coordTransform));
+    CHECK(std::abs(coordDeterminant) > 1e-8f) << "Analytic ray setup requires an invertible coordTransform";
+
+    Z3DAnalyticRaySetup setup;
+    setup.enabled = true;
+    setup.boxMinTex = glm::min(glm::vec3(xTexCoordStart, yTexCoordStart, zTexCoordStart),
+                               glm::vec3(xTexCoordEnd, yTexCoordEnd, zTexCoordEnd));
+    setup.boxMaxTex = glm::max(glm::vec3(xTexCoordStart, yTexCoordStart, zTexCoordStart),
+                               glm::vec3(xTexCoordEnd, yTexCoordEnd, zTexCoordEnd));
+    setup.ndcZRange =
+      (m_rendererBase.activeBackend() == RenderBackend::Vulkan) ? glm::vec2(0.0f, 1.0f) : glm::vec2(-1.0f, 1.0f);
+
+    const glm::mat4 worldToTex = localToTexMatrix(coordLuf, coordRdb) * glm::inverse(coordTransform);
+    const glm::mat4 fragCoordToNdc = fragCoordToNdcMatrix(outputSize);
+    const auto& eyeState = m_rendererBase.viewState().eyes[eye];
+    setup.ndcToTex = worldToTex * eyeState.inverseViewMatrix * eyeState.inverseProjectionMatrix * fragCoordToNdc;
+    setup.ndcToEye = eyeState.inverseProjectionMatrix * fragCoordToNdc;
+
+    std::array<glm::vec4, kZ3DAnalyticRaySetupMaxClipPlanes> worldPlanes{};
+    uint32_t worldPlaneCount = 0u;
+    auto appendWorldPlane = [&](const glm::vec4& plane) {
+      CHECK_LT(worldPlaneCount, static_cast<uint32_t>(worldPlanes.size()))
+        << "Analytic ray setup exceeded the supported global cut plane budget";
+      worldPlanes[worldPlaneCount++] = plane;
+    };
+
+    if (m_globalParameters.globalXCut.lowerValue() != m_globalParameters.globalXCut.minimum()) {
+      appendWorldPlane(glm::vec4(1.0f, 0.0f, 0.0f, -m_globalParameters.globalXCut.lowerValue()));
+    }
+    if (m_globalParameters.globalXCut.upperValue() != m_globalParameters.globalXCut.maximum()) {
+      appendWorldPlane(glm::vec4(-1.0f, 0.0f, 0.0f, m_globalParameters.globalXCut.upperValue()));
+    }
+    if (m_globalParameters.globalYCut.lowerValue() != m_globalParameters.globalYCut.minimum()) {
+      appendWorldPlane(glm::vec4(0.0f, 1.0f, 0.0f, -m_globalParameters.globalYCut.lowerValue()));
+    }
+    if (m_globalParameters.globalYCut.upperValue() != m_globalParameters.globalYCut.maximum()) {
+      appendWorldPlane(glm::vec4(0.0f, -1.0f, 0.0f, m_globalParameters.globalYCut.upperValue()));
+    }
+    if (m_globalParameters.globalZCut.lowerValue() != m_globalParameters.globalZCut.minimum()) {
+      appendWorldPlane(glm::vec4(0.0f, 0.0f, 1.0f, -m_globalParameters.globalZCut.lowerValue()));
+    }
+    if (m_globalParameters.globalZCut.upperValue() != m_globalParameters.globalZCut.maximum()) {
+      appendWorldPlane(glm::vec4(0.0f, 0.0f, -1.0f, m_globalParameters.globalZCut.upperValue()));
+    }
+
+    const glm::mat4 planeTransform = glm::transpose(glm::inverse(worldToTex));
+    for (uint32_t i = 0; i < worldPlaneCount; ++i) {
+      glm::vec4 texPlane = planeTransform * worldPlanes[i];
+      const float normalLength = glm::length(glm::vec3(texPlane));
+      CHECK_GT(normalLength, 1e-6f) << "Analytic ray setup produced a degenerate texture-space clip plane";
+      setup.clipPlanes[setup.clipPlaneCount++] = texPlane / normalLength;
+    }
+
+    m_imgRaycasterRenderer.releaseEntryExit();
+    m_imgRaycasterRenderer.setAnalyticRaySetup(setup);
+    return;
+  }
+
+  m_imgRaycasterRenderer.clearAnalyticRaySetup();
+
   // 3d volume raycasting: prepare clipped cube entry geometry (Vulkan uses
   // it directly; GL path also renders entry/exit textures inside prepareEntryExit()).
   ZMesh cube = ZMesh::createCube(glm::vec3(xCoordStart, yCoordStart, zCoordStart),
                                  glm::vec3(xCoordEnd, yCoordEnd, zCoordEnd),
                                  glm::vec3(xTexCoordStart, yTexCoordStart, zTexCoordStart),
                                  glm::vec3(xTexCoordEnd, yTexCoordEnd, zTexCoordEnd));
-  cube.transformVerticesByMatrix(m_rendererParameters.coordTransform.get());
-  const bool flipped = glm::determinant(glm::mat3(m_rendererParameters.coordTransform.get())) < 0.0;
-
-  // Keep viewport state consistent for subsequent batch capture.
-  setViewport(outputSize);
-  if (m_rendererBase.activeBackend() != RenderBackend::Vulkan) {
-    CHECK_GL_ERROR
-  }
+  cube.transformVerticesByMatrix(coordTransform);
+  const bool flipped = glm::determinant(glm::mat3(coordTransform)) < 0.0f;
 
   std::vector<glm::vec3> planeNormals;
   std::vector<glm::vec3> planeOrigins;

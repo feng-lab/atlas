@@ -3,6 +3,8 @@
 
 #include "include/bindless.glslinc"
 
+#define ATLAS_ANALYTIC_MAX_CLIP_PLANES 6
+
 // Ray modes: 0=DVR, 1=MIP, 2=ISO, 3=XRAY
 layout(constant_id = 80) const int RAY_MODE = 0;
 layout(constant_id = 81) const bool LOCAL_MIP = false;
@@ -20,6 +22,8 @@ layout(push_constant) uniform RayParams {
   uint volume_1;
   uint transfer_function_1;
 } rp;
+
+#include "include/analytic_ray_setup.glslinc"
 
 layout(location = 0) out vec4 FragData0;
 
@@ -52,17 +56,13 @@ vec4 compositeXRay(vec4 curResult, vec4 color, float currentRayLength, inout flo
 
 void main()
 {
-  vec4 entryTexCoordAndZ =
-    texelFetch(atlas_bindlessSampler2DArrayNearest(rp.ray_entry_exit_tex_coord),
-               ivec3(gl_FragCoord.xy, 0),
-               0);
-  vec4 exitTexCoordAndZ =
-    texelFetch(atlas_bindlessSampler2DArrayNearest(rp.ray_entry_exit_tex_coord),
-               ivec3(gl_FragCoord.xy, 1),
-               0);
+  vec4 entryTexCoordAndZ;
+  vec4 exitTexCoordAndZ;
+  if (!atlasFetchRaySegment(entryTexCoordAndZ, exitTexCoordAndZ, rp.ray_entry_exit_tex_coord)) {
+    discard;
+  }
   vec3 startRayPosition = entryTexCoordAndZ.xyz;
   vec3 exitRayPosition  = exitTexCoordAndZ.xyz;
-  if (all(equal(startRayPosition, exitRayPosition))) { discard; }
 
   vec4 result = vec4(0.0);
   float ch1V = 0.0;

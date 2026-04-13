@@ -1,6 +1,7 @@
 #pragma once
 
 #include "z3dprimitiverenderer.h"
+#include "z3draysetup.h"
 #include "z3dtransferfunction.h"
 #include "zmesh.h"
 #include "z3dshaderprogram.h"
@@ -249,6 +250,21 @@ public:
   // cleared and renderer switch to 3D mode
   void prepareEntryExit(const ZMesh& clipped, bool flipped, Z3DEye eye, const glm::uvec2& size);
 
+  void setAnalyticRaySetup(const Z3DAnalyticRaySetup& setup)
+  {
+    m_analyticRaySetup = setup;
+  }
+
+  void clearAnalyticRaySetup()
+  {
+    m_analyticRaySetup = {};
+  }
+
+  [[nodiscard]] bool hasAnalyticRaySetup() const
+  {
+    return m_analyticRaySetup.enabled;
+  }
+
   // Reset progressive accumulation state for an eye
   void resetProgress(Z3DEye eye);
 
@@ -335,6 +351,7 @@ private:
                                                        std::string& error);
   [[nodiscard]] ScreenSpaceSufficiencyAudit aggregateScreenSpaceAudit(const Z3DTexture& texture) const;
   [[nodiscard]] float benchmarkSelectedVoxelWorldSize() const;
+  void bindAnalyticRaySetupGL(Z3DShaderProgram& shader) const;
 
   void ensureRaycastAccumulators(Z3DEye eye);
   void releaseRaycastAccumulators(Z3DEye eye);
@@ -434,7 +451,7 @@ private:
   Z3DScratchResourcePool::RenderTargetLease
     m_entryExitLease; // holds lifetime of entry/exit render target during a frame
   Z3DScratchResourcePool::RenderTargetLease m_progressiveLayerLease; // persistent across progressive rounds
-
+  Z3DAnalyticRaySetup m_analyticRaySetup;
 };
 
 // Helper to finalize progressive rounds for ImgRaycaster by stream identity.
