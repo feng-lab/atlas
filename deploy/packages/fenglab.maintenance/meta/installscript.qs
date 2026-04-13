@@ -54,21 +54,6 @@ Component.prototype.createOperations = function()
     // Call the base createOperations and afterwards set some registry settings (unpacking ...)
     component.createOperations();
 
-    if (component.updateRequested() || component.installationRequested()) {
-        var maintenanceIniPath = "@TargetDir@/@MaintenanceToolName@.ini";
-
-        // Force the updated maintenance tool to rebuild its default repository list
-        // from the embedded RemoteRepositories config instead of stale persisted state.
-        component.addOperation(
-            "Settings",
-            "path=" + maintenanceIniPath,
-            "method=remove",
-            "key=DefaultRepositories",
-            "value=",
-            "UNDOOPERATION", ""
-        );
-    }
-
     var editionName = "Atlas";
 
     // Create uninstall link only for windows

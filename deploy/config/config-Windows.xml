@@ -14,6 +14,7 @@
     <RunProgram>@TargetDir@/Atlas/Atlas.exe</RunProgram>
     <RunProgramDescription>Run Atlas now.</RunProgramDescription>
     <MaintenanceToolName>MaintenanceTool</MaintenanceToolName>
+    <MaintenanceToolIniFile>MaintenanceToolState.ini</MaintenanceToolIniFile>
     <ControlScript>controlscript.qs</ControlScript>
     <RepositorySettingsPageVisible>false</RepositorySettingsPageVisible>
     <AllowNonAsciiCharacters>true</AllowNonAsciiCharacters>
