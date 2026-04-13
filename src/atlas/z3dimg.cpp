@@ -86,16 +86,22 @@ std::unique_ptr<Z3DTexture> createChannelTexture(const ZImg& image)
     return nullptr;
   }
 
-  // Volume previews should clamp to the dataset edge rather than sample beyond the
-  // texture domain, which avoids driver-dependent edge interpolation artifacts.
-  return std::make_unique<Z3DTexture>(internalFormat,
-                                      dimensions,
-                                      format,
-                                      dataType,
-                                      image.channelData(0),
-                                      GLint(GL_LINEAR),
-                                      GLint(GL_LINEAR),
-                                      GLint(GL_CLAMP_TO_EDGE));
+  // For 3D resident volumes, prefer an explicit zero border to avoid driver-dependent
+  // edge replication differences during linear filtering in the fast raycaster path.
+  // Keep 2D textures on edge clamp so we do not change slice/image behavior here.
+  const GLint wrap = dimensions.z > 1 ? GLint(GL_CLAMP_TO_BORDER) : GLint(GL_CLAMP_TO_EDGE);
+  auto texture = std::make_unique<Z3DTexture>(internalFormat,
+                                              dimensions,
+                                              format,
+                                              dataType,
+                                              image.channelData(0),
+                                              GLint(GL_LINEAR),
+                                              GLint(GL_LINEAR),
+                                              wrap);
+  if (wrap == GLint(GL_CLAMP_TO_BORDER)) {
+    texture->setBorderColor(glm::vec4(0.0f));
+  }
+  return texture;
 }
 
 std::array<size_t, 3> bestRatioAtMost(const std::vector<std::array<size_t, 3>>& candidates,
