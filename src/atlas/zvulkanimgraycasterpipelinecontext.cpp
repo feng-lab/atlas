@@ -3015,6 +3015,18 @@ void ZVulkanImgRaycasterPipelineContext::recordBlockIdCompaction(Z3DRendererBase
       }
       missingBlocks.swap(deduped);
 
+      // Match the GL progressive uploader contract. Under cache pressure, upload
+      // order affects whether progressive paging makes visible forward progress:
+      // depending on the view direction, we want either lower or higher block
+      // IDs first so nearer layers resolve before deeper layers.
+      const size_t cacheCapacity = imagePtr->numCachedImages(channelIndex);
+      const bool hasEnoughMissingIDs = missingBlocks.size() > cacheCapacity;
+      if ((roundIndex % 2u == 1u) && hasEnoughMissingIDs) {
+        std::ranges::sort(missingBlocks, std::ranges::greater{});
+      } else {
+        std::ranges::sort(missingBlocks);
+      }
+
       VLOG(1) << fmt::format("compaction output parsed: keys={} (non-empty)", missingBlocks.size());
 
       // Upload missing blocks (if any).
@@ -3065,7 +3077,6 @@ void ZVulkanImgRaycasterPipelineContext::recordBlockIdCompaction(Z3DRendererBase
       }
 
       // Last-round decision: require an all-zero attachment AND union fits cache
-      const size_t cacheCapacity = imagePtr->numCachedImages(channelIndex);
       const bool fitsCache = missingBlocks.size() <= cacheCapacity;
       if (VLOG_IS_ON(2)) {
         VLOG(2) << fmt::format(
