@@ -35,9 +35,10 @@ DEFINE_uint32(atlas_volume_rendering_progressive_blockid_effective_attachments,
               "to converge. Set to 0 to disable the cap and use all available attachments.");
 
 DEFINE_bool(atlas_volume_rendering_analytic_ray_setup,
-            true,
-            "Use analytic per-pixel volume ray setup by default instead of the legacy clipped-mesh entry/exit path. "
-            "Disable this to fall back to the old entry/exit render target workflow.");
+            false,
+            "Use analytic per-pixel volume ray setup instead of the legacy clipped-mesh entry/exit path. "
+            "Disabled by default so the legacy entry/exit workflow remains the baseline until the analytic path is "
+            "fully validated.");
 
 DEFINE_bool(atlas_enable_benchmark_raw_mip_export,
             false,

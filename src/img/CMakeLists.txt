@@ -193,7 +193,7 @@ set(IMG_SOURCES
         zimageavx512.h zimageavx512.cpp
         zmesh.h zmesh.cpp
         zmeshio.h zmeshio.cpp
-        zmeshutils.h zmeshutils.cpp
+        zmeshutils.h
         zimginterpolate.h zimginterpolate.cpp
         zimgblockprovider.cpp
         zmemorymappedfile.cpp zmemorymappedfile.h

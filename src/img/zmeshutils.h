@@ -55,9 +55,6 @@ public:
                                             glm::tvec3<Real, glm::defaultp> C,
                                             Real& s,
                                             Real& t);
-
-  // from VTK
-  static ZMesh clipClosedSurface(const ZMesh& mesh, const std::vector<glm::vec4>& clipPlanes, double epsilon = 1e-6);
 };
 
 // -------------------------------------------------------------------------------------------

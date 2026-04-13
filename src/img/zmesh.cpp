@@ -32,25 +32,120 @@
 
 namespace {
 
+constexpr const char* kAtlasTexCoord1DArrayName = "AtlasTexCoord1D";
+constexpr const char* kAtlasTexCoord2DArrayName = "AtlasTexCoord2D";
+constexpr const char* kAtlasTexCoord3DArrayName = "AtlasTexCoord3D";
+constexpr const char* kAtlasColorArrayName = "AtlasColor";
+
+template<typename FillTupleFn>
+void addNamedFloatPointArray(vtkPointData* pointData,
+                             const char* name,
+                             int components,
+                             vtkIdType tupleCount,
+                             FillTupleFn&& fillTuple)
+{
+  CHECK(pointData);
+  CHECK(name);
+  CHECK_GT(components, 0);
+  if (tupleCount == 0) {
+    return;
+  }
+
+  vtkNew<vtkFloatArray> array;
+  array->SetName(name);
+  array->SetNumberOfComponents(components);
+  array->SetNumberOfTuples(tupleCount);
+  for (vtkIdType i = 0; i < tupleCount; ++i) {
+    fillTuple(array.GetPointer(), i);
+  }
+  pointData->AddArray(array);
+}
+
+bool hasCompleteClippedPointAttributes(const nim::ZMesh& source, const nim::ZMesh& clipped)
+{
+  const size_t clippedVertexCount = clipped.numVertices();
+  if (!source.textureCoordinates1D().empty() && clipped.num1DTextureCoordinates() != clippedVertexCount) {
+    return false;
+  }
+  if (!source.textureCoordinates2D().empty() && clipped.num2DTextureCoordinates() != clippedVertexCount) {
+    return false;
+  }
+  if (!source.textureCoordinates3D().empty() && clipped.num3DTextureCoordinates() != clippedVertexCount) {
+    return false;
+  }
+  if (!source.colors().empty() && clipped.numColors() != clippedVertexCount) {
+    return false;
+  }
+  return true;
+}
+
 nim::ZMesh vtkPolyDataToMesh(vtkPolyData* polyData, int label = -1)
 {
   CHECK(polyData);
   vtkPoints* points = polyData->GetPoints();
   vtkCellArray* polys = polyData->GetPolys();
-  vtkDataArray* pointsNormals = polyData->GetPointData()->GetNormals();
+  vtkPointData* pointData = polyData->GetPointData();
+  CHECK(pointData);
+  vtkDataArray* pointsNormals = pointData->GetNormals();
+  vtkDataArray* texCoords1D = pointData->GetArray(kAtlasTexCoord1DArrayName);
+  vtkDataArray* texCoords2D = pointData->GetArray(kAtlasTexCoord2DArrayName);
+  vtkDataArray* texCoords3D = pointData->GetArray(kAtlasTexCoord3DArrayName);
+  vtkDataArray* colors = pointData->GetArray(kAtlasColorArrayName);
 
   std::vector<glm::dvec3> vertices(points->GetNumberOfPoints());
-  // VLOG(1) << vertices.size();
+  const vtkIdType pointCount = points->GetNumberOfPoints();
   std::vector<glm::dvec3> normals;
   if (pointsNormals) {
     normals.resize(pointsNormals->GetNumberOfTuples());
     CHECK(vertices.size() == normals.size());
   }
+  std::vector<float> outTexCoords1D;
+  if (texCoords1D) {
+    CHECK_EQ(texCoords1D->GetNumberOfComponents(), 1);
+    CHECK_EQ(texCoords1D->GetNumberOfTuples(), pointCount);
+    outTexCoords1D.resize(pointCount);
+  }
+  std::vector<glm::vec2> outTexCoords2D;
+  if (texCoords2D) {
+    CHECK_EQ(texCoords2D->GetNumberOfComponents(), 2);
+    CHECK_EQ(texCoords2D->GetNumberOfTuples(), pointCount);
+    outTexCoords2D.resize(pointCount);
+  }
+  std::vector<glm::vec3> outTexCoords3D;
+  if (texCoords3D) {
+    CHECK_EQ(texCoords3D->GetNumberOfComponents(), 3);
+    CHECK_EQ(texCoords3D->GetNumberOfTuples(), pointCount);
+    outTexCoords3D.resize(pointCount);
+  }
+  std::vector<glm::vec4> outColors;
+  if (colors) {
+    CHECK_EQ(colors->GetNumberOfComponents(), 4);
+    CHECK_EQ(colors->GetNumberOfTuples(), pointCount);
+    outColors.resize(pointCount);
+  }
   std::vector<uint32_t> indices;
-  for (vtkIdType id = 0; id < points->GetNumberOfPoints(); ++id) {
+  for (vtkIdType id = 0; id < pointCount; ++id) {
     points->GetPoint(id, &vertices[id][0]);
     if (pointsNormals) {
       pointsNormals->GetTuple(id, &normals[id][0]);
+    }
+    if (texCoords1D) {
+      outTexCoords1D[id] = static_cast<float>(texCoords1D->GetComponent(id, 0));
+    }
+    if (texCoords2D) {
+      double tuple[2];
+      texCoords2D->GetTuple(id, tuple);
+      outTexCoords2D[id] = glm::vec2(tuple[0], tuple[1]);
+    }
+    if (texCoords3D) {
+      double tuple[3];
+      texCoords3D->GetTuple(id, tuple);
+      outTexCoords3D[id] = glm::vec3(tuple[0], tuple[1], tuple[2]);
+    }
+    if (colors) {
+      double tuple[4];
+      colors->GetTuple(id, tuple);
+      outColors[id] = glm::vec4(tuple[0], tuple[1], tuple[2], tuple[3]);
     }
   }
   vtkIdType npts;
@@ -84,6 +179,18 @@ nim::ZMesh vtkPolyDataToMesh(vtkPolyData* polyData, int label = -1)
     msh.setNormals(normals);
   } else {
     msh.generateNormals();
+  }
+  if (!outTexCoords1D.empty()) {
+    msh.setTextureCoordinates(outTexCoords1D);
+  }
+  if (!outTexCoords2D.empty()) {
+    msh.setTextureCoordinates(outTexCoords2D);
+  }
+  if (!outTexCoords3D.empty()) {
+    msh.setTextureCoordinates(outTexCoords3D);
+  }
+  if (!outColors.empty()) {
+    msh.setColors(outColors);
   }
   return msh;
 }
@@ -126,6 +233,50 @@ vtkSmartPointer<vtkPolyData> meshToVtkPolyData(const nim::ZMesh& mesh)
   polyData->SetPoints(points);
   if (!normals.empty()) {
     polyData->GetPointData()->SetNormals(nrmls);
+  }
+  const auto& texCoords1D = mesh.textureCoordinates1D();
+  if (!texCoords1D.empty()) {
+    CHECK_EQ(texCoords1D.size(), vertices.size());
+    addNamedFloatPointArray(polyData->GetPointData(),
+                            kAtlasTexCoord1DArrayName,
+                            1,
+                            static_cast<vtkIdType>(texCoords1D.size()),
+                            [&](vtkFloatArray* array, vtkIdType i) {
+                              array->SetValue(i, texCoords1D[i]);
+                            });
+  }
+  const auto& texCoords2D = mesh.textureCoordinates2D();
+  if (!texCoords2D.empty()) {
+    CHECK_EQ(texCoords2D.size(), vertices.size());
+    addNamedFloatPointArray(polyData->GetPointData(),
+                            kAtlasTexCoord2DArrayName,
+                            2,
+                            static_cast<vtkIdType>(texCoords2D.size()),
+                            [&](vtkFloatArray* array, vtkIdType i) {
+                              array->SetTypedTuple(i, &texCoords2D[i][0]);
+                            });
+  }
+  const auto& texCoords3D = mesh.textureCoordinates3D();
+  if (!texCoords3D.empty()) {
+    CHECK_EQ(texCoords3D.size(), vertices.size());
+    addNamedFloatPointArray(polyData->GetPointData(),
+                            kAtlasTexCoord3DArrayName,
+                            3,
+                            static_cast<vtkIdType>(texCoords3D.size()),
+                            [&](vtkFloatArray* array, vtkIdType i) {
+                              array->SetTypedTuple(i, &texCoords3D[i][0]);
+                            });
+  }
+  const auto& colors = mesh.colors();
+  if (!colors.empty()) {
+    CHECK_EQ(colors.size(), vertices.size());
+    addNamedFloatPointArray(polyData->GetPointData(),
+                            kAtlasColorArrayName,
+                            4,
+                            static_cast<vtkIdType>(colors.size()),
+                            [&](vtkFloatArray* array, vtkIdType i) {
+                              array->SetTypedTuple(i, &colors[i][0]);
+                            });
   }
   polyData->SetPolys(polys);
 
@@ -1489,7 +1640,7 @@ ZMesh ZMesh::clipClosedSurface(const ZMesh& mesh,
   // clipper->SetScalarModeToColors();
   clipper->SetTolerance(epsilon);
   clipper->SetTriangulationErrorDisplay(true);
-  // clipper->SetPassPointData(true);
+  clipper->SetPassPointData(true);
   clipper->Update();
   // clipper->PrintSelf(std::cout, vtkIndent());
 
@@ -1497,7 +1648,11 @@ ZMesh ZMesh::clipClosedSurface(const ZMesh& mesh,
   if (pdres->GetNumberOfPolys() > 0) {
     // pdres->PrintSelf(std::cout, vtkIndent());
     auto res = vtkPolyDataToMesh(clipper->GetOutput());
-    res.interpolate(mesh);
+    if (!hasCompleteClippedPointAttributes(mesh, res)) {
+      LOG(WARNING) << "vtkClipClosedSurface returned incomplete point attributes; "
+                   << "falling back to geometric interpolation";
+      res.interpolate(mesh);
+    }
     //    VLOG(1) << res.numTriangles();
     //    for (size_t i = 0; i < res.numVertices(); ++i) {
     //      VLOG(1) << res.vertices()[i] << " " << res.textureCoordinates3D()[i];
