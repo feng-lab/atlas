@@ -14,7 +14,6 @@
     <RunProgramDescription>Run Atlas now.</RunProgramDescription>
     <MaintenanceToolName>MaintenanceTool</MaintenanceToolName>
     <MaintenanceToolIniFile>MaintenanceToolState.ini</MaintenanceToolIniFile>
-    <RepositorySettingsPageVisible>false</RepositorySettingsPageVisible>
     <AllowNonAsciiCharacters>true</AllowNonAsciiCharacters>
 
     <RemoteRepositories>
