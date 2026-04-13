@@ -317,6 +317,8 @@ void Z3DRendererVulkanBackend::preBackendSwitch()
   // Drop shared placeholders; they'll be recreated lazily on next use.
   m_defaultPlaceholder2D.reset();
   m_defaultSampler.reset();
+  m_nearestClampSampler.reset();
+  m_linearBorderZero3DSampler.reset();
   m_sharedDescriptorLayouts = {};
   // Finish any in-flight frame before we start tearing resources down.
   if (m_frameRecording && m_activeFrameHandle && m_activeFrameHandle->valid()) {
@@ -2559,11 +2561,12 @@ void Z3DRendererVulkanBackend::ensureSharedDescriptorLayouts()
     const vk::ShaderStageFlags fragStage = vk::ShaderStageFlagBits::eFragment;
     const vk::ShaderStageFlags compStage = vk::ShaderStageFlagBits::eCompute;
     ensureSharedSamplers();
-    CHECK(m_defaultSampler.has_value() && m_nearestClampSampler.has_value())
+    CHECK(m_defaultSampler.has_value() && m_nearestClampSampler.has_value() && m_linearBorderZero3DSampler.has_value())
       << "Bindless set layout requires shared samplers to be initialized";
     const std::array<vk::Sampler, 1> linearSamplers{**m_defaultSampler};
     const std::array<vk::Sampler, 1> nearestSamplers{**m_nearestClampSampler};
-    std::array<vk::DescriptorSetLayoutBinding, 7> bindings{
+    const std::array<vk::Sampler, 1> linearBorderZero3DSamplers{**m_linearBorderZero3DSampler};
+    std::array<vk::DescriptorSetLayoutBinding, 8> bindings{
       vk::DescriptorSetLayoutBinding{.binding = vkbind::kBindingBindlessTexture2D,
                                      .descriptorType = vk::DescriptorType::eSampledImage,
                                      .descriptorCount = cap2D,
@@ -2594,13 +2597,18 @@ void Z3DRendererVulkanBackend::ensureSharedDescriptorLayouts()
                                      .descriptorCount = 1,
                                      .stageFlags = fragStage | compStage,
                                      .pImmutableSamplers = nearestSamplers.data()},
+      vk::DescriptorSetLayoutBinding{.binding = vkbind::kBindingBindlessSamplerLinearBorderZero3D,
+                                     .descriptorType = vk::DescriptorType::eSampler,
+                                     .descriptorCount = 1,
+                                     .stageFlags = fragStage,
+                                     .pImmutableSamplers = linearBorderZero3DSamplers.data()},
     };
 
     // Enable descriptor indexing on these bindings:
     // - Partially bound: not all array elements must be populated.
     // - Update-after-bind: when enabled, large bindless arrays are accounted
     //   against descriptor indexing limits.
-    std::array<vk::DescriptorBindingFlags, 7> bindingFlags{};
+    std::array<vk::DescriptorBindingFlags, 8> bindingFlags{};
     for (size_t i = 0; i < 5; ++i) {
       vk::DescriptorBindingFlags f = vk::DescriptorBindingFlagBits::ePartiallyBound;
       if (useUpdateAfterBind) {
@@ -3261,6 +3269,16 @@ void Z3DRendererVulkanBackend::ensureSharedSamplers()
                                       .addressModeW = vk::SamplerAddressMode::eClampToEdge,
                                       .borderColor = vk::BorderColor::eFloatOpaqueWhite};
     m_nearestClampSampler.emplace(vkDevice, nearestInfo);
+  }
+  if (!m_linearBorderZero3DSampler) {
+    vk::SamplerCreateInfo linearBorderInfo{.magFilter = vk::Filter::eLinear,
+                                           .minFilter = vk::Filter::eLinear,
+                                           .mipmapMode = vk::SamplerMipmapMode::eNearest,
+                                           .addressModeU = vk::SamplerAddressMode::eClampToBorder,
+                                           .addressModeV = vk::SamplerAddressMode::eClampToBorder,
+                                           .addressModeW = vk::SamplerAddressMode::eClampToBorder,
+                                           .borderColor = vk::BorderColor::eFloatTransparentBlack};
+    m_linearBorderZero3DSampler.emplace(vkDevice, linearBorderInfo);
   }
 }
 

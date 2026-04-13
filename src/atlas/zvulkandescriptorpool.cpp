@@ -22,7 +22,7 @@ ZVulkanDescriptorPool::ZVulkanDescriptorPool(ZVulkanDevice& device)
   //   include the corresponding descriptor type in the pool to satisfy Vulkan's
   //   allocation accounting for the set layout.
   const uint32_t sampledImages = bindlessSum;
-  const uint32_t samplers = 2u; // linear clamp + nearest clamp
+  const uint32_t samplers = 3u; // linear clamp + nearest clamp + 3D border-zero clamp
 
   std::array<vk::DescriptorPoolSize, 6> poolSizes{
     vk::DescriptorPoolSize{.type = vk::DescriptorType::eUniformBuffer,        .descriptorCount = 1024         },

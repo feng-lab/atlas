@@ -57,7 +57,7 @@ void main()
 
   if (curLevel + 1 == LEVEL_COUNT) {
     color = texture(atlas_bindlessSampler2DLinear(sbubo.colormap),
-                    vec2(texture(atlas_bindlessSampler3DLinear(sbubo.volume), texCoord0).r, 0.5));
+                    vec2(texture(atlas_bindlessSampler3DLinearBorderZero(sbubo.volume), texCoord0).r, 0.5));
     color.rgb *= color.a;
     FragData0 = color;
     return;
@@ -84,7 +84,7 @@ void main()
       voxelAddress = pageTableEntry.xyz + (voxelCoord % pg.image_block_size.xyz) + fFracVoxelCoord + 2.0;
       color = texture(
         atlas_bindlessSampler2DLinear(sbubo.colormap),
-        vec2(texture(atlas_bindlessSampler3DLinear(sbubo.image_cache),
+        vec2(texture(atlas_bindlessSampler3DLinearBorderZero(sbubo.image_cache),
                      voxelAddress * pg.image_address_to_normalized_texture_coord.xyz)
                .r,
              0.5));

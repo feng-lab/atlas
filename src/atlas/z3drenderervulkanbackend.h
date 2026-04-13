@@ -1480,6 +1480,7 @@ public:
   std::unique_ptr<ZVulkanBuffer> m_defaultPlaceholderStorageBuffer;
   std::optional<vk::raii::Sampler> m_defaultSampler;
   std::optional<vk::raii::Sampler> m_nearestClampSampler;
+  std::optional<vk::raii::Sampler> m_linearBorderZero3DSampler;
 
   struct SharedDescriptorLayouts
   {

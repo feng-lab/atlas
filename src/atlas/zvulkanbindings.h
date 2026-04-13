@@ -33,6 +33,7 @@ inline constexpr uint32_t kBindingBindlessUTexture3D = 4;
 // portability) while allowing large bindless sampled-image tables.
 inline constexpr uint32_t kBindingBindlessSamplerLinearClamp = 5;
 inline constexpr uint32_t kBindingBindlessSamplerNearestClamp = 6;
+inline constexpr uint32_t kBindingBindlessSamplerLinearBorderZero3D = 7;
 
 // ---------------------------------------------------------------------------
 // OIT (set 3) bindings

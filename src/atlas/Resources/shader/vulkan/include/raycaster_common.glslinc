@@ -88,7 +88,7 @@ void sampleVolumeNoPaging(in vec3 startRayPosition, in vec3 exitRayPosition, in 
   for (int loop0 = 0; !finished && loop0 < 255; ++loop0) {
     for (int loop1 = 0; !finished && loop1 < 255; ++loop1) {
       vec3 samplePos = mix(startRayPosition, exitRayPosition, currentRayLength);
-      float voxel = texture(atlas_bindlessSampler3DLinear(rp.volume), samplePos).r;
+      float voxel = texture(atlas_bindlessSampler3DLinearBorderZero(rp.volume), samplePos).r;
 
       if (RAY_MODE == 1) { // MIP
         if (LOCAL_MIP) {
@@ -136,7 +136,7 @@ void sampleBlock(in uvec4 pageTableEntry, in int curLevel, in uvec3 pageTableCoo
     vec3 fFracVoxelCoord = samplePos * pg.levels[curLevel].image_dimensions.xyz - vec3(voxelCoord);
     vec3 voxelAddress = pageTableEntry.xyz + (voxelCoord % pg.image_block_size.xyz) + fFracVoxelCoord + 2.0;
     float voxel =
-      texture(atlas_bindlessSampler3DLinear(rp.image_cache),
+      texture(atlas_bindlessSampler3DLinearBorderZero(rp.image_cache),
               voxelAddress * pg.image_address_to_normalized_texture_coord.xyz)
         .r;
 

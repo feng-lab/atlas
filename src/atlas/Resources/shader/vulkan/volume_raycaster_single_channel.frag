@@ -69,7 +69,7 @@ void main()
 
   vec3 numVoxels =
     abs((exitRayPosition - startRayPosition) *
-        vec3(textureSize(atlas_bindlessSampler3DLinear(rp.volume_1), 0)));
+        vec3(textureSize(atlas_bindlessSampler3DLinearBorderZero(rp.volume_1), 0)));
   float numVoxel = max(max(numVoxels.x, numVoxels.y), numVoxels.z);
   float stepSize = 1.0 / (rp.sampling_rate * numVoxel);
 
@@ -79,7 +79,7 @@ void main()
   for (int loop0=0; !finished && loop0<255; ++loop0) {
     for (int loop1=0; !finished && loop1<255; ++loop1) {
       vec3 samplePos = mix(startRayPosition, exitRayPosition, currentRayLength);
-      float voxel = texture(atlas_bindlessSampler3DLinear(rp.volume_1), samplePos).r;
+      float voxel = texture(atlas_bindlessSampler3DLinearBorderZero(rp.volume_1), samplePos).r;
 
       if (RAY_MODE == 1) { // MIP
         if (LOCAL_MIP) {

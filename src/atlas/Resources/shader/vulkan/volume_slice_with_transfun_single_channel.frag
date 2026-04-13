@@ -19,7 +19,7 @@ void main()
 {
   vec4 color =
     texture(atlas_bindlessSampler2DLinear(sbubo.transfer_function_1),
-            vec2(texture(atlas_bindlessSampler3DLinear(sbubo.volume_1), texCoord0).r, 0.5));
+            vec2(texture(atlas_bindlessSampler3DLinearBorderZero(sbubo.volume_1), texCoord0).r, 0.5));
   if (color.a == 0.0) {
     color = vec4(0.0);
   }

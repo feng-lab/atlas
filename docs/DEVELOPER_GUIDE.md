@@ -344,7 +344,7 @@ Lookup Tables (LUTs)
     - No `vkUpdateDescriptorSets` during command-buffer recording. All descriptor writes must happen in the `beginRender()` pre-record phase (after the frame-slot completion safe point, before `vk::CommandBuffer::begin()`).
     - Sampled-image inputs are bindless (set=0). Register textures into the per-frame-slot bindless tables during the pre-record phase and pass indices via push constants / UBOs; do not bind per-pass sampled-image descriptor sets.
     - Per-draw variation must use dynamic UBO offsets and push constants; do not allocate/update per-draw descriptor sets.
-    - Bindless sampled-image tables use `VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE` (not combined image samplers). Sampler state is provided via immutable samplers in the set 0 layout (see `Resources/shader/vulkan/include/bindless.glslinc`).
+    - Bindless sampled-image tables use `VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE` (not combined image samplers). Sampler state is provided via immutable samplers in the set 0 layout (see `Resources/shader/vulkan/include/bindless.glslinc`): linear clamp for 2D/2D-array sampling, linear border-zero for 3D image volumes/caches, and nearest clamp for integer fetches.
     - Never free descriptor sets individually; rely on per-frame pool reset for transient descriptor arenas. Per-frame-slot persistent pools live for the lifetime of the slot. Clear any retained per-frame descriptor wrappers before reset (backend handles this at the completion safe point).
 
 ImgRaycaster Vulkan

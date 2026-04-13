@@ -1134,9 +1134,10 @@ void ZVulkanContext::computeBindlessSampledImageCapacities()
                   perSetSampledImageLimit));
   }
 
-  // Atlas' bindless layout includes immutable samplers (linear clamp + nearest clamp).
-  constexpr uint32_t kSamplerCountTotal = 2u;
-  constexpr uint32_t kSamplerCountFragment = 2u;
+  // Atlas' bindless layout includes immutable samplers for 2D linear clamp,
+  // 3D linear border-zero, and nearest clamp fetches.
+  constexpr uint32_t kSamplerCountTotal = 3u;
+  constexpr uint32_t kSamplerCountFragment = 3u;
   constexpr uint32_t kSamplerCountCompute = 1u; // nearest clamp only
   if (perStageSamplerLimit < kSamplerCountFragment || perSetSamplerLimit < kSamplerCountTotal ||
       perStageSamplerLimit < kSamplerCountCompute) {

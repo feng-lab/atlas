@@ -28,6 +28,7 @@ layout(set = 0, binding = 4) uniform utexture3D     atlas_bindlessUTexture3D[];
 // Immutable samplers (set 0).
 layout(set = 0, binding = 5) uniform sampler atlas_samplerLinearClamp;
 layout(set = 0, binding = 6) uniform sampler atlas_samplerNearestClamp;
+layout(set = 0, binding = 7) uniform sampler atlas_samplerLinearBorderZero3D;
 
 // Convenience constructors for sampling bindless tables. Use these instead of
 // spelling sampler2D(texture2D(...), sampler) at call sites.
@@ -45,6 +46,10 @@ layout(set = 0, binding = 6) uniform sampler atlas_samplerNearestClamp;
   sampler3D(atlas_bindlessTexture3D[nonuniformEXT(idx)], atlas_samplerLinearClamp)
 #define atlas_bindlessSampler3DNearest(idx) \
   sampler3D(atlas_bindlessTexture3D[nonuniformEXT(idx)], atlas_samplerNearestClamp)
+// 3D image previews and paged caches should sample transparent black outside
+// the texture domain to match the GL volume contract and avoid edge smearing.
+#define atlas_bindlessSampler3DLinearBorderZero(idx) \
+  sampler3D(atlas_bindlessTexture3D[nonuniformEXT(idx)], atlas_samplerLinearBorderZero3D)
 
 #define atlas_bindlessUSampler2DNearest(idx) \
   usampler2D(atlas_bindlessUTexture2D[nonuniformEXT(idx)], atlas_samplerNearestClamp)

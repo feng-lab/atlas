@@ -16,7 +16,7 @@ layout(location = 0) out vec4 FragData0;
 void main()
 {
   vec4 c = texture(atlas_bindlessSampler2DLinear(sbubo.colormap_1),
-                   vec2(texture(atlas_bindlessSampler3DLinear(sbubo.volume_1), texCoord0).r, 0.5));
+                   vec2(texture(atlas_bindlessSampler3DLinearBorderZero(sbubo.volume_1), texCoord0).r, 0.5));
   c.rgb *= c.a;
   FragData0 = c;
 }

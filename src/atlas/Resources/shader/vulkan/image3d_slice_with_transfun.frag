@@ -50,7 +50,7 @@ void main()
 
   if (curLevel + 1 == LEVEL_COUNT) {
     color = texture(atlas_bindlessSampler2DLinear(sbpc.transfer_function),
-                    vec2(texture(atlas_bindlessSampler3DLinear(sbpc.volume), texCoord0).r, 0.5));
+                    vec2(texture(atlas_bindlessSampler3DLinearBorderZero(sbpc.volume), texCoord0).r, 0.5));
     if (RESULT_OPAQUE) {
       if (color.a == 0.0) color = vec4(0.0);
       color.a = 1.0;
@@ -82,7 +82,7 @@ void main()
       voxelAddress = pageTableEntry.xyz + (voxelCoord % pg.image_block_size.xyz) + fFracVoxelCoord + 2.0;
       color = texture(
         atlas_bindlessSampler2DLinear(sbpc.transfer_function),
-        vec2(texture(atlas_bindlessSampler3DLinear(sbpc.image_cache),
+        vec2(texture(atlas_bindlessSampler3DLinearBorderZero(sbpc.image_cache),
                      voxelAddress * pg.image_address_to_normalized_texture_coord.xyz)
                .r,
              0.5));
