@@ -1263,7 +1263,8 @@ For reproducible still-image capture from saved workspaces:
 
 1. Prepare a `.scene` file and ensure all referenced data paths are accessible.
 2. Run Atlas with the scene-export mode. The export uses the same headless width/height and overwrite flags as the
-   animation exporter, but captures exactly one frame after loading the scene and applying its saved 3D state.
+   animation exporter, and honors `--output_tile_size` / `--output_tile_border` when they are provided explicitly,
+   but captures exactly one frame after loading the scene and applying its saved 3D state.
    ```bash
    ./atlas \
      --run_export_3d_scene \
@@ -1274,6 +1275,7 @@ For reproducible still-image capture from saved workspaces:
      --overwrite
    ```
 3. Optional flags:
+   - `--output_tile_size 1024 --output_tile_border 64`
    - `--limit_memory_usage_in_gb_to 12`
    - On Linux: `--use_gpu_devices 0 --__use_EGL`
 4. Atlas blocks until deferred `View3DGeneral` and per-object `View3D` scene settings finish applying, then captures
@@ -1537,7 +1539,7 @@ Use **Help → Shortcuts** in either the 2D or 3D window to open this section di
 | `--output_image_folder_name` | Directory for per-frame exports. |
 | `--skip_video_compression` | Render frames only, skip final video encoding. |
 | `--output_image_name_prefix`, `--output_image_name_field_width` | Control image sequence naming. |
-| `--output_tile_size`, `--output_tile_border` | Enable tiled rendering for high-resolution outputs. |
+| `--output_tile_size`, `--output_tile_border` | Enable tiled rendering for high-resolution outputs. Scene export uses its built-in still-image defaults unless either flag is provided explicitly. |
 | `--limit_memory_usage_in_gb_to` | Cap GPU memory usage (GB). |
 | `--use_gpu_devices` | Specify GPU indices (Linux). |
 | `--__use_EGL` | Force EGL context creation (Linux headless). |

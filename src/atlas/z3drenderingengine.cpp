@@ -738,7 +738,12 @@ void Z3DRenderingEngine::resetCameraClippingRange()
   m_mutex.unlock();
 }
 
-void Z3DRenderingEngine::takeFixedSizeScreenShot(const QString& filename, int width, int height, Z3DScreenShotType sst)
+void Z3DRenderingEngine::takeFixedSizeScreenShot(const QString& filename,
+                                                 int width,
+                                                 int height,
+                                                 Z3DScreenShotType sst,
+                                                 int tileSize,
+                                                 int tileBorder)
 {
   Q_EMIT progressChanged(5);
   auto progressGuard = folly::makeGuard([this]() {
@@ -754,7 +759,8 @@ void Z3DRenderingEngine::takeFixedSizeScreenShot(const QString& filename, int wi
   });
   try {
     const auto token = captureCancellationSource->getToken();
-    takeFixedSizeScreenShotWithoutResetCanvasSizePrivate(filename, width, height, sst, true, token);
+    takeFixedSizeScreenShotWithoutResetCanvasSizePrivate(
+      filename, width, height, sst, true, token, tileSize, tileBorder);
     Q_EMIT progressChanged(98);
   }
   catch (const ZCancellationException&) {
@@ -2263,18 +2269,21 @@ void Z3DRenderingEngine::takeFixedSizeScreenShotWithoutResetCanvasSizePrivate(
   int height,
   Z3DScreenShotType sst,
   bool reportProgress,
-  folly::CancellationToken cancellationToken)
+  folly::CancellationToken cancellationToken,
+  int tileSize,
+  int tileBorder)
 {
   const bool startedDeferredErrorFrame = beginDeferredRenderingErrorFrame();
   auto deferredErrorFrameGuard = folly::makeGuard([this, startedDeferredErrorFrame]() {
     endDeferredRenderingErrorFrame(startedDeferredErrorFrame);
   });
-  const int tileSize = 2048;
-  const int tileBorder = 128;
+  CHECK(tileSize >= 0 && tileBorder >= 0);
+  const int resolvedTileSize = tileSize > 0 ? tileSize : 2048;
+  const int resolvedTileBorder = (tileSize > 0 || tileBorder > 0) ? tileBorder : 128;
 
   maybeCancel(cancellationToken);
 
-  if (width <= tileSize && height <= tileSize) {
+  if (width <= resolvedTileSize && height <= resolvedTileSize) {
     if (reportProgress) {
       Q_EMIT progressChanged(15);
     }
@@ -2315,30 +2324,33 @@ void Z3DRenderingEngine::takeFixedSizeScreenShotWithoutResetCanvasSizePrivate(
       rightImg.infoRef().lastChannelIsAlphaChannel = true;
     }
 
-    int numCols = (width + tileSize - 1) / tileSize;
-    int numRows = (height + tileSize - 1) / tileSize;
+    int numCols = (width + resolvedTileSize - 1) / resolvedTileSize;
+    int numRows = (height + resolvedTileSize - 1) / resolvedTileSize;
     const int totalTiles = numCols * numRows;
     int completedTiles = 0;
     bool forwardCol = false;
     for (int r = 0; r < numRows; ++r) {
       maybeCancel(cancellationToken);
-      auto tileStartY = r * tileSize;
+      auto tileStartY = r * resolvedTileSize;
       forwardCol = !forwardCol;
       for (int c = forwardCol ? 0 : (numCols - 1); forwardCol ? (c < numCols) : (c >= 0); forwardCol ? ++c : --c) {
         maybeCancel(cancellationToken);
-        auto tileStartX = c * tileSize;
+        auto tileStartX = c * resolvedTileSize;
 
         int left = tileStartX;
-        int right = std::min(tileStartX + tileSize, width);
+        int right = std::min(tileStartX + resolvedTileSize, width);
         int bottom = tileStartY;
-        int top = std::min(tileStartY + tileSize, height);
-        double nLeft = static_cast<double>(left - tileBorder) / width;
-        double nRight = static_cast<double>(right + tileBorder) / width;
-        double nBottom = static_cast<double>(bottom - tileBorder) / height;
-        double nTop = static_cast<double>(top + tileBorder) / height;
-        ZImgRegion validRegion(tileBorder, tileBorder + right - left, tileBorder, tileBorder + top - bottom);
+        int top = std::min(tileStartY + resolvedTileSize, height);
+        double nLeft = static_cast<double>(left - resolvedTileBorder) / width;
+        double nRight = static_cast<double>(right + resolvedTileBorder) / width;
+        double nBottom = static_cast<double>(bottom - resolvedTileBorder) / height;
+        double nTop = static_cast<double>(top + resolvedTileBorder) / height;
+        ZImgRegion validRegion(resolvedTileBorder,
+                               resolvedTileBorder + right - left,
+                               resolvedTileBorder,
+                               resolvedTileBorder + top - bottom);
 
-        setOutputSize(glm::uvec2(right - left + tileBorder * 2, top - bottom + tileBorder * 2));
+        setOutputSize(glm::uvec2(right - left + resolvedTileBorder * 2, top - bottom + resolvedTileBorder * 2));
         m_globalParas->camera.viewportChanged(glm::uvec2(width, height));
 
         // set camera frustum

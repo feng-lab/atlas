@@ -9,6 +9,8 @@
 #include "zlog.h"
 #include "zview.h"
 
+#include <gflags/gflags.h>
+
 #include <folly/ScopeGuard.h>
 
 #include <QCoreApplication>
@@ -17,6 +19,8 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QThread>
+
+#include <utility>
 
 DEFINE_bool(run_export_3d_scene, false, "Enable exporting a 3D scene screenshot via command line");
 
@@ -28,6 +32,8 @@ DECLARE_bool(overwrite);
 DECLARE_uint64(limit_memory_usage_in_gb_to);
 DECLARE_int32(maximum_output_width);
 DECLARE_int32(maximum_output_height);
+DECLARE_int32(output_tile_size);
+DECLARE_int32(output_tile_border);
 DECLARE_string(use_gpu_devices);
 DECLARE_uint32(use_gpu_device);
 
@@ -96,6 +102,16 @@ bool configureSingleGpuFromFlags(QString& error)
   error = "Flag --use_gpu_devices is Linux only";
   return false;
 #endif
+}
+
+std::pair<int, int> resolveSceneTileSettings()
+{
+  const auto tileSizeInfo = gflags::GetCommandLineFlagInfoOrDie("output_tile_size");
+  const auto tileBorderInfo = gflags::GetCommandLineFlagInfoOrDie("output_tile_border");
+  if (tileSizeInfo.is_default && tileBorderInfo.is_default) {
+    return {0, 0};
+  }
+  return {FLAGS_output_tile_size, FLAGS_output_tile_border};
 }
 
 bool loadSceneForExport(const QString& filename, ZDoc& doc, ZView& view, Z3DRenderingEngine& engine, QString& error)
@@ -305,7 +321,13 @@ int ZRunExport3DScene::run()
     return 1;
   }
 
-  engine.takeFixedSizeScreenShot(outputFilename, FLAGS_output_width, FLAGS_output_height, Z3DScreenShotType::MonoView);
+  const auto [tileSize, tileBorder] = resolveSceneTileSettings();
+  engine.takeFixedSizeScreenShot(outputFilename,
+                                 FLAGS_output_width,
+                                 FLAGS_output_height,
+                                 Z3DScreenShotType::MonoView,
+                                 tileSize,
+                                 tileBorder);
 
   if (!m_hasError && !QFile::exists(outputFilename)) {
     LOG(ERROR) << "scene export did not produce an output image";

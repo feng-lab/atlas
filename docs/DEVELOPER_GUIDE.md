@@ -46,6 +46,8 @@ Entry Points
     - Both modes share the core output-path and size flags (`--filename`, `--output_filename`, `--output_width`,
       `--output_height`, `--overwrite`, `--limit_memory_usage_in_gb_to`) so benchmark scripts can swap between them
       without reshaping the command line.
+    - When `--output_tile_size` / `--output_tile_border` are supplied explicitly, both runners honor those shared
+      tiled-export settings; otherwise scene export keeps its built-in still-image tile defaults.
   - The `--trace` and `--auto_trace` subcommands use the `src/img/zneutube*` tracing stack.
   - The migrated trace CLI supports explicit tracing-selection arguments that bypass UI state:
     - `--channel <0-based>`

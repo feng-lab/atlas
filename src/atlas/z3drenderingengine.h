@@ -107,7 +107,9 @@ public:
   void takeFixedSizeScreenShot(const QString& filename,
                                int width,
                                int height,
-                               Z3DScreenShotType sst = Z3DScreenShotType::MonoView);
+                               Z3DScreenShotType sst = Z3DScreenShotType::MonoView,
+                               int tileSize = 0,
+                               int tileBorder = 0);
 
   void takeScreenShot(const QString& filename, Z3DScreenShotType sst);
 
@@ -411,7 +413,9 @@ private:
                                                             int height,
                                                             Z3DScreenShotType sst,
                                                             bool reportProgress = false,
-                                                            folly::CancellationToken cancellationToken = {});
+                                                            folly::CancellationToken cancellationToken = {},
+                                                            int tileSize = 0,
+                                                            int tileBorder = 0);
 
   void takeFixedSizeScreenShotWithoutResetCanvasSizeByTilePrivate(const QString& filename,
                                                                   const QString& rightFilename,
