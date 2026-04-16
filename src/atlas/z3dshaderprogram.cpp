@@ -5,7 +5,82 @@
 #include "z3dshadermanager.h"
 #include "zexception.h"
 
+#include <array>
+#include <string_view>
+
 namespace nim {
+
+namespace {
+
+struct FixedAttributeBinding
+{
+  std::string_view name;
+  GLuint location;
+};
+
+// OpenGL links each hook-specific shader program independently, while Atlas caches VAOs/VBOs
+// across normal/transparent hook variants. Reserve stable semantic slots so a depth-only hook
+// can safely skip using a color attribute without forcing the renderer to treat the binding as
+// invalid for VAO setup.
+constexpr std::array<FixedAttributeBinding, 11> kFixedAttributeBindings{{
+  {"attr_vertex", 0},
+  {"attr_origin", 0},
+  {"attr_p0", 0},
+  {"attr_T", 0},
+  {"attr_normal", 1},
+  {"attr_axis", 1},
+  {"attr_p1", 1},
+  {"attr_color", 4},
+  {"attr_1dTexCoord0", 4},
+  {"attr_2dTexCoord0", 4},
+  {"attr_3dTexCoord0", 4},
+}};
+
+constexpr std::array<FixedAttributeBinding, 4> kFixedAttributeBindings2{{
+  {"attr_flags", 5},
+  {"attr_specular_shininess", 6},
+  {"attr_color2", 6},
+  {"attr_p0color", 4},
+}};
+
+constexpr std::array<FixedAttributeBinding, 1> kFixedAttributeBindings3{{
+  {"attr_p1color", 6},
+}};
+
+std::optional<GLuint> fixedAttributeLocation(std::string_view name)
+{
+  for (const auto& binding : kFixedAttributeBindings) {
+    if (binding.name == name) {
+      return binding.location;
+    }
+  }
+  for (const auto& binding : kFixedAttributeBindings2) {
+    if (binding.name == name) {
+      return binding.location;
+    }
+  }
+  for (const auto& binding : kFixedAttributeBindings3) {
+    if (binding.name == name) {
+      return binding.location;
+    }
+  }
+  return std::nullopt;
+}
+
+void bindFixedAttributeLocations(GLuint programId)
+{
+  for (const auto& binding : kFixedAttributeBindings) {
+    glBindAttribLocation(programId, binding.location, binding.name.data());
+  }
+  for (const auto& binding : kFixedAttributeBindings2) {
+    glBindAttribLocation(programId, binding.location, binding.name.data());
+  }
+  for (const auto& binding : kFixedAttributeBindings3) {
+    glBindAttribLocation(programId, binding.location, binding.name.data());
+  }
+}
+
+} // namespace
 
 Z3DShaderProgram::Z3DShaderProgram()
 {
@@ -70,6 +145,7 @@ void Z3DShaderProgram::link()
       storeAttributeLocations();
     }
   }
+  bindFixedAttributeLocations(m_id);
   glLinkProgram(m_id);
   value = 0;
   glGetProgramiv(m_id, GL_LINK_STATUS, &value);
@@ -281,6 +357,9 @@ int Z3DShaderProgram::attributeLocation(const std::string& name) const
   if (it != m_attributes.end()) {
     return it->second.location;
   }
+  if (const auto fixedLocation = fixedAttributeLocation(name)) {
+    return static_cast<int>(*fixedLocation);
+  }
   if (logUniformLocationError()) {
     LOG(WARNING) << "Failed to locate attribute: " << name;
   }
@@ -455,6 +534,26 @@ void Z3DShaderProgram::storeAttributeLocations()
     glGetActiveAttrib(programId(), i, maxLength, nullptr, &u.size, &u.type, name.data());
     u.location = glGetAttribLocation(programId(), name.data());
     m_attributes.insert_or_assign(name.data(), u);
+  }
+
+  auto reserveFixedAttribute = [this](std::string_view name, GLuint location) {
+    const std::string key(name);
+    if (m_attributes.find(key) != m_attributes.end()) {
+      return;
+    }
+    Attribute attr{};
+    attr.location = static_cast<GLint>(location);
+    m_attributes.emplace(key, attr);
+  };
+
+  for (const auto& binding : kFixedAttributeBindings) {
+    reserveFixedAttribute(binding.name, binding.location);
+  }
+  for (const auto& binding : kFixedAttributeBindings2) {
+    reserveFixedAttribute(binding.name, binding.location);
+  }
+  for (const auto& binding : kFixedAttributeBindings3) {
+    reserveFixedAttribute(binding.name, binding.location);
   }
 
   std::map<std::string, Attribute>::const_iterator it;
