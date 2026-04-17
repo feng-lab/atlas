@@ -218,14 +218,20 @@ ZVulkanTexture::ZVulkanTexture(ZVulkanDevice& device, const CreateInfo& createIn
   , m_descriptorAspectMask(m_aspectMask)
   , m_currentLayout(createInfo.initialLayout)
 {
-  createImage();
-  allocateMemory();
-  createImageView();
-  createSampler();
-  if (m_arrayLayers > 1u) {
-    m_layerImageViews.resize(m_arrayLayers);
-    m_layerDepthViews.resize(m_arrayLayers);
-    m_layerStencilViews.resize(m_arrayLayers);
+  try {
+    createImage();
+    allocateMemory();
+    createImageView();
+    createSampler();
+    if (m_arrayLayers > 1u) {
+      m_layerImageViews.resize(m_arrayLayers);
+      m_layerDepthViews.resize(m_arrayLayers);
+      m_layerStencilViews.resize(m_arrayLayers);
+    }
+  }
+  catch (...) {
+    releaseDeviceResources();
+    throw;
   }
   VLOG(2) << "texture created: " << m_extent.width << "x" << m_extent.height << "x" << m_extent.depth
           << " layers=" << m_arrayLayers;
@@ -312,18 +318,54 @@ void ZVulkanTexture::recreateDeviceResources()
   // Reset tracked layout to the create-info initial layout (often UNDEFINED).
   m_currentLayout = m_createInfo.initialLayout;
 
-  createImage();
-  allocateMemory();
-  createImageView();
-  // Only create a sampler if we don't already have one.
-  if (!m_sampler) {
-    createSampler();
+  try {
+    createImage();
+    allocateMemory();
+    createImageView();
+    // Only create a sampler if we don't already have one.
+    if (!m_sampler) {
+      createSampler();
+    }
+    if (m_arrayLayers > 1u) {
+      m_layerImageViews.resize(m_arrayLayers);
+      m_layerDepthViews.resize(m_arrayLayers);
+      m_layerStencilViews.resize(m_arrayLayers);
+    }
   }
-  if (m_arrayLayers > 1u) {
-    m_layerImageViews.resize(m_arrayLayers);
-    m_layerDepthViews.resize(m_arrayLayers);
-    m_layerStencilViews.resize(m_arrayLayers);
+  catch (...) {
+    releaseDeviceResources();
+    throw;
   }
+}
+
+void ZVulkanTexture::resetNonResidentCreateInfo(const CreateInfo& createInfo)
+{
+  CHECK(!resident()) << "resetNonResidentCreateInfo called on a resident texture";
+  CHECK(m_imageAllocation == nullptr) << "resetNonResidentCreateInfo called with a live VMA allocation";
+
+  m_createInfo = createInfo;
+  m_extent = createInfo.extent;
+  m_format = createInfo.format;
+  m_mipLevels = std::max(1u, createInfo.mipLevels);
+  m_arrayLayers = std::max(1u, createInfo.arrayLayers);
+  m_usage = createInfo.usage;
+  m_memoryProperties = createInfo.memoryProperties;
+  m_aspectMask =
+    createInfo.aspectMask == vk::ImageAspectFlags{} ? defaultAspectMask(createInfo.format) : createInfo.aspectMask;
+  m_descriptorLayout = createInfo.descriptorLayout;
+  m_descriptorAspectMask = m_aspectMask;
+  m_currentLayout = createInfo.initialLayout;
+
+  m_layerImageViews.clear();
+  m_layerDepthViews.clear();
+  m_layerStencilViews.clear();
+  m_genericAspectViews.clear();
+  m_depthAspectView.reset();
+  m_stencilAspectView.reset();
+  m_imageView.reset();
+  // Sampler creation is controlled by CreateInfo, so a retargeted nonresident
+  // texture must rebuild it from the new contract.
+  m_sampler.reset();
 }
 
 void ZVulkanTexture::uploadData(const void* data, size_t size, vk::ImageLayout finalLayout)
@@ -1289,7 +1331,19 @@ void ZVulkanTexture::allocateMemory()
     }
   }
   if (res != vk::Result::eSuccess) {
-    throw ZException("Failed to create VMA image (with fallbacks)");
+    const auto budget = m_device.deviceLocalBudget();
+    throw ZException(fmt::format(
+      "Failed to create VMA image after fallbacks: result={} extent={}x{}x{} layers={} mips={} format={} approx_bytes={} device_usage={} device_budget={}",
+      enumOrUnderlying(res, 16),
+      m_extent.width,
+      m_extent.height,
+      m_extent.depth,
+      m_arrayLayers,
+      m_mipLevels,
+      enumOrUnderlying(m_format, 16),
+      static_cast<uint64_t>(approxSize),
+      budget.usageBytes,
+      budget.budgetBytes));
   }
 
   // Track each successful VkImage creation so downstream caches can detect when

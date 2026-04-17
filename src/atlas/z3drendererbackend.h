@@ -70,6 +70,9 @@ public:
   // engine to pump completion callbacks and to apply backpressure when frame
   // slots are exhausted. Immediate backends (e.g. OpenGL) keep defaults.
   virtual void pollCompletionsAndPumpSafePoints() {}
+  virtual void reclaimTransientResourcesForMemoryPressure(Z3DScratchResourcePool::VulkanScratchReclaimMode /*mode*/,
+                                                          std::string_view /*reason*/ = {})
+  {}
   [[nodiscard]] virtual bool hasInFlightFrames() const
   {
     return false;

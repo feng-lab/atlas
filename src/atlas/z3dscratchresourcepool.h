@@ -341,12 +341,36 @@ public:
     m_vulkanReleaseScheduler = std::move(scheduler);
   }
 
+  enum class VulkanScratchReclaimMode
+  {
+    PollCompleted,
+    WaitForIdle,
+  };
+
+  // Backend hook used by the scratch pool when it needs completed Vulkan
+  // submissions to reach their frame-completion safe point before deciding
+  // whether a new VkImage allocation is really necessary.
+  void setVulkanMemoryPressureHandler(std::function<void(VulkanScratchReclaimMode)> handler)
+  {
+    m_vulkanMemoryPressureHandler = std::move(handler);
+  }
+
+  // Reclaim Vulkan scratch cache. The non-blocking mode is used generally while
+  // rendering; WaitForIdle is intended for explicit memory-pressure boundaries
+  // such as export tile boundaries. Normal reclaim only pumps completion safe
+  // points so free slots become reusable; it does not trim. Only
+  // allocation-failure recovery may evict all free backing memory. Reclaim keeps
+  // scratch texture object identities alive so bindless descriptor indices can
+  // be reused when the slot is made resident again.
+  void reclaimVulkanScratchMemory(VulkanScratchReclaimMode mode);
+
   // Vulkan scratch slot (public because used in public method signature)
   struct VulkanScratchSlot
   {
     std::unique_ptr<ZVulkanScratchImage> image;
     ScratchImageDescriptor descriptor;
     bool inUse = false;
+    bool releasePending = false;
     uint64_t lastUseTick = 0;
   };
 
@@ -363,6 +387,7 @@ public:
   // Describe current memory usage for logging/diagnostics.
   // detailed=false: single-line total; detailed=true: breakdown per slot/category.
   [[nodiscard]] std::string describeMemoryUsage(bool detailed = false) const;
+  [[nodiscard]] std::string describeReuseStats(bool detailed = false) const;
   // Monotonic counters that increment when slot topology changes.
   // creationCounter(): slots created
   // changeCounter(): size/attachment/layers/format changed
@@ -374,8 +399,51 @@ public:
   {
     return m_changeCounter;
   }
+  [[nodiscard]] uint64_t reuseStatsCounter() const
+  {
+    return m_reuseStatsCounter;
+  }
 
 private:
+  enum class ScratchAcquireKind
+  {
+    ExactReuse,
+    CompatibleReuse,
+    RetargetReuse,
+    NewSlot
+  };
+
+  struct ScratchUsageLiveCounts
+  {
+    uint64_t slots = 0;
+    uint64_t inUseSlots = 0;
+    uint64_t textures = 0;
+    uint64_t inUseTextures = 0;
+    uint64_t residentSlots = 0;
+    uint64_t residentTextures = 0;
+  };
+
+  struct ScratchUsageReuseStats
+  {
+    uint64_t acquisitions = 0;
+    uint64_t exactReuses = 0;
+    uint64_t compatibleReuses = 0;
+    uint64_t retargetReuses = 0;
+    uint64_t newSlots = 0;
+    uint64_t residentRecreates = 0;
+    uint64_t allocationRecoveries = 0;
+    uint64_t budgetTrimEvents = 0;
+    uint64_t budgetTrimSlots = 0;
+    uint64_t evictAllEvents = 0;
+    uint64_t evictAllSlots = 0;
+    uint64_t peakSlots = 0;
+    uint64_t peakTextures = 0;
+    uint64_t peakInUseSlots = 0;
+    uint64_t peakInUseTextures = 0;
+    uint64_t peakResidentSlots = 0;
+    uint64_t peakResidentTextures = 0;
+  };
+
   struct BlockIdRenderTargetSlot
   {
     std::unique_ptr<Z3DRenderTarget> fbo;
@@ -395,6 +463,7 @@ private:
   uint64_t m_usageTick = 0;
   uint64_t m_creationCounter = 0;
   uint64_t m_changeCounter = 0;
+  uint64_t m_reuseStatsCounter = 0;
 
   // Entry/exit RenderTarget slots
   struct EntryExitRenderTargetSlot
@@ -481,6 +550,8 @@ private:
   };
 
   mutable std::array<DescriptionCacheEntry, 2> m_descriptionCache{};
+  std::array<ScratchUsageReuseStats, kScratchUsageCount> m_glReuseStats{};
+  std::array<ScratchUsageReuseStats, kScratchUsageCount> m_vulkanReuseStats{};
 
   struct VulkanEnvironment
   {
@@ -496,17 +567,31 @@ private:
   RenderBackend m_defaultBackend = RenderBackend::OpenGL;
   ZVulkanDevice* m_externalVkDevice = nullptr; // non-owning
   std::function<void(std::function<void()>)> m_vulkanReleaseScheduler; // installed by backend per-frame
+  std::function<void(VulkanScratchReclaimMode)> m_vulkanMemoryPressureHandler;
 
   static constexpr uint32_t kTrimAcquireInterval = 512;
   static constexpr uint64_t kTrimAgeTicks = 1024;
 
   void maybeTrimAfterAcquire();
   size_t performTrim(uint64_t ageThreshold, bool logSummary);
+  void pumpVulkanScratchReleases(VulkanScratchReclaimMode mode);
+  size_t evictAllFreeVulkanSlots(const VulkanScratchSlot* protectedSlot, bool logSummary);
+  void recordScratchAcquire(RenderBackend backend,
+                            const ScratchImageDescriptor& descriptor,
+                            ScratchAcquireKind kind,
+                            bool residentRecreated);
+  void recordVulkanAllocationRecovery(ScratchImageUsage usage);
+  void recordVulkanBudgetTrim(ScratchImageUsage usage, uint64_t slots);
+  void recordVulkanEvictAll(ScratchImageUsage usage, uint64_t slots);
+  [[nodiscard]] ScratchUsageLiveCounts scratchLiveCounts(RenderBackend backend, ScratchImageUsage usage) const;
 
   template<typename Slot>
   void markSlotAcquired(Slot& slot)
   {
     slot.inUse = true;
+    if constexpr (requires { slot.releasePending; }) {
+      slot.releasePending = false;
+    }
     slot.lastUseTick = ++m_usageTick;
   }
 };

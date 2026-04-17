@@ -1531,12 +1531,18 @@ double Z3DCompositor::processGL(Z3DEye eye)
     const auto& pool = Z3DRenderGlobalState::instance().scratchPool();
     static uint64_t s_lastCreate = 0;
     static uint64_t s_lastChange = 0;
+    static uint64_t s_lastReuse = 0;
     const uint64_t curCreate = pool.creationCounter();
     const uint64_t curChange = pool.changeCounter();
+    const uint64_t curReuse = pool.reuseStatsCounter();
     if (curCreate != s_lastCreate || curChange != s_lastChange) {
       VLOG(1) << pool.describeMemoryUsage(true);
       s_lastCreate = curCreate;
       s_lastChange = curChange;
+    }
+    if (curReuse != s_lastReuse) {
+      VLOG(1) << pool.describeReuseStats(true);
+      s_lastReuse = curReuse;
     }
     Q_EMIT renderingFinished();
 
@@ -3070,13 +3076,18 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
       }
 
       if (eyeCopy == MonoEye) {
-        static uint64_t s_lastCreate = 0, s_lastChange = 0;
+        static uint64_t s_lastCreate = 0, s_lastChange = 0, s_lastReuse = 0;
         const uint64_t curCreate = scratchPool->creationCounter();
         const uint64_t curChange = scratchPool->changeCounter();
+        const uint64_t curReuse = scratchPool->reuseStatsCounter();
         if (curCreate != s_lastCreate || curChange != s_lastChange) {
           VLOG(1) << scratchPool->describeMemoryUsage(true);
           s_lastCreate = curCreate;
           s_lastChange = curChange;
+        }
+        if (curReuse != s_lastReuse) {
+          VLOG(1) << scratchPool->describeReuseStats(true);
+          s_lastReuse = curReuse;
         }
         CHECK(finishedLabel != nullptr) << "VK mono publish expected a finished label";
         VLOG(1) << fmt::format("VK renderingFinished {} readyBuffer={}", finishedLabel, (void*)readyBufferForLog);
@@ -3581,6 +3592,10 @@ void Z3DCompositor::ensureOutputTargets(const glm::uvec2& size)
 
     if (missingResource || backendMismatch || sizeMismatch) {
       lease.release();
+      if (activeBackend == RenderBackend::Vulkan) {
+        Z3DRenderGlobalState::instance().scratchPool().reclaimVulkanScratchMemory(
+          Z3DScratchResourcePool::VulkanScratchReclaimMode::WaitForIdle);
+      }
       m_rendererBase.acquirePersistentTempRenderTarget2D(lease, size);
       LOG(INFO) << fmt::format("ensureOutputTargets reacquired {}x{} backend={} hasVulkanImage={} hasGLTarget={}",
                                size.x,
@@ -4461,6 +4476,8 @@ void Z3DCompositor::ensurePickingTargetVulkan(const glm::uvec2& size)
                            m_pickingTargetLease.backend != RenderBackend::Vulkan;
   if (needAcquire) {
     m_pickingTargetLease.release();
+    Z3DRenderGlobalState::instance().scratchPool().reclaimVulkanScratchMemory(
+      Z3DScratchResourcePool::VulkanScratchReclaimMode::WaitForIdle);
     m_rendererBase.acquirePersistentTempRenderTarget2D(m_pickingTargetLease,
                                                        size,
                                                        ScratchFormat::RGBA8,
@@ -4483,6 +4500,10 @@ Z3DScratchResourcePool::RenderTargetLease& Z3DCompositor::ensureDDPRenderTarget(
                                  : (!m_ddpRTLease.renderTarget || m_ddpRTLease.renderTarget->size() != size));
   if (needAcquire) {
     m_ddpRTLease.release();
+    if (wantVulkan) {
+      Z3DRenderGlobalState::instance().scratchPool().reclaimVulkanScratchMemory(
+        Z3DScratchResourcePool::VulkanScratchReclaimMode::WaitForIdle);
+    }
     m_rendererBase.acquirePersistentDualDepthPeelRenderTarget(m_ddpRTLease, size);
   }
   CHECK(m_ddpRTLease);
@@ -4503,6 +4524,10 @@ Z3DScratchResourcePool::RenderTargetLease& Z3DCompositor::ensureWARenderTarget(c
                                 : (!m_waRTLease.renderTarget || m_waRTLease.renderTarget->size() != size));
   if (needAcquire) {
     m_waRTLease.release();
+    if (wantVulkan) {
+      Z3DRenderGlobalState::instance().scratchPool().reclaimVulkanScratchMemory(
+        Z3DScratchResourcePool::VulkanScratchReclaimMode::WaitForIdle);
+    }
     m_rendererBase.acquirePersistentWeightedAverageRenderTarget(m_waRTLease, size);
   }
   CHECK(m_waRTLease);
@@ -4523,6 +4548,10 @@ Z3DScratchResourcePool::RenderTargetLease& Z3DCompositor::ensureWBRenderTarget(c
                                 : (!m_wbRTLease.renderTarget || m_wbRTLease.renderTarget->size() != size));
   if (needAcquire) {
     m_wbRTLease.release();
+    if (wantVulkan) {
+      Z3DRenderGlobalState::instance().scratchPool().reclaimVulkanScratchMemory(
+        Z3DScratchResourcePool::VulkanScratchReclaimMode::WaitForIdle);
+    }
     m_rendererBase.acquirePersistentWeightedBlendedRenderTarget(m_wbRTLease, size);
   }
   CHECK(m_wbRTLease);

@@ -2375,6 +2375,14 @@ void Z3DRenderingEngine::takeFixedSizeScreenShotWithoutResetCanvasSizePrivate(
         if (reportProgress) {
           Q_EMIT progressChanged(20 + (completedTiles * 70) / std::max(1, totalTiles));
         }
+
+        if (backend == RenderBackend::Vulkan) {
+          // Tiled export varies scratch sizes between full and edge tiles. Once
+          // tile pixels are copied to CPU memory, drain completed Vulkan leases
+          // so old edge/full-size scratch slots can be reused across tiles.
+          Z3DRenderGlobalState::instance().scratchPool().reclaimVulkanScratchMemory(
+            Z3DScratchResourcePool::VulkanScratchReclaimMode::WaitForIdle);
+        }
       }
     }
 
@@ -2502,6 +2510,17 @@ void Z3DRenderingEngine::takeFixedSizeScreenShotWithoutResetCanvasSizeByTilePriv
       tileBorder,
       rightFilename);
   }
+
+  const auto backend = static_cast<RenderBackend>(m_globalParas->renderBackend.associatedData());
+  if (backend == RenderBackend::Vulkan) {
+    // This helper is used by animation export's per-tile path, where each call
+    // writes one tile to disk. Release fence-completed Vulkan scratch now so a
+    // long tiled sequence can reuse free scratch slots without destroying
+    // bindless identities.
+    Z3DRenderGlobalState::instance().scratchPool().reclaimVulkanScratchMemory(
+      Z3DScratchResourcePool::VulkanScratchReclaimMode::WaitForIdle);
+  }
+
   if (startedDeferredErrorFrame) {
     reportDeferredRenderingErrorsIfAny();
   }
@@ -2741,6 +2760,7 @@ void Z3DRenderingEngine::applyBackendSwitch()
   // during the switch.
   if (m_scratchPool) {
     m_scratchPool->setVulkanReleaseScheduler(std::function<void(std::function<void()>)>());
+    m_scratchPool->setVulkanMemoryPressureHandler({});
   }
 
   // Switch renderer backends for compositor + connected filters (this will idle Vulkan via preBackendSwitch)

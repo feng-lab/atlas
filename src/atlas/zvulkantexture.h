@@ -162,6 +162,12 @@ public:
   // image contents (upload/clear) as needed.
   void recreateDeviceResources();
 
+  // Change the create-info used by later recreateDeviceResources() calls while
+  // preserving this ZVulkanTexture object's identity. The texture must already
+  // be non-resident so callers can batch metadata changes across related images
+  // before allocating any new backing VkImage memory.
+  void resetNonResidentCreateInfo(const CreateInfo& createInfo);
+
   vk::DescriptorImageInfo descriptorInfo() const;
   vk::DescriptorImageInfo descriptorInfo(vk::ImageLayout layoutOverride, vk::ImageAspectFlags aspectOverride) const;
   void setDescriptorLayout(vk::ImageLayout layout);

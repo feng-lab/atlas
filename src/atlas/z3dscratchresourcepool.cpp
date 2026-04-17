@@ -3,6 +3,7 @@
 #include "z3dgl.h"
 #include "z3drendertarget.h"
 #include "z3dtexture.h"
+#include "zexception.h"
 #include "zlog.h"
 #include "zvulkandevice.h"
 #include "zvulkanframeexecutor.h"
@@ -335,6 +336,29 @@ uint32_t colorAttachmentCount(const ScratchImageDescriptor& descriptor)
   return count;
 }
 
+bool attachmentsCompatibleForReuse(ScratchImageUsage usage,
+                                   const ScratchImageDescriptor& candidate,
+                                   const ScratchImageDescriptor& requested)
+{
+  if (candidate.dimension != requested.dimension) {
+    return false;
+  }
+
+  if (usage != ScratchImageUsage::BlockId) {
+    return candidate.attachments == requested.attachments;
+  }
+
+  if (candidate.attachments.size() < requested.attachments.size()) {
+    return false;
+  }
+  for (size_t i = 0; i < requested.attachments.size(); ++i) {
+    if (candidate.attachments[i] != requested.attachments[i]) {
+      return false;
+    }
+  }
+  return true;
+}
+
 void attachTexturesForDescriptor(Z3DRenderTarget& fbo, const ScratchImageDescriptor& descriptor)
 {
   const auto extent = textureExtentFor(descriptor);
@@ -428,6 +452,8 @@ DEFINE_double(atlas_blockid_rt_scale, 1.0, "Scale factor for block-id FBO size (
 
 namespace nim {
 
+static inline uint64_t bytesPerPixelForScratchFormat(ScratchFormat fmt);
+
 class ZVulkanScratchImage
 {
 public:
@@ -443,14 +469,75 @@ public:
     return m_descriptor;
   }
 
+  bool resident() const
+  {
+    bool sawAttachment = false;
+    for (const auto& attachment : m_descriptor.attachments) {
+      const auto* texture = attachmentTexture(attachment);
+      sawAttachment = true;
+      if (!texture->resident()) {
+        return false;
+      }
+    }
+    return sawAttachment;
+  }
+
+  uint64_t estimatedResidentBytes() const
+  {
+    const uint64_t pixels =
+      static_cast<uint64_t>(m_descriptor.size.x) * m_descriptor.size.y * std::max<uint32_t>(1u, m_descriptor.layers);
+    uint64_t bytes = 0;
+    for (const auto& attachment : m_descriptor.attachments) {
+      const auto* texture = attachmentTexture(attachment);
+      if (texture->resident()) {
+        bytes += pixels * bytesPerPixelForScratchFormat(attachment.format);
+      }
+    }
+    return bytes;
+  }
+
+  void releaseDeviceResources()
+  {
+    for (const auto& attachment : m_descriptor.attachments) {
+      attachmentTexture(attachment)->releaseDeviceResources();
+    }
+  }
+
+  void recreateDeviceResources()
+  {
+    try {
+      for (const auto& attachment : m_descriptor.attachments) {
+        auto* texture = attachmentTexture(attachment);
+        if (!texture->resident()) {
+          texture->recreateDeviceResources();
+        }
+      }
+    }
+    catch (...) {
+      releaseDeviceResources();
+      throw;
+    }
+  }
+
   void retarget(const ScratchImageDescriptor& descriptor)
   {
     if (m_descriptor.dimension == descriptor.dimension && m_descriptor.size == descriptor.size &&
         m_descriptor.layers == descriptor.layers && m_descriptor.attachments == descriptor.attachments) {
       return;
     }
+    if (m_descriptor.dimension == descriptor.dimension && m_descriptor.attachments == descriptor.attachments) {
+      releaseDeviceResources();
+      for (const auto& attachment : descriptor.attachments) {
+        attachmentTexture(attachment)->resetNonResidentCreateInfo(makeVulkanTextureInfo(descriptor, attachment));
+      }
+      m_descriptor = descriptor;
+      recreateDeviceResources();
+      return;
+    }
+    auto storage = createAttachmentsForDescriptor(descriptor);
     m_descriptor = descriptor;
-    createAttachments();
+    m_colorAttachments = std::move(storage.colorAttachments);
+    m_depthAttachment = std::move(storage.depthAttachment);
   }
 
   ZVulkanTexture* colorAttachment(uint32_t index) const
@@ -467,23 +554,52 @@ public:
   }
 
 private:
-  void createAttachments()
+  struct AttachmentStorage
   {
-    m_colorAttachments.clear();
-    m_depthAttachment.reset();
+    std::vector<std::unique_ptr<ZVulkanTexture>> colorAttachments;
+    std::unique_ptr<ZVulkanTexture> depthAttachment;
+  };
 
-    for (const auto& attachment : m_descriptor.attachments) {
-      auto info = makeVulkanTextureInfo(m_descriptor, attachment);
+  AttachmentStorage createAttachmentsForDescriptor(const ScratchImageDescriptor& descriptor)
+  {
+    AttachmentStorage storage;
+    for (const auto& attachment : descriptor.attachments) {
+      auto info = makeVulkanTextureInfo(descriptor, attachment);
       auto texture = m_device.createTexture(info);
       if (attachment.kind == ScratchAttachmentKind::Color) {
-        if (m_colorAttachments.size() <= attachment.index) {
-          m_colorAttachments.resize(attachment.index + 1);
+        if (storage.colorAttachments.size() <= attachment.index) {
+          storage.colorAttachments.resize(attachment.index + 1);
         }
-        m_colorAttachments[attachment.index] = std::move(texture);
+        storage.colorAttachments[attachment.index] = std::move(texture);
       } else {
-        m_depthAttachment = std::move(texture);
+        storage.depthAttachment = std::move(texture);
       }
     }
+    return storage;
+  }
+
+  void createAttachments()
+  {
+    auto storage = createAttachmentsForDescriptor(m_descriptor);
+    m_colorAttachments = std::move(storage.colorAttachments);
+    m_depthAttachment = std::move(storage.depthAttachment);
+  }
+
+  ZVulkanTexture* attachmentTexture(const ScratchAttachmentDesc& attachment)
+  {
+    return const_cast<ZVulkanTexture*>(std::as_const(*this).attachmentTexture(attachment));
+  }
+
+  const ZVulkanTexture* attachmentTexture(const ScratchAttachmentDesc& attachment) const
+  {
+    if (attachment.kind == ScratchAttachmentKind::Color) {
+      CHECK_LT(attachment.index, m_colorAttachments.size()) << "Vulkan scratch color attachment missing";
+      const auto& texture = m_colorAttachments[attachment.index];
+      CHECK(texture != nullptr) << "Vulkan scratch color attachment is null";
+      return texture.get();
+    }
+    CHECK(m_depthAttachment != nullptr) << "Vulkan scratch depth attachment is null";
+    return m_depthAttachment.get();
   }
 
   ZVulkanDevice& m_device;
@@ -555,6 +671,62 @@ static inline uint64_t bytesPerPixelForScratchFormat(ScratchFormat fmt)
       return 4u; // 32-bit float depth
   }
   return 0u;
+}
+
+static const char* scratchUsageLabel(ScratchImageUsage usage)
+{
+  switch (usage) {
+    case ScratchImageUsage::BlockId:
+      return "BlockID";
+    case ScratchImageUsage::EntryExit:
+      return "EntryExit";
+    case ScratchImageUsage::LayerArray:
+      return "LayerArray";
+    case ScratchImageUsage::RaycastAccumulator:
+      return "RaycastAccum";
+    case ScratchImageUsage::Temp2D:
+      return "Temp2D";
+    case ScratchImageUsage::DualDepthPeel:
+      return "DualDepthPeel";
+    case ScratchImageUsage::WeightedAverage:
+      return "WeightedAvg";
+    case ScratchImageUsage::WeightedBlended:
+      return "WeightedBlend";
+  }
+  return "Unknown";
+}
+
+static uint64_t estimatedBytesForDescriptor(const ScratchImageDescriptor& descriptor)
+{
+  const uint64_t pixels =
+    static_cast<uint64_t>(descriptor.size.x) * descriptor.size.y * std::max<uint32_t>(1u, descriptor.layers);
+  uint64_t bytes = 0;
+  for (const auto& attachment : descriptor.attachments) {
+    bytes += pixels * bytesPerPixelForScratchFormat(attachment.format);
+  }
+  return bytes;
+}
+
+static std::string describeScratchDescriptor(const ScratchImageDescriptor& descriptor)
+{
+  std::string attachments;
+  for (const auto& attachment : descriptor.attachments) {
+    if (!attachments.empty()) {
+      attachments += ", ";
+    }
+    attachments +=
+      fmt::format("{}{}={}",
+                  attachment.kind == ScratchAttachmentKind::Color ? "c" : "depth",
+                  attachment.kind == ScratchAttachmentKind::Color ? std::to_string(attachment.index) : std::string{},
+                  scratchFormatLabel(attachment.format));
+  }
+  return fmt::format("usage={} size={}x{} layers={} attachments=[{}] estimated_bytes={}",
+                     scratchUsageLabel(descriptor.usage),
+                     descriptor.size.x,
+                     descriptor.size.y,
+                     descriptor.layers,
+                     attachments,
+                     estimatedBytesForDescriptor(descriptor));
 }
 
 std::string Z3DScratchResourcePool::describeMemoryUsage(bool detailed) const
@@ -820,28 +992,6 @@ std::string Z3DScratchResourcePool::describeMemoryUsage(bool detailed) const
     }
   };
 
-  auto usageName = [](ScratchImageUsage usage) -> const char* {
-    switch (usage) {
-      case ScratchImageUsage::BlockId:
-        return "BlockID";
-      case ScratchImageUsage::EntryExit:
-        return "EntryExit";
-      case ScratchImageUsage::LayerArray:
-        return "LayerArray";
-      case ScratchImageUsage::RaycastAccumulator:
-        return "RaycastAccum";
-      case ScratchImageUsage::Temp2D:
-        return "Temp2D";
-      case ScratchImageUsage::DualDepthPeel:
-        return "DualDepthPeel";
-      case ScratchImageUsage::WeightedAverage:
-        return "WeightedAvg";
-      case ScratchImageUsage::WeightedBlended:
-        return "WeightedBlend";
-    }
-    return "Unknown";
-  };
-
   auto accumulateVulkan = [&](ScratchImageUsage usage) -> uint64_t {
     const auto index = static_cast<size_t>(usage);
     uint64_t bytes = 0;
@@ -852,20 +1002,17 @@ std::string Z3DScratchResourcePool::describeMemoryUsage(bool detailed) const
     for (size_t i = 0; i < slots.size(); ++i) {
       const auto& slot = *slots[i];
       const auto& desc = slot.descriptor;
-      const uint64_t pixels = static_cast<uint64_t>(desc.size.x) * desc.size.y * std::max<uint32_t>(1u, desc.layers);
-      uint64_t slotBytes = 0;
+      const uint64_t slotBytes = slot.image ? slot.image->estimatedResidentBytes() : 0;
       std::string attachmentFormats;
       if (detailed) {
         attachmentFormats.reserve(64);
       }
       for (const auto& att : desc.attachments) {
-        const uint64_t bpp = bytesPerPixelForScratchFormat(att.format);
-        slotBytes += pixels * bpp;
         if (detailed) {
           if (!attachmentFormats.empty()) {
             attachmentFormats += ", ";
           }
-          // Reuse scratchFormatLabel for readability even in Vulkan mode
+          // Reuse scratchFormatLabel for readability even in Vulkan mode.
           attachmentFormats +=
             fmt::format("{}={}",
                         (att.kind == ScratchAttachmentKind::Color) ? "c" + std::to_string(att.index) : "depth",
@@ -874,15 +1021,17 @@ std::string Z3DScratchResourcePool::describeMemoryUsage(bool detailed) const
       }
       bytes += slotBytes;
       if (detailed) {
-        appendDetail(fmt::format("[Vulkan/{}] slot={} size={}x{} layers={} inUse={} bytes={} attachments=[{}]",
-                                 usageName(usage),
-                                 i,
-                                 desc.size.x,
-                                 desc.size.y,
-                                 desc.layers,
-                                 slot.inUse ? 1 : 0,
-                                 slotBytes,
-                                 attachmentFormats));
+        appendDetail(
+          fmt::format("[Vulkan/{}] slot={} size={}x{} layers={} inUse={} resident={} bytes={} attachments=[{}]",
+                      scratchUsageLabel(usage),
+                      i,
+                      desc.size.x,
+                      desc.size.y,
+                      desc.layers,
+                      slot.inUse ? 1 : 0,
+                      (slot.image && slot.image->resident()) ? 1 : 0,
+                      slotBytes,
+                      attachmentFormats));
       }
     }
     return bytes;
@@ -949,6 +1098,232 @@ std::string Z3DScratchResourcePool::describeMemoryUsage(bool detailed) const
   cache.text = std::move(result);
 
   return cache.text;
+}
+
+Z3DScratchResourcePool::ScratchUsageLiveCounts Z3DScratchResourcePool::scratchLiveCounts(RenderBackend backend,
+                                                                                         ScratchImageUsage usage) const
+{
+  auto countGlSlots = [](const auto& slots) {
+    ScratchUsageLiveCounts counts;
+    for (const auto& slotPtr : slots) {
+      const auto& slot = *slotPtr;
+      const uint64_t textures = slot.descriptor.attachments.size();
+      counts.slots++;
+      counts.textures += textures;
+      counts.residentSlots++;
+      counts.residentTextures += textures;
+      if (slot.inUse) {
+        counts.inUseSlots++;
+        counts.inUseTextures += textures;
+      }
+    }
+    return counts;
+  };
+
+  if (backend == RenderBackend::OpenGL) {
+    switch (usage) {
+      case ScratchImageUsage::BlockId:
+        return countGlSlots(m_blockIdRenderTargetSlots);
+      case ScratchImageUsage::EntryExit:
+        return countGlSlots(m_entryExitRenderTargetSlots);
+      case ScratchImageUsage::LayerArray:
+        return countGlSlots(m_layerArrayRenderTargetSlots);
+      case ScratchImageUsage::RaycastAccumulator:
+        return countGlSlots(m_raycastAccumulatorSlots);
+      case ScratchImageUsage::Temp2D:
+        return countGlSlots(m_temp2DRenderTargetSlots);
+      case ScratchImageUsage::DualDepthPeel:
+        return countGlSlots(m_dualDepthPeelSlots);
+      case ScratchImageUsage::WeightedAverage:
+        return countGlSlots(m_weightedAverageSlots);
+      case ScratchImageUsage::WeightedBlended:
+        return countGlSlots(m_weightedBlendedSlots);
+    }
+  }
+
+  ScratchUsageLiveCounts counts;
+  const auto index = static_cast<size_t>(usage);
+  CHECK_LT(index, m_vulkanSlots.size()) << "Invalid Vulkan scratch usage index";
+  for (const auto& slotPtr : m_vulkanSlots[index]) {
+    const auto& slot = *slotPtr;
+    const uint64_t textures = slot.descriptor.attachments.size();
+    const bool resident = slot.image && slot.image->resident();
+    counts.slots++;
+    counts.textures += textures;
+    if (resident) {
+      counts.residentSlots++;
+      counts.residentTextures += textures;
+    }
+    if (slot.inUse) {
+      counts.inUseSlots++;
+      counts.inUseTextures += textures;
+    }
+  }
+  return counts;
+}
+
+void Z3DScratchResourcePool::recordScratchAcquire(RenderBackend backend,
+                                                  const ScratchImageDescriptor& descriptor,
+                                                  ScratchAcquireKind kind,
+                                                  bool residentRecreated)
+{
+  const auto index = static_cast<size_t>(descriptor.usage);
+  CHECK_LT(index, m_glReuseStats.size()) << "Invalid scratch usage index";
+  auto& stats = (backend == RenderBackend::Vulkan) ? m_vulkanReuseStats[index] : m_glReuseStats[index];
+
+  stats.acquisitions++;
+  switch (kind) {
+    case ScratchAcquireKind::ExactReuse:
+      stats.exactReuses++;
+      break;
+    case ScratchAcquireKind::CompatibleReuse:
+      stats.compatibleReuses++;
+      break;
+    case ScratchAcquireKind::RetargetReuse:
+      stats.retargetReuses++;
+      break;
+    case ScratchAcquireKind::NewSlot:
+      stats.newSlots++;
+      break;
+  }
+  if (residentRecreated) {
+    stats.residentRecreates++;
+  }
+
+  const auto counts = scratchLiveCounts(backend, descriptor.usage);
+  stats.peakSlots = std::max(stats.peakSlots, counts.slots);
+  stats.peakTextures = std::max(stats.peakTextures, counts.textures);
+  stats.peakInUseSlots = std::max(stats.peakInUseSlots, counts.inUseSlots);
+  stats.peakInUseTextures = std::max(stats.peakInUseTextures, counts.inUseTextures);
+  stats.peakResidentSlots = std::max(stats.peakResidentSlots, counts.residentSlots);
+  stats.peakResidentTextures = std::max(stats.peakResidentTextures, counts.residentTextures);
+  ++m_reuseStatsCounter;
+}
+
+void Z3DScratchResourcePool::recordVulkanAllocationRecovery(ScratchImageUsage usage)
+{
+  const auto index = static_cast<size_t>(usage);
+  CHECK_LT(index, m_vulkanReuseStats.size()) << "Invalid Vulkan scratch usage index";
+  m_vulkanReuseStats[index].allocationRecoveries++;
+  ++m_reuseStatsCounter;
+}
+
+void Z3DScratchResourcePool::recordVulkanBudgetTrim(ScratchImageUsage usage, uint64_t slots)
+{
+  const auto index = static_cast<size_t>(usage);
+  CHECK_LT(index, m_vulkanReuseStats.size()) << "Invalid Vulkan scratch usage index";
+  auto& stats = m_vulkanReuseStats[index];
+  stats.budgetTrimEvents++;
+  stats.budgetTrimSlots += slots;
+  ++m_reuseStatsCounter;
+}
+
+void Z3DScratchResourcePool::recordVulkanEvictAll(ScratchImageUsage usage, uint64_t slots)
+{
+  const auto index = static_cast<size_t>(usage);
+  CHECK_LT(index, m_vulkanReuseStats.size()) << "Invalid Vulkan scratch usage index";
+  auto& stats = m_vulkanReuseStats[index];
+  stats.evictAllEvents++;
+  stats.evictAllSlots += slots;
+  ++m_reuseStatsCounter;
+}
+
+std::string Z3DScratchResourcePool::describeReuseStats(bool detailed) const
+{
+  auto appendBackendSummary = [&](RenderBackend backend, const char* label, std::string& out) {
+    const auto& allStats = (backend == RenderBackend::Vulkan) ? m_vulkanReuseStats : m_glReuseStats;
+    ScratchUsageReuseStats total;
+    for (const auto& stats : allStats) {
+      total.acquisitions += stats.acquisitions;
+      total.exactReuses += stats.exactReuses;
+      total.compatibleReuses += stats.compatibleReuses;
+      total.retargetReuses += stats.retargetReuses;
+      total.newSlots += stats.newSlots;
+      total.residentRecreates += stats.residentRecreates;
+      total.allocationRecoveries += stats.allocationRecoveries;
+      total.budgetTrimEvents += stats.budgetTrimEvents;
+      total.budgetTrimSlots += stats.budgetTrimSlots;
+      total.evictAllEvents += stats.evictAllEvents;
+      total.evictAllSlots += stats.evictAllSlots;
+      total.peakSlots += stats.peakSlots;
+      total.peakTextures += stats.peakTextures;
+      total.peakInUseSlots += stats.peakInUseSlots;
+      total.peakInUseTextures += stats.peakInUseTextures;
+      total.peakResidentSlots += stats.peakResidentSlots;
+      total.peakResidentTextures += stats.peakResidentTextures;
+    }
+    if (!out.empty()) {
+      out += " | ";
+    }
+    out += fmt::format(
+      "{} acq={} new={} exact={} compat={} retarget={} re_resident={} recover={} trim_events={} trim_slots={} evict_all_events={} evict_all_slots={} peak_in_use_slots={} peak_in_use_tex={} peak_slots={} peak_tex={} peak_resident_slots={} peak_resident_tex={}",
+      label,
+      total.acquisitions,
+      total.newSlots,
+      total.exactReuses,
+      total.compatibleReuses,
+      total.retargetReuses,
+      total.residentRecreates,
+      total.allocationRecoveries,
+      total.budgetTrimEvents,
+      total.budgetTrimSlots,
+      total.evictAllEvents,
+      total.evictAllSlots,
+      total.peakInUseSlots,
+      total.peakInUseTextures,
+      total.peakSlots,
+      total.peakTextures,
+      total.peakResidentSlots,
+      total.peakResidentTextures);
+  };
+
+  std::string summary;
+  appendBackendSummary(RenderBackend::OpenGL, "GL", summary);
+  appendBackendSummary(RenderBackend::Vulkan, "Vulkan", summary);
+
+  std::string result = "ScratchPool reuse stats: " + summary;
+
+  if (!detailed) {
+    return result;
+  }
+
+  auto appendDetail = [&](RenderBackend backend, const char* backendLabel) {
+    const auto& allStats = (backend == RenderBackend::Vulkan) ? m_vulkanReuseStats : m_glReuseStats;
+    for (size_t i = 0; i < allStats.size(); ++i) {
+      const auto& stats = allStats[i];
+      if (stats.acquisitions == 0 && stats.peakSlots == 0 && stats.allocationRecoveries == 0 &&
+          stats.budgetTrimEvents == 0 && stats.evictAllEvents == 0) {
+        continue;
+      }
+      const auto usage = static_cast<ScratchImageUsage>(i);
+      result += '\n';
+      result += fmt::format(
+        "[{}/{}] acq={} new={} exact={} compat={} retarget={} re_resident={} recover={} trim_events={} trim_slots={} evict_all_events={} evict_all_slots={} peak_in_use_slots={} peak_in_use_tex={} peak_slots={} peak_tex={} peak_resident_slots={} peak_resident_tex={}",
+        backendLabel,
+        scratchUsageLabel(usage),
+        stats.acquisitions,
+        stats.newSlots,
+        stats.exactReuses,
+        stats.compatibleReuses,
+        stats.retargetReuses,
+        stats.residentRecreates,
+        stats.allocationRecoveries,
+        stats.budgetTrimEvents,
+        stats.budgetTrimSlots,
+        stats.evictAllEvents,
+        stats.evictAllSlots,
+        stats.peakInUseSlots,
+        stats.peakInUseTextures,
+        stats.peakSlots,
+        stats.peakTextures,
+        stats.peakResidentSlots,
+        stats.peakResidentTextures);
+    }
+  };
+
+  appendDetail(RenderBackend::OpenGL, "GL");
+  appendDetail(RenderBackend::Vulkan, "Vulkan");
+  return result;
 }
 
 Z3DScratchResourcePool::BlockIdRenderTargetSlot* Z3DScratchResourcePool::acquireFreeBlockIdSlot(const glm::uvec2& size,
@@ -1022,8 +1397,12 @@ Z3DScratchResourcePool::acquireBlockIdRenderTarget(const glm::uvec2& viewport,
     return acquireVulkanScratchImage(descriptor);
   }
 
+  const uint64_t createBefore = m_creationCounter;
   BlockIdRenderTargetSlot* slot = acquireFreeBlockIdSlot(size, requestedAttachmentCount);
   CHECK(slot != nullptr) << "Failed to acquire Block ID slot";
+  const bool createdSlot = (m_creationCounter != createBefore);
+  const bool needsResize = slot->fbo->size() != size;
+  const bool needsAttachmentGrow = slot->attachments < requestedAttachmentCount;
   growSlotIfNeeded(*slot, descriptor);
 
   markSlotAcquired(*slot);
@@ -1034,6 +1413,11 @@ Z3DScratchResourcePool::acquireBlockIdRenderTarget(const glm::uvec2& viewport,
   }
   auto lease = makeLeaseFromSlot(slot, usableAttachments, RenderBackend::OpenGL);
   lease.descriptor = std::move(leaseDescriptor);
+  const ScratchAcquireKind acquireKind =
+    createdSlot
+      ? ScratchAcquireKind::NewSlot
+      : ((needsResize || needsAttachmentGrow) ? ScratchAcquireKind::RetargetReuse : ScratchAcquireKind::ExactReuse);
+  recordScratchAcquire(RenderBackend::OpenGL, lease.descriptor, acquireKind, false);
   maybeTrimAfterAcquire();
   return lease;
 }
@@ -1098,14 +1482,21 @@ size_t Z3DScratchResourcePool::performTrim(uint64_t ageThreshold, bool logSummar
 
   for (size_t usageIndex = 0; usageIndex < m_vulkanSlots.size(); ++usageIndex) {
     auto& slots = m_vulkanSlots[usageIndex];
-    const size_t freed = std::erase_if(slots, [&](const auto& slot) {
-      if (slot->inUse) {
-        return false;
+    size_t evicted = 0;
+    for (auto& slot : slots) {
+      if (slot->inUse || !slot->image || !shouldTrim(slot->lastUseTick)) {
+        continue;
       }
-      return shouldTrim(slot->lastUseTick);
-    });
-    if (freed > 0) {
-      totalFreed += freed;
+      const uint64_t slotBytes = slot->image->estimatedResidentBytes();
+      if (slotBytes == 0) {
+        continue;
+      }
+      slot->image->releaseDeviceResources();
+      recordVulkanBudgetTrim(static_cast<ScratchImageUsage>(usageIndex), 1);
+      ++evicted;
+    }
+    if (evicted > 0) {
+      totalFreed += evicted;
       ++m_changeCounter;
     }
   }
@@ -1115,6 +1506,55 @@ size_t Z3DScratchResourcePool::performTrim(uint64_t ageThreshold, bool logSummar
   }
 
   return totalFreed;
+}
+
+void Z3DScratchResourcePool::pumpVulkanScratchReleases(VulkanScratchReclaimMode mode)
+{
+  if (m_vulkanMemoryPressureHandler) {
+    m_vulkanMemoryPressureHandler(mode);
+    return;
+  }
+
+  if (mode != VulkanScratchReclaimMode::PollCompleted && m_externalVkDevice != nullptr) {
+    m_externalVkDevice->frameExecutor().waitForAllInFlight();
+  }
+}
+
+size_t Z3DScratchResourcePool::evictAllFreeVulkanSlots(const VulkanScratchSlot* protectedSlot, bool logSummary)
+{
+  size_t evicted = 0;
+  uint64_t evictedBytes = 0;
+  for (size_t usageIndex = 0; usageIndex < m_vulkanSlots.size(); ++usageIndex) {
+    auto& slots = m_vulkanSlots[usageIndex];
+    for (auto& slot : slots) {
+      if (slot.get() == protectedSlot || slot->inUse || !slot->image) {
+        continue;
+      }
+      const uint64_t slotBytes = slot->image->estimatedResidentBytes();
+      if (slotBytes == 0) {
+        continue;
+      }
+      slot->image->releaseDeviceResources();
+      recordVulkanEvictAll(static_cast<ScratchImageUsage>(usageIndex), 1);
+      evictedBytes += slotBytes;
+      ++evicted;
+    }
+  }
+
+  if (evicted > 0) {
+    ++m_changeCounter;
+    if (logSummary) {
+      VLOG(1) << fmt::format("scratch pool Vulkan evict-all-free: evicted {} slots ({:.2f} MiB)",
+                             evicted,
+                             static_cast<double>(evictedBytes) / (1024.0 * 1024.0));
+    }
+  }
+  return evicted;
+}
+
+void Z3DScratchResourcePool::reclaimVulkanScratchMemory(VulkanScratchReclaimMode mode)
+{
+  pumpVulkanScratchReleases(mode);
 }
 
 void Z3DScratchResourcePool::trim()
@@ -1144,6 +1584,9 @@ void Z3DScratchResourcePool::reset()
   m_usageTick = 0;
   m_creationCounter = 0;
   m_changeCounter = 0;
+  m_reuseStatsCounter = 0;
+  m_glReuseStats = {};
+  m_vulkanReuseStats = {};
 }
 
 Z3DScratchResourcePool::RenderTargetLease
@@ -1165,6 +1608,7 @@ Z3DScratchResourcePool::acquireEntryExitRenderTarget(const glm::uvec2& size,
       return s.colorFormat == colorFormat;
     });
 
+  ScratchAcquireKind acquireKind = ScratchAcquireKind::ExactReuse;
   if (slot) {
     // Existing slot path: single-pass resize; grow Z only if XY unchanged.
     const uint32_t prevLayers = slot->layers;
@@ -1181,6 +1625,9 @@ Z3DScratchResourcePool::acquireEntryExitRenderTarget(const glm::uvec2& size,
     slotDescriptor.layers = desiredZ;
     updateSlotDescriptor(slot->descriptor, slotDescriptor);
     markSlotAcquired(*slot);
+    acquireKind = (xyChanged || desiredZ != prevLayers)
+                    ? ScratchAcquireKind::RetargetReuse
+                    : (prevLayers > layers ? ScratchAcquireKind::CompatibleReuse : ScratchAcquireKind::ExactReuse);
   } else {
     // Creation path: make a fresh slot and attachments.
     m_entryExitRenderTargetSlots.emplace_back(std::make_unique<EntryExitRenderTargetSlot>());
@@ -1195,9 +1642,11 @@ Z3DScratchResourcePool::acquireEntryExitRenderTarget(const glm::uvec2& size,
     slot->colorFormat = colorFormat;
     updateSlotDescriptor(slot->descriptor, descriptor);
     markSlotAcquired(*slot);
+    acquireKind = ScratchAcquireKind::NewSlot;
   }
 
   auto lease = makeLeaseFromSlot(slot, 1, RenderBackend::OpenGL);
+  recordScratchAcquire(RenderBackend::OpenGL, lease.descriptor, acquireKind, false);
   maybeTrimAfterAcquire();
   return lease;
 }
@@ -1222,6 +1671,7 @@ Z3DScratchResourcePool::acquireLayerArrayRenderTarget(const glm::uvec2& size,
       return s.colorFormat == colorFormat && s.depthFormat == depthFormat;
     });
 
+  ScratchAcquireKind acquireKind = ScratchAcquireKind::ExactReuse;
   if (slot) {
     // Existing slot path: single-pass resize; grow Z only if XY unchanged.
     const uint32_t prevLayers = slot->layers;
@@ -1239,6 +1689,9 @@ Z3DScratchResourcePool::acquireLayerArrayRenderTarget(const glm::uvec2& size,
     slotDescriptor.layers = desiredZ;
     updateSlotDescriptor(slot->descriptor, slotDescriptor);
     markSlotAcquired(*slot);
+    acquireKind = (xyChanged || desiredZ != prevLayers)
+                    ? ScratchAcquireKind::RetargetReuse
+                    : (prevLayers > layers ? ScratchAcquireKind::CompatibleReuse : ScratchAcquireKind::ExactReuse);
   } else {
     // Creation path: make a fresh slot and attachments.
     m_layerArrayRenderTargetSlots.emplace_back(std::make_unique<LayerArrayRenderTargetSlot>());
@@ -1255,9 +1708,11 @@ Z3DScratchResourcePool::acquireLayerArrayRenderTarget(const glm::uvec2& size,
     slot->depthFormat = depthFormat;
     updateSlotDescriptor(slot->descriptor, descriptor);
     markSlotAcquired(*slot);
+    acquireKind = ScratchAcquireKind::NewSlot;
   }
 
   auto lease = makeLeaseFromSlot(slot, 1, RenderBackend::OpenGL);
+  recordScratchAcquire(RenderBackend::OpenGL, lease.descriptor, acquireKind, false);
   maybeTrimAfterAcquire();
   return lease;
 }
@@ -1280,6 +1735,7 @@ Z3DScratchResourcePool::acquireRaycastAccumulatorRenderTarget(const glm::uvec2& 
       return true;
     });
 
+  ScratchAcquireKind acquireKind = ScratchAcquireKind::ExactReuse;
   if (slot) {
     bool changed = false;
     if (slot->fbo->size() != size) {
@@ -1294,6 +1750,7 @@ Z3DScratchResourcePool::acquireRaycastAccumulatorRenderTarget(const glm::uvec2& 
       ++m_changeCounter;
     }
     markSlotAcquired(*slot);
+    acquireKind = changed ? ScratchAcquireKind::RetargetReuse : ScratchAcquireKind::ExactReuse;
   } else {
     m_raycastAccumulatorSlots.emplace_back(std::make_unique<RaycastAccumulatorSlot>());
     slot = m_raycastAccumulatorSlots.back().get();
@@ -1306,9 +1763,11 @@ Z3DScratchResourcePool::acquireRaycastAccumulatorRenderTarget(const glm::uvec2& 
     slot->colorFormat = ScratchFormat::RGBA16;
     slot->accumulatorFormat = ScratchFormat::RG32F;
     markSlotAcquired(*slot);
+    acquireKind = ScratchAcquireKind::NewSlot;
   }
 
   auto lease = makeLeaseFromSlot(slot, 2, RenderBackend::OpenGL);
+  recordScratchAcquire(RenderBackend::OpenGL, lease.descriptor, acquireKind, false);
   maybeTrimAfterAcquire();
   return lease;
 }
@@ -1333,6 +1792,7 @@ Z3DScratchResourcePool::acquireTempRenderTarget2D(const glm::uvec2& size,
       return s.colorFormat == colorFormat && s.depthFormat == depthFormat;
     });
 
+  ScratchAcquireKind acquireKind = ScratchAcquireKind::ExactReuse;
   if (slot) {
     // Existing slot path: adjust size if needed and retain formats.
     bool changed = false;
@@ -1348,6 +1808,7 @@ Z3DScratchResourcePool::acquireTempRenderTarget2D(const glm::uvec2& size,
       ++m_changeCounter;
     }
     markSlotAcquired(*slot);
+    acquireKind = changed ? ScratchAcquireKind::RetargetReuse : ScratchAcquireKind::ExactReuse;
   } else {
     // Creation path: make a fresh slot and attachments.
     m_temp2DRenderTargetSlots.emplace_back(std::make_unique<Temp2DRenderTargetSlot>());
@@ -1362,9 +1823,11 @@ Z3DScratchResourcePool::acquireTempRenderTarget2D(const glm::uvec2& size,
     slot->depthFormat = depthFormat;
     updateSlotDescriptor(slot->descriptor, descriptor);
     markSlotAcquired(*slot);
+    acquireKind = ScratchAcquireKind::NewSlot;
   }
 
   auto lease = makeLeaseFromSlot(slot, 1, RenderBackend::OpenGL);
+  recordScratchAcquire(RenderBackend::OpenGL, lease.descriptor, acquireKind, false);
   maybeTrimAfterAcquire();
   return lease;
 }
@@ -1379,6 +1842,7 @@ Z3DScratchResourcePool::acquireDualDepthPeelRenderTarget(const glm::uvec2& size,
   }
   DualDepthPeelSlot* slot = findClosestFreeSlot(m_dualDepthPeelSlots, size);
 
+  ScratchAcquireKind acquireKind = ScratchAcquireKind::ExactReuse;
   if (slot) {
     bool changed = false;
     if (slot->fbo->size() != size) {
@@ -1391,6 +1855,7 @@ Z3DScratchResourcePool::acquireDualDepthPeelRenderTarget(const glm::uvec2& size,
       ++m_changeCounter;
     }
     markSlotAcquired(*slot);
+    acquireKind = changed ? ScratchAcquireKind::RetargetReuse : ScratchAcquireKind::ExactReuse;
   } else {
     m_dualDepthPeelSlots.emplace_back(std::make_unique<DualDepthPeelSlot>());
     slot = m_dualDepthPeelSlots.back().get();
@@ -1400,9 +1865,11 @@ Z3DScratchResourcePool::acquireDualDepthPeelRenderTarget(const glm::uvec2& size,
     attachTexturesForDescriptor(*slot->fbo, descriptor);
     slot->fbo->isFBOComplete();
     markSlotAcquired(*slot);
+    acquireKind = ScratchAcquireKind::NewSlot;
   }
 
   auto lease = makeLeaseFromSlot(slot, 8, RenderBackend::OpenGL);
+  recordScratchAcquire(RenderBackend::OpenGL, lease.descriptor, acquireKind, false);
   maybeTrimAfterAcquire();
   return lease;
 }
@@ -1417,6 +1884,7 @@ Z3DScratchResourcePool::acquireWeightedAverageRenderTarget(const glm::uvec2& siz
   }
   WeightedAverageSlot* slot = findClosestFreeSlot(m_weightedAverageSlots, size);
 
+  ScratchAcquireKind acquireKind = ScratchAcquireKind::ExactReuse;
   if (slot) {
     bool changed = false;
     if (slot->fbo->size() != size) {
@@ -1429,6 +1897,7 @@ Z3DScratchResourcePool::acquireWeightedAverageRenderTarget(const glm::uvec2& siz
       ++m_changeCounter;
     }
     markSlotAcquired(*slot);
+    acquireKind = changed ? ScratchAcquireKind::RetargetReuse : ScratchAcquireKind::ExactReuse;
   } else {
     m_weightedAverageSlots.emplace_back(std::make_unique<WeightedAverageSlot>());
     slot = m_weightedAverageSlots.back().get();
@@ -1438,9 +1907,11 @@ Z3DScratchResourcePool::acquireWeightedAverageRenderTarget(const glm::uvec2& siz
     attachTexturesForDescriptor(*slot->fbo, descriptor);
     slot->fbo->isFBOComplete();
     markSlotAcquired(*slot);
+    acquireKind = ScratchAcquireKind::NewSlot;
   }
 
   auto lease = makeLeaseFromSlot(slot, 2, RenderBackend::OpenGL);
+  recordScratchAcquire(RenderBackend::OpenGL, lease.descriptor, acquireKind, false);
   maybeTrimAfterAcquire();
   return lease;
 }
@@ -1455,6 +1926,7 @@ Z3DScratchResourcePool::acquireWeightedBlendedRenderTarget(const glm::uvec2& siz
   }
   WeightedBlendedSlot* slot = findClosestFreeSlot(m_weightedBlendedSlots, size);
 
+  ScratchAcquireKind acquireKind = ScratchAcquireKind::ExactReuse;
   if (slot) {
     bool changed = false;
     if (slot->fbo->size() != size) {
@@ -1467,6 +1939,7 @@ Z3DScratchResourcePool::acquireWeightedBlendedRenderTarget(const glm::uvec2& siz
       ++m_changeCounter;
     }
     markSlotAcquired(*slot);
+    acquireKind = changed ? ScratchAcquireKind::RetargetReuse : ScratchAcquireKind::ExactReuse;
   } else {
     m_weightedBlendedSlots.emplace_back(std::make_unique<WeightedBlendedSlot>());
     slot = m_weightedBlendedSlots.back().get();
@@ -1476,9 +1949,11 @@ Z3DScratchResourcePool::acquireWeightedBlendedRenderTarget(const glm::uvec2& siz
     attachTexturesForDescriptor(*slot->fbo, descriptor);
     slot->fbo->isFBOComplete();
     markSlotAcquired(*slot);
+    acquireKind = ScratchAcquireKind::NewSlot;
   }
 
   auto lease = makeLeaseFromSlot(slot, 2, RenderBackend::OpenGL);
+  recordScratchAcquire(RenderBackend::OpenGL, lease.descriptor, acquireKind, false);
   maybeTrimAfterAcquire();
   return lease;
 }
@@ -1506,32 +1981,128 @@ Z3DScratchResourcePool::acquireVulkanScratchImage(const ScratchImageDescriptor& 
 {
   // Ensure a device is available (external or internal)
   ZVulkanDevice& dev = ensureVulkanDevice();
+  pumpVulkanScratchReleases(VulkanScratchReclaimMode::PollCompleted);
   auto& slots = vulkanSlotsForUsage(descriptor.usage);
 
-  VulkanScratchSlot* slot = nullptr;
-  for (auto& candidate : slots) {
-    if (candidate->inUse) {
-      continue;
+  auto deviceBudgetText = [&dev]() {
+    const auto budget = dev.deviceLocalBudget();
+    return fmt::format("device_usage={} device_budget={}", budget.usageBytes, budget.budgetBytes);
+  };
+  auto recoverBeforeRetry =
+    [&](const char* operation, const VulkanScratchSlot* protectedSlot, std::string_view failure) {
+      recordVulkanAllocationRecovery(descriptor.usage);
+      LOG(WARNING) << fmt::format("Vulkan scratch {} failed before reclaim: {}; {}; {}; scratch={}",
+                                  operation,
+                                  failure,
+                                  describeScratchDescriptor(descriptor),
+                                  deviceBudgetText(),
+                                  describeMemoryUsage(false));
+      pumpVulkanScratchReleases(VulkanScratchReclaimMode::WaitForIdle);
+      evictAllFreeVulkanSlots(protectedSlot, true);
+    };
+  auto retryFailure = [&](const char* operation, std::string_view failure) {
+    return ZException(fmt::format("Vulkan scratch {} failed after reclaim: {}; {}; {}; scratch={}",
+                                  operation,
+                                  failure,
+                                  describeScratchDescriptor(descriptor),
+                                  deviceBudgetText(),
+                                  describeMemoryUsage(false)));
+  };
+  auto createScratchImage = [&]() {
+    try {
+      return std::make_unique<ZVulkanScratchImage>(dev, descriptor);
     }
-    if (candidate->descriptor.dimension != descriptor.dimension) {
-      continue;
+    catch (const std::exception& e) {
+      recoverBeforeRetry("create", nullptr, e.what());
     }
-    if (candidate->descriptor.size != descriptor.size) {
-      continue;
+    catch (...) {
+      recoverBeforeRetry("create", nullptr, "unknown exception");
     }
-    if (candidate->descriptor.layers != descriptor.layers) {
-      continue;
-    }
-    if (candidate->descriptor.attachments != descriptor.attachments) {
-      continue;
-    }
-    slot = candidate.get();
-    break;
-  }
 
-  bool retargeted = false;
-  ScratchImageDescriptor targetDescriptor = descriptor;
-  if (!slot) {
+    try {
+      return std::make_unique<ZVulkanScratchImage>(dev, descriptor);
+    }
+    catch (const std::exception& e) {
+      throw retryFailure("create", e.what());
+    }
+    catch (...) {
+      throw retryFailure("create", "unknown exception");
+    }
+  };
+  auto retargetScratchImage = [&](VulkanScratchSlot& target, const ScratchImageDescriptor& retargetDescriptor) {
+    try {
+      target.image->retarget(retargetDescriptor);
+      return;
+    }
+    catch (const std::exception& e) {
+      recoverBeforeRetry("retarget", &target, e.what());
+    }
+    catch (...) {
+      recoverBeforeRetry("retarget", &target, "unknown exception");
+    }
+
+    try {
+      target.image->retarget(retargetDescriptor);
+    }
+    catch (const std::exception& e) {
+      throw retryFailure("retarget", e.what());
+    }
+    catch (...) {
+      throw retryFailure("retarget", "unknown exception");
+    }
+  };
+  auto ensureResidentScratchImage = [&](VulkanScratchSlot& target) {
+    if (target.image->resident()) {
+      return false;
+    }
+    try {
+      target.image->recreateDeviceResources();
+      return true;
+    }
+    catch (const std::exception& e) {
+      recoverBeforeRetry("recreate", &target, e.what());
+    }
+    catch (...) {
+      recoverBeforeRetry("recreate", &target, "unknown exception");
+    }
+
+    try {
+      target.image->recreateDeviceResources();
+      return true;
+    }
+    catch (const std::exception& e) {
+      throw retryFailure("recreate", e.what());
+    }
+    catch (...) {
+      throw retryFailure("recreate", "unknown exception");
+    }
+  };
+
+  auto findExactFreeSlot = [&]() -> VulkanScratchSlot* {
+    for (auto& candidate : slots) {
+      if (candidate->inUse) {
+        continue;
+      }
+      if (candidate->descriptor.dimension != descriptor.dimension) {
+        continue;
+      }
+      if (candidate->descriptor.size != descriptor.size) {
+        continue;
+      }
+      if (candidate->descriptor.layers != descriptor.layers) {
+        continue;
+      }
+      if (candidate->descriptor.attachments != descriptor.attachments) {
+        continue;
+      }
+      return candidate.get();
+    }
+    return nullptr;
+  };
+
+  auto findCompatibleFreeSlot = [&](ScratchImageDescriptor& outDescriptor,
+                                    ScratchAcquireKind& outAcquireKind,
+                                    bool& outRetargeted) -> VulkanScratchSlot* {
     VulkanScratchSlot* reusable = nullptr;
     uint64_t bestDelta = std::numeric_limits<uint64_t>::max();
     const uint64_t desiredPixels =
@@ -1543,10 +2114,7 @@ Z3DScratchResourcePool::acquireVulkanScratchImage(const ScratchImageDescriptor& 
       if (candidate->descriptor.dimension != descriptor.dimension) {
         continue;
       }
-      if (candidate->descriptor.attachments.size() != descriptor.attachments.size()) {
-        continue;
-      }
-      if (candidate->descriptor.attachments != descriptor.attachments) {
+      if (!attachmentsCompatibleForReuse(descriptor.usage, candidate->descriptor, descriptor)) {
         continue;
       }
       const auto& candDesc = candidate->descriptor;
@@ -1560,37 +2128,88 @@ Z3DScratchResourcePool::acquireVulkanScratchImage(const ScratchImageDescriptor& 
       }
     }
 
-    if (reusable) {
-      const auto& candDesc = reusable->descriptor;
-      const bool needRetarget = candDesc.size != descriptor.size || candDesc.layers < descriptor.layers;
-      if (needRetarget) {
-        reusable->image->retarget(descriptor);
-        targetDescriptor = descriptor;
-        retargeted = true;
-      } else {
-        // Keep existing descriptor (may have equal or larger layer count)
-        targetDescriptor = candDesc;
-      }
-      reusable->descriptor = targetDescriptor;
-      slot = reusable;
-    } else {
-      auto newSlot = std::make_unique<VulkanScratchSlot>();
-      newSlot->image = std::make_unique<ZVulkanScratchImage>(dev, descriptor);
-      newSlot->descriptor = descriptor;
-      targetDescriptor = descriptor;
-      slot = newSlot.get();
-      slots.emplace_back(std::move(newSlot));
-      ++m_creationCounter;
+    if (!reusable) {
+      return nullptr;
     }
+
+    const auto& candDesc = reusable->descriptor;
+    ScratchImageDescriptor reusableDescriptor = descriptor;
+    if (descriptor.usage == ScratchImageUsage::BlockId && candDesc.attachments.size() > descriptor.attachments.size()) {
+      reusableDescriptor.attachments = candDesc.attachments;
+    }
+    const bool needRetarget = candDesc.size != reusableDescriptor.size || candDesc.layers < reusableDescriptor.layers ||
+                              candDesc.attachments != reusableDescriptor.attachments;
+    if (needRetarget) {
+      retargetScratchImage(*reusable, reusableDescriptor);
+      outDescriptor = reusableDescriptor;
+      outRetargeted = true;
+      outAcquireKind = ScratchAcquireKind::RetargetReuse;
+    } else {
+      // Keep existing descriptor (may have equal/larger layers or, for BlockID,
+      // more color attachments than requested).
+      outDescriptor = candDesc;
+      outRetargeted = false;
+      outAcquireKind = ScratchAcquireKind::CompatibleReuse;
+    }
+    reusable->descriptor = outDescriptor;
+    return reusable;
+  };
+
+  auto hasPendingReusableRelease = [&]() {
+    for (const auto& candidate : slots) {
+      if (!candidate->releasePending) {
+        continue;
+      }
+      if (candidate->descriptor.dimension != descriptor.dimension) {
+        continue;
+      }
+      if (attachmentsCompatibleForReuse(descriptor.usage, candidate->descriptor, descriptor)) {
+        return true;
+      }
+    }
+    return false;
+  };
+
+  VulkanScratchSlot* slot = findExactFreeSlot();
+  bool retargeted = false;
+  ScratchAcquireKind acquireKind = slot ? ScratchAcquireKind::ExactReuse : ScratchAcquireKind::NewSlot;
+  ScratchImageDescriptor targetDescriptor = descriptor;
+  if (!slot) {
+    slot = findCompatibleFreeSlot(targetDescriptor, acquireKind, retargeted);
+  }
+
+  if (!slot && hasPendingReusableRelease()) {
+    pumpVulkanScratchReleases(VulkanScratchReclaimMode::WaitForIdle);
+    slot = findExactFreeSlot();
+    retargeted = false;
+    acquireKind = slot ? ScratchAcquireKind::ExactReuse : ScratchAcquireKind::NewSlot;
+    targetDescriptor = descriptor;
+    if (!slot) {
+      slot = findCompatibleFreeSlot(targetDescriptor, acquireKind, retargeted);
+    }
+  }
+
+  if (!slot) {
+    auto newSlot = std::make_unique<VulkanScratchSlot>();
+    newSlot->image = createScratchImage();
+    newSlot->descriptor = descriptor;
+    targetDescriptor = descriptor;
+    slot = newSlot.get();
+    slots.emplace_back(std::move(newSlot));
+    ++m_creationCounter;
   }
 
   slot->descriptor = targetDescriptor;
   if (retargeted) {
     ++m_changeCounter;
   }
+  const bool residentRecreated = ensureResidentScratchImage(*slot);
+  if (residentRecreated) {
+    ++m_changeCounter;
+  }
   markSlotAcquired(*slot);
   auto lease = RenderTargetLease{};
-  lease.descriptor = slot->descriptor;
+  lease.descriptor = (descriptor.usage == ScratchImageUsage::BlockId) ? descriptor : slot->descriptor;
   lease.backend = RenderBackend::Vulkan;
   lease.vulkanImage = slot->image.get();
   lease.attachments = colorAttachmentCount(descriptor);
@@ -1598,7 +2217,7 @@ Z3DScratchResourcePool::acquireVulkanScratchImage(const ScratchImageDescriptor& 
   // the backend installs the scheduler after this lease is acquired (e.g.,
   // persistent output targets allocated before the first beginRender()).
   lease.releaser = RenderTargetLease::Releaser::forVulkanSlotDeferred(this, slot);
-  maybeTrimAfterAcquire();
+  recordScratchAcquire(RenderBackend::Vulkan, lease.descriptor, acquireKind, residentRecreated);
   return lease;
 }
 
@@ -1618,9 +2237,14 @@ void Z3DScratchResourcePool::scheduleDeferredRelease(Z3DScratchResourcePool::Vul
   if (!slot) {
     return;
   }
+  slot->releasePending = true;
   if (m_vulkanReleaseScheduler) {
-    // Capture just the slot pointer; the scheduler executes later on the render thread.
-    m_vulkanReleaseScheduler([slot]() { slot->inUse = false; });
+    // The scheduler executes later on the render thread after the relevant
+    // frame-completion safe point, so Vulkan resources can be recycled or freed.
+    m_vulkanReleaseScheduler([slot]() {
+      slot->inUse = false;
+      slot->releasePending = false;
+    });
   } else {
     // Fallback: no scheduler is installed (startup/backend-switch edge cases).
     // Be conservative: ensure all in-flight frame-executor submissions have
@@ -1629,6 +2253,7 @@ void Z3DScratchResourcePool::scheduleDeferredRelease(Z3DScratchResourcePool::Vul
       m_externalVkDevice->frameExecutor().waitForAllInFlight();
     }
     slot->inUse = false;
+    slot->releasePending = false;
     VLOG(1) << "scratch pool: Vulkan slot release drained in-flight work (no scheduler installed)";
   }
 }

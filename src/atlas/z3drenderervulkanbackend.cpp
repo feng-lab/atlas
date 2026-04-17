@@ -294,6 +294,7 @@ Z3DRendererVulkanBackend::~Z3DRendererVulkanBackend()
   // engine is tearing down. Do not leave a scheduler closure capturing this
   // backend beyond its lifetime.
   Z3DRenderGlobalState::instance().scratchPool().setVulkanReleaseScheduler({});
+  Z3DRenderGlobalState::instance().scratchPool().setVulkanMemoryPressureHandler({});
 }
 
 Z3DRendererVulkanBackend* Z3DRendererVulkanBackend::current()
@@ -313,6 +314,7 @@ void Z3DRendererVulkanBackend::preBackendSwitch()
   // tied to this backend instance. After flushForTeardown(), immediate release
   // is safe.
   Z3DRenderGlobalState::instance().scratchPool().setVulkanReleaseScheduler({});
+  Z3DRenderGlobalState::instance().scratchPool().setVulkanMemoryPressureHandler({});
 
   // Drop shared placeholders; they'll be recreated lazily on next use.
   m_defaultPlaceholder2D.reset();
@@ -972,6 +974,9 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
   // (Used by RenderTargetLease to delay Vulkan slot reuse until the frame-slot
   // reaches the completion safe point.)
   auto& pool = Z3DRenderGlobalState::instance().scratchPool();
+  pool.setVulkanMemoryPressureHandler([this](Z3DScratchResourcePool::VulkanScratchReclaimMode mode) {
+    reclaimTransientResourcesForMemoryPressure(mode, "scratch_pool");
+  });
   pool.setVulkanReleaseScheduler([this](std::function<void()> fn) {
     if (!fn) {
       return;
@@ -985,6 +990,16 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
     }
 
     if (!m_sharedDevice) {
+      fn();
+      return;
+    }
+
+    // Persistent scratch leases can be released outside an active frame when
+    // resizing between tiled-export regions. If all submitted work has already
+    // reached its fence, the slot is GPU-safe now; releasing immediately lets
+    // the following acquire retarget/reuse the same slot instead of allocating
+    // a parallel full-size/edge-size variant.
+    if (!m_activeFrame && !m_frameRecording && m_sharedDevice->frameExecutor().inFlightCount() == 0u) {
       fn();
       return;
     }
@@ -5172,6 +5187,35 @@ void Z3DRendererVulkanBackend::pollCompletionsAndPumpSafePoints()
     << "pollCompletionsAndPumpSafePoints must be called on the rendering thread";
   if (!m_sharedDevice) {
     return;
+  }
+
+  m_completedFrameKeysScratch.clear();
+  device().frameExecutor().pollCompletions(&m_completedFrameKeysScratch);
+  pumpFrameCompletionSafePoints(m_completedFrameKeysScratch);
+}
+
+void Z3DRendererVulkanBackend::reclaimTransientResourcesForMemoryPressure(
+  Z3DScratchResourcePool::VulkanScratchReclaimMode mode,
+  std::string_view reason)
+{
+  CHECK(currentRenderThreadExecutorOrNull() != nullptr)
+    << "reclaimTransientResourcesForMemoryPressure must be called on the rendering thread";
+  if (!m_sharedDevice) {
+    return;
+  }
+
+  if (mode == Z3DScratchResourcePool::VulkanScratchReclaimMode::PollCompleted || m_frameRecording || m_activeFrame) {
+    pollCompletionsAndPumpSafePoints();
+    return;
+  }
+
+  VLOG(1) << fmt::format("VK memory-pressure reclaim: mode={} reason='{}' in_flight={}",
+                         static_cast<int>(mode),
+                         reason,
+                         m_sharedDevice->frameExecutor().inFlightCount());
+  m_sharedDevice->frameExecutor().waitForAllInFlight();
+  for (auto& frame : m_frames) {
+    applyPendingArenaReset(frame);
   }
 
   m_completedFrameKeysScratch.clear();

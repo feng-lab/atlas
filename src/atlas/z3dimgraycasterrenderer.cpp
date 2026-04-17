@@ -439,15 +439,27 @@ std::vector<ImgRaycasterPayload> Z3DImgRaycasterRenderer::buildVulkanStagePayloa
   };
 
   if (needsEntryExit) {
-    // Ensure a persistent Vulkan entry/exit lease of the correct size.
-    if (!m_entryExitLease.hasVulkanImage() || m_entryExitLease.descriptor.size != m_outputSize) {
-      m_entryExitLease.release();
-      m_entryExitLease = pool.acquireEntryExitRenderTarget(m_outputSize,
-                                                           2u,
-                                                           ScratchFormat::RGBA32F,
-                                                           std::optional<RenderBackend>(RenderBackend::Vulkan));
+    if (common.fastPathOnly) {
+      // Fast export/GUI frames consume entry/exit within the same staged render, so
+      // keep the lease temporary and let the scratch pool reuse it for the next
+      // renderer instead of pinning one target per image renderer.
+      auto entryExitLease = pool.acquireEntryExitRenderTarget(m_outputSize,
+                                                              2u,
+                                                              ScratchFormat::RGBA32F,
+                                                              std::optional<RenderBackend>(RenderBackend::Vulkan));
+      common.entryExitLease = std::make_shared<Z3DScratchResourcePool::RenderTargetLease>(std::move(entryExitLease));
+    } else {
+      // Progressive rendering samples the same entry/exit image across multiple
+      // frames in the progressive cycle, so it remains renderer-owned.
+      if (!m_entryExitLease.hasVulkanImage() || m_entryExitLease.descriptor.size != m_outputSize) {
+        m_entryExitLease.release();
+        m_entryExitLease = pool.acquireEntryExitRenderTarget(m_outputSize,
+                                                             2u,
+                                                             ScratchFormat::RGBA32F,
+                                                             std::optional<RenderBackend>(RenderBackend::Vulkan));
+      }
+      common.entryExitLease = shareLease(m_entryExitLease);
     }
-    common.entryExitLease = shareLease(m_entryExitLease);
   }
 
   if (!common.fastPathOnly) {

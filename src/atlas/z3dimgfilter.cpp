@@ -276,7 +276,6 @@ Z3DImgFilter::Z3DImgFilter(Z3DGlobalParameters& globalParas, QObject* parent)
           &Z3DImgFilter::fullResolutionRenderingToggled);
 
   adjustWidget();
-  CHECK_GL_ERROR
 
   m_numParas = m_parameters.size();
 

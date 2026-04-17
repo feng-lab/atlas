@@ -6,6 +6,8 @@
 #include "zexception.h"
 
 #include <array>
+#include <optional>
+#include <string>
 #include <string_view>
 
 namespace nim {
@@ -20,46 +22,33 @@ struct FixedAttributeBinding
 
 // OpenGL links each hook-specific shader program independently, while Atlas caches VAOs/VBOs
 // across normal/transparent hook variants. Reserve stable semantic slots so a depth-only hook
-// can safely skip using a color attribute without forcing the renderer to treat the binding as
-// invalid for VAO setup.
-constexpr std::array<FixedAttributeBinding, 11> kFixedAttributeBindings{{
-  {"attr_vertex", 0},
-  {"attr_origin", 0},
-  {"attr_p0", 0},
-  {"attr_T", 0},
-  {"attr_normal", 1},
-  {"attr_axis", 1},
-  {"attr_p1", 1},
-  {"attr_color", 4},
-  {"attr_1dTexCoord0", 4},
-  {"attr_2dTexCoord0", 4},
-  {"attr_3dTexCoord0", 4},
-}};
-
-constexpr std::array<FixedAttributeBinding, 4> kFixedAttributeBindings2{{
-  {"attr_flags", 5},
-  {"attr_specular_shininess", 6},
-  {"attr_color2", 6},
-  {"attr_p0color", 4},
-}};
-
-constexpr std::array<FixedAttributeBinding, 1> kFixedAttributeBindings3{{
-  {"attr_p1color", 6},
-}};
+// can skip using an attribute without making VAO setup call glEnableVertexAttribArray(-1).
+//
+// Locations are allowed to alias only when the names are not active together in current GL
+// shaders. In particular, keep texture coordinates distinct from attr_color: almag.vert uses
+// attr_color and attr_2dTexCoord0 in the same program.
+constexpr std::array kFixedAttributeBindings{
+  FixedAttributeBinding{"attr_vertex",             0u},
+  FixedAttributeBinding{"attr_origin",             0u},
+  FixedAttributeBinding{"attr_p0",                 0u},
+  FixedAttributeBinding{"attr_T",                  0u}, // mat4 consumes locations 0..3
+  FixedAttributeBinding{"attr_normal",             1u},
+  FixedAttributeBinding{"attr_axis",               1u},
+  FixedAttributeBinding{"attr_p1",                 1u},
+  FixedAttributeBinding{"attr_color",              4u},
+  FixedAttributeBinding{"attr_p0color",            4u},
+  FixedAttributeBinding{"attr_flags",              5u},
+  FixedAttributeBinding{"attr_specular_shininess", 6u},
+  FixedAttributeBinding{"attr_color2",             6u},
+  FixedAttributeBinding{"attr_p1color",            6u},
+  FixedAttributeBinding{"attr_1dTexCoord0",        7u},
+  FixedAttributeBinding{"attr_2dTexCoord0",        8u},
+  FixedAttributeBinding{"attr_3dTexCoord0",        9u},
+};
 
 std::optional<GLuint> fixedAttributeLocation(std::string_view name)
 {
   for (const auto& binding : kFixedAttributeBindings) {
-    if (binding.name == name) {
-      return binding.location;
-    }
-  }
-  for (const auto& binding : kFixedAttributeBindings2) {
-    if (binding.name == name) {
-      return binding.location;
-    }
-  }
-  for (const auto& binding : kFixedAttributeBindings3) {
     if (binding.name == name) {
       return binding.location;
     }
@@ -70,12 +59,6 @@ std::optional<GLuint> fixedAttributeLocation(std::string_view name)
 void bindFixedAttributeLocations(GLuint programId)
 {
   for (const auto& binding : kFixedAttributeBindings) {
-    glBindAttribLocation(programId, binding.location, binding.name.data());
-  }
-  for (const auto& binding : kFixedAttributeBindings2) {
-    glBindAttribLocation(programId, binding.location, binding.name.data());
-  }
-  for (const auto& binding : kFixedAttributeBindings3) {
     glBindAttribLocation(programId, binding.location, binding.name.data());
   }
 }
@@ -547,12 +530,6 @@ void Z3DShaderProgram::storeAttributeLocations()
   };
 
   for (const auto& binding : kFixedAttributeBindings) {
-    reserveFixedAttribute(binding.name, binding.location);
-  }
-  for (const auto& binding : kFixedAttributeBindings2) {
-    reserveFixedAttribute(binding.name, binding.location);
-  }
-  for (const auto& binding : kFixedAttributeBindings3) {
     reserveFixedAttribute(binding.name, binding.location);
   }
 

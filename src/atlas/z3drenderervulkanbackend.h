@@ -787,6 +787,8 @@ public:
   // called from the rendering thread event loop when the engine is idle so
   // queued readback consumers can run even if no further frames are rendered.
   void pollCompletionsAndPumpSafePoints() override;
+  void reclaimTransientResourcesForMemoryPressure(Z3DScratchResourcePool::VulkanScratchReclaimMode mode,
+                                                  std::string_view reason = {}) override;
   [[nodiscard]] bool hasInFlightFrames() const override;
   [[nodiscard]] uint32_t inFlightCount() const override;
   [[nodiscard]] uint32_t maxFramesInFlight() const override;
