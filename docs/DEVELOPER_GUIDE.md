@@ -558,6 +558,7 @@ Vulkan Pipeline Invariants
 - Dynamic rendering is used; a new segment is begun only when attachment sets change.
 - Graphics pipeline keys include attachment formats: `colorFormats[]` and optional `depthFormat` are part of the key in all Vulkan pipeline contexts to avoid layout mismatches.
 - Composite/resolve passes (DDP final, WA resolve, WB resolve) must write to exactly one color attachment; depth is disabled in the pipeline and no depth attachment is bound.
+- Texture-copy passes that do not propagate depth (for example the final RGBA8 readback copy) must use the no-depth copy variant: no destination depth attachment, no source depth descriptor lookup, `VK_FORMAT_UNDEFINED` depth pipeline format, depth test/write disabled, and a fragment shader with no `FragDepth` output.
 - Descriptor writes during command-buffer recording are forbidden. All descriptor sets must be primed before recording begins; per-draw variation uses dynamic offsets and bindless indices.
 - Dynamic UBO arena (Vulkan): all per‑draw UBOs are suballocated from a per‑frame, host‑visible "uniform arena" buffer. Capacity is fixed for the frame; exceeding it is a hard CHECK. The backend provisions a baseline capacity (default 256 KiB) and will pre‑size above it when needed (based on a cheap pre‑record estimate). Growth within a frame is not supported (would invalidate already‑bound descriptors).
 - Dynamic upload arena (Vulkan): transient vertex/index staging uses a per-frame paged linear allocator over one or more persistently mapped host-visible upload buffers. Atlas rewinds page cursors only after the frame-completion safe point, so mapped pointers handed to a submission remain valid for that submission without retiring/replacing buffers mid-frame.
@@ -1119,6 +1120,7 @@ Transparency Methods
   - Dual Depth Peeling (multiple layers with depth/alpha peeling)
     - Vulkan has two implementations for DDP-quality transparency: classic multi-pass DDP and exact OIT via a per-pixel fragment list (PPLL).
       The selection is controlled by the `Transparency` parameter (`Dual Depth Peeling` vs `Per-Pixel Fragment List (PPLL Exact)`).
+    - Vulkan DDP records peel passes in bounded chunks controlled by `--atlas_vk_ddp_cpu_chunk_passes` (default 4). When `drawIndirectCount` is available and `--atlas_vk_ddp_indirect_count=true`, draws are device-gated inside each chunk; the compositor still reads back the DDP changed flag between chunks so it can stop recording later chunks after convergence.
   - Weighted Average and Weighted Blended (OIT approximations)
 - Images are blended via `Z3DTextureBlendRenderer` and the compositor’s merge shaders; image layers from multiple filters are collected/merged consistently.
 

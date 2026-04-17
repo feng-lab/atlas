@@ -12,4 +12,3 @@ void main()
   FragData0 = c;
   gl_FragDepth = d;
 }
-

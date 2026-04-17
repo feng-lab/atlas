@@ -304,6 +304,7 @@ set(ATLAS_VK_SHADER_SOURCES
 
     # Copy
     copyimage.frag
+    copyimage_color.frag
     glow.frag
     blur.frag
 

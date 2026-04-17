@@ -55,6 +55,13 @@ public:
     m_flipY = v;
   }
 
+  // When disabled, Vulkan copy passes copy color only: no source depth handle is
+  // required, no depth image is sampled, and the destination depth attachment is not bound.
+  void setCopyDepth(bool v)
+  {
+    m_copyDepth = v;
+  }
+
 protected:
   void compile() override;
 
@@ -81,6 +88,7 @@ protected:
   std::unique_ptr<Z3DShaderGroup> m_copyTextureShaderGrp;
   bool m_discardTransparent = true;
   bool m_flipY = false;
+  bool m_copyDepth = true;
 
   OutputColorOption m_mode;
   std::unique_ptr<Z3DVertexArrayObject> m_VAO;

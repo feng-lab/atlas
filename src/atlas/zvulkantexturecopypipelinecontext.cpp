@@ -41,37 +41,52 @@ void ZVulkanTextureCopyPipelineContext::record(Z3DRendererBase& renderer,
                                                vk::raii::CommandBuffer& cmd)
 {
   (void)renderer;
-  (void)payload;
   CHECK(batch.shaderHook.captured) << "Texture copy batch missing shader hook snapshot";
+  CHECK(payload.copyDepth || batch.shaderHook.type == Z3DRendererBase::ShaderHookType::Normal)
+    << "Depth-disabled texture copy is only valid for normal color copy passes";
   VLOG(2) << fmt::format("record begin hook={} color=0x{:x} depth=0x{:x}",
                          static_cast<int>(batch.shaderHook.type),
                          payload.colorAttachmentHandle.id,
                          payload.depthAttachmentHandle.id);
 
-  CHECK(payload.colorAttachmentHandle.valid() && payload.depthAttachmentHandle.valid())
-    << "Skipping Vulkan texture copy pass due to missing attachments";
+  CHECK(payload.colorAttachmentHandle.valid()) << "Skipping Vulkan texture copy pass due to missing color attachment";
+  CHECK(!payload.copyDepth || payload.depthAttachmentHandle.valid())
+    << "Skipping Vulkan texture copy pass due to missing depth attachment";
 
   auto& colorTexture =
     vulkan::textureFromHandle(payload.colorAttachmentHandle, m_backend.device(), "texture-copy color attachment");
-  auto& depthTexture =
-    vulkan::textureFromHandle(payload.depthAttachmentHandle, m_backend.device(), "texture-copy depth attachment");
+  ZVulkanTexture* depthTexture = nullptr;
+  if (payload.copyDepth) {
+    depthTexture =
+      &vulkan::textureFromHandle(payload.depthAttachmentHandle, m_backend.device(), "texture-copy depth attachment");
+  }
 
-  VLOG(1) << fmt::format("inputs: color=0x{:x} layout={} descr={} fmt={} | depth=0x{:x} layout={} descr={} fmt={}",
-                         payload.colorAttachmentHandle.id,
-                         enumOrUnderlying(colorTexture.layout(), 16),
-                         enumOrUnderlying(colorTexture.descriptorLayout(), 16),
-                         enumOrUnderlying(colorTexture.format(), 16),
-                         payload.depthAttachmentHandle.id,
-                         enumOrUnderlying(depthTexture.layout(), 16),
-                         enumOrUnderlying(depthTexture.descriptorLayout(), 16),
-                         enumOrUnderlying(depthTexture.format(), 16));
+  if (payload.copyDepth) {
+    VLOG(1) << fmt::format("inputs: color=0x{:x} layout={} descr={} fmt={} | depth=0x{:x} layout={} descr={} fmt={}",
+                           payload.colorAttachmentHandle.id,
+                           enumOrUnderlying(colorTexture.layout(), 16),
+                           enumOrUnderlying(colorTexture.descriptorLayout(), 16),
+                           enumOrUnderlying(colorTexture.format(), 16),
+                           payload.depthAttachmentHandle.id,
+                           enumOrUnderlying(depthTexture->layout(), 16),
+                           enumOrUnderlying(depthTexture->descriptorLayout(), 16),
+                           enumOrUnderlying(depthTexture->format(), 16));
+  } else {
+    VLOG(1) << fmt::format("inputs: color=0x{:x} layout={} descr={} fmt={} | depth copy disabled",
+                           payload.colorAttachmentHandle.id,
+                           enumOrUnderlying(colorTexture.layout(), 16),
+                           enumOrUnderlying(colorTexture.descriptorLayout(), 16),
+                           enumOrUnderlying(colorTexture.format(), 16));
+  }
 
   // Fullscreen quad with UVs
   m_vertexCount = 4;
   const bool ddpPeel = (batch.shaderHook.type == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel);
   CopyImagePushConstants copyPC{};
   copyPC.colorTex = m_backend.bindlessLookupSampledImageAutoOrCrash(colorTexture, "texture_copy color");
-  copyPC.depthTex = m_backend.bindlessLookupSampledImageAutoOrCrash(depthTexture, "texture_copy depth");
+  if (payload.copyDepth) {
+    copyPC.depthTex = m_backend.bindlessLookupSampledImageAutoOrCrash(*depthTexture, "texture_copy depth");
+  }
   if (ddpPeel) {
     const auto& hookPara = batch.shaderHook.para;
     if (hookPara.dualDepthPeelingDepthBlenderHandle.valid()) {
@@ -94,6 +109,7 @@ void ZVulkanTextureCopyPipelineContext::record(Z3DRendererBase& renderer,
   key.discardTransparent = payload.discardTransparent;
   key.mode = payload.mode;
   key.flipY = payload.flipY;
+  key.copyDepth = payload.copyDepth;
   key.waInit = (batch.shaderHook.type == Z3DRendererBase::ShaderHookType::WeightedAverageInit);
   key.wbInit = (batch.shaderHook.type == Z3DRendererBase::ShaderHookType::WeightedBlendedInit);
   key.ddpInit = (batch.shaderHook.type == Z3DRendererBase::ShaderHookType::DualDepthPeelingInit);
@@ -239,7 +255,12 @@ ZVulkanTextureCopyPipelineContext::ensurePipeline(const PipelineKey& key, const 
 
   PipelineInstance instance;
   // Select fragment shader for image compositing modes
-  std::string frag = shaderBase + std::string("copyimage.frag.spv");
+  const bool usesOitShader = key.ddpPeel || key.ddpInit || key.ppllCount || key.ppllStore || key.waInit || key.wbInit;
+  CHECK(key.copyDepth || !usesOitShader) << "Depth-disabled texture copy is only valid for normal color copies";
+  CHECK(key.copyDepth || !formats.depthFormat.has_value())
+    << "Depth-disabled texture copy must not bind a depth attachment";
+
+  std::string frag = shaderBase + std::string(key.copyDepth ? "copyimage.frag.spv" : "copyimage_color.frag.spv");
   if (key.ppllCount) {
     frag = shaderBase + std::string("ppll_count_image.frag.spv");
   } else if (key.ppllStore) {

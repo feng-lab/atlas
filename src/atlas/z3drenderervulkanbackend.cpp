@@ -4424,6 +4424,16 @@ void Z3DRendererVulkanBackend::ddpBarrierFragToCompute(vk::raii::CommandBuffer& 
   cmd.pipelineBarrier2(dep);
 }
 
+void Z3DRendererVulkanBackend::ddpBarrierComputeToTransfer(vk::raii::CommandBuffer& cmd)
+{
+  vk::MemoryBarrier2 mb{.srcStageMask = vk::PipelineStageFlagBits2::eComputeShader,
+                        .srcAccessMask = vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eShaderWrite,
+                        .dstStageMask = vk::PipelineStageFlagBits2::eTransfer,
+                        .dstAccessMask = vk::AccessFlagBits2::eTransferWrite};
+  vk::DependencyInfo dep{.memoryBarrierCount = 1, .pMemoryBarriers = &mb};
+  cmd.pipelineBarrier2(dep);
+}
+
 void Z3DRendererVulkanBackend::ppllBarrierFragToCompute(vk::raii::CommandBuffer& cmd)
 {
   vk::MemoryBarrier2 mb{.srcStageMask = vk::PipelineStageFlagBits2::eFragmentShader,

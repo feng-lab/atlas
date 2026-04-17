@@ -63,6 +63,7 @@ TextureCopyPayload Z3DTextureCopyRenderer::buildTextureCopyPayload() const
   TextureCopyPayload payload;
   payload.discardTransparent = m_discardTransparent;
   payload.flipY = m_flipY;
+  payload.copyDepth = m_copyDepth;
   payload.colorAttachmentHandle = m_colorAttachmentHandle;
   payload.depthAttachmentHandle = m_depthAttachmentHandle;
 
@@ -98,12 +99,17 @@ RenderBatch Z3DTextureCopyRenderer::buildRenderBatch(Z3DEye eye) const
   batch.pass.colorAttachments = surface.colorAttachments;
   batch.pass.depthAttachment = surface.depthAttachment;
 
-  CHECK(m_colorAttachmentHandle.valid() && m_depthAttachmentHandle.valid())
-    << "Texture copy renderer missing Vulkan input attachment handles.";
+  CHECK(m_colorAttachmentHandle.valid()) << "Texture copy renderer missing Vulkan color attachment handle.";
+  CHECK(!m_copyDepth || m_depthAttachmentHandle.valid())
+    << "Texture copy renderer missing Vulkan depth attachment handle for depth-copy pass.";
   batch.pass.externalImageUses.push_back(
     {m_colorAttachmentHandle, ExternalImageUseKind::SampledRead, ExternalImageAspectHint::Color});
-  batch.pass.externalImageUses.push_back(
-    {m_depthAttachmentHandle, ExternalImageUseKind::SampledRead, ExternalImageAspectHint::Depth});
+  if (m_copyDepth) {
+    batch.pass.externalImageUses.push_back(
+      {m_depthAttachmentHandle, ExternalImageUseKind::SampledRead, ExternalImageAspectHint::Depth});
+  } else {
+    batch.pass.depthAttachment.reset();
+  }
 
   batch.draw.topology = PrimitiveTopology::TriangleStrip;
   batch.draw.vertexCount = 4;
@@ -120,8 +126,9 @@ void Z3DTextureCopyRenderer::enqueueRenderBatches(Z3DEye eye, RenderBackend back
     return;
   }
 
-  CHECK(m_colorAttachmentHandle.valid() && m_depthAttachmentHandle.valid())
-    << "Texture copy renderer missing Vulkan attachment handles.";
+  CHECK(m_colorAttachmentHandle.valid()) << "Texture copy renderer missing Vulkan color attachment handle.";
+  CHECK(!m_copyDepth || m_depthAttachmentHandle.valid())
+    << "Texture copy renderer missing Vulkan depth attachment handle for depth-copy pass.";
 
   auto batch = buildRenderBatch(eye);
   m_rendererBase.appendBatch(std::move(batch));

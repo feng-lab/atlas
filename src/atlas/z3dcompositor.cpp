@@ -34,7 +34,8 @@ DECLARE_bool(atlas_vk_ddp_indirect_count);
 DEFINE_int32(atlas_ddp_max_passes, 100, "Maximum dual-depth peeling peel passes (applies to GL and Vulkan)");
 DEFINE_int32(atlas_vk_ddp_cpu_chunk_passes,
              4,
-             "Vulkan DDP CPU early-stop: number of peel passes per submission when drawIndirectCount is unavailable");
+             "Vulkan DDP: number of peel passes per submission for chunked early-stop. "
+             "drawIndirectCount, when available, gates draws inside each chunk. Use <=0 to record the full loop.");
 
 namespace {
 using namespace nim;
@@ -2675,6 +2676,11 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
       srcDepth.index = 0;
       srcDepth.id = reinterpret_cast<uint64_t>(copySrc->depthAttachmentTexture());
       // Internal resolve: no Y-flip
+      const bool resolveDepth = needResolvedLeaseForHandles || !selectedFilters.empty();
+      m_textureCopyRenderer.setCopyDepth(resolveDepth);
+      auto copyDepthGuard = folly::makeGuard([&]() {
+        m_textureCopyRenderer.setCopyDepth(true);
+      });
       m_textureCopyRenderer.setFlipY(false);
       m_textureCopyRenderer.setSourceAttachments(srcColor, srcDepth);
       m_rendererBase.renderVulkan(eye, m_textureCopyRenderer);
@@ -3197,10 +3203,14 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
           srcDepth.backend = RenderBackend::Vulkan;
           srcDepth.index = 0;
           srcDepth.id = reinterpret_cast<uint64_t>(copySrc->depthAttachmentTexture());
-          CHECK(srcColor.id != 0 && srcDepth.id != 0) << "final_rgba8_copy: missing source attachments";
+          CHECK(srcColor.id != 0) << "final_rgba8_copy: missing source color attachment";
           VLOG(1) << fmt::format("VK final_rgba8_copy srcColor=0x{:x} srcDepth=0x{:x}",
                                  static_cast<uint64_t>(srcColor.id),
                                  static_cast<uint64_t>(srcDepth.id));
+          m_textureCopyRenderer.setCopyDepth(false);
+          auto copyDepthGuard = folly::makeGuard([&]() {
+            m_textureCopyRenderer.setCopyDepth(true);
+          });
           m_textureCopyRenderer.setFlipY(FLAGS_atlas_vk_copy_yflip_in_shader);
           m_textureCopyRenderer.setSourceAttachments(srcColor, srcDepth);
           m_rendererBase.renderVulkan(eye, m_textureCopyRenderer);
@@ -4878,39 +4888,44 @@ void Z3DCompositor::renderTransparentDDPVulkan(const std::vector<Z3DBoundedFilte
   const uint32_t totalOrchestratedPasses = static_cast<uint32_t>(kMaxPasses > 0 ? (kMaxPasses - 1) : 0);
   ZVulkanLinearScript::SegmentHandle segLast = segInit;
 
-  if (useIndirectCount || FLAGS_atlas_vk_ddp_cpu_chunk_passes <= 0) {
-    // Fast path: record all passes in one submission, relying on
-    // VK_KHR_draw_indirect_count gating to skip geometry after convergence.
-    bool firstPass = true;
+  auto recordDdpPeelPass = [&](uint32_t pass,
+                               ZVulkanLinearScript::SegmentHandle dep,
+                               bool firstPassInSubmission) -> ZVulkanLinearScript::SegmentHandle {
+    const auto segReset =
+      script.commands("transparency_ddp_reset", {dep}, [firstPassInSubmission](Z3DRendererVulkanBackend& be) {
+        auto& cmd = be.commandBuffer();
+        if (!firstPassInSubmission) {
+          be.ddpBarrierComputeToTransfer(cmd);
+        }
+        be.ddpResetForPass(cmd, firstPassInSubmission);
+        be.ddpBarrierTransferToFrag(cmd);
+      });
+
+    const auto segBlend = drawPass(pass, segReset);
+
+    const bool useIndirectCountLocal = useIndirectCount;
+    return script.commands("transparency_ddp_count", {segBlend}, [useIndirectCountLocal](Z3DRendererVulkanBackend& be) {
+      auto& cmd = be.commandBuffer();
+      be.ddpBarrierFragToCompute(cmd);
+      be.ddpDispatchCountCompute(cmd);
+      if (useIndirectCountLocal) {
+        be.ddpBarrierComputeToIndirect(cmd);
+      }
+    });
+  };
+
+  if (FLAGS_atlas_vk_ddp_cpu_chunk_passes <= 0) {
+    // Compatibility/debug path: record the whole peel loop in one submission.
+    bool firstPassInSubmission = true;
     for (uint32_t pass = 0; pass < totalOrchestratedPasses; ++pass) {
-      const bool firstPassLocal = firstPass;
-      const auto segReset =
-        script.commands("transparency_ddp_reset", {segLast}, [firstPassLocal](Z3DRendererVulkanBackend& be) {
-          auto& cmd = be.commandBuffer();
-          be.ddpResetForPass(cmd, firstPassLocal);
-          be.ddpBarrierTransferToFrag(cmd);
-        });
-
-      const auto segBlend = drawPass(pass, segReset);
-
-      const bool useIndirectCountLocal = useIndirectCount;
-      const auto segCount =
-        script.commands("transparency_ddp_count", {segBlend}, [useIndirectCountLocal](Z3DRendererVulkanBackend& be) {
-          auto& cmd = be.commandBuffer();
-          be.ddpBarrierFragToCompute(cmd);
-          be.ddpDispatchCountCompute(cmd);
-          if (useIndirectCountLocal) {
-            be.ddpBarrierComputeToIndirect(cmd);
-          }
-        });
-
-      segLast = segCount;
-      firstPass = false;
+      segLast = recordDdpPeelPass(pass, segLast, firstPassInSubmission);
+      firstPassInSubmission = false;
     }
   } else {
-    // Fallback path (macOS/MoltenVK): break the peel loop into multiple
-    // submissions and read back ddpChangedFlag between chunks so we can stop
-    // recording passes once the peel converges.
+    // Chunked path: keep each DDP submission bounded and read back the changed
+    // flag between chunks so later chunks are not recorded after convergence.
+    // When drawIndirectCount is supported, each chunk also uses device-side
+    // gating to skip draws after convergence within that chunk.
     const uint32_t chunkPasses = static_cast<uint32_t>(std::max<int32_t>(1, FLAGS_atlas_vk_ddp_cpu_chunk_passes));
     uint32_t passBase = 0;
     while (passBase < totalOrchestratedPasses) {
@@ -4918,11 +4933,12 @@ void Z3DCompositor::renderTransparentDDPVulkan(const std::vector<Z3DBoundedFilte
       const uint32_t thisChunk = std::min(chunkPasses, remaining);
       const bool needReadback = (passBase + thisChunk < totalOrchestratedPasses);
 
-      VLOG(1) << fmt::format("DDP Vulkan CPU-chunk: passBase={} chunk={} remaining={} needReadback={}",
+      VLOG(1) << fmt::format("DDP Vulkan chunk: passBase={} chunk={} remaining={} needReadback={} indirectCount={}",
                              passBase,
                              thisChunk,
                              remaining,
-                             needReadback);
+                             needReadback,
+                             useIndirectCount);
 
       ZVulkanLinearScript::SegmentHandle segChunkLast = segLast;
       const auto ddpChangedFlagSlot = script.makeSlot<ZVulkanBuffer*>();
@@ -4936,27 +4952,11 @@ void Z3DCompositor::renderTransparentDDPVulkan(const std::vector<Z3DBoundedFilte
                                           ddpChangedFlagSlot.set(flag);
                                         });
       }
+
       for (uint32_t local = 0; local < thisChunk; ++local) {
         const uint32_t pass = passBase + local;
         const bool firstPassInSubmission = (local == 0);
-
-        const auto segReset = script.commands("transparency_ddp_reset",
-                                              {segChunkLast},
-                                              [firstPassInSubmission](Z3DRendererVulkanBackend& be) {
-                                                auto& cmd = be.commandBuffer();
-                                                be.ddpResetForPass(cmd, firstPassInSubmission);
-                                                be.ddpBarrierTransferToFrag(cmd);
-                                              });
-
-        const auto segBlend = drawPass(pass, segReset);
-
-        const auto segCount = script.commands("transparency_ddp_count", {segBlend}, [](Z3DRendererVulkanBackend& be) {
-          auto& cmd = be.commandBuffer();
-          be.ddpBarrierFragToCompute(cmd);
-          be.ddpDispatchCountCompute(cmd);
-        });
-
-        segChunkLast = segCount;
+        segChunkLast = recordDdpPeelPass(pass, segChunkLast, firstPassInSubmission);
       }
 
       segLast = segChunkLast;
@@ -4968,7 +4968,7 @@ void Z3DCompositor::renderTransparentDDPVulkan(const std::vector<Z3DBoundedFilte
       const uint32_t changedFlag =
         script.readbackU32("vk_ddp_changedflag_readback", {segChunkLast}, ddpChangedFlagSlot, /*srcOffset=*/0);
       if (changedFlag == 0u) {
-        VLOG(1) << fmt::format("DDP Vulkan CPU-chunk: converged at pass {}", passBase + thisChunk - 1);
+        VLOG(1) << fmt::format("DDP Vulkan chunk: converged at pass {}", passBase + thisChunk - 1);
         break;
       }
 

@@ -51,6 +51,7 @@ private:
     bool discardTransparent = true;
     TextureCopyPayload::OutputMode mode = TextureCopyPayload::OutputMode::NoChange;
     bool flipY = false;
+    bool copyDepth = true;
     bool waInit = false; // use WA-init image shader (writes 2 color attachments with additive blend)
     bool wbInit = false; // use WB-init image shader (writes 2 color attachments with specific blends)
     bool ddpInit = false; // use DDP-init image shader (writes depth blender values)
@@ -65,6 +66,7 @@ private:
       return std::tuple(discardTransparent,
                         static_cast<int>(mode),
                         flipY,
+                        copyDepth,
                         waInit,
                         wbInit,
                         ddpInit,

@@ -1316,6 +1316,7 @@ public:
   void ddpResetForPass(vk::raii::CommandBuffer& cmd, bool firstPass);
   void ddpBarrierTransferToFrag(vk::raii::CommandBuffer& cmd);
   void ddpBarrierFragToCompute(vk::raii::CommandBuffer& cmd);
+  void ddpBarrierComputeToTransfer(vk::raii::CommandBuffer& cmd);
   void ddpBarrierComputeToIndirect(vk::raii::CommandBuffer& cmd);
   void ddpDispatchCountCompute(vk::raii::CommandBuffer& cmd);
   // Schedule a static copy for indirect args (upload arena -> device-local args buffer)

@@ -689,6 +689,7 @@ struct TextureCopyPayload
   bool discardTransparent = true;
   OutputMode mode = OutputMode::NoChange;
   bool flipY = false;
+  bool copyDepth = true;
   AttachmentHandle colorAttachmentHandle;
   AttachmentHandle depthAttachmentHandle;
 };
