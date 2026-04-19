@@ -17,6 +17,7 @@
 #include "zvulkandescriptorset.h"
 // Attachment format helpers
 #include "zvulkanrenderconversions.h"
+#include "zvulkanresidencymanager.h"
 #include "z3dtypes.h"
 #include "zvulkanuniforms.h"
 
@@ -638,6 +639,7 @@ public:
 private:
   enum class FrameHookSpot
   {
+    AfterFrameResourceRelease,
     AfterFrameCompletionSafePoint
   };
 
@@ -656,8 +658,8 @@ public:
   //
   // This is the preferred API for post-fence work that needs correct ordering
   // with respect to the backend's frame completion safe point (after fence-gated
-  // completion callbacks, descriptor arena resets, and scratch releases) while
-  // allowing the hook body to be written
+  // completion callbacks, descriptor arena resets, and resource-release hooks)
+  // while allowing the hook body to be written
   // linearly with co_await and to run on the call-site chosen executor.
   //
   // Contract:
@@ -714,6 +716,14 @@ public:
   // Pin a texture in the device residency manager for the lifetime of the
   // current GPU submission. This prevents eviction of in-flight resources.
   void pinTextureForActiveSubmission(class ZVulkanTexture* texture);
+  // Pin an externally brokered residency resource for the lifetime of the
+  // current GPU submission. The release callback runs after the submission
+  // fence completes, matching managed texture/static geometry pin lifetime.
+  [[nodiscard]] bool pinExternalResidencyResourceForActiveSubmission(const void* key, std::function<void()> release);
+  void clearColorTextureToShaderReadOnly(class ZVulkanTexture& texture,
+                                         const vk::ClearColorValue& clear,
+                                         const vk::ImageSubresourceRange& range,
+                                         std::string_view debugLabel = {});
   void notifyPipelineCreated();
   void notifyPipelineBound(vk::Pipeline pipeline);
 
@@ -760,6 +770,10 @@ public:
   [[nodiscard]] bool isRecording() const
   {
     return m_frameRecording;
+  }
+  [[nodiscard]] bool inCompletionSafePoint() const
+  {
+    return m_frameInCompletionSafePoint.load(std::memory_order_acquire) != nullptr;
   }
 
   void notifyDescriptorWriteWhileRecording(bool rewriteAttempt)
@@ -1051,6 +1065,9 @@ private:
     // Work to execute at the frame completion safe point. This runs after the
     // GPU finished executing the submission, after fence completion callbacks
     // ran, and after per-frame descriptor pool resets have been applied.
+    // The resource-release spot is reached before the user completion spot so
+    // scratch leases and similar backend-owned resources can be dropped before
+    // readback hooks upload or allocate more GPU memory.
     //
     // Hooks are executed with a barrier at the safe point. Each hook is bound
     // to a call-site chosen executor (render thread, CPU pool, etc.).
@@ -1078,6 +1095,7 @@ private:
     // Residency pins for managed (evictable) textures referenced by this submission.
     // These pins are released via a submission-fence callback after queueSubmit().
     std::unordered_set<class ZVulkanTexture*> residencyPinnedTextures;
+    std::unordered_map<const void*, std::function<void()>> externalResidencyPinReleases;
 
     // Pins for static geometry segments referenced by this submission (vertex
     // inputs and/or upload->static transfer destinations). These prevent reuse
@@ -1237,6 +1255,7 @@ private:
   };
 
   void collectFrameTimings(FrameResources& frame);
+  [[nodiscard]] bool timestampQueriesEnabled() const;
   void
   enterCompletionSafePointForKeyIfMatches(void* key, uint64_t expectedRealFrameToken, uint32_t expectedSubmissionId);
   void flushScheduledCopies(vk::raii::CommandBuffer& cmd);
@@ -1254,6 +1273,12 @@ private:
   void ensureDDPComputePipeline();
   void ensurePPLLComputePipelines();
   size_t uniformAlignment() const;
+  enum class TextureCommandUse : uint8_t
+  {
+    ReadExistingContents,
+    DiscardAndWrite,
+  };
+  void prepareTextureForCommandUse(class ZVulkanTexture& texture, TextureCommandUse use, std::string_view debugLabel);
 
 public:
   // Record an additional CPU scope for perf collection. Intended for
@@ -1447,6 +1472,7 @@ public:
   Z3DRendererBase* m_activeRenderer = nullptr;
   std::atomic<FrameResources*> m_frameInCompletionSafePoint{nullptr};
   bool m_frameRecording = false;
+  bool m_submissionResourcePinningOpen = false;
   // Scratch storage for frame-executor polling: keys of frame slots whose
   // fences completed in the last pollCompletions() call.
   std::vector<void*> m_completedFrameKeysScratch;
@@ -1554,7 +1580,25 @@ public:
   // Static arena helpers
   std::unique_ptr<StaticArena::Segment> createStaticArenaSegment(StaticArena::Kind kind, size_t capacityBytes);
   void flushPendingFreesAndMaybeTrimStaticSegment(StaticArena::Segment* segment);
+  [[nodiscard]] bool
+  prepareStaticPromotionBudget(StaticPressureDomain domain, size_t promotionBytes, std::string_view reason);
   size_t evictColdStaticCacheForPressure(StaticPressureDomain domain, size_t growthBytes, bool force);
+
+  void installMemoryBrokerProviders();
+  void uninstallMemoryBrokerProviders();
+  [[nodiscard]] ZVulkanResidencyManager::ReclaimStats
+  reclaimCompletedUploadPagesForMemoryPressure(std::string_view reason);
+  [[nodiscard]] ZVulkanResidencyManager::ReclaimStats reclaimStaticGeometryForMemoryPressure(uint64_t requestedBytes,
+                                                                                             std::string_view reason);
+  [[nodiscard]] std::vector<ZVulkanResidencyManager::EvictionCandidate> staticGeometryEvictionCandidates() const;
+  [[nodiscard]] ZVulkanResidencyManager::ReclaimStats
+  evictStaticGeometryCandidate(const ZVulkanResidencyManager::EvictionCandidate& candidate, std::string_view reason);
+  [[nodiscard]] ZVulkanResidencyManager::ReclaimStats reclaimReadbackStagingForMemoryPressure(std::string_view reason);
+  [[nodiscard]] ZVulkanResidencyManager::ResourceReport uploadPageMemoryReport() const;
+  [[nodiscard]] ZVulkanResidencyManager::ResourceReport scratchBackingMemoryReport() const;
+  [[nodiscard]] ZVulkanResidencyManager::ResourceReport staticGeometryMemoryReport() const;
+  [[nodiscard]] ZVulkanResidencyManager::ResourceReport readbackStagingMemoryReport() const;
+  std::vector<ZVulkanResidencyManager::ResourceProviderId> m_memoryBrokerProviderIds;
 
   // Pending per-stream static-geometry evictions requested from outside the
   // render thread (e.g., primitive renderer destruction). Drained in beginRender().

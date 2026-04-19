@@ -13,11 +13,376 @@
 #include "zlog.h"
 
 #include <algorithm>
+#include <exception>
+#include <limits>
+#include <string_view>
 #include <utility>
 
 namespace nim {
 
 DEFINE_int32(atlas_vk_frames_in_flight, 2, "Max Vulkan frames in flight (debug: set to 1 to serialize submits)");
+
+namespace {
+
+thread_local uint32_t s_allocationRecoveryScopeDepth = 0;
+
+uint64_t checkedMul(uint64_t lhs, uint64_t rhs)
+{
+  if (lhs == 0u || rhs == 0u) {
+    return 0;
+  }
+  if (lhs > std::numeric_limits<uint64_t>::max() / rhs) {
+    return std::numeric_limits<uint64_t>::max();
+  }
+  return lhs * rhs;
+}
+
+uint64_t bytesPerTexel(vk::Format format)
+{
+  constexpr uint64_t kConservativeUnknownFormatBytesPerTexel = 16;
+  switch (format) {
+    case vk::Format::eR8Unorm:
+    case vk::Format::eR8Uint:
+    case vk::Format::eR8Sint:
+      return 1;
+    case vk::Format::eR16Unorm:
+    case vk::Format::eR16Sfloat:
+      return 2;
+    case vk::Format::eR32Sfloat:
+    case vk::Format::eR32Uint:
+    case vk::Format::eR8G8B8A8Unorm:
+    case vk::Format::eB8G8R8A8Unorm:
+    case vk::Format::eD24UnormS8Uint:
+    case vk::Format::eD32Sfloat:
+      return 4;
+    case vk::Format::eR16G16B16A16Unorm:
+    case vk::Format::eR16G16B16A16Sfloat:
+    case vk::Format::eR32G32Sfloat:
+    case vk::Format::eD32SfloatS8Uint:
+      return 8;
+    case vk::Format::eR32G32B32A32Sfloat:
+    case vk::Format::eR32G32B32A32Uint:
+      return 16;
+    default:
+      // Conservative diagnostic estimate for uncommon formats. VMA remains the
+      // source of truth after allocation succeeds.
+      return kConservativeUnknownFormatBytesPerTexel;
+  }
+}
+
+uint64_t sampleCount(vk::SampleCountFlagBits samples)
+{
+  switch (samples) {
+    case vk::SampleCountFlagBits::e1:
+      return 1;
+    case vk::SampleCountFlagBits::e2:
+      return 2;
+    case vk::SampleCountFlagBits::e4:
+      return 4;
+    case vk::SampleCountFlagBits::e8:
+      return 8;
+    case vk::SampleCountFlagBits::e16:
+      return 16;
+    case vk::SampleCountFlagBits::e32:
+      return 32;
+    case vk::SampleCountFlagBits::e64:
+      return 64;
+  }
+  return 1;
+}
+
+uint64_t estimateImageBytes(const ZVulkanTexture::CreateInfo& createInfo)
+{
+  uint64_t total = 0;
+  uint32_t width = std::max(1u, createInfo.extent.width);
+  uint32_t height = std::max(1u, createInfo.extent.height);
+  uint32_t depth = std::max(1u, createInfo.extent.depth);
+  const uint64_t layers = std::max(1u, createInfo.arrayLayers);
+  const uint64_t texelBytes = bytesPerTexel(createInfo.format);
+  const uint64_t samples = sampleCount(createInfo.samples);
+  const uint32_t levels = std::max(1u, createInfo.mipLevels);
+  for (uint32_t level = 0; level < levels; ++level) {
+    uint64_t levelBytes = checkedMul(width, height);
+    levelBytes = checkedMul(levelBytes, depth);
+    levelBytes = checkedMul(levelBytes, layers);
+    levelBytes = checkedMul(levelBytes, samples);
+    levelBytes = checkedMul(levelBytes, texelBytes);
+    if (total > std::numeric_limits<uint64_t>::max() - levelBytes) {
+      return std::numeric_limits<uint64_t>::max();
+    }
+    total += levelBytes;
+    width = std::max(1u, width / 2u);
+    height = std::max(1u, height / 2u);
+    depth = std::max(1u, depth / 2u);
+  }
+  return total;
+}
+
+ZVulkanResidencyManager::ResourceClass classifyBufferAllocation(vk::BufferUsageFlags usage,
+                                                                vk::MemoryPropertyFlags properties,
+                                                                VmaPool poolOverride,
+                                                                const ZVulkanDevice& device)
+{
+  if (poolOverride == device.uploadTransientPool()) {
+    return ZVulkanResidencyManager::ResourceClass::TransientUploadPage;
+  }
+  if (properties & vk::MemoryPropertyFlagBits::eHostVisible) {
+    return ZVulkanResidencyManager::ResourceClass::ReadbackStaging;
+  }
+  if ((properties & vk::MemoryPropertyFlagBits::eDeviceLocal) &&
+      (usage & (vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eIndexBuffer))) {
+    return ZVulkanResidencyManager::ResourceClass::StaticGeometry;
+  }
+  return ZVulkanResidencyManager::ResourceClass::PersistentCompositorTarget;
+}
+
+ZVulkanResidencyManager::ResourceClass classifyTextureAllocation(const ZVulkanTexture::CreateInfo& createInfo)
+{
+  switch (createInfo.residencyClassHint) {
+    case ZVulkanTexture::ResidencyClassHint::Auto:
+      break;
+    case ZVulkanTexture::ResidencyClassHint::ScratchBacking:
+      return ZVulkanResidencyManager::ResourceClass::ScratchBacking;
+    case ZVulkanTexture::ResidencyClassHint::DenseImageTexture:
+      return ZVulkanResidencyManager::ResourceClass::DenseImageTexture;
+    case ZVulkanTexture::ResidencyClassHint::DenseVolumeTexture:
+      return ZVulkanResidencyManager::ResourceClass::DenseVolumeTexture;
+    case ZVulkanTexture::ResidencyClassHint::PagedImageCacheR8:
+      return ZVulkanResidencyManager::ResourceClass::PagedImageCacheR8;
+    case ZVulkanTexture::ResidencyClassHint::PersistentCompositorTarget:
+      return ZVulkanResidencyManager::ResourceClass::PersistentCompositorTarget;
+  }
+
+  if (createInfo.imageType == vk::ImageType::e3D && createInfo.format == vk::Format::eR8Unorm &&
+      (createInfo.usage & vk::ImageUsageFlagBits::eSampled)) {
+    return ZVulkanResidencyManager::ResourceClass::DenseVolumeTexture;
+  }
+  if (createInfo.usage & (vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eDepthStencilAttachment)) {
+    return ZVulkanResidencyManager::ResourceClass::PersistentCompositorTarget;
+  }
+  return ZVulkanResidencyManager::ResourceClass::PersistentCompositorTarget;
+}
+
+bool countsAgainstDeviceLocalBudget(vk::MemoryPropertyFlags properties)
+{
+  return static_cast<bool>(properties & vk::MemoryPropertyFlagBits::eDeviceLocal);
+}
+
+[[noreturn]] void throwStrictBudgetExceeded(ZVulkanDevice& device,
+                                            ZVulkanResidencyManager::ResourceClass requestClass,
+                                            uint64_t requestedBytes,
+                                            std::string_view reason,
+                                            const ZVulkanResidencyManager::AllocationPressure& pressure)
+{
+  throw ZException(fmt::format(
+    "VK strict residency budget exceeded: class={} requested={}B usage={}B budget={}B unreclaimed={}B reason='{}' memory_by_class=[{}] memory_by_label=[{}]",
+    ZVulkanResidencyManager::resourceClassName(requestClass),
+    requestedBytes,
+    pressure.usageBytes,
+    pressure.budgetBytes,
+    pressure.reclaimBytes,
+    reason.empty() ? "<unspecified>" : std::string(reason),
+    device.residencyManager().describeMemoryByClass(),
+    device.residencyManager().describeMemoryByLabel()));
+}
+
+void brokerReclaimBeforeAllocation(ZVulkanDevice& device,
+                                   ZVulkanResidencyManager::ResourceClass requestClass,
+                                   uint64_t requestedBytes,
+                                   bool enforceDeviceLocalBudget,
+                                   bool force,
+                                   std::string_view reason)
+{
+  if (requestedBytes == 0u || device.allocationRecoveryScopeActive()) {
+    return;
+  }
+  const bool strictBudget = device.residencyManager().strictBudgetActive();
+  if (!enforceDeviceLocalBudget && !strictBudget) {
+    return;
+  }
+  if (!force &&
+      (requestClass == ZVulkanResidencyManager::ResourceClass::ReadbackStaging ||
+       requestClass == ZVulkanResidencyManager::ResourceClass::TransientUploadPage) &&
+      !strictBudget) {
+    // Readback/staging and transient upload buffers are host-visible allocations on the paths that call createBuffer().
+    // They stay registered as reclaimable providers, but they should not make a device-local residency budget
+    // walk evict sampled images before every small transfer buffer. If the allocation really fails, the
+    // force retry below still asks the broker for recovery.
+    return;
+  }
+
+  const uint64_t strictAllocationBytes =
+    strictBudget && !ZVulkanResidencyManager::resourceClassCountsAgainstStrictBudget(requestClass) ? 0u
+                                                                                                   : requestedBytes;
+  auto pressure = device.residencyManager().allocationPressureFor(strictAllocationBytes);
+  if (!force && !pressure.needsReclaim()) {
+    return;
+  }
+  const auto initialPressure = pressure;
+
+  const bool originalForce = force;
+  bool waitedForCompletion = false;
+  ZVulkanResidencyManager::ReclaimStats totalStats{};
+  uint64_t initialReclaimTargetBytes = 0u;
+  while (force || pressure.needsReclaim()) {
+    const uint64_t reclaimTargetBytes =
+      force ? std::max<uint64_t>(requestedBytes, pressure.reclaimBytes) : pressure.reclaimBytes;
+    if (initialReclaimTargetBytes == 0u) {
+      initialReclaimTargetBytes = reclaimTargetBytes;
+    }
+
+    const auto stats = device.residencyManager().reclaimMemory(
+      ZVulkanResidencyManager::ReclaimRequest{.requestClass = requestClass,
+                                              .requestedBytes = reclaimTargetBytes,
+                                              .force = force,
+                                              .reason = reason});
+    totalStats.add(stats);
+
+    if (!strictBudget) {
+      break;
+    }
+
+    const auto retryPressure = device.residencyManager().allocationPressureFor(strictAllocationBytes);
+    if (!retryPressure.needsReclaim()) {
+      pressure = retryPressure;
+      break;
+    }
+    if (stats.resourcesReleased == 0u && stats.bytesReleased == 0u) {
+      if (!waitedForCompletion) {
+        const uint32_t inFlightBefore = device.frameExecutor().inFlightCount();
+        VLOG(1) << fmt::format(
+          "VK allocation broker strong recovery: class={} allocation={}B unreclaimed={}B in_flight={} reason='{}'",
+          ZVulkanResidencyManager::resourceClassName(requestClass),
+          requestedBytes,
+          retryPressure.reclaimBytes,
+          inFlightBefore,
+          reason.empty() ? "<unspecified>" : std::string(reason));
+        device.frameExecutor().waitForAllInFlight();
+        waitedForCompletion = true;
+        pressure = device.residencyManager().allocationPressureFor(strictAllocationBytes);
+        force = false;
+        if (!pressure.needsReclaim()) {
+          break;
+        }
+        continue;
+      }
+      throwStrictBudgetExceeded(device, requestClass, requestedBytes, reason, retryPressure);
+    }
+    pressure = retryPressure;
+    force = false;
+  }
+
+  if (VLOG_IS_ON(1)) {
+    const auto afterPressure = device.residencyManager().allocationPressureFor(0u);
+    VLOG(1) << fmt::format(
+      "VK allocation broker reclaim: class={} allocation={}B target={}B force={} released={} resources={} usage_before={}B budget={}B usage_after={}B reason='{}'",
+      ZVulkanResidencyManager::resourceClassName(requestClass),
+      requestedBytes,
+      initialReclaimTargetBytes,
+      originalForce ? 1 : 0,
+      totalStats.bytesReleased,
+      totalStats.resourcesReleased,
+      initialPressure.usageBytes,
+      initialPressure.budgetBytes,
+      afterPressure.usageBytes,
+      reason.empty() ? "<unspecified>" : std::string(reason));
+  }
+}
+
+void enforceStrictBudgetAfterAllocation(ZVulkanDevice& device,
+                                        ZVulkanResidencyManager::ResourceClass requestClass,
+                                        uint64_t requestedBytes,
+                                        bool enforceDeviceLocalBudget,
+                                        std::string_view reason)
+{
+  if (!device.residencyManager().strictBudgetActive()) {
+    return;
+  }
+  if (device.allocationRecoveryScopeActive()) {
+    return;
+  }
+  (void)enforceDeviceLocalBudget;
+
+  auto pressure = device.residencyManager().allocationPressureFor(0u);
+  if (!pressure.needsReclaim()) {
+    return;
+  }
+
+  ZVulkanResidencyManager::ReclaimStats totalStats{};
+  bool waitedForCompletion = false;
+  const auto initialPressure = pressure;
+  while (pressure.needsReclaim()) {
+    const uint64_t reclaimTargetBytes = pressure.reclaimBytes;
+    const auto stats = device.residencyManager().reclaimMemory(
+      ZVulkanResidencyManager::ReclaimRequest{.requestClass = requestClass,
+                                              .requestedBytes = reclaimTargetBytes,
+                                              .force = false,
+                                              .reason = reason});
+    totalStats.add(stats);
+
+    pressure = device.residencyManager().allocationPressureFor(0u);
+    if (!pressure.needsReclaim()) {
+      VLOG(1) << fmt::format(
+        "VK post-allocation broker reclaim: class={} allocation={}B target={}B released={} resources={} usage_before={}B usage_after={}B budget={}B reason='{}'",
+        ZVulkanResidencyManager::resourceClassName(requestClass),
+        requestedBytes,
+        reclaimTargetBytes,
+        totalStats.bytesReleased,
+        totalStats.resourcesReleased,
+        initialPressure.usageBytes,
+        pressure.usageBytes,
+        initialPressure.budgetBytes,
+        reason.empty() ? "<unspecified>" : std::string(reason));
+      return;
+    }
+
+    if (stats.resourcesReleased != 0u || stats.bytesReleased != 0u) {
+      continue;
+    }
+    if (!waitedForCompletion) {
+      const uint32_t inFlightBefore = device.frameExecutor().inFlightCount();
+      VLOG(1) << fmt::format(
+        "VK post-allocation broker strong recovery: class={} allocation={}B unreclaimed={}B in_flight={} reason='{}'",
+        ZVulkanResidencyManager::resourceClassName(requestClass),
+        requestedBytes,
+        pressure.reclaimBytes,
+        inFlightBefore,
+        reason.empty() ? "<unspecified>" : std::string(reason));
+      device.frameExecutor().waitForAllInFlight();
+      waitedForCompletion = true;
+      pressure = device.residencyManager().allocationPressureFor(0u);
+      if (!pressure.needsReclaim()) {
+        return;
+      }
+      continue;
+    }
+    break;
+  }
+
+  pressure.allocationBytes = requestedBytes;
+  throwStrictBudgetExceeded(device, requestClass, requestedBytes, reason, pressure);
+}
+
+void logAllocationFailureReport(ZVulkanDevice& device,
+                                ZVulkanResidencyManager::ResourceClass requestClass,
+                                uint64_t requestedBytes,
+                                std::string_view reason,
+                                const std::exception& e)
+{
+  const auto budget = device.deviceLocalBudget();
+  LOG(ERROR) << fmt::format(
+    "VK allocation failed after broker reclaim: class={} requested={}B usage={}B budget={}B reason='{}' error={} memory_by_class=[{}] memory_by_label=[{}]",
+    ZVulkanResidencyManager::resourceClassName(requestClass),
+    requestedBytes,
+    budget.usageBytes,
+    budget.budgetBytes,
+    reason.empty() ? "<unspecified>" : std::string(reason),
+    e.what(),
+    device.residencyManager().describeMemoryByClass(),
+    device.residencyManager().describeMemoryByLabel());
+}
+
+} // namespace
 
 ZVulkanDevice::ZVulkanDevice(ZVulkanContext& context)
   : m_context(context)
@@ -175,17 +540,55 @@ ZVulkanDevice::~ZVulkanDevice()
 std::unique_ptr<ZVulkanBuffer>
 ZVulkanDevice::createBuffer(size_t size, vk::BufferUsageFlags usage, vk::MemoryPropertyFlags properties)
 {
-  return std::make_unique<ZVulkanBuffer>(*this, size, usage, properties);
+  const auto requestClass = classifyBufferAllocation(usage, properties, VK_NULL_HANDLE, *this);
+  const bool enforceBudget = countsAgainstDeviceLocalBudget(properties);
+  brokerReclaimBeforeAllocation(*this, requestClass, size, enforceBudget, false, "buffer_preallocate");
+  try {
+    auto buffer = std::make_unique<ZVulkanBuffer>(*this, size, usage, properties);
+    enforceStrictBudgetAfterAllocation(*this, requestClass, size, enforceBudget, "buffer_postallocate");
+    return buffer;
+  }
+  catch (const std::exception&) {
+    brokerReclaimBeforeAllocation(*this, requestClass, size, enforceBudget, true, "buffer_allocation_retry");
+    try {
+      auto buffer = std::make_unique<ZVulkanBuffer>(*this, size, usage, properties);
+      enforceStrictBudgetAfterAllocation(*this, requestClass, size, enforceBudget, "buffer_retry_postallocate");
+      return buffer;
+    }
+    catch (const std::exception& retryError) {
+      logAllocationFailureReport(*this, requestClass, size, "buffer_allocation_retry", retryError);
+      throw;
+    }
+  }
 }
 
 std::unique_ptr<ZVulkanTexture> ZVulkanDevice::createTexture(const ZVulkanTexture::CreateInfo& createInfo)
 {
-  return std::make_unique<ZVulkanTexture>(*this, createInfo);
+  const uint64_t requestedBytes = estimateImageBytes(createInfo);
+  const auto requestClass = classifyTextureAllocation(createInfo);
+  reclaimBeforeTextureAllocation(createInfo, false, "image_preallocate");
+  try {
+    auto texture = std::make_unique<ZVulkanTexture>(*this, createInfo);
+    enforceTextureAllocationBudgetAfter(createInfo, "image_postallocate");
+    return texture;
+  }
+  catch (const std::exception&) {
+    reclaimBeforeTextureAllocation(createInfo, true, "image_allocation_retry");
+    try {
+      auto texture = std::make_unique<ZVulkanTexture>(*this, createInfo);
+      enforceTextureAllocationBudgetAfter(createInfo, "image_retry_postallocate");
+      return texture;
+    }
+    catch (const std::exception& retryError) {
+      logAllocationFailureReport(*this, requestClass, requestedBytes, "image_allocation_retry", retryError);
+      throw;
+    }
+  }
 }
 
 std::unique_ptr<ZVulkanTexture> ZVulkanDevice::createTexture(uint32_t width, uint32_t height, vk::Format format)
 {
-  return std::make_unique<ZVulkanTexture>(*this, width, height, format);
+  return createTexture(ZVulkanTexture::CreateInfo::make2D(width, height, format));
 }
 
 std::unique_ptr<ZVulkanTexture> ZVulkanDevice::createTexture(uint32_t width,
@@ -194,7 +597,26 @@ std::unique_ptr<ZVulkanTexture> ZVulkanDevice::createTexture(uint32_t width,
                                                              vk::ImageUsageFlags usage,
                                                              vk::MemoryPropertyFlags memoryProperties)
 {
-  return std::make_unique<ZVulkanTexture>(*this, width, height, format, usage, memoryProperties);
+  return createTexture(ZVulkanTexture::CreateInfo::make2D(width, height, format, usage, memoryProperties));
+}
+
+void ZVulkanDevice::reclaimBeforeTextureAllocation(const ZVulkanTexture::CreateInfo& createInfo,
+                                                   bool force,
+                                                   std::string_view reason)
+{
+  const uint64_t requestedBytes = estimateImageBytes(createInfo);
+  const auto requestClass = classifyTextureAllocation(createInfo);
+  const bool enforceBudget = countsAgainstDeviceLocalBudget(createInfo.memoryProperties);
+  brokerReclaimBeforeAllocation(*this, requestClass, requestedBytes, enforceBudget, force, reason);
+}
+
+void ZVulkanDevice::enforceTextureAllocationBudgetAfter(const ZVulkanTexture::CreateInfo& createInfo,
+                                                        std::string_view reason)
+{
+  const uint64_t requestedBytes = estimateImageBytes(createInfo);
+  const auto requestClass = classifyTextureAllocation(createInfo);
+  const bool enforceBudget = countsAgainstDeviceLocalBudget(createInfo.memoryProperties);
+  enforceStrictBudgetAfterAllocation(*this, requestClass, requestedBytes, enforceBudget, reason);
 }
 
 std::unique_ptr<ZVulkanShader> ZVulkanDevice::createShader(const std::string& vertexCode,
@@ -244,6 +666,24 @@ const ZVulkanResidencyManager& ZVulkanDevice::residencyManager() const
   return *m_residencyManager;
 }
 
+void ZVulkanDevice::enterAllocationRecoveryScope() const
+{
+  CHECK(s_allocationRecoveryScopeDepth < std::numeric_limits<uint32_t>::max())
+    << "Vulkan allocation recovery scope depth overflow";
+  s_allocationRecoveryScopeDepth++;
+}
+
+void ZVulkanDevice::leaveAllocationRecoveryScope() const
+{
+  CHECK(s_allocationRecoveryScopeDepth > 0u) << "Vulkan allocation recovery scope underflow";
+  s_allocationRecoveryScopeDepth--;
+}
+
+bool ZVulkanDevice::allocationRecoveryScopeActive() const
+{
+  return s_allocationRecoveryScopeDepth > 0u;
+}
+
 std::unique_ptr<ZVulkanDescriptorPool> ZVulkanDevice::createDescriptorPool()
 {
   return std::make_unique<ZVulkanDescriptorPool>(*this);
@@ -261,7 +701,26 @@ std::unique_ptr<ZVulkanBuffer> ZVulkanDevice::createBufferInPool(size_t size,
                                                                  vk::MemoryPropertyFlags properties,
                                                                  VmaPool poolOverride)
 {
-  return std::make_unique<ZVulkanBuffer>(*this, size, usage, properties, poolOverride);
+  const auto requestClass = classifyBufferAllocation(usage, properties, poolOverride, *this);
+  const bool enforceBudget = countsAgainstDeviceLocalBudget(properties);
+  brokerReclaimBeforeAllocation(*this, requestClass, size, enforceBudget, false, "pooled_buffer_preallocate");
+  try {
+    auto buffer = std::make_unique<ZVulkanBuffer>(*this, size, usage, properties, poolOverride);
+    enforceStrictBudgetAfterAllocation(*this, requestClass, size, enforceBudget, "pooled_buffer_postallocate");
+    return buffer;
+  }
+  catch (const std::exception&) {
+    brokerReclaimBeforeAllocation(*this, requestClass, size, enforceBudget, true, "pooled_buffer_allocation_retry");
+    try {
+      auto buffer = std::make_unique<ZVulkanBuffer>(*this, size, usage, properties, poolOverride);
+      enforceStrictBudgetAfterAllocation(*this, requestClass, size, enforceBudget, "pooled_buffer_retry_postallocate");
+      return buffer;
+    }
+    catch (const std::exception& retryError) {
+      logAllocationFailureReport(*this, requestClass, size, "pooled_buffer_allocation_retry", retryError);
+      throw;
+    }
+  }
 }
 
 uint32_t ZVulkanDevice::findMemoryTypeIndex(VkMemoryPropertyFlags requiredFlags,

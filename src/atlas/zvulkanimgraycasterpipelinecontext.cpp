@@ -28,6 +28,7 @@
 #include "zvulkanpagedimageblockuploader.h"
 #include "zcancellation.h"
 #include "zrenderthreadexecutor_tls.h"
+#include "zvulkanresidencymanager.h"
 
 // Safe instantiation of capturing coroutine callables.
 #include <folly/coro/Invoke.h>
@@ -464,16 +465,17 @@ void ZVulkanImgRaycasterPipelineContext::preRecordBindlessWarmup(const BindlessW
     CHECK_LT(channelIndex, image.numChannels()) << "Raycaster bindless warmup: channel index out of range";
     ChannelResources& resources = ensureChannelResources(channelIndex);
 
-    const ZImg& channelImage = *image.channelImageShared(channelIndex);
+    auto channelImage = image.channelImageShared(channelIndex);
+    CHECK(channelImage != nullptr) << "Raycaster bindless warmup: missing channel image";
     const uint64_t generation = image.volumeGeneration(channelIndex);
 
     if (desc.wants2D) {
-      ZVulkanTexture& img2d = ensureImage2DTexture(resources, channelImage, generation);
+      ZVulkanTexture& img2d = ensureImage2DTexture(image, channelIndex, generation, channelImage);
       (void)m_backend.bindlessRegisterSampledImageAuto(img2d, "raycaster_image2d");
     }
 
     if (desc.wantsVolume3D) {
-      ZVulkanTexture& vol = ensureVolumeTexture(resources, channelImage, channelIndex, generation);
+      ZVulkanTexture& vol = ensureVolumeTexture(image, channelIndex, generation, channelImage);
       (void)m_backend.bindlessRegisterSampledImageAuto(vol, "raycaster_volume");
     }
 
@@ -489,9 +491,9 @@ void ZVulkanImgRaycasterPipelineContext::preRecordBindlessWarmup(const BindlessW
 
     if (desc.wantsPaging) {
       CHECK(m_imageBlockUploader != nullptr) << "Raycaster bindless warmup: paging uploader missing";
+      ZVulkanTexture* imageCache = m_imageBlockUploader->imageCacheTexture(image, channelIndex);
       ZVulkanTexture* pageDirectory = m_imageBlockUploader->pageDirectoryTexture(image, channelIndex);
       ZVulkanTexture* pageTable = m_imageBlockUploader->pageTableTexture(image, channelIndex);
-      ZVulkanTexture* imageCache = m_imageBlockUploader->imageCacheTexture(image, channelIndex);
       CHECK(pageDirectory && pageTable && imageCache)
         << "Raycaster bindless warmup: paging textures missing for channel " << channelIndex;
       (void)m_backend.bindlessRegisterSampledImageAuto(*pageDirectory, "raycaster_page_directory");
@@ -803,9 +805,10 @@ ZVulkanImgRaycasterPipelineContext::ensurePreparedProgressiveRound(Z3DRendererBa
 
   ChannelResources& resources = ensureChannelResources(prep.channelIndex);
 
-  const ZImg& channelImage = *payload.image->channelImageShared(prep.channelIndex);
+  auto channelImage = payload.image->channelImageShared(prep.channelIndex);
+  CHECK(channelImage != nullptr) << "Raycaster progressive path missing channel image";
   const uint64_t volGen = payload.image->volumeGeneration(prep.channelIndex);
-  ZVulkanTexture& volumeTex = ensureVolumeTexture(resources, channelImage, prep.channelIndex, volGen);
+  ZVulkanTexture& volumeTex = ensureVolumeTexture(*payload.image, prep.channelIndex, volGen, channelImage);
 
   CHECK(payload.transferFunctions != nullptr)
     << "Raycaster progressive path: payload missing transferFunctions vector (fatal)";
@@ -850,9 +853,9 @@ ZVulkanImgRaycasterPipelineContext::ensurePreparedProgressiveRound(Z3DRendererBa
         prep.currentColor && prep.currentDepth)
     << "Vulkan raycaster progressive path missing required textures.";
 
+  prep.imageCache = m_imageBlockUploader->imageCacheTexture(*payload.image, prep.channelIndex);
   prep.pageDirectory = m_imageBlockUploader->pageDirectoryTexture(*payload.image, prep.channelIndex);
   prep.pageTable = m_imageBlockUploader->pageTableTexture(*payload.image, prep.channelIndex);
-  prep.imageCache = m_imageBlockUploader->imageCacheTexture(*payload.image, prep.channelIndex);
   CHECK(prep.pageDirectory && prep.pageTable && prep.imageCache)
     << "Raycaster progressive path missing paging textures for channel " << prep.channelIndex;
 
@@ -1170,9 +1173,10 @@ void ZVulkanImgRaycasterPipelineContext::recordStageFastDirect(Z3DRendererBase& 
     CHECK(payload.analyticRaySetup.enabled || entryTexture != nullptr) << "Entry/exit texture unavailable";
 
     ChannelResources& resources = ensureChannelResources(channelIndex);
-    const ZImg& channelImage = *payload.image->channelImageShared(channelIndex);
+    auto channelImage = payload.image->channelImageShared(channelIndex);
+    CHECK(channelImage != nullptr) << "Raycaster fast volume stage missing channel image";
     const uint64_t volGen = payload.image->volumeGeneration(channelIndex);
-    ZVulkanTexture& volumeTex = ensureVolumeTexture(resources, channelImage, channelIndex, volGen);
+    ZVulkanTexture& volumeTex = ensureVolumeTexture(*payload.image, channelIndex, volGen, channelImage);
     ZVulkanTexture& transferTex = ensureTransferTexture(resources, *transferFunctions[channelIndex]);
     const ImgRaySetupUBOStd140 raySetup = buildRaySetupUBO(payload.analyticRaySetup);
     const auto raySetupSlice = m_backend.suballocateUniformFor(payload, sizeof(raySetup));
@@ -1252,9 +1256,10 @@ void ZVulkanImgRaycasterPipelineContext::recordStageFastDirect(Z3DRendererBase& 
 
   if (payload.image->is2DData()) {
     ChannelResources& resources = ensureChannelResources(channelIndex);
-    const ZImg& channelImage = *payload.image->channelImageShared(channelIndex);
+    auto channelImage = payload.image->channelImageShared(channelIndex);
+    CHECK(channelImage != nullptr) << "Raycaster fast planar stage missing channel image";
     const uint64_t imgGen = payload.image->volumeGeneration(channelIndex);
-    ZVulkanTexture& imageTex = ensureImage2DTexture(resources, channelImage, imgGen);
+    ZVulkanTexture& imageTex = ensureImage2DTexture(*payload.image, channelIndex, imgGen, channelImage);
     ZVulkanTexture& transferTex = ensureTransferTexture(resources, *transferFunctions[channelIndex]);
 
     RaycasterSingleChannelBindlessUBOStd140 ubo{};
@@ -1324,9 +1329,10 @@ void ZVulkanImgRaycasterPipelineContext::recordStageFastDirect(Z3DRendererBase& 
 
   const glm::mat4 viewMatrix = eyeState.viewMatrix;
   ChannelResources& resources = ensureChannelResources(channelIndex);
-  const ZImg& channelImage = *payload.image->channelImageShared(channelIndex);
+  auto channelImage = payload.image->channelImageShared(channelIndex);
+  CHECK(channelImage != nullptr) << "Raycaster fast slice stage missing channel image";
   const uint64_t volGen = payload.image->volumeGeneration(channelIndex);
-  ZVulkanTexture& volumeTex = ensureVolumeTexture(resources, channelImage, channelIndex, volGen);
+  ZVulkanTexture& volumeTex = ensureVolumeTexture(*payload.image, channelIndex, volGen, channelImage);
   ZVulkanTexture& transferTex = ensureTransferTexture(resources, *transferFunctions[channelIndex]);
 
   RaycasterSingleChannelBindlessUBOStd140 ubo{};
@@ -2017,9 +2023,10 @@ void ZVulkanImgRaycasterPipelineContext::recordFastVolumeLayersOnly(Z3DRendererB
     << "Missing transfer function for channel " << channelIndex;
 
   ChannelResources& resources = ensureChannelResources(channelIndex);
-  const ZImg& channelImage = *payload.image->channelImageShared(channelIndex);
+  auto channelImage = payload.image->channelImageShared(channelIndex);
+  CHECK(channelImage != nullptr) << "Raycaster fast layers stage missing channel image";
   const uint64_t volGen = payload.image->volumeGeneration(channelIndex);
-  ZVulkanTexture& volumeTex = ensureVolumeTexture(resources, channelImage, channelIndex, volGen);
+  ZVulkanTexture& volumeTex = ensureVolumeTexture(*payload.image, channelIndex, volGen, channelImage);
   ZVulkanTexture& transferTex = ensureTransferTexture(resources, *transferFunctions[channelIndex]);
   const ImgRaySetupUBOStd140 raySetup = buildRaySetupUBO(payload.analyticRaySetup);
   const auto raySetupSlice = m_backend.suballocateUniformFor(payload, sizeof(raySetup));
@@ -2124,9 +2131,10 @@ void ZVulkanImgRaycasterPipelineContext::recordFastPlanarLayersOnly(Z3DRendererB
 
   if (payload.image->is2DData()) {
     ChannelResources& resources = ensureChannelResources(channelIndex);
-    const ZImg& channelImage = *payload.image->channelImageShared(channelIndex);
+    auto channelImage = payload.image->channelImageShared(channelIndex);
+    CHECK(channelImage != nullptr) << "Raycaster fast planar layers stage missing channel image";
     const uint64_t imgGen = payload.image->volumeGeneration(channelIndex);
-    ZVulkanTexture& imageTex = ensureImage2DTexture(resources, channelImage, imgGen);
+    ZVulkanTexture& imageTex = ensureImage2DTexture(*payload.image, channelIndex, imgGen, channelImage);
     ZVulkanTexture& transferTex = ensureTransferTexture(resources, *transferFunctions[channelIndex]);
 
     RaycasterSingleChannelBindlessUBOStd140 ubo{};
@@ -2197,9 +2205,10 @@ void ZVulkanImgRaycasterPipelineContext::recordFastPlanarLayersOnly(Z3DRendererB
 
   const glm::mat4 viewMatrix = eyeState.viewMatrix;
   ChannelResources& resources = ensureChannelResources(channelIndex);
-  const ZImg& channelImage = *payload.image->channelImageShared(channelIndex);
+  auto channelImage = payload.image->channelImageShared(channelIndex);
+  CHECK(channelImage != nullptr) << "Raycaster fast layers slice stage missing channel image";
   const uint64_t volGen = payload.image->volumeGeneration(channelIndex);
-  ZVulkanTexture& volumeTex = ensureVolumeTexture(resources, channelImage, channelIndex, volGen);
+  ZVulkanTexture& volumeTex = ensureVolumeTexture(*payload.image, channelIndex, volGen, channelImage);
   ZVulkanTexture& transferTex = ensureTransferTexture(resources, *transferFunctions[channelIndex]);
 
   RaycasterSingleChannelBindlessUBOStd140 ubo{};
@@ -3592,86 +3601,38 @@ ZVulkanImgRaycasterPipelineContext::ensureChannelResources(size_t channelIndex)
   return m_channelResources[channelIndex];
 }
 
-ZVulkanTexture& ZVulkanImgRaycasterPipelineContext::ensureVolumeTexture(ChannelResources& resources,
-                                                                        const ZImg& image,
+ZVulkanTexture& ZVulkanImgRaycasterPipelineContext::ensureVolumeTexture(Z3DImg& owner,
                                                                         size_t channelIndex,
-                                                                        uint64_t generation)
+                                                                        uint64_t generation,
+                                                                        std::shared_ptr<const ZImg> image)
 {
-  (void)channelIndex;
-  const uint32_t width = static_cast<uint32_t>(image.width());
-  const uint32_t height = static_cast<uint32_t>(image.height());
-  const uint32_t depth = static_cast<uint32_t>(image.depth());
-  const size_t byteSize = image.byteNumber();
-
-  CHECK_EQ(image.info().bytesPerVoxel, 1u) << "Vulkan raycaster currently expects 8-bit single-channel volumes.";
-  const uint8_t* data = image.channelData<uint8_t>(0);
-
-  const bool needsRecreate = !resources.volumeTexture || resources.volumeTexture->extent().width != width ||
-                             resources.volumeTexture->extent().height != height ||
-                             resources.volumeTexture->extent().depth != depth;
-
-  if (needsRecreate) {
-    auto info =
-      ZVulkanTexture::CreateInfo::make3D(width,
-                                         height,
-                                         depth,
-                                         vk::Format::eR8Unorm,
-                                         vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
-                                         vk::MemoryPropertyFlagBits::eDeviceLocal,
-                                         1u,
-                                         true,
-                                         vk::ImageLayout::eShaderReadOnlyOptimal);
-    resources.volumeTexture = m_backend.device().createTexture(info);
-    CHECK(resources.volumeTexture != nullptr) << "Raycaster: failed to create 3D volume texture";
-  } else if (resources.volumeGeneration == generation && resources.volumeTexture) {
-    // Static content unchanged; no upload needed.
-    return *resources.volumeTexture;
-  }
-
-  if (byteSize > 0 && data) {
-    resources.volumeTexture->uploadData(data, byteSize, vk::ImageLayout::eShaderReadOnlyOptimal);
-    resources.volumeGeneration = generation;
-  }
-
-  return *resources.volumeTexture;
+  CHECK(channelIndex <= static_cast<size_t>(std::numeric_limits<uint32_t>::max()))
+    << "Raycaster channel index exceeds Vulkan residency key range";
+  ZVulkanTexture* texture =
+    m_backend.device().residencyManager().denseVolumeTexture(owner,
+                                                             static_cast<uint32_t>(channelIndex),
+                                                             std::move(image),
+                                                             generation);
+  CHECK(texture != nullptr) << "Raycaster: managed 3D volume texture missing";
+  m_backend.pinTextureForActiveSubmission(texture);
+  return *texture;
 }
 
-ZVulkanTexture& ZVulkanImgRaycasterPipelineContext::ensureImage2DTexture(ChannelResources& resources,
-                                                                         const ZImg& image,
-                                                                         uint64_t generation)
+ZVulkanTexture& ZVulkanImgRaycasterPipelineContext::ensureImage2DTexture(Z3DImg& owner,
+                                                                         size_t channelIndex,
+                                                                         uint64_t generation,
+                                                                         std::shared_ptr<const ZImg> image)
 {
-  const uint32_t width = static_cast<uint32_t>(image.width());
-  const uint32_t height = static_cast<uint32_t>(image.height());
-  const size_t byteSize = static_cast<size_t>(width) * height * image.info().bytesPerVoxel;
-
-  CHECK_EQ(image.info().bytesPerVoxel, 1u) << "Vulkan raycaster expects 8-bit single-channel 2D inputs.";
-  const uint8_t* data = image.channelData<uint8_t>(0);
-
-  const bool needsRecreate = !resources.image2DTexture || resources.image2DTexture->extent().width != width ||
-                             resources.image2DTexture->extent().height != height;
-
-  if (needsRecreate) {
-    auto info =
-      ZVulkanTexture::CreateInfo::make2D(width,
-                                         height,
-                                         vk::Format::eR8Unorm,
-                                         vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
-                                         vk::MemoryPropertyFlagBits::eDeviceLocal,
-                                         1u,
-                                         true,
-                                         vk::ImageLayout::eShaderReadOnlyOptimal);
-    resources.image2DTexture = m_backend.device().createTexture(info);
-    CHECK(resources.image2DTexture != nullptr) << "Raycaster: failed to create 2D image texture";
-  } else if (resources.image2DGeneration == generation && resources.image2DTexture) {
-    return *resources.image2DTexture;
-  }
-
-  if (byteSize > 0 && data) {
-    resources.image2DTexture->uploadData(data, byteSize, vk::ImageLayout::eShaderReadOnlyOptimal);
-    resources.image2DGeneration = generation;
-  }
-
-  return *resources.image2DTexture;
+  CHECK(channelIndex <= static_cast<size_t>(std::numeric_limits<uint32_t>::max()))
+    << "Raycaster 2D channel index exceeds Vulkan residency key range";
+  ZVulkanTexture* texture =
+    m_backend.device().residencyManager().denseImage2DTexture(owner,
+                                                              static_cast<uint32_t>(channelIndex),
+                                                              std::move(image),
+                                                              generation);
+  CHECK(texture != nullptr) << "Raycaster: managed 2D image texture missing";
+  m_backend.pinTextureForActiveSubmission(texture);
+  return *texture;
 }
 
 ZVulkanTexture& ZVulkanImgRaycasterPipelineContext::ensureTransferTexture(ChannelResources& resources,

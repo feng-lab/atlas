@@ -108,6 +108,7 @@ DEFINE_int32(atlas_vk_bindless_utexture3d_capacity,
 static constexpr int kUniformArenaBaseKiB = 256;
 static constexpr size_t kUploadArenaMinPageBytes = 1ull << 20;
 static constexpr size_t kUploadArenaPreferredPageBytes = 32ull * 1024ull * 1024ull;
+static constexpr size_t kUploadArenaStrictPageGranularityBytes = 1ull << 20;
 
 namespace nim {
 
@@ -122,11 +123,32 @@ size_t uploadArenaMaxPageBytes(const ZVulkanDevice& device)
   return static_cast<size_t>(limit);
 }
 
+size_t roundUpToMultiple(size_t value, size_t multiple)
+{
+  CHECK_GT(multiple, 0u) << "roundUpToMultiple requires a non-zero multiple";
+  const size_t remainder = value % multiple;
+  if (remainder == 0u) {
+    return value;
+  }
+  const size_t delta = multiple - remainder;
+  CHECK_LE(value, std::numeric_limits<size_t>::max() - delta) << "roundUpToMultiple overflow";
+  return value + delta;
+}
+
 size_t chooseUploadArenaPageCapacity(const ZVulkanDevice& device, size_t minCapacity)
 {
   const size_t limit = uploadArenaMaxPageBytes(device);
   if (minCapacity > limit) {
     return 0;
+  }
+
+  if (device.residencyManager().strictBudgetActive()) {
+    size_t capacity = std::max(minCapacity, kUploadArenaMinPageBytes);
+    capacity = roundUpToMultiple(capacity, kUploadArenaStrictPageGranularityBytes);
+    if (capacity > limit) {
+      capacity = minCapacity;
+    }
+    return capacity;
   }
 
   const size_t preferred = std::max<size_t>(kUploadArenaMinPageBytes, std::min(kUploadArenaPreferredPageBytes, limit));
@@ -152,6 +174,22 @@ std::string_view staticCacheOwnerName(Z3DRendererVulkanBackend::StaticCacheOwner
       return "cone";
   }
   return "<unknown>";
+}
+
+uint64_t staticCandidateOwnerDomainKey(Z3DRendererVulkanBackend::StaticCacheOwner owner,
+                                       Z3DRendererVulkanBackend::StaticPressureDomain domain)
+{
+  return (static_cast<uint64_t>(owner) << 8u) | static_cast<uint64_t>(domain);
+}
+
+Z3DRendererVulkanBackend::StaticCacheOwner staticCandidateOwner(uint64_t key)
+{
+  return static_cast<Z3DRendererVulkanBackend::StaticCacheOwner>((key >> 8u) & 0xffu);
+}
+
+Z3DRendererVulkanBackend::StaticPressureDomain staticCandidateDomain(uint64_t key)
+{
+  return static_cast<Z3DRendererVulkanBackend::StaticPressureDomain>(key & 0xffu);
 }
 
 } // namespace
@@ -293,6 +331,7 @@ Z3DRendererVulkanBackend::~Z3DRendererVulkanBackend()
   // The scratch pool may still release outstanding Vulkan leases while the
   // engine is tearing down. Do not leave a scheduler closure capturing this
   // backend beyond its lifetime.
+  uninstallMemoryBrokerProviders();
   Z3DRenderGlobalState::instance().scratchPool().setVulkanReleaseScheduler({});
   Z3DRenderGlobalState::instance().scratchPool().setVulkanMemoryPressureHandler({});
 }
@@ -313,6 +352,7 @@ void Z3DRendererVulkanBackend::preBackendSwitch()
   // Switching away from Vulkan: drop the scratch-pool release scheduler that is
   // tied to this backend instance. After flushForTeardown(), immediate release
   // is safe.
+  uninstallMemoryBrokerProviders();
   Z3DRenderGlobalState::instance().scratchPool().setVulkanReleaseScheduler({});
   Z3DRenderGlobalState::instance().scratchPool().setVulkanMemoryPressureHandler({});
 
@@ -334,6 +374,7 @@ void Z3DRendererVulkanBackend::preBackendSwitch()
   }
   m_activeFrameHandle.reset();
   m_activeFrame = nullptr;
+  m_submissionResourcePinningOpen = false;
 
   // Global coordination (device waitIdle, scratch-pool reset) is handled by the
   // rendering engine during backend switches. Beyond clearing the scratch-pool
@@ -521,6 +562,7 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
   // Vulkan frame. This avoids call sites (debug validation, descriptor helpers)
   // observing a partially-initialised backend before ensureDevice/beginFrame.
   s_currentBackend = nullptr;
+  m_submissionResourcePinningOpen = false;
   m_activeRenderer = &renderer;
   auto preRecordActions = std::move(m_pendingBeginRenderPreRecordActions);
   m_pendingBeginRenderPreRecordActions.clear();
@@ -669,6 +711,7 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
     m_activeFrameHandle.reset();
     m_activeFrame = nullptr;
     m_frameRecording = false;
+    m_submissionResourcePinningOpen = false;
     m_activeRenderer = nullptr;
     m_activePPLLIndex.reset();
     s_currentBackend = nullptr;
@@ -679,6 +722,7 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
   if (!m_activeFrameHandle || !m_activeFrameHandle->valid()) {
     m_activeFrame = nullptr;
     m_frameRecording = false;
+    m_submissionResourcePinningOpen = false;
     m_activeRenderer = nullptr;
     m_activePPLLIndex.reset();
     s_currentBackend = nullptr;
@@ -719,6 +763,7 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
   ensureDDPGatingResources(frameResources);
   // Expose frame resources early so suballocateUniform can target this frame.
   m_activeFrame = &frameResources;
+  m_submissionResourcePinningOpen = true;
   // Compute and publish the shared per-frame lighting UBO slice before descriptor priming.
   {
     const size_t align = uniformAlignment();
@@ -866,6 +911,8 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
   frameResources.drawSecondaryCacheExecutes = 0;
   frameResources.pipelinesCreated = 0;
   frameResources.pipelinesBound.clear();
+  CHECK(frameResources.externalResidencyPinReleases.empty())
+    << "External Vulkan residency pins survived the frame completion safe point";
   frameResources.residencyPinnedTextures.clear();
   frameResources.activeSegmentFormats.reset();
   frameResources.skippedBatchesFormatMismatch = 0;
@@ -903,9 +950,6 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
   frameResources.uploadArena.usedPageCount = 0;
   frameResources.uploadArena.usedBytes = 0;
   frameResources.uploadArena.highWatermark = 0;
-  // Ensure static arenas exist once a device is present
-  ensureStaticArenas();
-
   // Run any pending "pre-record" actions now that the frame slot, descriptor
   // arena, and thread-local renderer state are established, but before descriptor
   // priming and command-buffer recording begins.
@@ -965,7 +1009,9 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
     VLOG(2) << "VK cmdBegin: flags=eOneTimeSubmit";
   }
   cmdBuffer.begin(beginInfo);
-  cmdBuffer.resetQueryPool(*frameResources.queryPool, 0, kMaxTimestampQueries);
+  if (timestampQueriesEnabled()) {
+    cmdBuffer.resetQueryPool(*frameResources.queryPool, 0, kMaxTimestampQueries);
+  }
 
   m_frameRecording = true;
   s_currentBackend = this;
@@ -994,6 +1040,18 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
       return;
     }
 
+    if (currentRenderThreadExecutorOrNull() == nullptr) {
+      // Exception teardown can destroy persistent scratch leases after the engine
+      // has cleared render-thread executor TLS. At that point we cannot register
+      // a coroutine completion hook, so fall back to a blocking GPU-safe release.
+      m_sharedDevice->frameExecutor().waitForAllInFlight();
+      for (auto& frame : m_frames) {
+        applyPendingArenaReset(frame);
+      }
+      fn();
+      return;
+    }
+
     // Persistent scratch leases can be released outside an active frame when
     // resizing between tiled-export regions. If all submitted work has already
     // reached its fence, the slot is GPU-safe now; releasing immediately lets
@@ -1005,10 +1063,12 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
     }
 
     // Common case: delay until the current frame-slot reaches the completion
-    // safe point (applyPendingArenaReset).
+    // safe point, but run before user readback/update hooks so completed
+    // scratch backing is reclaimable under strict residency budgets.
     const std::string_view debugLabel = "scratch_pool_vulkan_release";
     if (m_activeFrame && m_activeFrameHandle && m_activeFrameHandle->valid()) {
-      registerAfterCurrentFrameCompletionHook(
+      m_activeFrame->afterFrameCompletionHooks.registerHook(
+        FrameHookSpot::AfterFrameResourceRelease,
         currentRenderThreadExecutorKeepAlive(debugLabel),
         [fn = std::move(fn)](Z3DRendererVulkanBackend&) mutable -> folly::coro::Task<void> {
           fn();
@@ -1028,7 +1088,7 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
       if (it != m_frameResourceMap.end()) {
         CHECK_LT(it->second, m_frames.size()) << "Last submitted frame index out of bounds";
         m_frames[it->second].afterFrameCompletionHooks.registerHook(
-          FrameHookSpot::AfterFrameCompletionSafePoint,
+          FrameHookSpot::AfterFrameResourceRelease,
           currentRenderThreadExecutorKeepAlive(debugLabel),
           [fn = std::move(fn)](Z3DRendererVulkanBackend&) mutable -> folly::coro::Task<void> {
             fn();
@@ -1059,6 +1119,7 @@ void Z3DRendererVulkanBackend::endRender(Z3DRendererBase& renderer)
     s_currentBackend = nullptr;
   });
   if (!m_activeFrame || !m_activeFrameHandle || !m_activeFrameHandle->valid()) {
+    m_submissionResourcePinningOpen = false;
     return;
   }
 
@@ -1068,6 +1129,7 @@ void Z3DRendererVulkanBackend::endRender(Z3DRendererBase& renderer)
 
   auto resetActiveStateGuard = folly::makeGuard([this]() {
     m_frameRecording = false;
+    m_submissionResourcePinningOpen = false;
     m_activeFrameHandle.reset();
     m_activeFrame = nullptr;
     m_activeRenderer = nullptr;
@@ -1212,16 +1274,11 @@ void Z3DRendererVulkanBackend::endRender(Z3DRendererBase& renderer)
       frame.pendingBufferReadbacks.size());
   }
 
-  // Move submission-scoped residency pins out of the frame record so we can
-  // unpin deterministically after submission, even if the frame record is reused.
-  auto residencyPins = std::move(frame.residencyPinnedTextures);
-  frame.residencyPinnedTextures.clear();
-
-  // Move submission-scoped static-geometry segment pins out of the frame record
-  // so we can unpin deterministically after submission, even if the frame record
-  // is reused.
-  auto staticSegmentPins = std::move(frame.pinnedStaticSegments);
-  frame.pinnedStaticSegments.clear();
+  // Keep submission-scoped pins attached to the backend frame record until the
+  // frame completion safe point. applyPendingArenaReset() releases them before
+  // user completion hooks run, which gives all residency classes the same
+  // after-fence boundary and avoids extending pins into readback/update hooks.
+  m_submissionResourcePinningOpen = false;
 
   bool submitted = false;
   try {
@@ -1233,53 +1290,22 @@ void Z3DRendererVulkanBackend::endRender(Z3DRendererBase& renderer)
     LOG(ERROR) << "Vulkan queue submit failed: " << e.what();
   }
 
-  // Release residency pins after the GPU has finished executing this submission.
-  // If submission failed, unpin immediately to avoid leaking pins indefinitely.
-  if (!residencyPins.empty()) {
-    if (submitted) {
-      ZVulkanDevice* submitDevice = m_sharedDevice;
-      device().frameExecutor().scheduleAfterCompletion(frameHandle,
-                                                       [submitDevice, pins = std::move(residencyPins)]() mutable {
-                                                         if (!submitDevice) {
-                                                           return;
-                                                         }
-                                                         for (auto* tex : pins) {
-                                                           submitDevice->residencyManager().unpinIfManaged(tex);
-                                                         }
-                                                       });
-    } else {
-      for (auto* tex : residencyPins) {
+  if (!submitted) {
+    if (!frame.residencyPinnedTextures.empty()) {
+      for (auto* tex : frame.residencyPinnedTextures) {
         device().residencyManager().unpinIfManaged(tex);
       }
+      frame.residencyPinnedTextures.clear();
     }
-  }
-
-  // Release static-geometry segment pins after the GPU has finished executing
-  // this submission. This ensures deferred frees (per-stream eviction) can't
-  // reuse the same suballocated ranges while the GPU is still reading them.
-  if (!staticSegmentPins.empty()) {
-    if (submitted) {
-      Z3DRendererVulkanBackend* submitBackend = this;
-      device().frameExecutor().scheduleAfterCompletion(
-        frameHandle,
-        [submitBackend, pins = std::move(staticSegmentPins)]() mutable {
-          if (!submitBackend) {
-            return;
-          }
-          for (void* segVoid : pins) {
-            auto* seg = static_cast<StaticArena::Segment*>(segVoid);
-            if (seg == nullptr) {
-              continue;
-            }
-            CHECK_GT(seg->pinCount, 0u) << "Static segment pinCount underflow in completion callback";
-            seg->pinCount--;
-            if (seg->pinCount == 0) {
-              submitBackend->flushPendingFreesAndMaybeTrimStaticSegment(seg);
-            }
-          }
-        });
-    } else {
-      for (void* segVoid : staticSegmentPins) {
+    if (!frame.externalResidencyPinReleases.empty()) {
+      for (auto& [_, release] : frame.externalResidencyPinReleases) {
+        CHECK(release) << "External Vulkan residency release callback is empty";
+        release();
+      }
+      frame.externalResidencyPinReleases.clear();
+    }
+    if (!frame.pinnedStaticSegments.empty()) {
+      for (void* segVoid : frame.pinnedStaticSegments) {
         auto* seg = static_cast<StaticArena::Segment*>(segVoid);
         if (seg == nullptr) {
           continue;
@@ -1290,6 +1316,7 @@ void Z3DRendererVulkanBackend::endRender(Z3DRendererBase& renderer)
           flushPendingFreesAndMaybeTrimStaticSegment(seg);
         }
       }
+      frame.pinnedStaticSegments.clear();
     }
   }
 
@@ -1305,11 +1332,9 @@ void Z3DRendererVulkanBackend::endRender(Z3DRendererBase& renderer)
   // never ingested into Z3DPerfCollector, and the per-frame perf summary stalls
   // because Z3DPerfCollector preserves token ordering.
   //
-  // Ordering: schedule this AFTER other completion callbacks (readback-fence
-  // batons, residency unpins, static segment unpins) so that the backend can
-  // safely enter the "completion safe point" (AfterFrameCompletion hooks) and
-  // allow the compositor to record end-to-end `all` latency before we ingest
-  // into Z3DPerfCollector.
+  // Ordering: readback-fence batons may already be registered on this frame.
+  // The backend completion safe point releases residency/static pins before it
+  // runs user hooks, then ingests timings after those hooks finish.
   if (frame.realFrameToken != 0 && frame.submissionId != 0) {
     if (submitted) {
       const std::weak_ptr<bool> alive = m_aliveFlag;
@@ -1691,6 +1716,7 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
         continue;
       }
       auto& texture = vulkan::textureFromHandle(attachment.handle, device(), "renderer color attachment");
+      CHECK(texture.resident()) << "Vulkan color attachment backing is not resident before recording";
       ZVulkanAttachmentInfo info{};
       info.image = texture.image();
       info.view = chooseAttachmentView(texture, attachment.handle.index, vk::ImageAspectFlagBits::eColor);
@@ -1737,6 +1763,7 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
     if (batch.pass.depthAttachment && batch.pass.depthAttachment->handle.valid()) {
       const auto& attachment = *batch.pass.depthAttachment;
       auto& texture = vulkan::textureFromHandle(attachment.handle, device(), "renderer depth attachment");
+      CHECK(texture.resident()) << "Vulkan depth attachment backing is not resident before recording";
       ZVulkanAttachmentInfo info{};
       info.image = texture.image();
       info.view = chooseAttachmentView(texture, attachment.handle.index, vk::ImageAspectFlagBits::eDepth);
@@ -2009,6 +2036,14 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
       CHECK(!isPassAttachment(use.handle)) << "External image use references an active attachment (read-while-write)";
 
       auto& texture = vulkan::textureFromHandle(use.handle, device(), "renderer external image use");
+      (void)device().residencyManager().ensureResidentIfManaged(&texture, "renderer_external_image_use");
+      pinTextureForActiveSubmission(&texture);
+      CHECK(texture.resident()) << "Vulkan external image backing is not resident before recording: handle=0x"
+                                << std::hex << use.handle.id << std::dec << " kind=" << static_cast<int>(use.kind)
+                                << " pass='"
+                                << (renderer.currentPassLabel().empty() ? "<unlabeled-pass>"
+                                                                        : renderer.currentPassLabel())
+                                << "'";
 
       vk::ImageLayout desiredLayout = vk::ImageLayout::eGeneral;
       vk::ImageAspectFlags transitionAspect{};
@@ -3016,6 +3051,15 @@ uint32_t Z3DRendererVulkanBackend::bindlessRegisterSampledImageAuto(ZVulkanTextu
   ensureBindlessSampledImagesOnFrame(*m_activeFrame);
   CHECK(m_activeFrame->bindlessSampledImages != nullptr) << "Bindless descriptor set missing on active frame-slot";
 
+  if (device().residencyManager().ensureResidentIfManaged(&texture,
+                                                          debugLabel.empty() ? std::string_view("bindless_register")
+                                                                             : debugLabel)) {
+    pinTextureForActiveSubmission(&texture);
+  }
+  CHECK(texture.resident()) << "bindlessRegisterSampledImageAuto requires a resident texture"
+                            << (debugLabel.empty() ? "" : " (") << std::string(debugLabel)
+                            << (debugLabel.empty() ? "" : ")");
+
   ZVulkanBindlessDescriptorSet::RegisterRequest req{};
   req.kind = bindlessKindForTextureOrCrash(texture);
   req.texture = &texture;
@@ -3313,6 +3357,11 @@ Z3DRendererVulkanBackend::activateUploadPage(FrameResources::UploadArena& arena,
   }
 
   const size_t targetIndex = arena.usedPageCount;
+  CHECK_LE(targetIndex, arena.pages.size())
+    << fmt::format("Upload arena usedPageCount exceeds page count: used={} pages={} ({})",
+                   arena.usedPageCount,
+                   arena.pages.size(),
+                   debugLabel);
   size_t bestReuseIndex = arena.pages.size();
   for (size_t i = targetIndex; i < arena.pages.size(); ++i) {
     if (arena.pages[i].capacity < minCapacity) {
@@ -3341,9 +3390,8 @@ Z3DRendererVulkanBackend::activateUploadPage(FrameResources::UploadArena& arena,
   }
 
   const size_t newIndex = arena.pages.size();
-  arena.pages.emplace_back();
+  FrameResources::UploadArena::Page newPage{};
   try {
-    auto& newPage = arena.pages.back();
     newPage.buffer = m_sharedDevice->createBufferInPool(
       pageCapacity,
       vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eIndexBuffer |
@@ -3356,7 +3404,9 @@ Z3DRendererVulkanBackend::activateUploadPage(FrameResources::UploadArena& arena,
     newPage.cursor = 0;
   }
   catch (const std::exception& e) {
-    arena.pages.resize(newIndex);
+    if (m_sharedDevice->residencyManager().strictBudgetActive()) {
+      throw;
+    }
     LOG(ERROR) << fmt::format("Upload arena page allocation failed: request={}B size={}B ({}) error={}",
                               minCapacity,
                               pageCapacity,
@@ -3365,13 +3415,21 @@ Z3DRendererVulkanBackend::activateUploadPage(FrameResources::UploadArena& arena,
     return nullptr;
   }
   catch (...) {
-    arena.pages.resize(newIndex);
+    if (m_sharedDevice->residencyManager().strictBudgetActive()) {
+      throw;
+    }
     LOG(ERROR) << fmt::format("Upload arena page allocation failed: request={}B size={}B ({}) error=<unknown>",
                               minCapacity,
                               pageCapacity,
                               debugLabel);
     return nullptr;
   }
+  CHECK_EQ(arena.pages.size(), newIndex) << fmt::format(
+    "Upload arena page count changed during allocation: before={} after={} ({})",
+    newIndex,
+    arena.pages.size(),
+    debugLabel);
+  arena.pages.emplace_back(std::move(newPage));
   if (newIndex != targetIndex) {
     std::swap(arena.pages[targetIndex], arena.pages.back());
   }
@@ -4657,13 +4715,55 @@ void* Z3DRendererVulkanBackend::persistentUniformMappedAt(vk::DeviceSize offset,
   return static_cast<char*>(arena.mapped) + off;
 }
 
+bool Z3DRendererVulkanBackend::prepareStaticPromotionBudget(StaticPressureDomain domain,
+                                                            size_t promotionBytes,
+                                                            std::string_view reason)
+{
+  if (promotionBytes == 0u || m_sharedDevice == nullptr) {
+    return true;
+  }
+
+  const uint64_t requestedBytes = promotionBytes > std::numeric_limits<uint64_t>::max()
+                                    ? std::numeric_limits<uint64_t>::max()
+                                    : static_cast<uint64_t>(promotionBytes);
+  auto& residency = m_sharedDevice->residencyManager();
+  const auto pressure = residency.allocationPressureFor(requestedBytes);
+  if (!pressure.needsReclaim()) {
+    return true;
+  }
+
+  const auto reclaimStats = residency.reclaimMemory(
+    ZVulkanResidencyManager::ReclaimRequest{.requestClass = ZVulkanResidencyManager::ResourceClass::StaticGeometry,
+                                            .requestedBytes = pressure.reclaimBytes,
+                                            .force = false,
+                                            .reason = reason});
+  (void)reclaimStats;
+  const auto retryPressure = residency.allocationPressureFor(requestedBytes);
+  if (!retryPressure.needsReclaim()) {
+    return true;
+  }
+
+  VLOG(1) << fmt::format(
+    "Static {} promotion skipped under Vulkan memory budget: request={}B target={}B usage={}B budget={}B reason='{}'",
+    domain == StaticPressureDomain::Vertex ? "VB" : "IB",
+    promotionBytes,
+    retryPressure.reclaimBytes,
+    retryPressure.usageBytes,
+    retryPressure.budgetBytes,
+    reason.empty() ? "<unspecified>" : std::string(reason));
+  return false;
+}
+
 Z3DRendererVulkanBackend::StaticSlice Z3DRendererVulkanBackend::allocateStaticVB(size_t bytes, size_t alignment)
 {
-  ensureStaticArenas();
   StaticSlice slice{};
   if (bytes == 0) {
     return slice;
   }
+  if (!prepareStaticPromotionBudget(StaticPressureDomain::Vertex, bytes, "static_vb_promotion_preallocate")) {
+    return {};
+  }
+  ensureStaticArenas();
 
   const size_t align = std::max<size_t>(1, alignment);
   VmaVirtualAllocationCreateInfo ainfo{};
@@ -4729,6 +4829,10 @@ Z3DRendererVulkanBackend::StaticSlice Z3DRendererVulkanBackend::allocateStaticVB
     cap *= 2;
   }
 
+  if (!prepareStaticPromotionBudget(StaticPressureDomain::Vertex, cap, "static_vb_segment_preallocate")) {
+    return {};
+  }
+
   auto newSeg = createStaticArenaSegment(StaticArena::Kind::Vertex, cap);
   if (!newSeg) {
     if (tryPressureEviction(true)) {
@@ -4759,11 +4863,14 @@ Z3DRendererVulkanBackend::StaticSlice Z3DRendererVulkanBackend::allocateStaticVB
 
 Z3DRendererVulkanBackend::StaticSlice Z3DRendererVulkanBackend::allocateStaticIB(size_t bytes, size_t alignment)
 {
-  ensureStaticArenas();
   StaticSlice slice{};
   if (bytes == 0) {
     return slice;
   }
+  if (!prepareStaticPromotionBudget(StaticPressureDomain::Index, bytes, "static_ib_promotion_preallocate")) {
+    return {};
+  }
+  ensureStaticArenas();
 
   const size_t align = std::max<size_t>(1, alignment);
   VmaVirtualAllocationCreateInfo ainfo{};
@@ -4824,6 +4931,10 @@ Z3DRendererVulkanBackend::StaticSlice Z3DRendererVulkanBackend::allocateStaticIB
   while (cap < requiredBytes) {
     CHECK(cap <= std::numeric_limits<size_t>::max() / 2) << "Static IB segment capacity overflow";
     cap *= 2;
+  }
+
+  if (!prepareStaticPromotionBudget(StaticPressureDomain::Index, cap, "static_ib_segment_preallocate")) {
+    return {};
   }
 
   auto newSeg = createStaticArenaSegment(StaticArena::Kind::Index, cap);
@@ -4890,7 +5001,7 @@ void Z3DRendererVulkanBackend::pinStaticSliceForActiveSubmission(const StaticSli
   if (!slice.alloc) {
     return;
   }
-  if (!m_activeFrame) {
+  if (!m_activeFrame || !m_submissionResourcePinningOpen) {
     return;
   }
   auto* segment = static_cast<StaticArena::Segment*>(slice.alloc.segment);
@@ -4939,19 +5050,21 @@ Z3DRendererVulkanBackend::evictColdStaticCacheForPressure(StaticPressureDomain d
   const uint64_t projectedUsage = budget.usageBytes > std::numeric_limits<uint64_t>::max() - cappedGrowthBytes
                                     ? std::numeric_limits<uint64_t>::max()
                                     : budget.usageBytes + cappedGrowthBytes;
+  const uint64_t budgetBytes = m_sharedDevice->residencyManager().effectiveBrokerBudgetBytes();
   if (!force) {
-    if (budget.budgetBytes == 0 || projectedUsage <= budget.budgetBytes) {
+    if (budgetBytes == 0 || projectedUsage <= budgetBytes) {
       return 0;
     }
   }
 
   const uint64_t pressureBytes64 =
-    (budget.budgetBytes != 0 && projectedUsage > budget.budgetBytes) ? (projectedUsage - budget.budgetBytes) : 0;
+    (budgetBytes != 0 && projectedUsage > budgetBytes) ? (projectedUsage - budgetBytes) : 0;
   const size_t pressureBytes = pressureBytes64 >= std::numeric_limits<size_t>::max()
                                  ? std::numeric_limits<size_t>::max()
                                  : static_cast<size_t>(pressureBytes64);
   const size_t targetBytes = std::max(growthBytes, pressureBytes);
-  const uint64_t protectedEpoch = m_staticCacheEpoch;
+  const uint64_t protectedEpoch =
+    m_submissionResourcePinningOpen ? m_staticCacheEpoch : std::numeric_limits<uint64_t>::max();
 
   size_t releasedBytes = 0;
   size_t evictedStreams = 0;
@@ -5036,7 +5149,7 @@ Z3DRendererVulkanBackend::evictColdStaticCacheForPressure(StaticPressureDomain d
       releasedBytes,
       targetBytes,
       budget.usageBytes,
-      budget.budgetBytes);
+      budgetBytes);
   }
 
   if (releasedBytes > 0) {
@@ -5048,6 +5161,474 @@ Z3DRendererVulkanBackend::evictColdStaticCacheForPressure(StaticPressureDomain d
                            force);
   }
   return releasedBytes;
+}
+
+void Z3DRendererVulkanBackend::installMemoryBrokerProviders()
+{
+  if (m_sharedDevice == nullptr || !m_memoryBrokerProviderIds.empty()) {
+    return;
+  }
+
+  auto& broker = m_sharedDevice->residencyManager();
+  auto registerProvider = [&](ZVulkanResidencyManager::ResourceProvider provider) {
+    if (provider.owner == nullptr) {
+      provider.owner = this;
+    }
+    m_memoryBrokerProviderIds.push_back(broker.registerResourceProvider(std::move(provider)));
+  };
+  constexpr uint32_t kBrokerPriorityUploadPages = 0;
+  constexpr uint32_t kBrokerPriorityScratchBacking = 10;
+  constexpr uint32_t kBrokerPriorityStaticGeometry = 20;
+  constexpr uint32_t kBrokerPriorityReadbackStaging = 30;
+
+  registerProvider(ZVulkanResidencyManager::ResourceProvider{
+    .resourceClass = ZVulkanResidencyManager::ResourceClass::TransientUploadPage,
+    .priority = kBrokerPriorityUploadPages,
+    .label = "renderer_upload_pages",
+    .reclaim =
+      [this](const ZVulkanResidencyManager::ReclaimRequest& request) {
+        if (currentRenderThreadExecutorOrNull() == nullptr) {
+          return ZVulkanResidencyManager::ReclaimStats{};
+        }
+        return reclaimCompletedUploadPagesForMemoryPressure(request.reason);
+      },
+    .report =
+      [this]() {
+        if (currentRenderThreadExecutorOrNull() == nullptr) {
+          ZVulkanResidencyManager::ResourceReport report{};
+          report.resourceClass = ZVulkanResidencyManager::ResourceClass::TransientUploadPage;
+          report.label = "renderer_upload_pages";
+          return report;
+        }
+        return uploadPageMemoryReport();
+      },
+  });
+
+  auto& scratchPool = Z3DRenderGlobalState::instance().scratchPool();
+  registerProvider(ZVulkanResidencyManager::ResourceProvider{
+    .resourceClass = ZVulkanResidencyManager::ResourceClass::ScratchBacking,
+    .priority = kBrokerPriorityScratchBacking,
+    .owner = &scratchPool,
+    .label = "scratch_pool_backing",
+    .reclaim =
+      [](const ZVulkanResidencyManager::ReclaimRequest& request) {
+        if (currentRenderThreadExecutorOrNull() == nullptr) {
+          return ZVulkanResidencyManager::ReclaimStats{};
+        }
+        auto& pool = Z3DRenderGlobalState::instance().scratchPool();
+        auto stats = pool.reclaimFreeVulkanScratchBacking(request.reason, request.requestedBytes);
+        return ZVulkanResidencyManager::ReclaimStats{.resourcesReleased = stats.slotsEvicted,
+                                                     .bytesReleased = stats.bytesReleased};
+      },
+    .collectCandidates =
+      []() {
+        std::vector<ZVulkanResidencyManager::EvictionCandidate> out;
+        if (currentRenderThreadExecutorOrNull() == nullptr) {
+          return out;
+        }
+        auto& pool = Z3DRenderGlobalState::instance().scratchPool();
+        const auto scratchCandidates = pool.vulkanScratchBackingCandidates();
+        out.reserve(scratchCandidates.size());
+        for (const auto& candidate : scratchCandidates) {
+          out.push_back(ZVulkanResidencyManager::EvictionCandidate{
+            .resourceClass = ZVulkanResidencyManager::ResourceClass::ScratchBacking,
+            .priority = candidate.inUse ? 1u : 0u,
+            .residentBytes = candidate.residentBytes,
+            .lastUsedEpoch = candidate.lastUseTick,
+            .pinCount = candidate.pinCount,
+            .restoreAvailable = true,
+            .userKey0 = static_cast<uint64_t>(candidate.usage),
+            .userKey1 = static_cast<uint64_t>(candidate.slotIndex),
+            .label = candidate.label});
+        }
+        return out;
+      },
+    .evictCandidate =
+      [](const ZVulkanResidencyManager::EvictionCandidate& candidate,
+         const ZVulkanResidencyManager::ReclaimRequest& request) {
+        if (currentRenderThreadExecutorOrNull() == nullptr) {
+          return ZVulkanResidencyManager::ReclaimStats{};
+        }
+        const size_t usageIndex = static_cast<size_t>(candidate.userKey0);
+        if (usageIndex >= kScratchUsageCount || candidate.userKey1 > std::numeric_limits<size_t>::max()) {
+          return ZVulkanResidencyManager::ReclaimStats{};
+        }
+        auto& pool = Z3DRenderGlobalState::instance().scratchPool();
+        const auto stats = pool.reclaimVulkanScratchBackingCandidate(static_cast<ScratchImageUsage>(usageIndex),
+                                                                     static_cast<size_t>(candidate.userKey1),
+                                                                     request.reason);
+        return ZVulkanResidencyManager::ReclaimStats{.resourcesReleased = stats.slotsEvicted,
+                                                     .bytesReleased = stats.bytesReleased};
+      },
+    .report =
+      [this]() {
+        ZVulkanResidencyManager::ResourceReport report{};
+        report.resourceClass = ZVulkanResidencyManager::ResourceClass::ScratchBacking;
+        report.label = "scratch_pool_backing";
+        if (currentRenderThreadExecutorOrNull() == nullptr) {
+          return report;
+        }
+        const auto scratchReport = Z3DRenderGlobalState::instance().scratchPool().vulkanScratchBackingReport();
+        const bool inFlight = m_sharedDevice != nullptr && m_sharedDevice->frameExecutor().inFlightCount() != 0u;
+        report.residentObjects = scratchReport.residentSlots;
+        report.pinnedObjects =
+          scratchReport.releasePendingSlots + scratchReport.protectedSlots + (inFlight ? scratchReport.inUseSlots : 0u);
+        report.residentBytes = scratchReport.residentBytes;
+        return report;
+      },
+  });
+
+  registerProvider(ZVulkanResidencyManager::ResourceProvider{
+    .resourceClass = ZVulkanResidencyManager::ResourceClass::StaticGeometry,
+    .priority = kBrokerPriorityStaticGeometry,
+    .label = "renderer_static_geometry",
+    .reclaim =
+      [this](const ZVulkanResidencyManager::ReclaimRequest& request) {
+        return reclaimStaticGeometryForMemoryPressure(request.requestedBytes, request.reason);
+      },
+    .collectCandidates =
+      [this]() {
+        return staticGeometryEvictionCandidates();
+      },
+    .evictCandidate =
+      [this](const ZVulkanResidencyManager::EvictionCandidate& candidate,
+             const ZVulkanResidencyManager::ReclaimRequest& request) {
+        return evictStaticGeometryCandidate(candidate, request.reason);
+      },
+    .report =
+      [this]() {
+        return staticGeometryMemoryReport();
+      },
+  });
+
+  registerProvider(ZVulkanResidencyManager::ResourceProvider{
+    .resourceClass = ZVulkanResidencyManager::ResourceClass::ReadbackStaging,
+    .priority = kBrokerPriorityReadbackStaging,
+    .label = "renderer_readback_staging",
+    .reclaim =
+      [this](const ZVulkanResidencyManager::ReclaimRequest& request) {
+        if (currentRenderThreadExecutorOrNull() == nullptr) {
+          return ZVulkanResidencyManager::ReclaimStats{};
+        }
+        return reclaimReadbackStagingForMemoryPressure(request.reason);
+      },
+    .report =
+      [this]() {
+        if (currentRenderThreadExecutorOrNull() == nullptr) {
+          ZVulkanResidencyManager::ResourceReport report{};
+          report.resourceClass = ZVulkanResidencyManager::ResourceClass::ReadbackStaging;
+          report.label = "renderer_readback_staging";
+          return report;
+        }
+        return readbackStagingMemoryReport();
+      },
+  });
+}
+
+void Z3DRendererVulkanBackend::uninstallMemoryBrokerProviders()
+{
+  if (m_sharedDevice == nullptr || m_memoryBrokerProviderIds.empty()) {
+    m_memoryBrokerProviderIds.clear();
+    return;
+  }
+  auto& broker = m_sharedDevice->residencyManager();
+  for (const auto id : m_memoryBrokerProviderIds) {
+    broker.unregisterResourceProvider(id);
+  }
+  m_memoryBrokerProviderIds.clear();
+}
+
+ZVulkanResidencyManager::ReclaimStats
+Z3DRendererVulkanBackend::reclaimCompletedUploadPagesForMemoryPressure(std::string_view reason)
+{
+  ZVulkanResidencyManager::ReclaimStats stats{};
+  if (m_sharedDevice == nullptr || m_sharedDevice->frameExecutor().inFlightCount() != 0u) {
+    return stats;
+  }
+
+  for (auto& frame : m_frames) {
+    auto& arena = frame.uploadArena;
+    const bool activeFrame = (&frame == m_activeFrame);
+    const size_t keepPages = activeFrame ? std::min(arena.usedPageCount, arena.pages.size()) : 0u;
+    for (size_t pageIndex = keepPages; pageIndex < arena.pages.size(); ++pageIndex) {
+      const auto& page = arena.pages[pageIndex];
+      if (page.capacity == 0u) {
+        continue;
+      }
+      stats.bytesReleased += page.capacity;
+      stats.resourcesReleased++;
+    }
+    arena.pages.resize(keepPages);
+    arena.usedPageCount = keepPages;
+    if (keepPages == 0u) {
+      arena.activePageIndex = 0;
+      arena.usedBytes = 0;
+      arena.highWatermark = 0;
+    } else if (arena.activePageIndex >= keepPages) {
+      arena.activePageIndex = keepPages - 1u;
+    }
+  }
+
+  if (stats.resourcesReleased > 0u) {
+    VLOG(1) << fmt::format("VK upload-page broker reclaim: pages={} bytes={}B reason='{}'",
+                           stats.resourcesReleased,
+                           stats.bytesReleased,
+                           reason.empty() ? "<unspecified>" : std::string(reason));
+  }
+  return stats;
+}
+
+std::vector<ZVulkanResidencyManager::EvictionCandidate>
+Z3DRendererVulkanBackend::staticGeometryEvictionCandidates() const
+{
+  std::vector<ZVulkanResidencyManager::EvictionCandidate> candidates;
+  if (m_sharedDevice == nullptr || m_staticCacheEpoch == 0) {
+    return candidates;
+  }
+
+  const uint64_t protectedEpoch =
+    m_submissionResourcePinningOpen ? m_staticCacheEpoch : std::numeric_limits<uint64_t>::max();
+  auto addCandidate = [&](std::optional<StaticPressureEvictionCandidate> candidate, StaticPressureDomain domain) {
+    if (!candidate || candidate->bytes == 0u) {
+      return;
+    }
+    candidates.push_back(ZVulkanResidencyManager::EvictionCandidate{
+      .resourceClass = ZVulkanResidencyManager::ResourceClass::StaticGeometry,
+      .priority = 0,
+      .residentBytes = static_cast<uint64_t>(candidate->bytes),
+      .lastUsedEpoch = candidate->lastUsedEpoch,
+      .pinCount = 0,
+      .restoreAvailable = true,
+      .userKey0 = candidate->streamKey,
+      .userKey1 = staticCandidateOwnerDomainKey(candidate->owner, domain),
+      .label = fmt::format("static_{}_{} stream={}",
+                           staticCacheOwnerName(candidate->owner),
+                           domain == StaticPressureDomain::Vertex ? "vb" : "ib",
+                           candidate->streamKey)});
+  };
+
+  for (StaticPressureDomain domain : {StaticPressureDomain::Vertex, StaticPressureDomain::Index}) {
+    if (m_meshContext) {
+      addCandidate(m_meshContext->oldestEvictableStaticStream(domain, protectedEpoch), domain);
+    }
+    if (m_lineContext) {
+      addCandidate(m_lineContext->oldestEvictableStaticStream(domain, protectedEpoch), domain);
+    }
+    if (m_ellipsoidContext) {
+      addCandidate(m_ellipsoidContext->oldestEvictableStaticStream(domain, protectedEpoch), domain);
+    }
+    if (m_sphereContext) {
+      addCandidate(m_sphereContext->oldestEvictableStaticStream(domain, protectedEpoch), domain);
+    }
+    if (m_coneContext) {
+      addCandidate(m_coneContext->oldestEvictableStaticStream(domain, protectedEpoch), domain);
+    }
+  }
+
+  return candidates;
+}
+
+ZVulkanResidencyManager::ReclaimStats
+Z3DRendererVulkanBackend::evictStaticGeometryCandidate(const ZVulkanResidencyManager::EvictionCandidate& candidate,
+                                                       std::string_view reason)
+{
+  ZVulkanResidencyManager::ReclaimStats stats{};
+  if (candidate.resourceClass != ZVulkanResidencyManager::ResourceClass::StaticGeometry || candidate.userKey0 == 0u) {
+    return stats;
+  }
+
+  const uint64_t streamKey = candidate.userKey0;
+  const StaticCacheOwner owner = staticCandidateOwner(candidate.userKey1);
+  const StaticPressureDomain domain = staticCandidateDomain(candidate.userKey1);
+  const uint64_t residentBytesBefore = staticGeometryMemoryReport().residentBytes;
+  size_t virtualBytesFreed = 0;
+  switch (owner) {
+    case StaticCacheOwner::Mesh:
+      if (m_meshContext) {
+        virtualBytesFreed = m_meshContext->evictStaticStreamForPressure(streamKey);
+      }
+      break;
+    case StaticCacheOwner::Line:
+      if (m_lineContext) {
+        virtualBytesFreed = m_lineContext->evictStaticStreamForPressure(streamKey);
+      }
+      break;
+    case StaticCacheOwner::Ellipsoid:
+      if (m_ellipsoidContext) {
+        virtualBytesFreed = m_ellipsoidContext->evictStaticStreamForPressure(streamKey);
+      }
+      break;
+    case StaticCacheOwner::Sphere:
+      if (m_sphereContext) {
+        virtualBytesFreed = m_sphereContext->evictStaticStreamForPressure(streamKey);
+      }
+      break;
+    case StaticCacheOwner::Cone:
+      if (m_coneContext) {
+        virtualBytesFreed = m_coneContext->evictStaticStreamForPressure(streamKey);
+      }
+      break;
+  }
+
+  const uint64_t residentBytesAfter = staticGeometryMemoryReport().residentBytes;
+  const uint64_t residentBytesFreed =
+    residentBytesBefore > residentBytesAfter ? (residentBytesBefore - residentBytesAfter) : 0u;
+  if (virtualBytesFreed == 0u && residentBytesFreed == 0u) {
+    return stats;
+  }
+  stats.resourcesReleased = 1u;
+  stats.bytesReleased = residentBytesFreed;
+  VLOG(1) << fmt::format(
+    "VK static broker candidate evict: owner={} domain={} streamKey={} resident_released={}B virtual_released={}B reason='{}'",
+    staticCacheOwnerName(owner),
+    domain == StaticPressureDomain::Vertex ? "VB" : "IB",
+    streamKey,
+    residentBytesFreed,
+    virtualBytesFreed,
+    reason.empty() ? "<unspecified>" : std::string(reason));
+  return stats;
+}
+
+ZVulkanResidencyManager::ReclaimStats
+Z3DRendererVulkanBackend::reclaimStaticGeometryForMemoryPressure(uint64_t requestedBytes, std::string_view reason)
+{
+  const size_t maxSize = std::numeric_limits<size_t>::max();
+  const size_t target = requestedBytes == 0u || requestedBytes > static_cast<uint64_t>(maxSize)
+                          ? maxSize
+                          : static_cast<size_t>(requestedBytes);
+
+  ZVulkanResidencyManager::ReclaimStats stats{};
+  const uint64_t residentBytesBefore = staticGeometryMemoryReport().residentBytes;
+  const size_t vbReleased = evictColdStaticCacheForPressure(StaticPressureDomain::Vertex, target, true);
+  if (vbReleased > 0u) {
+    stats.resourcesReleased++;
+  }
+
+  size_t remaining = maxSize;
+  if (target != maxSize) {
+    remaining = vbReleased >= target ? 0u : (target - vbReleased);
+  }
+  if (remaining > 0u) {
+    const size_t ibReleased = evictColdStaticCacheForPressure(StaticPressureDomain::Index, remaining, true);
+    if (ibReleased > 0u) {
+      stats.resourcesReleased++;
+    }
+  }
+
+  const uint64_t residentBytesAfter = staticGeometryMemoryReport().residentBytes;
+  stats.bytesReleased = residentBytesBefore > residentBytesAfter ? (residentBytesBefore - residentBytesAfter) : 0u;
+  if (stats.bytesReleased > 0u) {
+    VLOG(1) << fmt::format("VK static-geometry broker reclaim: bytes={}B target={}B reason='{}'",
+                           stats.bytesReleased,
+                           target == maxSize ? 0u : target,
+                           reason.empty() ? "<unspecified>" : std::string(reason));
+  }
+  return stats;
+}
+
+ZVulkanResidencyManager::ReclaimStats
+Z3DRendererVulkanBackend::reclaimReadbackStagingForMemoryPressure(std::string_view reason)
+{
+  ZVulkanResidencyManager::ReclaimStats stats{};
+  for (auto& slot : m_readbackSlots) {
+    if (slot.inUse || !slot.buffer) {
+      continue;
+    }
+    stats.bytesReleased += slot.capacity;
+    stats.resourcesReleased++;
+    if (slot.mapped != nullptr) {
+      slot.buffer->unmap();
+      slot.mapped = nullptr;
+    }
+    slot.buffer.reset();
+    slot.capacity = 0;
+  }
+  if (stats.resourcesReleased > 0u) {
+    VLOG(1) << fmt::format("VK readback-staging broker reclaim: slots={} bytes={}B reason='{}'",
+                           stats.resourcesReleased,
+                           stats.bytesReleased,
+                           reason.empty() ? "<unspecified>" : std::string(reason));
+  }
+  return stats;
+}
+
+ZVulkanResidencyManager::ResourceReport Z3DRendererVulkanBackend::uploadPageMemoryReport() const
+{
+  ZVulkanResidencyManager::ResourceReport report{};
+  report.resourceClass = ZVulkanResidencyManager::ResourceClass::TransientUploadPage;
+  report.label = "renderer_upload_pages";
+  const bool inFlight = m_sharedDevice != nullptr && m_sharedDevice->frameExecutor().inFlightCount() != 0u;
+  for (const auto& frame : m_frames) {
+    for (const auto& page : frame.uploadArena.pages) {
+      if (!page.buffer || page.capacity == 0u) {
+        continue;
+      }
+      report.residentObjects++;
+      report.residentBytes += page.capacity;
+    }
+    if (inFlight || &frame == m_activeFrame) {
+      report.pinnedObjects += static_cast<uint32_t>(
+        std::min<size_t>(frame.uploadArena.usedPageCount, static_cast<size_t>(std::numeric_limits<uint32_t>::max())));
+    }
+  }
+  return report;
+}
+
+ZVulkanResidencyManager::ResourceReport Z3DRendererVulkanBackend::scratchBackingMemoryReport() const
+{
+  ZVulkanResidencyManager::ResourceReport report{};
+  report.resourceClass = ZVulkanResidencyManager::ResourceClass::ScratchBacking;
+  report.label = "scratch_pool_backing";
+  if (currentRenderThreadExecutorOrNull() == nullptr) {
+    return report;
+  }
+  const auto scratchReport = Z3DRenderGlobalState::instance().scratchPool().vulkanScratchBackingReport();
+  const bool inFlight = m_sharedDevice != nullptr && m_sharedDevice->frameExecutor().inFlightCount() != 0u;
+  report.residentObjects = scratchReport.residentSlots;
+  report.pinnedObjects =
+    scratchReport.releasePendingSlots + scratchReport.protectedSlots + (inFlight ? scratchReport.inUseSlots : 0u);
+  report.residentBytes = scratchReport.residentBytes;
+  return report;
+}
+
+ZVulkanResidencyManager::ResourceReport Z3DRendererVulkanBackend::staticGeometryMemoryReport() const
+{
+  ZVulkanResidencyManager::ResourceReport report{};
+  report.resourceClass = ZVulkanResidencyManager::ResourceClass::StaticGeometry;
+  report.label = "renderer_static_geometry";
+  auto addSegments = [&](const auto& segments) {
+    for (const auto& segment : segments) {
+      if (!segment || !segment->buffer || segment->capacity == 0u) {
+        continue;
+      }
+      report.residentObjects++;
+      report.residentBytes += segment->capacity;
+      if (segment->pinCount > 0u) {
+        report.pinnedObjects++;
+      }
+    }
+  };
+  addSegments(m_staticArena.vb);
+  addSegments(m_staticArena.ib);
+  return report;
+}
+
+ZVulkanResidencyManager::ResourceReport Z3DRendererVulkanBackend::readbackStagingMemoryReport() const
+{
+  ZVulkanResidencyManager::ResourceReport report{};
+  report.resourceClass = ZVulkanResidencyManager::ResourceClass::ReadbackStaging;
+  report.label = "renderer_readback_staging";
+  for (const auto& slot : m_readbackSlots) {
+    if (!slot.buffer || slot.capacity == 0u) {
+      continue;
+    }
+    report.residentObjects++;
+    report.residentBytes += slot.capacity;
+    if (slot.inUse) {
+      report.pinnedObjects++;
+    }
+  }
+  return report;
 }
 
 void Z3DRendererVulkanBackend::stageCopy(vk::Buffer dst,
@@ -5137,24 +5718,59 @@ void Z3DRendererVulkanBackend::flushForTeardown(std::string_view reason)
                            m_sharedDevice->frameExecutor().hasInFlightFrames());
   }
 
-  // If we're mid-recording and have pinned managed textures for this (not yet submitted)
-  // command buffer, unpin them now to avoid carrying pins into teardown without a fence.
-  if (m_activeFrame && (!m_activeFrameHandle || !m_activeFrameHandle->valid())) {
-    // Defensive: if m_activeFrame exists without a valid handle, it cannot be submitted.
-    if (!m_activeFrame->residencyPinnedTextures.empty()) {
-      for (auto* tex : m_activeFrame->residencyPinnedTextures) {
-        m_sharedDevice->residencyManager().unpinIfManaged(tex);
-      }
-      m_activeFrame->residencyPinnedTextures.clear();
+  auto unpinUnsubmittedResidency = [&]() {
+    if (!m_activeFrame || m_activeFrame->residencyPinnedTextures.empty()) {
+      return;
     }
-  } else if (m_activeFrame && m_activeFrameHandle && m_activeFrameHandle->valid() && m_frameRecording) {
-    // We have an active recording. We do not attempt to submit during teardown; just drop
-    // any pins accumulated so far since they have not been consumed by the GPU.
-    if (!m_activeFrame->residencyPinnedTextures.empty()) {
-      for (auto* tex : m_activeFrame->residencyPinnedTextures) {
-        m_sharedDevice->residencyManager().unpinIfManaged(tex);
+    for (auto* tex : m_activeFrame->residencyPinnedTextures) {
+      m_sharedDevice->residencyManager().unpinIfManaged(tex);
+    }
+    m_activeFrame->residencyPinnedTextures.clear();
+  };
+
+  auto unpinUnsubmittedStaticSegments = [&]() {
+    if (!m_activeFrame || m_activeFrame->pinnedStaticSegments.empty()) {
+      return;
+    }
+    for (void* segVoid : m_activeFrame->pinnedStaticSegments) {
+      auto* seg = static_cast<StaticArena::Segment*>(segVoid);
+      CHECK(seg != nullptr) << "Active frame carried a null static segment pin during teardown";
+      CHECK_GT(seg->pinCount, 0u) << "Static segment pinCount underflow during teardown";
+      seg->pinCount--;
+      if (seg->pinCount == 0u) {
+        flushPendingFreesAndMaybeTrimStaticSegment(seg);
       }
-      m_activeFrame->residencyPinnedTextures.clear();
+    }
+    m_activeFrame->pinnedStaticSegments.clear();
+  };
+
+  auto releaseUnsubmittedExternalResidency = [&]() {
+    if (!m_activeFrame || m_activeFrame->externalResidencyPinReleases.empty()) {
+      return;
+    }
+    for (auto& [_, release] : m_activeFrame->externalResidencyPinReleases) {
+      CHECK(release) << "External Vulkan residency release callback is empty during teardown";
+      release();
+    }
+    m_activeFrame->externalResidencyPinReleases.clear();
+  };
+
+  // If beginRender()/recording failed before endRender() submitted the command
+  // buffer, any pins on m_activeFrame are CPU-only reservations. Drop them here
+  // so resource-limit exceptions can unwind without leaving owner-destruction
+  // callbacks to observe pinned managed textures.
+  if (m_activeFrame) {
+    unpinUnsubmittedResidency();
+    releaseUnsubmittedExternalResidency();
+    unpinUnsubmittedStaticSegments();
+    m_frameRecording = false;
+    m_submissionResourcePinningOpen = false;
+    m_activeFrameHandle.reset();
+    m_activeFrame = nullptr;
+    m_activeRenderer = nullptr;
+    m_activePPLLIndex.reset();
+    if (s_currentBackend == this) {
+      s_currentBackend = nullptr;
     }
   }
 
@@ -5370,7 +5986,8 @@ void Z3DRendererVulkanBackend::spawnDetachedTask(folly::Executor::KeepAlive<> ex
 
 void Z3DRendererVulkanBackend::pinTextureForActiveSubmission(ZVulkanTexture* texture)
 {
-  if (!texture || !m_activeFrame || !m_activeFrameHandle || !m_activeFrameHandle->valid()) {
+  if (!texture || !m_activeFrame || !m_activeFrameHandle || !m_activeFrameHandle->valid() ||
+      !m_submissionResourcePinningOpen) {
     return;
   }
   // Deduplicate per submission: we unpin once per unique texture, so only pin
@@ -5385,6 +6002,78 @@ void Z3DRendererVulkanBackend::pinTextureForActiveSubmission(ZVulkanTexture* tex
   if (!device().residencyManager().pinIfManaged(texture)) {
     m_activeFrame->residencyPinnedTextures.erase(texture);
   }
+}
+
+void Z3DRendererVulkanBackend::prepareTextureForCommandUse(ZVulkanTexture& texture,
+                                                           TextureCommandUse use,
+                                                           std::string_view debugLabel)
+{
+  CHECK(m_sharedDevice != nullptr) << "prepareTextureForCommandUse requires an initialized Vulkan device";
+  CHECK(m_activeFrame && m_activeFrameHandle && m_activeFrameHandle->valid())
+    << "prepareTextureForCommandUse requires an active frame";
+  CHECK(m_frameRecording) << "prepareTextureForCommandUse requires command-buffer recording";
+
+  const std::string_view reason = debugLabel.empty() ? std::string_view("command_texture_use") : debugLabel;
+  const bool contentsRequired = use == TextureCommandUse::ReadExistingContents;
+
+  auto& residency = device().residencyManager();
+  if (residency.ensureResidentIfManaged(&texture, reason)) {
+    pinTextureForActiveSubmission(&texture);
+  }
+
+  auto& scratchPool = Z3DRenderGlobalState::instance().scratchPool();
+  const std::array scratchUses{
+    Z3DScratchResourcePool::VulkanScratchTextureUse{.texture = &texture, .contentsRequired = contentsRequired}
+  };
+  scratchPool.prepareVulkanScratchTexturesForPass(
+    std::span<const Z3DScratchResourcePool::VulkanScratchTextureUse>(scratchUses.data(), scratchUses.size()),
+    reason);
+
+  const std::array scratchTextures{&texture};
+  auto scratchProtection = scratchPool.protectVulkanScratchTextures(
+    std::span<ZVulkanTexture* const>(scratchTextures.data(), scratchTextures.size()));
+  if (scratchProtection.active()) {
+    auto sharedProtection =
+      std::make_shared<Z3DScratchResourcePool::VulkanScratchProtectionScope>(std::move(scratchProtection));
+    (void)pinExternalResidencyResourceForActiveSubmission(static_cast<const void*>(&texture),
+                                                          [sharedProtection = std::move(sharedProtection)]() mutable {
+                                                            sharedProtection.reset();
+                                                          });
+  }
+
+  CHECK(texture.resident()) << "Vulkan command texture is not resident after backend preparation"
+                            << (debugLabel.empty() ? "" : " label='") << (debugLabel.empty() ? "" : debugLabel)
+                            << (debugLabel.empty() ? "" : "'");
+}
+
+void Z3DRendererVulkanBackend::clearColorTextureToShaderReadOnly(ZVulkanTexture& texture,
+                                                                 const vk::ClearColorValue& clear,
+                                                                 const vk::ImageSubresourceRange& range,
+                                                                 std::string_view debugLabel)
+{
+  prepareTextureForCommandUse(texture, TextureCommandUse::DiscardAndWrite, debugLabel);
+
+  auto& cmd = commandBuffer();
+  texture.transitionLayout(cmd, texture.layout(), vk::ImageLayout::eTransferDstOptimal, range.aspectMask);
+  cmd.clearColorImage(texture.image(), vk::ImageLayout::eTransferDstOptimal, clear, range);
+  texture.transitionLayout(cmd,
+                           vk::ImageLayout::eTransferDstOptimal,
+                           vk::ImageLayout::eShaderReadOnlyOptimal,
+                           range.aspectMask);
+  texture.setDescriptorLayout(vk::ImageLayout::eShaderReadOnlyOptimal);
+}
+
+bool Z3DRendererVulkanBackend::pinExternalResidencyResourceForActiveSubmission(const void* key,
+                                                                               std::function<void()> release)
+{
+  if (key == nullptr || !m_activeFrame || !m_activeFrameHandle || !m_activeFrameHandle->valid() ||
+      !m_submissionResourcePinningOpen) {
+    return false;
+  }
+  CHECK(release) << "External Vulkan residency pin requires a release callback";
+
+  const auto [_, inserted] = m_activeFrame->externalResidencyPinReleases.emplace(key, std::move(release));
+  return inserted;
 }
 
 vk::raii::CommandBuffer& Z3DRendererVulkanBackend::commandBuffer()
@@ -5413,6 +6102,7 @@ void Z3DRendererVulkanBackend::ensureDevice()
   auto* dev = pool.vulkanDevice();
   CHECK(dev != nullptr) << "Shared Vulkan device not injected into scratch pool";
   if (m_sharedDevice != dev) {
+    uninstallMemoryBrokerProviders();
     m_sharedDescriptorLayouts = {};
     m_sharedDevice = dev;
     m_deviceRevision++;
@@ -5447,7 +6137,9 @@ void Z3DRendererVulkanBackend::ensureDevice()
     catch (...) {
       m_timestampPeriod = 1.0f;
     }
+    installMemoryBrokerProviders();
   }
+  installMemoryBrokerProviders();
   // Keep local ring sizes aligned with the device executor setting.
   m_maxFramesInFlight = m_sharedDevice->frameExecutor().maxFramesInFlight();
   if (m_completedFrameKeysScratch.capacity() < m_maxFramesInFlight) {
@@ -5469,6 +6161,7 @@ void Z3DRendererVulkanBackend::resetFrameResources()
   m_activeFrame = nullptr;
   m_lastSubmittedFrameKey = nullptr;
   m_frameRecording = false;
+  m_submissionResourcePinningOpen = false;
   m_frames.clear();
   m_frameResourceMap.clear();
   m_frameDevice = nullptr;
@@ -5727,21 +6420,64 @@ void Z3DRendererVulkanBackend::applyPendingArenaReset(FrameResources& frame)
   // alive until the previous submission fence completed.
   frame.ddpArgsDevice.retiredBuffers.clear();
 
-  // Barrier: execute all registered hooks for this frame-slot completion safe
-  // point, then continue.
+  // Completion safe point: the frame slot's fence is complete, so submission
+  // pins are safe to release before user completion hooks allocate readback,
+  // staging, restored textures, or promoted geometry.
+  if (!frame.residencyPinnedTextures.empty()) {
+    CHECK(m_sharedDevice != nullptr) << "Shared Vulkan device missing while releasing residency pins";
+    for (auto* tex : frame.residencyPinnedTextures) {
+      m_sharedDevice->residencyManager().unpinIfManaged(tex);
+    }
+    VLOG(1) << fmt::format("VK completion safe point released texture pins: count={}",
+                           frame.residencyPinnedTextures.size());
+    frame.residencyPinnedTextures.clear();
+  }
+
+  if (!frame.externalResidencyPinReleases.empty()) {
+    const size_t releaseCount = frame.externalResidencyPinReleases.size();
+    for (auto& [_, release] : frame.externalResidencyPinReleases) {
+      CHECK(release) << "External Vulkan residency release callback is empty";
+      release();
+    }
+    VLOG(1) << fmt::format("VK completion safe point released external residency pins: count={}", releaseCount);
+    frame.externalResidencyPinReleases.clear();
+  }
+
+  if (!frame.pinnedStaticSegments.empty()) {
+    for (void* segVoid : frame.pinnedStaticSegments) {
+      auto* seg = static_cast<StaticArena::Segment*>(segVoid);
+      CHECK(seg != nullptr) << "Static segment pin carried a null segment";
+      CHECK_GT(seg->pinCount, 0u) << "Static segment pinCount underflow";
+      seg->pinCount--;
+      if (seg->pinCount == 0u) {
+        flushPendingFreesAndMaybeTrimStaticSegment(seg);
+      }
+    }
+    VLOG(1) << fmt::format("VK completion safe point released static pins: count={}",
+                           frame.pinnedStaticSegments.size());
+    frame.pinnedStaticSegments.clear();
+  }
+
+  // Barrier: execute backend resource-release hooks first, then user completion
+  // hooks for this frame-slot completion safe point.
   //
   // We capture and rethrow after waking awaiters so cancellation/errors do not
   // strand coroutines waiting on the frame completion signal.
   FrameResources* previousSafePointFrame = m_frameInCompletionSafePoint.exchange(&frame, std::memory_order_acq_rel);
 
   std::exception_ptr deferredException;
-  try {
-    folly::coro::blockingWait(
-      frame.afterFrameCompletionHooks.reach(FrameHookSpot::AfterFrameCompletionSafePoint, *this));
-  }
-  catch (...) {
-    deferredException = std::current_exception();
-  }
+  auto reachSpot = [&](FrameHookSpot spot) {
+    try {
+      folly::coro::blockingWait(frame.afterFrameCompletionHooks.reach(spot, *this));
+    }
+    catch (...) {
+      if (!deferredException) {
+        deferredException = std::current_exception();
+      }
+    }
+  };
+  reachSpot(FrameHookSpot::AfterFrameResourceRelease);
+  reachSpot(FrameHookSpot::AfterFrameCompletionSafePoint);
 
   m_frameInCompletionSafePoint.store(previousSafePointFrame, std::memory_order_release);
 
@@ -5908,14 +6644,19 @@ void Z3DRendererVulkanBackend::ensureReadbackSlots(size_t minBytes, uint32_t min
       continue;
     }
     if (!slot.buffer || slot.capacity < minBytes) {
-      slot.buffer = device().createBufferInPool(minBytes,
-                                                vk::BufferUsageFlagBits::eTransferDst,
-                                                vk::MemoryPropertyFlagBits::eHostVisible |
-                                                  vk::MemoryPropertyFlagBits::eHostCoherent |
-                                                  vk::MemoryPropertyFlagBits::eHostCached,
-                                                device().uploadStagingPool());
+      auto newBuffer = device().createBufferInPool(minBytes,
+                                                   vk::BufferUsageFlagBits::eTransferDst,
+                                                   vk::MemoryPropertyFlagBits::eHostVisible |
+                                                     vk::MemoryPropertyFlagBits::eHostCoherent |
+                                                     vk::MemoryPropertyFlagBits::eHostCached,
+                                                   device().uploadStagingPool());
+      void* newMapped = newBuffer->map(0, minBytes);
+      if (slot.buffer && slot.mapped != nullptr) {
+        slot.buffer->unmap();
+      }
+      slot.buffer = std::move(newBuffer);
       slot.capacity = minBytes;
-      slot.mapped = slot.buffer->map(0, minBytes);
+      slot.mapped = newMapped;
       slot.inUse = false;
       slot.tag = "color";
     }
@@ -6046,6 +6787,9 @@ Z3DRendererVulkanBackend::requestEndOfFrameImageReadbackTicket(ZVulkanTexture& s
     << (debugLabel.empty() ? "" : debugLabel) << (debugLabel.empty() ? "" : ")");
   CHECK(m_activeFrame && m_activeFrameHandle && m_activeFrameHandle->valid())
     << "VK image readback requested outside of an active frame";
+  prepareTextureForCommandUse(src,
+                              TextureCommandUse::ReadExistingContents,
+                              debugLabel.empty() ? std::string_view("vk_image_readback") : debugLabel);
 
   const glm::uvec2 size{src.width(), src.height()};
   const vk::Format fmt = src.format();
@@ -6392,7 +7136,7 @@ void Z3DRendererVulkanBackend::scheduleStaticCopy(vk::Buffer dst,
   }
   // Pin the destination static segment for this submission so that any evictions
   // cannot reuse its suballocated range until the fence signals.
-  if (dst) {
+  if (dst && m_submissionResourcePinningOpen) {
     const VkBuffer raw = static_cast<VkBuffer>(dst);
     auto it = m_staticArena.segmentByBuffer.find(raw);
     if (it != m_staticArena.segmentByBuffer.end() && it->second != nullptr) {
@@ -6514,8 +7258,9 @@ void Z3DRendererVulkanBackend::collectFrameTimings(FrameResources& frame)
   bool haveCalibration = false;
   uint64_t deviceCalibTicks = 0;
   uint64_t hostCalibNs = 0;
+  const bool collectGpuTimestamps = timestampQueriesEnabled();
 
-  if (frame.nextQuery > 0 && !frame.gpuScopes.empty()) {
+  if (collectGpuTimestamps && frame.nextQuery > 0 && !frame.gpuScopes.empty()) {
     // Optional calibration: map GPU ticks to CPU nanoseconds for trace alignment
     if (FLAGS_atlas_perf_trace_calibrated) {
       try {
@@ -6591,7 +7336,7 @@ void Z3DRendererVulkanBackend::collectFrameTimings(FrameResources& frame)
     } else {
       VLOG(1) << "Vulkan query results unavailable: " << vk::to_string(result);
     }
-  } else {
+  } else if (collectGpuTimestamps) {
     VLOG(1) << "No GPU timestamp scopes recorded this frame";
   }
 
@@ -6638,7 +7383,7 @@ void Z3DRendererVulkanBackend::collectFrameTimings(FrameResources& frame)
   std::vector<Z3DPerfCollector::Scope> cpuScopesForCollector;
 
   // Re-fetch timestamp query data to compute ms for GPU scopes (we already have message; reconstruct ms values)
-  if (frame.nextQuery > 0 && !frame.gpuScopes.empty()) {
+  if (collectGpuTimestamps && frame.nextQuery > 0 && !frame.gpuScopes.empty()) {
     const auto [result, queryData] = frame.queryPool.getResults<uint64_t>(0,
                                                                           frame.nextQuery,
                                                                           frame.nextQuery * sizeof(uint64_t),
@@ -6736,9 +7481,23 @@ void Z3DRendererVulkanBackend::collectFrameTimings(FrameResources& frame)
   frame.preCpuStartMs.reset();
 }
 
+bool Z3DRendererVulkanBackend::timestampQueriesEnabled() const
+{
+  if (!m_sharedDevice) {
+    return false;
+  }
+  // Strict residency-budget runs are for proving Atlas-owned resources stay
+  // within a hard cap. GPU timestamp writes are optional instrumentation, and
+  // some Vulkan portability stacks allocate hidden query backing at submit time.
+  return !m_sharedDevice->residencyManager().strictBudgetActive();
+}
+
 std::optional<size_t> Z3DRendererVulkanBackend::beginGpuScope(std::string_view label)
 {
   if (!m_activeFrame || !m_activeFrameHandle || !m_activeFrameHandle->valid() || label.empty() || !m_frameRecording) {
+    return std::nullopt;
+  }
+  if (!timestampQueriesEnabled()) {
     return std::nullopt;
   }
   auto& frame = *m_activeFrame;

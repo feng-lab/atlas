@@ -9,7 +9,9 @@
 #include <memory>
 #include <optional>
 #include <functional>
+#include <span>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -347,6 +349,66 @@ public:
     WaitForIdle,
   };
 
+  struct VulkanScratchBackingReclaimStats
+  {
+    uint32_t slotsEvicted = 0;
+    uint64_t bytesReleased = 0;
+  };
+
+  struct VulkanScratchBackingReport
+  {
+    uint32_t residentSlots = 0;
+    uint32_t inUseSlots = 0;
+    uint32_t releasePendingSlots = 0;
+    uint32_t protectedSlots = 0;
+    uint64_t residentBytes = 0;
+  };
+
+  struct VulkanScratchBackingCandidate
+  {
+    ScratchImageUsage usage = ScratchImageUsage::BlockId;
+    size_t slotIndex = 0;
+    uint64_t residentBytes = 0;
+    uint64_t lastUseTick = 0;
+    uint32_t pinCount = 0;
+    bool inUse = false;
+    bool releasePending = false;
+    std::string label;
+  };
+
+  struct VulkanScratchTextureUse
+  {
+    ZVulkanTexture* texture = nullptr;
+    // True when the pass must observe the existing image contents before it
+    // writes, samples, copies, or otherwise reads the texture. Clear/dont-care
+    // render-target writes can set this false.
+    bool contentsRequired = true;
+  };
+
+  class VulkanScratchProtectionScope final
+  {
+  public:
+    VulkanScratchProtectionScope() = default;
+    VulkanScratchProtectionScope(Z3DScratchResourcePool* pool, std::vector<ZVulkanTexture*> textures);
+    ~VulkanScratchProtectionScope();
+
+    VulkanScratchProtectionScope(const VulkanScratchProtectionScope&) = delete;
+    VulkanScratchProtectionScope& operator=(const VulkanScratchProtectionScope&) = delete;
+    VulkanScratchProtectionScope(VulkanScratchProtectionScope&& other) noexcept;
+    VulkanScratchProtectionScope& operator=(VulkanScratchProtectionScope&& other) noexcept;
+
+    [[nodiscard]] bool active() const
+    {
+      return m_pool != nullptr && !m_textures.empty();
+    }
+
+  private:
+    void release();
+
+    Z3DScratchResourcePool* m_pool = nullptr;
+    std::vector<ZVulkanTexture*> m_textures;
+  };
+
   // Backend hook used by the scratch pool when it needs completed Vulkan
   // submissions to reach their frame-completion safe point before deciding
   // whether a new VkImage allocation is really necessary.
@@ -363,6 +425,22 @@ public:
   // scratch texture object identities alive so bindless descriptor indices can
   // be reused when the slot is made resident again.
   void reclaimVulkanScratchMemory(VulkanScratchReclaimMode mode);
+
+  // Broker-facing reclaim hook. This releases backing memory for free Vulkan
+  // scratch slots only; slot objects and bindless identities remain intact and
+  // are recreated on the next acquire.
+  [[nodiscard]] VulkanScratchBackingReclaimStats reclaimFreeVulkanScratchBacking(std::string_view reason = {},
+                                                                                 uint64_t targetBytes = 0);
+  [[nodiscard]] VulkanScratchBackingReclaimStats
+  reclaimColdVulkanScratchBacking(std::span<ZVulkanTexture* const> protectedTextures,
+                                  std::string_view reason = {},
+                                  uint64_t targetBytes = 0);
+  [[nodiscard]] std::vector<VulkanScratchBackingCandidate> vulkanScratchBackingCandidates() const;
+  [[nodiscard]] VulkanScratchBackingReclaimStats
+  reclaimVulkanScratchBackingCandidate(ScratchImageUsage usage, size_t slotIndex, std::string_view reason = {});
+  [[nodiscard]] VulkanScratchProtectionScope protectVulkanScratchTextures(std::span<ZVulkanTexture* const> textures);
+  void prepareVulkanScratchTexturesForPass(std::span<const VulkanScratchTextureUse> uses, std::string_view reason = {});
+  [[nodiscard]] VulkanScratchBackingReport vulkanScratchBackingReport() const;
 
   // Vulkan scratch slot (public because used in public method signature)
   struct VulkanScratchSlot
@@ -564,6 +642,7 @@ private:
 
   std::unique_ptr<VulkanEnvironment> m_vulkanEnvironment;
   std::array<std::vector<std::unique_ptr<VulkanScratchSlot>>, kScratchUsageCount> m_vulkanSlots;
+  std::vector<ZVulkanTexture*> m_vulkanResidencyProtectedTextures;
   RenderBackend m_defaultBackend = RenderBackend::OpenGL;
   ZVulkanDevice* m_externalVkDevice = nullptr; // non-owning
   std::function<void(std::function<void()>)> m_vulkanReleaseScheduler; // installed by backend per-frame
@@ -575,6 +654,9 @@ private:
   void maybeTrimAfterAcquire();
   size_t performTrim(uint64_t ageThreshold, bool logSummary);
   void pumpVulkanScratchReleases(VulkanScratchReclaimMode mode);
+  void releaseVulkanScratchTextureProtections(std::span<ZVulkanTexture* const> textures);
+  VulkanScratchBackingReclaimStats
+  evictAllFreeVulkanSlotsWithStats(const VulkanScratchSlot* protectedSlot, bool logSummary, uint64_t targetBytes = 0);
   size_t evictAllFreeVulkanSlots(const VulkanScratchSlot* protectedSlot, bool logSummary);
   void recordScratchAcquire(RenderBackend backend,
                             const ScratchImageDescriptor& descriptor,

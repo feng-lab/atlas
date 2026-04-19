@@ -6,12 +6,14 @@
 #include "zcancellation.h"
 #include "zexception.h"
 #include "zlog.h"
+#include "zrenderthreadexecutor_tls.h"
 #include "zvulkandevice.h"
 #include "zvulkanresidencymanager.h"
 #include "zvulkantexture.h"
 
 #include <folly/OperationCancelled.h>
 #include <folly/MPMCQueue.h>
+#include <folly/ScopeGuard.h>
 #include <folly/coro/FutureUtil.h>
 #include <folly/executors/GlobalExecutor.h>
 #include <folly/executors/ThreadPoolExecutor.h>
@@ -64,7 +66,7 @@ std::unique_ptr<ZVulkanTexture> createUint3DTexture(ZVulkanDevice& device, glm::
                                        vk::ImageLayout::eShaderReadOnlyOptimal);
   info.createDefaultSampler = false;
   info.samplerInfo = makeNearestSampler();
-  return std::make_unique<ZVulkanTexture>(device, info);
+  return device.createTexture(info);
 }
 
 } // namespace
@@ -72,10 +74,35 @@ std::unique_ptr<ZVulkanTexture> createUint3DTexture(ZVulkanDevice& device, glm::
 ZVulkanPagedImageBlockUploader::ZVulkanPagedImageBlockUploader(ZVulkanDevice& device)
   : m_device(device)
   , m_aliveFlag(std::make_shared<std::atomic_bool>(true))
-{}
+{
+  m_metadataProviderId = m_device.residencyManager().registerResourceProvider(ZVulkanResidencyManager::ResourceProvider{
+    .resourceClass = ZVulkanResidencyManager::ResourceClass::PagedImageMetadataTexture,
+    .priority = 0,
+    .owner = this,
+    .label = "paged_image_metadata",
+    .collectCandidates =
+      [this]() {
+        return metadataEvictionCandidates();
+      },
+    .evictCandidate =
+      [this](const ZVulkanResidencyManager::EvictionCandidate& candidate,
+             const ZVulkanResidencyManager::ReclaimRequest& request) {
+        return evictMetadataCandidate(candidate, request.reason);
+      },
+    .report =
+      [this]() {
+        return metadataMemoryReport();
+      },
+  });
+}
 
 ZVulkanPagedImageBlockUploader::~ZVulkanPagedImageBlockUploader()
 {
+  if (m_metadataProviderId != 0u) {
+    m_device.residencyManager().unregisterResourceProvider(m_metadataProviderId);
+    m_metadataProviderId = 0u;
+  }
+
   std::vector<const Z3DImg*> owners;
   {
     std::scoped_lock lock(m_mutex);
@@ -259,16 +286,56 @@ void ZVulkanPagedImageBlockUploader::uploadPageCaches(Z3DImg& image, size_t chan
 
   auto pageDirectorySpan = image.pageDirectoryView(channel);
   if (pageDirectory && !pageDirectorySpan.empty()) {
+    {
+      std::scoped_lock lock(m_mutex);
+      auto& resources = ensureImageResourcesLocked(image);
+      CHECK_LT(channel, resources.channels.size());
+      uint32_t& pinCount = resources.channels[channel].pageDirectoryPinCount;
+      CHECK_LT(pinCount, std::numeric_limits<uint32_t>::max()) << "Paged-image directory upload pin count overflow";
+      ++pinCount;
+    }
+    auto uploadPinGuard = folly::makeGuard([this, &image, channel]() {
+      unpinMetadataTexture(&image, channel, false);
+    });
+
+    if (!pageDirectory->resident()) {
+      pageDirectory->recreateDeviceResources();
+    }
     pageDirectory->uploadData(pageDirectorySpan.data(),
                               pageDirectorySpan.size_bytes(),
                               vk::ImageLayout::eShaderReadOnlyOptimal);
+    std::scoped_lock lock(m_mutex);
+    auto& resources = ensureImageResourcesLocked(image);
+    CHECK_LT(channel, resources.channels.size());
+    resources.channels[channel].pageDirectoryUploaded = true;
+    resources.channels[channel].pageDirectoryLastUsedTick = m_usageTick++;
   }
 
   auto pageTableSpan = image.pageTableCacheView(channel);
   if (pageTableCache && !pageTableSpan.empty()) {
+    {
+      std::scoped_lock lock(m_mutex);
+      auto& resources = ensureImageResourcesLocked(image);
+      CHECK_LT(channel, resources.channels.size());
+      uint32_t& pinCount = resources.channels[channel].pageTableCachePinCount;
+      CHECK_LT(pinCount, std::numeric_limits<uint32_t>::max()) << "Paged-image page-table upload pin count overflow";
+      ++pinCount;
+    }
+    auto uploadPinGuard = folly::makeGuard([this, &image, channel]() {
+      unpinMetadataTexture(&image, channel, true);
+    });
+
+    if (!pageTableCache->resident()) {
+      pageTableCache->recreateDeviceResources();
+    }
     pageTableCache->uploadData(pageTableSpan.data(),
                                pageTableSpan.size_bytes(),
                                vk::ImageLayout::eShaderReadOnlyOptimal);
+    std::scoped_lock lock(m_mutex);
+    auto& resources = ensureImageResourcesLocked(image);
+    CHECK_LT(channel, resources.channels.size());
+    resources.channels[channel].pageTableCacheUploaded = true;
+    resources.channels[channel].pageTableCacheLastUsedTick = m_usageTick++;
   }
 
   timer.recordEvent("upload page table");
@@ -276,20 +343,38 @@ void ZVulkanPagedImageBlockUploader::uploadPageCaches(Z3DImg& image, size_t chan
 
 ZVulkanTexture* ZVulkanPagedImageBlockUploader::pageDirectoryTexture(Z3DImg& image, size_t channel)
 {
-  std::scoped_lock lock(m_mutex);
-  auto& resources = ensureImageResourcesLocked(image);
-  CHECK_LT(channel, resources.channels.size());
-  ensureChannelResourcesLocked(image, channel, resources.channels[channel]);
-  return resources.channels[channel].pageDirectory.get();
+  ZVulkanTexture* texture = nullptr;
+  {
+    std::scoped_lock lock(m_mutex);
+    auto& resources = ensureImageResourcesLocked(image);
+    CHECK_LT(channel, resources.channels.size());
+    ensureChannelResourcesLocked(image, channel, resources.channels[channel]);
+    resources.channels[channel].pageDirectoryLastUsedTick = m_usageTick++;
+    texture = resources.channels[channel].pageDirectory.get();
+  }
+  if (texture != nullptr) {
+    ensurePageDirectoryResident(image, channel, *texture);
+    pinMetadataTextureForActiveSubmission(image, channel, false, *texture);
+  }
+  return texture;
 }
 
 ZVulkanTexture* ZVulkanPagedImageBlockUploader::pageTableTexture(Z3DImg& image, size_t channel)
 {
-  std::scoped_lock lock(m_mutex);
-  auto& resources = ensureImageResourcesLocked(image);
-  CHECK_LT(channel, resources.channels.size());
-  ensureChannelResourcesLocked(image, channel, resources.channels[channel]);
-  return resources.channels[channel].pageTableCache.get();
+  ZVulkanTexture* texture = nullptr;
+  {
+    std::scoped_lock lock(m_mutex);
+    auto& resources = ensureImageResourcesLocked(image);
+    CHECK_LT(channel, resources.channels.size());
+    ensureChannelResourcesLocked(image, channel, resources.channels[channel]);
+    resources.channels[channel].pageTableCacheLastUsedTick = m_usageTick++;
+    texture = resources.channels[channel].pageTableCache.get();
+  }
+  if (texture != nullptr) {
+    ensurePageTableResident(image, channel, *texture);
+    pinMetadataTextureForActiveSubmission(image, channel, true, *texture);
+  }
+  return texture;
 }
 
 ZVulkanTexture* ZVulkanPagedImageBlockUploader::imageCacheTexture(Z3DImg& image, size_t channel)
@@ -312,6 +397,125 @@ ZVulkanTexture* ZVulkanPagedImageBlockUploader::imageCacheTexture(Z3DImg& image,
   return tex;
 }
 
+void ZVulkanPagedImageBlockUploader::ensurePageDirectoryResident(Z3DImg& image, size_t channel, ZVulkanTexture& texture)
+{
+  bool needsUpload = !texture.resident();
+  {
+    std::scoped_lock lock(m_mutex);
+    auto& resources = ensureImageResourcesLocked(image);
+    CHECK_LT(channel, resources.channels.size());
+    needsUpload = needsUpload || !resources.channels[channel].pageDirectoryUploaded;
+  }
+  if (!needsUpload) {
+    return;
+  }
+
+  {
+    std::scoped_lock lock(m_mutex);
+    auto& resources = ensureImageResourcesLocked(image);
+    CHECK_LT(channel, resources.channels.size());
+    uint32_t& pinCount = resources.channels[channel].pageDirectoryPinCount;
+    CHECK_LT(pinCount, std::numeric_limits<uint32_t>::max()) << "Paged-image directory restore pin count overflow";
+    ++pinCount;
+  }
+  auto restorePinGuard = folly::makeGuard([this, &image, channel]() {
+    unpinMetadataTexture(&image, channel, false);
+  });
+
+  if (!texture.resident()) {
+    texture.recreateDeviceResources();
+  }
+  auto pageDirectorySpan = image.pageDirectoryView(channel);
+  CHECK(!pageDirectorySpan.empty()) << "Paged-image directory restore source is empty";
+  texture.uploadData(pageDirectorySpan.data(), pageDirectorySpan.size_bytes(), vk::ImageLayout::eShaderReadOnlyOptimal);
+
+  std::scoped_lock lock(m_mutex);
+  auto& resources = ensureImageResourcesLocked(image);
+  CHECK_LT(channel, resources.channels.size());
+  resources.channels[channel].pageDirectoryUploaded = true;
+  resources.channels[channel].pageDirectoryLastUsedTick = m_usageTick++;
+}
+
+void ZVulkanPagedImageBlockUploader::ensurePageTableResident(Z3DImg& image, size_t channel, ZVulkanTexture& texture)
+{
+  bool needsUpload = !texture.resident();
+  {
+    std::scoped_lock lock(m_mutex);
+    auto& resources = ensureImageResourcesLocked(image);
+    CHECK_LT(channel, resources.channels.size());
+    needsUpload = needsUpload || !resources.channels[channel].pageTableCacheUploaded;
+  }
+  if (!needsUpload) {
+    return;
+  }
+
+  {
+    std::scoped_lock lock(m_mutex);
+    auto& resources = ensureImageResourcesLocked(image);
+    CHECK_LT(channel, resources.channels.size());
+    uint32_t& pinCount = resources.channels[channel].pageTableCachePinCount;
+    CHECK_LT(pinCount, std::numeric_limits<uint32_t>::max()) << "Paged-image page-table restore pin count overflow";
+    ++pinCount;
+  }
+  auto restorePinGuard = folly::makeGuard([this, &image, channel]() {
+    unpinMetadataTexture(&image, channel, true);
+  });
+
+  if (!texture.resident()) {
+    texture.recreateDeviceResources();
+  }
+  auto pageTableSpan = image.pageTableCacheView(channel);
+  CHECK(!pageTableSpan.empty()) << "Paged-image page-table restore source is empty";
+  texture.uploadData(pageTableSpan.data(), pageTableSpan.size_bytes(), vk::ImageLayout::eShaderReadOnlyOptimal);
+
+  std::scoped_lock lock(m_mutex);
+  auto& resources = ensureImageResourcesLocked(image);
+  CHECK_LT(channel, resources.channels.size());
+  resources.channels[channel].pageTableCacheUploaded = true;
+  resources.channels[channel].pageTableCacheLastUsedTick = m_usageTick++;
+}
+
+void ZVulkanPagedImageBlockUploader::pinMetadataTextureForActiveSubmission(Z3DImg& image,
+                                                                           size_t channel,
+                                                                           bool pageTable,
+                                                                           ZVulkanTexture& texture)
+{
+  auto* backend = Z3DRendererVulkanBackend::current();
+  if (backend == nullptr) {
+    return;
+  }
+
+  const bool inserted =
+    backend->pinExternalResidencyResourceForActiveSubmission(&texture, [this, image = &image, channel, pageTable]() {
+      unpinMetadataTexture(image, channel, pageTable);
+    });
+  if (!inserted) {
+    return;
+  }
+
+  std::scoped_lock lock(m_mutex);
+  auto& resources = ensureImageResourcesLocked(image);
+  CHECK_LT(channel, resources.channels.size());
+  uint32_t& pinCount =
+    pageTable ? resources.channels[channel].pageTableCachePinCount : resources.channels[channel].pageDirectoryPinCount;
+  CHECK_LT(pinCount, std::numeric_limits<uint32_t>::max()) << "Paged-image metadata pin count overflow";
+  ++pinCount;
+}
+
+void ZVulkanPagedImageBlockUploader::unpinMetadataTexture(const Z3DImg* image, size_t channel, bool pageTable)
+{
+  CHECK(image != nullptr) << "Paged-image metadata unpin requires an image owner";
+
+  std::scoped_lock lock(m_mutex);
+  auto imageIt = m_resources.find(image);
+  CHECK(imageIt != m_resources.end()) << "Paged-image metadata unpin lost image resources";
+  CHECK_LT(channel, imageIt->second.channels.size()) << "Paged-image metadata unpin channel out of range";
+  uint32_t& pinCount = pageTable ? imageIt->second.channels[channel].pageTableCachePinCount
+                                 : imageIt->second.channels[channel].pageDirectoryPinCount;
+  CHECK_GT(pinCount, 0u) << "Paged-image metadata pin count underflow";
+  --pinCount;
+}
+
 void ZVulkanPagedImageBlockUploader::ensureChannelResourcesLocked(Z3DImg& image,
                                                                   size_t channel,
                                                                   ChannelResources& resources)
@@ -321,13 +525,142 @@ void ZVulkanPagedImageBlockUploader::ensureChannelResourcesLocked(Z3DImg& image,
   if (resources.pageDirectorySize != pdSize) {
     resources.pageDirectory = createUint3DTexture(m_device, pdSize);
     resources.pageDirectorySize = pdSize;
+    resources.pageDirectoryUploaded = false;
+    resources.pageDirectoryLastUsedTick = m_usageTick++;
   }
 
   const glm::uvec3 ptSize = image.pageTableCacheSize();
   if (resources.pageTableCacheSize != ptSize) {
     resources.pageTableCache = createUint3DTexture(m_device, ptSize);
     resources.pageTableCacheSize = ptSize;
+    resources.pageTableCacheUploaded = false;
+    resources.pageTableCacheLastUsedTick = m_usageTick++;
   }
+}
+
+std::vector<ZVulkanResidencyManager::EvictionCandidate>
+ZVulkanPagedImageBlockUploader::metadataEvictionCandidates() const
+{
+  std::vector<ZVulkanResidencyManager::EvictionCandidate> candidates;
+  if (currentRenderThreadExecutorOrNull() == nullptr || m_device.frameExecutor().inFlightCount() != 0u) {
+    return candidates;
+  }
+
+  std::unique_lock lock(m_mutex, std::try_to_lock);
+  if (!lock.owns_lock()) {
+    return candidates;
+  }
+  for (const auto& resourceEntry : m_resources) {
+    const Z3DImg* image = resourceEntry.first;
+    const ImageResources& resources = resourceEntry.second;
+    for (size_t channel = 0; channel < resources.channels.size(); ++channel) {
+      const auto& channelResources = resources.channels[channel];
+      auto addCandidate = [&](const std::unique_ptr<ZVulkanTexture>& texture,
+                              bool pageTable,
+                              uint64_t lastUsedTick,
+                              uint32_t pinCount,
+                              std::string_view labelKind) {
+        if (!texture || !texture->resident()) {
+          return;
+        }
+        const uint64_t residentBytes = texture->allocationSizeBytes();
+        if (residentBytes == 0u) {
+          return;
+        }
+        candidates.push_back(ZVulkanResidencyManager::EvictionCandidate{
+          .resourceClass = ZVulkanResidencyManager::ResourceClass::PagedImageMetadataTexture,
+          .priority = 0,
+          .residentBytes = residentBytes,
+          .lastUsedEpoch = lastUsedTick,
+          .pinCount = pinCount,
+          .restoreAvailable = true,
+          .userKey0 = static_cast<uint64_t>(reinterpret_cast<uintptr_t>(image)),
+          .userKey1 = (static_cast<uint64_t>(channel) << 1u) | (pageTable ? 1u : 0u),
+          .label = fmt::format("paged_image_{} owner={} channel={}", labelKind, fmt::ptr(image), channel)});
+      };
+      addCandidate(channelResources.pageDirectory,
+                   false,
+                   channelResources.pageDirectoryLastUsedTick,
+                   channelResources.pageDirectoryPinCount,
+                   "page_directory");
+      addCandidate(channelResources.pageTableCache,
+                   true,
+                   channelResources.pageTableCacheLastUsedTick,
+                   channelResources.pageTableCachePinCount,
+                   "page_table");
+    }
+  }
+  return candidates;
+}
+
+ZVulkanResidencyManager::ReclaimStats
+ZVulkanPagedImageBlockUploader::evictMetadataCandidate(const ZVulkanResidencyManager::EvictionCandidate& candidate,
+                                                       std::string_view reason)
+{
+  ZVulkanResidencyManager::ReclaimStats stats{};
+  if (candidate.resourceClass != ZVulkanResidencyManager::ResourceClass::PagedImageMetadataTexture ||
+      candidate.userKey0 == 0u) {
+    return stats;
+  }
+  if (currentRenderThreadExecutorOrNull() == nullptr || m_device.frameExecutor().inFlightCount() != 0u) {
+    return stats;
+  }
+
+  const auto* image = reinterpret_cast<const Z3DImg*>(static_cast<uintptr_t>(candidate.userKey0));
+  const size_t channel = static_cast<size_t>(candidate.userKey1 >> 1u);
+  const bool pageTable = (candidate.userKey1 & 1u) != 0u;
+
+  std::scoped_lock lock(m_mutex);
+  auto imageIt = m_resources.find(image);
+  if (imageIt == m_resources.end() || channel >= imageIt->second.channels.size()) {
+    return stats;
+  }
+  auto& resources = imageIt->second.channels[channel];
+  auto& texture = pageTable ? resources.pageTableCache : resources.pageDirectory;
+  const uint32_t pinCount = pageTable ? resources.pageTableCachePinCount : resources.pageDirectoryPinCount;
+  if (!texture || !texture->resident() || pinCount > 0u) {
+    return stats;
+  }
+
+  const uint64_t releasedBytes = texture->allocationSizeBytes();
+  texture->releaseDeviceResources();
+  stats.resourcesReleased = 1u;
+  stats.bytesReleased = releasedBytes;
+  VLOG(1) << fmt::format("VK paged-image metadata evict: kind={} owner={} channel={} bytes={}B reason='{}'",
+                         pageTable ? "page_table" : "page_directory",
+                         fmt::ptr(image),
+                         channel,
+                         releasedBytes,
+                         reason.empty() ? "<unspecified>" : std::string(reason));
+  return stats;
+}
+
+ZVulkanResidencyManager::ResourceReport ZVulkanPagedImageBlockUploader::metadataMemoryReport() const
+{
+  ZVulkanResidencyManager::ResourceReport report{};
+  report.resourceClass = ZVulkanResidencyManager::ResourceClass::PagedImageMetadataTexture;
+  report.label = "paged_image_metadata";
+
+  std::unique_lock lock(m_mutex, std::try_to_lock);
+  if (!lock.owns_lock()) {
+    return report;
+  }
+  for (const auto& [_, resources] : m_resources) {
+    for (const auto& channelResources : resources.channels) {
+      for (const auto* texture : {channelResources.pageDirectory.get(), channelResources.pageTableCache.get()}) {
+        if (texture == nullptr || !texture->resident()) {
+          continue;
+        }
+        report.residentObjects++;
+        if ((texture == channelResources.pageDirectory.get() && channelResources.pageDirectoryPinCount > 0u) ||
+            (texture == channelResources.pageTableCache.get() && channelResources.pageTableCachePinCount > 0u)) {
+          report.pinnedObjects++;
+        }
+        report.residentBytes += texture->allocationSizeBytes();
+      }
+    }
+  }
+  return report;
 }
 
 ZVulkanPagedImageBlockUploader::ImageResources&

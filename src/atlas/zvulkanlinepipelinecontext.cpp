@@ -994,6 +994,24 @@ void ZVulkanLinePipelineContext::uploadWideGeometry(const LinePayload& payload, 
 
   const bool needGeometryUpload = !geometryBound;
   const bool needAppearanceUpload = !appearanceBound;
+  // A pass may reuse only geometry or only appearance statics while uploading the
+  // other half. Protect the selected static slices before upload reservation or
+  // promotion can invoke the global residency broker.
+  if (boundGeometryStaticEntry != nullptr) {
+    vulkan::pinStaticSlicesForActiveSubmission(m_backend,
+                                               {&boundGeometryStaticEntry->vbP0,
+                                                &boundGeometryStaticEntry->vbP1,
+                                                &boundGeometryStaticEntry->vbFlags,
+                                                &boundGeometryStaticEntry->ib});
+    boundGeometryStaticEntry->usedStaticOnce = true;
+    touchStaticStream(geometryKey.streamKey);
+  }
+  if (boundAppearanceStaticEntry != nullptr) {
+    vulkan::pinStaticSlicesForActiveSubmission(m_backend,
+                                               {&boundAppearanceStaticEntry->vbC0, &boundAppearanceStaticEntry->vbC1});
+    boundAppearanceStaticEntry->usedStaticOnce = true;
+    touchStaticStream(appearanceKey.streamKey);
+  }
   m_backend.reserveUploadSlices({
     {needGeometryUpload ? pBytes : 0u,                        alignof(glm::vec3)},
     {needGeometryUpload ? pBytes : 0u,                        alignof(glm::vec3)},
@@ -1197,6 +1215,7 @@ void ZVulkanLinePipelineContext::uploadWideGeometry(const LinePayload& payload, 
           if (promoteGeometryToStatics(entry)) {
             entry.promoted = true;
             entry.usedStaticOnce = false;
+            touchStaticStream(geometryKey.streamKey);
             m_wideGeometryStreamCache.markPendingCopy(geometryKey);
             rememberPendingGeometryUpload();
           }
@@ -1208,6 +1227,7 @@ void ZVulkanLinePipelineContext::uploadWideGeometry(const LinePayload& payload, 
           if (promoteGeometryToStatics(entry)) {
             entry.promoted = true;
             entry.usedStaticOnce = false;
+            touchStaticStream(geometryKey.streamKey);
             m_wideGeometryStreamCache.markPendingCopy(geometryKey);
             rememberPendingGeometryUpload();
           }
@@ -1250,6 +1270,7 @@ void ZVulkanLinePipelineContext::uploadWideGeometry(const LinePayload& payload, 
           if (promoteGeometryToStatics(entry)) {
             entry.promoted = true;
             entry.usedStaticOnce = false;
+            touchStaticStream(geometryKey.streamKey);
             m_wideGeometryStreamCache.markPendingCopy(geometryKey);
             rememberPendingGeometryUpload();
           }
@@ -1286,6 +1307,7 @@ void ZVulkanLinePipelineContext::uploadWideGeometry(const LinePayload& payload, 
           if (promoteAppearanceToStatics(entry)) {
             entry.promoted = true;
             entry.usedStaticOnce = false;
+            touchStaticStream(appearanceKey.streamKey);
             m_wideAppearanceStreamCache.markPendingCopy(appearanceKey);
             rememberPendingAppearanceUpload();
           }
@@ -1297,6 +1319,7 @@ void ZVulkanLinePipelineContext::uploadWideGeometry(const LinePayload& payload, 
           if (promoteAppearanceToStatics(entry)) {
             entry.promoted = true;
             entry.usedStaticOnce = false;
+            touchStaticStream(appearanceKey.streamKey);
             m_wideAppearanceStreamCache.markPendingCopy(appearanceKey);
             rememberPendingAppearanceUpload();
           }
@@ -1338,6 +1361,7 @@ void ZVulkanLinePipelineContext::uploadWideGeometry(const LinePayload& payload, 
           if (promoteAppearanceToStatics(entry)) {
             entry.promoted = true;
             entry.usedStaticOnce = false;
+            touchStaticStream(appearanceKey.streamKey);
             m_wideAppearanceStreamCache.markPendingCopy(appearanceKey);
             rememberPendingAppearanceUpload();
           }
@@ -1517,6 +1541,20 @@ void ZVulkanLinePipelineContext::uploadThinGeometry(const LinePayload& payload, 
     return;
   }
 
+  // A pass may reuse only geometry or only appearance statics while uploading the
+  // other half. Protect the selected static slices before upload reservation or
+  // promotion can invoke the global residency broker.
+  if (boundGeometryStaticEntry != nullptr) {
+    vulkan::pinStaticSlicesForActiveSubmission(m_backend,
+                                               {&boundGeometryStaticEntry->vbPos, &boundGeometryStaticEntry->ib});
+    boundGeometryStaticEntry->usedStaticOnce = true;
+    touchStaticStream(geometryKey.streamKey);
+  }
+  if (boundAppearanceStaticEntry != nullptr) {
+    vulkan::pinStaticSlicesForActiveSubmission(m_backend, {&boundAppearanceStaticEntry->vbColor});
+    boundAppearanceStaticEntry->usedStaticOnce = true;
+    touchStaticStream(appearanceKey.streamKey);
+  }
   m_backend.reserveUploadSlices({
     {!geometryBound ? posBytes : 0u,                                                                          alignof(glm::vec3)},
     {!appearanceBound ? colBytes : 0u,                                                                        alignof(glm::vec4)},
@@ -1698,6 +1736,7 @@ void ZVulkanLinePipelineContext::uploadThinGeometry(const LinePayload& payload, 
           if (promoteGeometryToStatics(entry)) {
             entry.promoted = true;
             entry.usedStaticOnce = false;
+            touchStaticStream(geometryKey.streamKey);
             m_thinGeometryStreamCache.markPendingCopy(geometryKey);
             rememberPendingGeometryUpload();
           }
@@ -1709,6 +1748,7 @@ void ZVulkanLinePipelineContext::uploadThinGeometry(const LinePayload& payload, 
           if (promoteGeometryToStatics(entry)) {
             entry.promoted = true;
             entry.usedStaticOnce = false;
+            touchStaticStream(geometryKey.streamKey);
             m_thinGeometryStreamCache.markPendingCopy(geometryKey);
             rememberPendingGeometryUpload();
           }
@@ -1740,6 +1780,7 @@ void ZVulkanLinePipelineContext::uploadThinGeometry(const LinePayload& payload, 
           if (promoteGeometryToStatics(entry)) {
             entry.promoted = true;
             entry.usedStaticOnce = false;
+            touchStaticStream(geometryKey.streamKey);
             m_thinGeometryStreamCache.markPendingCopy(geometryKey);
             rememberPendingGeometryUpload();
           }
@@ -1767,6 +1808,7 @@ void ZVulkanLinePipelineContext::uploadThinGeometry(const LinePayload& payload, 
           if (promoteAppearanceToStatics(entry)) {
             entry.promoted = true;
             entry.usedStaticOnce = false;
+            touchStaticStream(appearanceKey.streamKey);
             m_thinAppearanceStreamCache.markPendingCopy(appearanceKey);
             rememberPendingAppearanceUpload();
           }
@@ -1778,6 +1820,7 @@ void ZVulkanLinePipelineContext::uploadThinGeometry(const LinePayload& payload, 
           if (promoteAppearanceToStatics(entry)) {
             entry.promoted = true;
             entry.usedStaticOnce = false;
+            touchStaticStream(appearanceKey.streamKey);
             m_thinAppearanceStreamCache.markPendingCopy(appearanceKey);
             rememberPendingAppearanceUpload();
           }
@@ -1798,6 +1841,7 @@ void ZVulkanLinePipelineContext::uploadThinGeometry(const LinePayload& payload, 
           if (promoteAppearanceToStatics(entry)) {
             entry.promoted = true;
             entry.usedStaticOnce = false;
+            touchStaticStream(appearanceKey.streamKey);
             m_thinAppearanceStreamCache.markPendingCopy(appearanceKey);
             rememberPendingAppearanceUpload();
           }

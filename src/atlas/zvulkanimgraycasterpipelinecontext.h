@@ -24,6 +24,8 @@ struct CompositingConfig
 
 class Z3DRendererBase;
 class Z3DRendererVulkanBackend;
+class Z3DImg;
+class ZImg;
 class ZVulkanDescriptorSet;
 class ZVulkanShader;
 class ZVulkanPipeline;
@@ -100,10 +102,6 @@ private:
 
   struct ChannelResources
   {
-    uint64_t volumeGeneration = 0;
-    std::unique_ptr<ZVulkanTexture> volumeTexture;
-    uint64_t image2DGeneration = 0;
-    std::unique_ptr<ZVulkanTexture> image2DTexture;
     std::unique_ptr<ZVulkanTexture> transferTexture;
     uint64_t transferGeneration = 0;
     uint32_t transferWidth = 0;
@@ -416,8 +414,9 @@ private:
   ChannelResources& ensureChannelResources(size_t channelIndex);
 
   ZVulkanTexture&
-  ensureVolumeTexture(ChannelResources& resources, const ZImg& image, size_t channelIndex, uint64_t generation);
-  ZVulkanTexture& ensureImage2DTexture(ChannelResources& resources, const ZImg& image, uint64_t generation);
+  ensureVolumeTexture(Z3DImg& owner, size_t channelIndex, uint64_t generation, std::shared_ptr<const ZImg> image);
+  ZVulkanTexture&
+  ensureImage2DTexture(Z3DImg& owner, size_t channelIndex, uint64_t generation, std::shared_ptr<const ZImg> image);
   ZVulkanTexture& ensureTransferTexture(ChannelResources& resources, const Z3DTransferFunction& transferFunction);
 
   // ---------------------------------------------------------------------------

@@ -7,11 +7,14 @@
 #include "zlog.h"
 #include "zvulkandevice.h"
 #include "zvulkanframeexecutor.h"
+#include "zvulkanresidencymanager.h"
 #include "zvulkantexture.h"
 #include <glbinding-aux/Meta.h>
+#include <folly/ScopeGuard.h>
 #include <cmath>
 #include <limits>
 #include <algorithm>
+#include <unordered_set>
 #include <utility>
 
 namespace {
@@ -309,6 +312,8 @@ ZVulkanTexture::CreateInfo makeVulkanTextureInfo(const ScratchImageDescriptor& d
                                                    createSampler,
                                                    descriptorLayout);
     info.aspectMask = aspect;
+    info.residencyClassHint = ZVulkanTexture::ResidencyClassHint::ScratchBacking;
+    info.deferAllocation = true;
     return info;
   }
 
@@ -322,6 +327,8 @@ ZVulkanTexture::CreateInfo makeVulkanTextureInfo(const ScratchImageDescriptor& d
                                                       createSampler,
                                                       descriptorLayout);
   info.aspectMask = aspect;
+  info.residencyClassHint = ZVulkanTexture::ResidencyClassHint::ScratchBacking;
+  info.deferAllocation = true;
   return info;
 }
 
@@ -453,9 +460,38 @@ DEFINE_double(atlas_blockid_rt_scale, 1.0, "Scale factor for block-id FBO size (
 namespace nim {
 
 static inline uint64_t bytesPerPixelForScratchFormat(ScratchFormat fmt);
+static std::string describeScratchDescriptor(const ScratchImageDescriptor& descriptor);
+
+class VulkanAllocationRecoveryScope final
+{
+public:
+  explicit VulkanAllocationRecoveryScope(ZVulkanDevice& device)
+    : m_device(device)
+  {
+    m_device.enterAllocationRecoveryScope();
+  }
+
+  VulkanAllocationRecoveryScope(const VulkanAllocationRecoveryScope&) = delete;
+  VulkanAllocationRecoveryScope& operator=(const VulkanAllocationRecoveryScope&) = delete;
+
+  ~VulkanAllocationRecoveryScope()
+  {
+    m_device.leaveAllocationRecoveryScope();
+  }
+
+private:
+  ZVulkanDevice& m_device;
+};
 
 class ZVulkanScratchImage
 {
+  struct AttachmentBackup
+  {
+    std::vector<uint8_t> bytes;
+    vk::ImageLayout layout = vk::ImageLayout::eUndefined;
+    bool valid = false;
+  };
+
 public:
   ZVulkanScratchImage(ZVulkanDevice& device, const ScratchImageDescriptor& descriptor)
     : m_device(device)
@@ -496,11 +532,58 @@ public:
     return bytes;
   }
 
+  uint64_t estimatedTotalBytes() const
+  {
+    const uint64_t pixels =
+      static_cast<uint64_t>(m_descriptor.size.x) * m_descriptor.size.y * std::max<uint32_t>(1u, m_descriptor.layers);
+    uint64_t bytes = 0;
+    for (const auto& attachment : m_descriptor.attachments) {
+      bytes += pixels * bytesPerPixelForScratchFormat(attachment.format);
+    }
+    return bytes;
+  }
+
+  bool containsTexture(const ZVulkanTexture* texture) const
+  {
+    if (texture == nullptr) {
+      return false;
+    }
+    for (const auto& attachment : m_descriptor.attachments) {
+      if (attachmentTexture(attachment) == texture) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  bool contentAvailable(const ZVulkanTexture* texture) const
+  {
+    if (texture == nullptr) {
+      return false;
+    }
+    if (texture->resident()) {
+      return true;
+    }
+    const auto* backup = backupForTexture(texture);
+    return backup != nullptr && backup->valid && !backup->bytes.empty();
+  }
+
   void releaseDeviceResources()
   {
     for (const auto& attachment : m_descriptor.attachments) {
       attachmentTexture(attachment)->releaseDeviceResources();
     }
+  }
+
+  uint64_t releaseDeviceResourcesToHost()
+  {
+    VulkanAllocationRecoveryScope recoveryScope(m_device);
+    uint64_t releasedBytes = estimatedResidentBytes();
+    for (const auto& attachment : m_descriptor.attachments) {
+      backupAttachmentToHost(attachment);
+    }
+    releaseDeviceResources();
+    return releasedBytes;
   }
 
   void recreateDeviceResources()
@@ -511,6 +594,56 @@ public:
         if (!texture->resident()) {
           texture->recreateDeviceResources();
         }
+      }
+    }
+    catch (...) {
+      releaseDeviceResources();
+      throw;
+    }
+  }
+
+  void makeResidentForPass(std::span<const Z3DScratchResourcePool::VulkanScratchTextureUse> uses)
+  {
+    for (const auto& use : uses) {
+      if (!use.contentsRequired || !containsTexture(use.texture) || use.texture == nullptr || use.texture->resident()) {
+        continue;
+      }
+      if (!contentAvailable(use.texture)) {
+        throw ZException(fmt::format(
+          "Vulkan scratch texture restore failed: contents required but no host backup is available label={} texture=0x{:x}",
+          describe(),
+          reinterpret_cast<uintptr_t>(use.texture)));
+      }
+    }
+
+    struct RestoreTarget
+    {
+      ScratchAttachmentDesc attachment;
+      bool wasResident = false;
+    };
+    std::vector<RestoreTarget> restoreTargets;
+    restoreTargets.reserve(m_descriptor.attachments.size());
+    for (const auto& attachment : m_descriptor.attachments) {
+      auto* texture = attachmentTexture(attachment);
+      restoreTargets.push_back(RestoreTarget{.attachment = attachment, .wasResident = texture->resident()});
+    }
+
+    recreateDeviceResources();
+
+    try {
+      for (const auto& target : restoreTargets) {
+        if (target.wasResident) {
+          continue;
+        }
+        auto* texture = attachmentTexture(target.attachment);
+        const auto& backup = attachmentBackup(target.attachment);
+        if (!backup.valid || backup.bytes.empty()) {
+          continue;
+        }
+        CHECK(texture->resident()) << "Scratch texture restore recreated no resident backing";
+        CHECK(backup.layout != vk::ImageLayout::eUndefined)
+          << "Scratch host backup cannot restore to undefined image layout";
+        texture->uploadData(backup.bytes.data(), backup.bytes.size(), backup.layout);
       }
     }
     catch (...) {
@@ -531,13 +664,16 @@ public:
         attachmentTexture(attachment)->resetNonResidentCreateInfo(makeVulkanTextureInfo(descriptor, attachment));
       }
       m_descriptor = descriptor;
-      recreateDeviceResources();
+      m_colorBackups.clear();
+      m_depthBackup = AttachmentBackup{};
       return;
     }
     auto storage = createAttachmentsForDescriptor(descriptor);
     m_descriptor = descriptor;
     m_colorAttachments = std::move(storage.colorAttachments);
     m_depthAttachment = std::move(storage.depthAttachment);
+    m_colorBackups.clear();
+    m_depthBackup = AttachmentBackup{};
   }
 
   ZVulkanTexture* colorAttachment(uint32_t index) const
@@ -551,6 +687,11 @@ public:
   ZVulkanTexture* depthAttachment() const
   {
     return m_depthAttachment.get();
+  }
+
+  std::string describe() const
+  {
+    return describeScratchDescriptor(m_descriptor);
   }
 
 private:
@@ -602,10 +743,80 @@ private:
     return m_depthAttachment.get();
   }
 
+  uint64_t attachmentByteSize(const ScratchAttachmentDesc& attachment) const
+  {
+    const uint64_t pixels =
+      static_cast<uint64_t>(m_descriptor.size.x) * m_descriptor.size.y * std::max<uint32_t>(1u, m_descriptor.layers);
+    return pixels * bytesPerPixelForScratchFormat(attachment.format);
+  }
+
+  AttachmentBackup& attachmentBackup(const ScratchAttachmentDesc& attachment)
+  {
+    if (attachment.kind == ScratchAttachmentKind::Color) {
+      if (m_colorBackups.size() <= attachment.index) {
+        m_colorBackups.resize(attachment.index + 1u);
+      }
+      return m_colorBackups[attachment.index];
+    }
+    return m_depthBackup;
+  }
+
+  const AttachmentBackup& attachmentBackup(const ScratchAttachmentDesc& attachment) const
+  {
+    if (attachment.kind == ScratchAttachmentKind::Color) {
+      CHECK_LT(attachment.index, m_colorBackups.size()) << "Vulkan scratch color backup missing";
+      return m_colorBackups[attachment.index];
+    }
+    return m_depthBackup;
+  }
+
+  const AttachmentBackup* backupForTexture(const ZVulkanTexture* texture) const
+  {
+    for (const auto& attachment : m_descriptor.attachments) {
+      if (attachmentTexture(attachment) == texture) {
+        if (attachment.kind == ScratchAttachmentKind::Color) {
+          if (attachment.index >= m_colorBackups.size()) {
+            return nullptr;
+          }
+          return &m_colorBackups[attachment.index];
+        }
+        return &m_depthBackup;
+      }
+    }
+    return nullptr;
+  }
+
+  void backupAttachmentToHost(const ScratchAttachmentDesc& attachment)
+  {
+    auto* texture = attachmentTexture(attachment);
+    auto& backup = attachmentBackup(attachment);
+    backup.valid = false;
+    backup.layout = vk::ImageLayout::eUndefined;
+
+    if (!texture->resident()) {
+      return;
+    }
+
+    const uint64_t bytes = attachmentByteSize(attachment);
+    CHECK(bytes <= static_cast<uint64_t>(std::numeric_limits<size_t>::max()))
+      << "Vulkan scratch host backup exceeds addressable size";
+    if (bytes == 0u || texture->layout() == vk::ImageLayout::eUndefined) {
+      backup.bytes.clear();
+      return;
+    }
+
+    backup.bytes.resize(static_cast<size_t>(bytes));
+    backup.layout = texture->layout();
+    texture->downloadData(backup.bytes.data(), backup.bytes.size());
+    backup.valid = true;
+  }
+
   ZVulkanDevice& m_device;
   ScratchImageDescriptor m_descriptor;
   std::vector<std::unique_ptr<ZVulkanTexture>> m_colorAttachments;
   std::unique_ptr<ZVulkanTexture> m_depthAttachment;
+  std::vector<AttachmentBackup> m_colorBackups;
+  AttachmentBackup m_depthBackup;
 };
 
 ZVulkanTexture* Z3DScratchResourcePool::RenderTargetLease::colorAttachment(uint32_t index) const
@@ -1003,6 +1214,15 @@ std::string Z3DScratchResourcePool::describeMemoryUsage(bool detailed) const
       const auto& slot = *slots[i];
       const auto& desc = slot.descriptor;
       const uint64_t slotBytes = slot.image ? slot.image->estimatedResidentBytes() : 0;
+      bool protectedSlot = false;
+      if (slot.image) {
+        for (auto* texture : m_vulkanResidencyProtectedTextures) {
+          if (slot.image->containsTexture(texture)) {
+            protectedSlot = true;
+            break;
+          }
+        }
+      }
       std::string attachmentFormats;
       if (detailed) {
         attachmentFormats.reserve(64);
@@ -1021,17 +1241,19 @@ std::string Z3DScratchResourcePool::describeMemoryUsage(bool detailed) const
       }
       bytes += slotBytes;
       if (detailed) {
-        appendDetail(
-          fmt::format("[Vulkan/{}] slot={} size={}x{} layers={} inUse={} resident={} bytes={} attachments=[{}]",
-                      scratchUsageLabel(usage),
-                      i,
-                      desc.size.x,
-                      desc.size.y,
-                      desc.layers,
-                      slot.inUse ? 1 : 0,
-                      (slot.image && slot.image->resident()) ? 1 : 0,
-                      slotBytes,
-                      attachmentFormats));
+        appendDetail(fmt::format(
+          "[Vulkan/{}] slot={} size={}x{} layers={} inUse={} releasePending={} protected={} resident={} bytes={} attachments=[{}]",
+          scratchUsageLabel(usage),
+          i,
+          desc.size.x,
+          desc.size.y,
+          desc.layers,
+          slot.inUse ? 1 : 0,
+          slot.releasePending ? 1 : 0,
+          protectedSlot ? 1 : 0,
+          (slot.image && slot.image->resident()) ? 1 : 0,
+          slotBytes,
+          attachmentFormats));
       }
     }
     return bytes;
@@ -1520,10 +1742,20 @@ void Z3DScratchResourcePool::pumpVulkanScratchReleases(VulkanScratchReclaimMode 
   }
 }
 
-size_t Z3DScratchResourcePool::evictAllFreeVulkanSlots(const VulkanScratchSlot* protectedSlot, bool logSummary)
+Z3DScratchResourcePool::VulkanScratchBackingReclaimStats
+Z3DScratchResourcePool::evictAllFreeVulkanSlotsWithStats(const VulkanScratchSlot* protectedSlot,
+                                                         bool logSummary,
+                                                         uint64_t targetBytes)
 {
-  size_t evicted = 0;
-  uint64_t evictedBytes = 0;
+  struct EvictCandidate
+  {
+    VulkanScratchSlot* slot = nullptr;
+    ScratchImageUsage usage = ScratchImageUsage::BlockId;
+    uint64_t bytes = 0;
+    uint64_t lastUseTick = 0;
+  };
+
+  std::vector<EvictCandidate> candidates;
   for (size_t usageIndex = 0; usageIndex < m_vulkanSlots.size(); ++usageIndex) {
     auto& slots = m_vulkanSlots[usageIndex];
     for (auto& slot : slots) {
@@ -1534,27 +1766,550 @@ size_t Z3DScratchResourcePool::evictAllFreeVulkanSlots(const VulkanScratchSlot* 
       if (slotBytes == 0) {
         continue;
       }
-      slot->image->releaseDeviceResources();
-      recordVulkanEvictAll(static_cast<ScratchImageUsage>(usageIndex), 1);
-      evictedBytes += slotBytes;
-      ++evicted;
+      candidates.push_back(EvictCandidate{.slot = slot.get(),
+                                          .usage = static_cast<ScratchImageUsage>(usageIndex),
+                                          .bytes = slotBytes,
+                                          .lastUseTick = slot->lastUseTick});
     }
   }
 
-  if (evicted > 0) {
-    ++m_changeCounter;
-    if (logSummary) {
-      VLOG(1) << fmt::format("scratch pool Vulkan evict-all-free: evicted {} slots ({:.2f} MiB)",
-                             evicted,
-                             static_cast<double>(evictedBytes) / (1024.0 * 1024.0));
+  std::sort(candidates.begin(), candidates.end(), [](const EvictCandidate& a, const EvictCandidate& b) {
+    if (a.lastUseTick != b.lastUseTick) {
+      return a.lastUseTick < b.lastUseTick;
+    }
+    if (a.bytes != b.bytes) {
+      return a.bytes > b.bytes;
+    }
+    return static_cast<uint8_t>(a.usage) < static_cast<uint8_t>(b.usage);
+  });
+
+  VulkanScratchBackingReclaimStats stats{};
+  for (const EvictCandidate& candidate : candidates) {
+    CHECK(candidate.slot != nullptr) << "Vulkan scratch eviction candidate missing slot";
+    CHECK(candidate.slot->image != nullptr) << "Vulkan scratch eviction candidate lost image";
+    candidate.slot->image->releaseDeviceResources();
+    recordVulkanEvictAll(candidate.usage, 1);
+    stats.bytesReleased += candidate.bytes;
+    stats.slotsEvicted++;
+    if (targetBytes > 0u && stats.bytesReleased >= targetBytes) {
+      break;
     }
   }
-  return evicted;
+
+  if (stats.slotsEvicted > 0) {
+    ++m_changeCounter;
+    if (logSummary) {
+      VLOG(1) << fmt::format("scratch pool Vulkan evict-free-backing: evicted {} slots ({:.2f} MiB) target={}B",
+                             stats.slotsEvicted,
+                             static_cast<double>(stats.bytesReleased) / (1024.0 * 1024.0),
+                             targetBytes);
+    }
+  }
+  return stats;
+}
+
+size_t Z3DScratchResourcePool::evictAllFreeVulkanSlots(const VulkanScratchSlot* protectedSlot, bool logSummary)
+{
+  return evictAllFreeVulkanSlotsWithStats(protectedSlot, logSummary).slotsEvicted;
 }
 
 void Z3DScratchResourcePool::reclaimVulkanScratchMemory(VulkanScratchReclaimMode mode)
 {
   pumpVulkanScratchReleases(mode);
+}
+
+Z3DScratchResourcePool::VulkanScratchBackingReclaimStats
+Z3DScratchResourcePool::reclaimFreeVulkanScratchBacking(std::string_view reason, uint64_t targetBytes)
+{
+  const auto stats = evictAllFreeVulkanSlotsWithStats(nullptr, true, targetBytes);
+  if (stats.slotsEvicted > 0u) {
+    VLOG(1) << fmt::format("scratch pool Vulkan broker reclaim: reason='{}' slots={} bytes={}B target={}B",
+                           reason.empty() ? "<unspecified>" : std::string(reason),
+                           stats.slotsEvicted,
+                           stats.bytesReleased,
+                           targetBytes);
+  }
+  return stats;
+}
+
+std::vector<Z3DScratchResourcePool::VulkanScratchBackingCandidate>
+Z3DScratchResourcePool::vulkanScratchBackingCandidates() const
+{
+  std::vector<VulkanScratchBackingCandidate> candidates;
+  const bool canHostBackLeasedScratch =
+    m_externalVkDevice != nullptr && m_externalVkDevice->frameExecutor().inFlightCount() == 0u;
+  for (size_t usageIndex = 0; usageIndex < m_vulkanSlots.size(); ++usageIndex) {
+    const auto usage = static_cast<ScratchImageUsage>(usageIndex);
+    const auto& slots = m_vulkanSlots[usageIndex];
+    for (size_t slotIndex = 0; slotIndex < slots.size(); ++slotIndex) {
+      const auto& slot = slots[slotIndex];
+      if (!slot || !slot->image) {
+        continue;
+      }
+      const uint64_t residentBytes = slot->image->estimatedResidentBytes();
+      if (residentBytes == 0u) {
+        continue;
+      }
+
+      uint32_t pinCount = slot->releasePending || (slot->inUse && !canHostBackLeasedScratch) ? 1u : 0u;
+      for (auto* texture : m_vulkanResidencyProtectedTextures) {
+        if (slot->image->containsTexture(texture)) {
+          CHECK(pinCount < std::numeric_limits<uint32_t>::max()) << "Vulkan scratch candidate pin count overflow";
+          ++pinCount;
+        }
+      }
+
+      candidates.push_back(VulkanScratchBackingCandidate{
+        .usage = usage,
+        .slotIndex = slotIndex,
+        .residentBytes = residentBytes,
+        .lastUseTick = slot->lastUseTick,
+        .pinCount = pinCount,
+        .inUse = slot->inUse,
+        .releasePending = slot->releasePending,
+        .label = fmt::format("scratch_{} slot={} inUse={}", scratchUsageLabel(usage), slotIndex, slot->inUse ? 1 : 0)});
+    }
+  }
+  return candidates;
+}
+
+Z3DScratchResourcePool::VulkanScratchBackingReclaimStats
+Z3DScratchResourcePool::reclaimVulkanScratchBackingCandidate(ScratchImageUsage usage,
+                                                             size_t slotIndex,
+                                                             std::string_view reason)
+{
+  VulkanScratchBackingReclaimStats stats{};
+  const size_t usageIndex = static_cast<size_t>(usage);
+  CHECK_LT(usageIndex, m_vulkanSlots.size()) << "Invalid Vulkan scratch backing candidate usage";
+  auto& slots = m_vulkanSlots[usageIndex];
+  if (slotIndex >= slots.size()) {
+    return stats;
+  }
+
+  auto& slot = slots[slotIndex];
+  if (!slot || !slot->image || slot->releasePending) {
+    return stats;
+  }
+  if (slot->inUse && (m_externalVkDevice == nullptr || m_externalVkDevice->frameExecutor().inFlightCount() != 0u)) {
+    return stats;
+  }
+  for (auto* texture : m_vulkanResidencyProtectedTextures) {
+    if (slot->image->containsTexture(texture)) {
+      return stats;
+    }
+  }
+
+  const uint64_t residentBytes = slot->image->estimatedResidentBytes();
+  if (residentBytes == 0u) {
+    return stats;
+  }
+
+  const uint64_t releasedBytes =
+    slot->inUse ? slot->image->releaseDeviceResourcesToHost() : (slot->image->releaseDeviceResources(), residentBytes);
+  if (releasedBytes == 0u) {
+    return stats;
+  }
+
+  recordVulkanEvictAll(usage, 1);
+  ++m_changeCounter;
+  stats.bytesReleased = releasedBytes;
+  stats.slotsEvicted = 1u;
+  VLOG(1) << fmt::format("scratch pool Vulkan broker candidate evict: usage={} slot={} inUse={} bytes={}B reason='{}'",
+                         scratchUsageLabel(usage),
+                         slotIndex,
+                         slot->inUse ? 1 : 0,
+                         releasedBytes,
+                         reason.empty() ? "<unspecified>" : std::string(reason));
+  return stats;
+}
+
+Z3DScratchResourcePool::VulkanScratchProtectionScope::VulkanScratchProtectionScope(
+  Z3DScratchResourcePool* pool,
+  std::vector<ZVulkanTexture*> textures)
+  : m_pool(pool)
+  , m_textures(std::move(textures))
+{}
+
+Z3DScratchResourcePool::VulkanScratchProtectionScope::~VulkanScratchProtectionScope()
+{
+  release();
+}
+
+Z3DScratchResourcePool::VulkanScratchProtectionScope::VulkanScratchProtectionScope(
+  VulkanScratchProtectionScope&& other) noexcept
+  : m_pool(other.m_pool)
+  , m_textures(std::move(other.m_textures))
+{
+  other.m_pool = nullptr;
+}
+
+Z3DScratchResourcePool::VulkanScratchProtectionScope&
+Z3DScratchResourcePool::VulkanScratchProtectionScope::operator=(VulkanScratchProtectionScope&& other) noexcept
+{
+  if (this != &other) {
+    release();
+    m_pool = other.m_pool;
+    m_textures = std::move(other.m_textures);
+    other.m_pool = nullptr;
+  }
+  return *this;
+}
+
+void Z3DScratchResourcePool::VulkanScratchProtectionScope::release()
+{
+  if (m_pool == nullptr || m_textures.empty()) {
+    m_pool = nullptr;
+    m_textures.clear();
+    return;
+  }
+  m_pool->releaseVulkanScratchTextureProtections(
+    std::span<ZVulkanTexture* const>(m_textures.data(), m_textures.size()));
+  m_pool = nullptr;
+  m_textures.clear();
+}
+
+Z3DScratchResourcePool::VulkanScratchProtectionScope
+Z3DScratchResourcePool::protectVulkanScratchTextures(std::span<ZVulkanTexture* const> textures)
+{
+  auto containsScratchTexture = [&](const ZVulkanTexture* texture) {
+    for (const auto& slots : m_vulkanSlots) {
+      for (const auto& slot : slots) {
+        if (slot->image && slot->image->containsTexture(texture)) {
+          return true;
+        }
+      }
+    }
+    return false;
+  };
+
+  std::vector<ZVulkanTexture*> protectedTextures;
+  protectedTextures.reserve(textures.size());
+  for (auto* texture : textures) {
+    if (texture == nullptr) {
+      continue;
+    }
+    if (!containsScratchTexture(texture)) {
+      continue;
+    }
+    if (std::find(protectedTextures.begin(), protectedTextures.end(), texture) != protectedTextures.end()) {
+      continue;
+    }
+    protectedTextures.push_back(texture);
+    m_vulkanResidencyProtectedTextures.push_back(texture);
+  }
+  if (protectedTextures.empty()) {
+    return VulkanScratchProtectionScope{};
+  }
+  return VulkanScratchProtectionScope(this, std::move(protectedTextures));
+}
+
+void Z3DScratchResourcePool::releaseVulkanScratchTextureProtections(std::span<ZVulkanTexture* const> textures)
+{
+  for (auto* texture : textures) {
+    if (texture == nullptr) {
+      continue;
+    }
+    const auto it =
+      std::find(m_vulkanResidencyProtectedTextures.begin(), m_vulkanResidencyProtectedTextures.end(), texture);
+    CHECK(it != m_vulkanResidencyProtectedTextures.end())
+      << "Vulkan scratch protection release without a matching acquire";
+    m_vulkanResidencyProtectedTextures.erase(it);
+  }
+}
+
+Z3DScratchResourcePool::VulkanScratchBackingReclaimStats
+Z3DScratchResourcePool::reclaimColdVulkanScratchBacking(std::span<ZVulkanTexture* const> protectedTextures,
+                                                        std::string_view reason,
+                                                        uint64_t targetBytes)
+{
+  struct EvictCandidate
+  {
+    VulkanScratchSlot* slot = nullptr;
+    ScratchImageUsage usage = ScratchImageUsage::BlockId;
+    uint64_t bytes = 0;
+    uint64_t lastUseTick = 0;
+    bool inUse = false;
+  };
+
+  std::unordered_set<ZVulkanTexture*> protectedSet;
+  protectedSet.reserve(protectedTextures.size() + m_vulkanResidencyProtectedTextures.size());
+  for (auto* texture : m_vulkanResidencyProtectedTextures) {
+    if (texture != nullptr) {
+      protectedSet.insert(texture);
+    }
+  }
+  for (auto* texture : protectedTextures) {
+    if (texture != nullptr) {
+      protectedSet.insert(texture);
+    }
+  }
+
+  auto slotIsProtected = [&](const VulkanScratchSlot& slot) {
+    if (!slot.image) {
+      return false;
+    }
+    for (auto* texture : protectedSet) {
+      if (slot.image->containsTexture(texture)) {
+        return true;
+      }
+    }
+    return false;
+  };
+
+  std::vector<EvictCandidate> candidates;
+  for (size_t usageIndex = 0; usageIndex < m_vulkanSlots.size(); ++usageIndex) {
+    auto& slots = m_vulkanSlots[usageIndex];
+    for (auto& slot : slots) {
+      if (!slot->image || slot->releasePending || slotIsProtected(*slot)) {
+        continue;
+      }
+      const uint64_t slotBytes = slot->image->estimatedResidentBytes();
+      if (slotBytes == 0u) {
+        continue;
+      }
+      candidates.push_back(EvictCandidate{.slot = slot.get(),
+                                          .usage = static_cast<ScratchImageUsage>(usageIndex),
+                                          .bytes = slotBytes,
+                                          .lastUseTick = slot->lastUseTick,
+                                          .inUse = slot->inUse});
+    }
+  }
+
+  std::sort(candidates.begin(), candidates.end(), [](const EvictCandidate& a, const EvictCandidate& b) {
+    if (a.lastUseTick != b.lastUseTick) {
+      return a.lastUseTick < b.lastUseTick;
+    }
+    if (a.bytes != b.bytes) {
+      return a.bytes > b.bytes;
+    }
+    return static_cast<uint8_t>(a.usage) < static_cast<uint8_t>(b.usage);
+  });
+
+  VulkanScratchBackingReclaimStats stats{};
+  for (const EvictCandidate& candidate : candidates) {
+    CHECK(candidate.slot != nullptr) << "Vulkan scratch cold eviction candidate missing slot";
+    CHECK(candidate.slot->image != nullptr) << "Vulkan scratch cold eviction candidate lost image";
+    const uint64_t released = candidate.inUse ? candidate.slot->image->releaseDeviceResourcesToHost()
+                                              : (candidate.slot->image->releaseDeviceResources(), candidate.bytes);
+    if (released == 0u) {
+      continue;
+    }
+    recordVulkanEvictAll(candidate.usage, 1);
+    stats.bytesReleased += released;
+    stats.slotsEvicted++;
+    if (targetBytes > 0u && stats.bytesReleased >= targetBytes) {
+      break;
+    }
+  }
+
+  if (stats.slotsEvicted > 0u) {
+    ++m_changeCounter;
+    VLOG(1) << fmt::format(
+      "scratch pool Vulkan evict-cold-backing: reason='{}' protected_textures={} slots={} bytes={}B target={}B",
+      reason.empty() ? "<unspecified>" : std::string(reason),
+      protectedSet.size(),
+      stats.slotsEvicted,
+      stats.bytesReleased,
+      targetBytes);
+  }
+  return stats;
+}
+
+void Z3DScratchResourcePool::prepareVulkanScratchTexturesForPass(std::span<const VulkanScratchTextureUse> uses,
+                                                                 std::string_view reason)
+{
+  if (uses.empty()) {
+    return;
+  }
+
+  ZVulkanDevice& dev = ensureVulkanDevice();
+  pumpVulkanScratchReleases(VulkanScratchReclaimMode::PollCompleted);
+
+  std::vector<VulkanScratchTextureUse> dedupedUses;
+  dedupedUses.reserve(uses.size());
+  for (const auto& use : uses) {
+    if (use.texture == nullptr) {
+      continue;
+    }
+    auto it = std::find_if(dedupedUses.begin(), dedupedUses.end(), [&](const VulkanScratchTextureUse& existing) {
+      return existing.texture == use.texture;
+    });
+    if (it == dedupedUses.end()) {
+      dedupedUses.push_back(use);
+    } else {
+      it->contentsRequired = it->contentsRequired || use.contentsRequired;
+    }
+  }
+  if (dedupedUses.empty()) {
+    return;
+  }
+
+  std::vector<ZVulkanTexture*> protectedTextures;
+  protectedTextures.reserve(dedupedUses.size());
+  for (const auto& use : dedupedUses) {
+    protectedTextures.push_back(use.texture);
+  }
+  auto protectedGuard =
+    protectVulkanScratchTextures(std::span<ZVulkanTexture* const>(protectedTextures.data(), protectedTextures.size()));
+  (void)protectedGuard;
+
+  std::vector<ZVulkanScratchImage*> hotImages;
+  auto addHotImageForTexture = [&](ZVulkanTexture* texture) {
+    for (auto& slots : m_vulkanSlots) {
+      for (auto& slot : slots) {
+        if (!slot->image || !slot->image->containsTexture(texture)) {
+          continue;
+        }
+        if (std::find(hotImages.begin(), hotImages.end(), slot->image.get()) == hotImages.end()) {
+          hotImages.push_back(slot->image.get());
+        }
+        return;
+      }
+    }
+  };
+  for (auto* texture : protectedTextures) {
+    addHotImageForTexture(texture);
+  }
+  if (hotImages.empty()) {
+    return;
+  }
+
+  uint64_t hotTotalBytes = 0u;
+  uint64_t missingBytes = 0u;
+  for (auto* image : hotImages) {
+    CHECK(image != nullptr);
+    const uint64_t total = image->estimatedTotalBytes();
+    const uint64_t resident = image->estimatedResidentBytes();
+    hotTotalBytes += total;
+    if (total > resident) {
+      missingBytes += total - resident;
+    }
+  }
+
+  const uint64_t strictBudget = dev.residencyManager().effectiveBrokerBudgetBytes();
+  if (dev.residencyManager().strictBudgetActive() && strictBudget > 0u && hotTotalBytes > strictBudget) {
+    throw ZException(fmt::format(
+      "Vulkan scratch pass working set exceeds strict residency budget: hot_set={}B budget={}B textures={} slots={} reason='{}'",
+      hotTotalBytes,
+      strictBudget,
+      protectedTextures.size(),
+      hotImages.size(),
+      reason.empty() ? "<unspecified>" : std::string(reason)));
+  }
+
+  auto strictBudgetReclaimBytes = [&](uint64_t incomingBytes) {
+    const auto pressure = dev.residencyManager().allocationPressureFor(incomingBytes);
+    return pressure.needsReclaim() ? pressure.reclaimBytes : 0u;
+  };
+
+  auto reclaimForScratchPassBudget = [&](uint64_t incomingBytes) {
+    while (true) {
+      uint64_t targetBytes = strictBudgetReclaimBytes(incomingBytes);
+      if (targetBytes == 0u) {
+        return;
+      }
+      pumpVulkanScratchReleases(VulkanScratchReclaimMode::WaitForIdle);
+
+      const auto coldScratchStats = reclaimColdVulkanScratchBacking(
+        std::span<ZVulkanTexture* const>(protectedTextures.data(), protectedTextures.size()),
+        reason,
+        targetBytes);
+      if (coldScratchStats.bytesReleased > 0u || coldScratchStats.slotsEvicted > 0u) {
+        continue;
+      }
+
+      const auto stats = dev.residencyManager().reclaimMemory(
+        ZVulkanResidencyManager::ReclaimRequest{.requestClass = ZVulkanResidencyManager::ResourceClass::ScratchBacking,
+                                                .requestedBytes = targetBytes,
+                                                .force = false,
+                                                .reason = reason});
+
+      if (stats.resourcesReleased == 0u && stats.bytesReleased == 0u) {
+        return;
+      }
+    }
+  };
+
+  reclaimForScratchPassBudget(missingBytes);
+
+  for (auto* image : hotImages) {
+    CHECK(image != nullptr);
+    if (image->resident()) {
+      continue;
+    }
+    try {
+      image->makeResidentForPass(std::span<const VulkanScratchTextureUse>(dedupedUses.data(), dedupedUses.size()));
+    }
+    catch (const std::exception& e) {
+      VLOG(2) << fmt::format("Vulkan scratch pass restore retrying after cold reclaim: reason='{}' error={}",
+                             reason.empty() ? "<unspecified>" : std::string(reason),
+                             e.what());
+      pumpVulkanScratchReleases(VulkanScratchReclaimMode::WaitForIdle);
+      (void)dev.residencyManager().reclaimMemory(
+        ZVulkanResidencyManager::ReclaimRequest{.requestClass = ZVulkanResidencyManager::ResourceClass::ScratchBacking,
+                                                .requestedBytes = image->estimatedTotalBytes(),
+                                                .force = false,
+                                                .reason = reason});
+      try {
+        image->makeResidentForPass(std::span<const VulkanScratchTextureUse>(dedupedUses.data(), dedupedUses.size()));
+      }
+      catch (const std::exception& retryError) {
+        throw ZException(
+          fmt::format("Vulkan scratch pass restore failed after cold reclaim: reason='{}' error={} scratch={}",
+                      reason.empty() ? "<unspecified>" : std::string(reason),
+                      retryError.what(),
+                      describeMemoryUsage(false)));
+      }
+    }
+  }
+
+  reclaimForScratchPassBudget(0u);
+
+  if (dev.residencyManager().strictBudgetActive()) {
+    const auto pressure = dev.residencyManager().allocationPressureFor(0u);
+    if (pressure.needsReclaim()) {
+      throw ZException(fmt::format(
+        "Vulkan scratch pass restore exceeded strict residency budget: usage={}B budget={}B over={}B hot_set={}B reason='{}' memory_by_class=[{}] scratch={}",
+        pressure.usageBytes,
+        pressure.budgetBytes,
+        pressure.reclaimBytes,
+        hotTotalBytes,
+        reason.empty() ? "<unspecified>" : std::string(reason),
+        dev.residencyManager().describeMemoryByClass(),
+        describeMemoryUsage(false)));
+    }
+  }
+}
+
+Z3DScratchResourcePool::VulkanScratchBackingReport Z3DScratchResourcePool::vulkanScratchBackingReport() const
+{
+  VulkanScratchBackingReport report{};
+  for (const auto& slots : m_vulkanSlots) {
+    for (const auto& slot : slots) {
+      if (!slot->image) {
+        continue;
+      }
+      if (slot->inUse) {
+        report.inUseSlots++;
+      }
+      if (slot->releasePending) {
+        report.releasePendingSlots++;
+      }
+      for (auto* texture : m_vulkanResidencyProtectedTextures) {
+        if (slot->image->containsTexture(texture)) {
+          report.protectedSlots++;
+          break;
+        }
+      }
+      const uint64_t bytes = slot->image->estimatedResidentBytes();
+      if (bytes == 0) {
+        continue;
+      }
+      report.residentSlots++;
+      report.residentBytes += bytes;
+    }
+  }
+  return report;
 }
 
 void Z3DScratchResourcePool::trim()
@@ -2051,33 +2806,6 @@ Z3DScratchResourcePool::acquireVulkanScratchImage(const ScratchImageDescriptor& 
       throw retryFailure("retarget", "unknown exception");
     }
   };
-  auto ensureResidentScratchImage = [&](VulkanScratchSlot& target) {
-    if (target.image->resident()) {
-      return false;
-    }
-    try {
-      target.image->recreateDeviceResources();
-      return true;
-    }
-    catch (const std::exception& e) {
-      recoverBeforeRetry("recreate", &target, e.what());
-    }
-    catch (...) {
-      recoverBeforeRetry("recreate", &target, "unknown exception");
-    }
-
-    try {
-      target.image->recreateDeviceResources();
-      return true;
-    }
-    catch (const std::exception& e) {
-      throw retryFailure("recreate", e.what());
-    }
-    catch (...) {
-      throw retryFailure("recreate", "unknown exception");
-    }
-  };
-
   auto findExactFreeSlot = [&]() -> VulkanScratchSlot* {
     for (auto& candidate : slots) {
       if (candidate->inUse) {
@@ -2179,7 +2907,7 @@ Z3DScratchResourcePool::acquireVulkanScratchImage(const ScratchImageDescriptor& 
   }
 
   if (!slot && hasPendingReusableRelease()) {
-    pumpVulkanScratchReleases(VulkanScratchReclaimMode::WaitForIdle);
+    pumpVulkanScratchReleases(VulkanScratchReclaimMode::PollCompleted);
     slot = findExactFreeSlot();
     retargeted = false;
     acquireKind = slot ? ScratchAcquireKind::ExactReuse : ScratchAcquireKind::NewSlot;
@@ -2203,10 +2931,7 @@ Z3DScratchResourcePool::acquireVulkanScratchImage(const ScratchImageDescriptor& 
   if (retargeted) {
     ++m_changeCounter;
   }
-  const bool residentRecreated = ensureResidentScratchImage(*slot);
-  if (residentRecreated) {
-    ++m_changeCounter;
-  }
+  const bool residentRecreated = false;
   markSlotAcquired(*slot);
   auto lease = RenderTargetLease{};
   lease.descriptor = (descriptor.usage == ScratchImageUsage::BlockId) ? descriptor : slot->descriptor;

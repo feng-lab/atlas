@@ -2,11 +2,16 @@
 
 #include "z3drendererbase.h"
 #include "z3drenderervulkanbackend.h"
+#include "z3drenderglobalstate.h"
+#include "z3dscratchresourcepool.h"
 #include "z3dimg.h"
 #include "zcancellation.h"
 #include "zlog.h"
 #include "zrenderthreadexecutor_tls.h"
 #include "zvulkanbuffer.h"
+#include "zvulkandevice.h"
+#include "zvulkanresidencymanager.h"
+#include "zvulkantexture.h"
 
 #include <folly/OperationCancelled.h>
 #include <folly/coro/Task.h>
@@ -14,6 +19,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <exception>
 #include <unordered_map>
 #include <unordered_set>
 #include <type_traits>
@@ -386,6 +392,105 @@ void appendBindlessSampledImageUsesFromBatch(
     batch.geometry);
 }
 
+bool externalImageUseRequiresContents(ExternalImageUseKind kind)
+{
+  switch (kind) {
+    case ExternalImageUseKind::SampledRead:
+    case ExternalImageUseKind::StorageRead:
+    case ExternalImageUseKind::StorageReadWrite:
+    case ExternalImageUseKind::TransferSrc:
+    case ExternalImageUseKind::General:
+      return true;
+    case ExternalImageUseKind::StorageWrite:
+    case ExternalImageUseKind::TransferDst:
+      return false;
+  }
+  return true;
+}
+
+void appendTextureUseFromHandle(const AttachmentHandle& handle,
+                                bool contentsRequired,
+                                std::vector<Z3DScratchResourcePool::VulkanScratchTextureUse>& out)
+{
+  if (!handle.valid() || handle.backend != RenderBackend::Vulkan) {
+    return;
+  }
+  auto* texture = reinterpret_cast<ZVulkanTexture*>(handle.id);
+  if (texture == nullptr) {
+    return;
+  }
+  out.push_back(
+    Z3DScratchResourcePool::VulkanScratchTextureUse{.texture = texture, .contentsRequired = contentsRequired});
+}
+
+void appendTextureUsesFromBatch(const RenderBatch& batch,
+                                std::vector<Z3DScratchResourcePool::VulkanScratchTextureUse>& out)
+{
+  for (const auto& attachment : batch.pass.colorAttachments) {
+    appendTextureUseFromHandle(attachment.handle, attachment.loadOp == LoadOp::Load, out);
+  }
+  if (batch.pass.depthAttachment) {
+    appendTextureUseFromHandle(batch.pass.depthAttachment->handle,
+                               batch.pass.depthAttachment->loadOp == LoadOp::Load,
+                               out);
+  }
+  if (batch.pass.resolveAttachment) {
+    appendTextureUseFromHandle(batch.pass.resolveAttachment->handle,
+                               batch.pass.resolveAttachment->loadOp == LoadOp::Load,
+                               out);
+  }
+
+  for (const auto& use : batch.pass.externalImageUses) {
+    appendTextureUseFromHandle(use.handle, externalImageUseRequiresContents(use.kind), out);
+  }
+
+  std::vector<ExternalImageUseDesc> sampledUses;
+  appendBindlessSampledImageUsesFromBatch(batch, sampledUses, nullptr);
+  for (const auto& use : sampledUses) {
+    appendTextureUseFromHandle(use.handle, true, out);
+  }
+
+  auto appendLeaseColors = [&](const std::shared_ptr<Z3DScratchResourcePool::RenderTargetLease>& lease,
+                               uint32_t requestedAttachments,
+                               bool contentsRequired) {
+    if (!lease || !lease->hasVulkanImage()) {
+      return;
+    }
+    const uint32_t count =
+      requestedAttachments == 0u ? lease->attachments : std::min(requestedAttachments, lease->attachments);
+    for (uint32_t i = 0; i < count; ++i) {
+      if (auto* texture = lease->colorAttachment(i)) {
+        out.push_back(
+          Z3DScratchResourcePool::VulkanScratchTextureUse{.texture = texture, .contentsRequired = contentsRequired});
+      }
+    }
+  };
+
+  std::visit(
+    [&](auto&& payload) {
+      using T = std::decay_t<decltype(payload)>;
+      if constexpr (std::is_same_v<T, ImgRaycasterPayload>) {
+        if (payload.stage == ImgRaycasterPayload::Stage::ProgressiveCompaction) {
+          appendLeaseColors(payload.blockIdLease, payload.blockIdEffectiveAttachmentCount, true);
+        }
+      } else if constexpr (std::is_same_v<T, ImgSlicePayload>) {
+        if (payload.stage == ImgSlicePayload::Stage::BlockIdDiscovery && payload.blockIdLease) {
+          appendLeaseColors(payload.blockIdLease, 1u, true);
+        }
+      } else {
+      }
+    },
+    batch.geometry);
+}
+
+void appendTextureUsesFromState(const RendererCPUState& state,
+                                std::vector<Z3DScratchResourcePool::VulkanScratchTextureUse>& out)
+{
+  for (const auto& batch : state.batches) {
+    appendTextureUsesFromBatch(batch, out);
+  }
+}
+
 } // namespace
 
 ZVulkanLinearScript::ZVulkanLinearScript(Z3DRendererBase& renderer,
@@ -405,6 +510,10 @@ ZVulkanLinearScript::ZVulkanLinearScript(Z3DRendererBase& renderer,
 ZVulkanLinearScript::~ZVulkanLinearScript()
 {
   if (m_nodes.empty() && m_preRecordNodes.empty() && !m_frameOpen) {
+    return;
+  }
+  if (std::uncaught_exceptions() > 0) {
+    LOG(WARNING) << "ZVulkanLinearScript dropping unflushed nodes during exception unwinding";
     return;
   }
 
@@ -467,6 +576,9 @@ ZVulkanLinearScript::SegmentHandle ZVulkanLinearScript::raster(std::string_view 
   node.state = m_renderer.captureVulkanBatches(recordBatches, label);
   node.captureMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - captureStart).count();
   m_nodes.emplace_back(std::move(node));
+  if (strictResidencyFlushEachNode()) {
+    flushNodes("strict_residency_node", nullptr);
+  }
   return handle;
 }
 
@@ -505,6 +617,9 @@ ZVulkanLinearScript::SegmentHandle ZVulkanLinearScript::replay(std::string_view 
   }
   node.state = std::move(state);
   m_nodes.emplace_back(std::move(node));
+  if (strictResidencyFlushEachNode()) {
+    flushNodes("strict_residency_node", nullptr);
+  }
   return handle;
 }
 
@@ -520,6 +635,13 @@ ZVulkanLinearScript::commands(std::string_view label,
   node.label = std::string(label);
   node.record = record;
   m_nodes.emplace_back(std::move(node));
+  // Command nodes may use backend helper APIs that prepare, clear, copy, or
+  // read textures internally. Those texture effects are intentionally hidden
+  // from call sites, so the linear script cannot include them in the later
+  // hot-set prepass without executing the command. Treat the command node as
+  // an existing safe point: submit everything up to and including it before
+  // subsequent raster nodes infer their texture contents requirements.
+  flushNodes(strictResidencyFlushEachNode() ? "strict_residency_node" : "command_node", nullptr);
   return handle;
 }
 
@@ -605,27 +727,190 @@ void ZVulkanLinearScript::drainNodesIntoExecutionOrder(std::vector<Node>& out)
   m_nodes.clear();
 }
 
+bool ZVulkanLinearScript::strictResidencyFlushEachNode() const
+{
+  return m_backend.device().residencyManager().strictBudgetActive();
+}
+
+std::vector<Z3DScratchResourcePool::VulkanScratchTextureUse>
+ZVulkanLinearScript::collectScratchTextureUsesForNodes(std::span<const Node> nodes) const
+{
+  std::vector<Z3DScratchResourcePool::VulkanScratchTextureUse> uses;
+  std::unordered_map<ZVulkanTexture*, size_t> useIndex;
+  std::unordered_set<ZVulkanTexture*> availableWithinFlush;
+
+  auto textureFromHandle = [](const AttachmentHandle& handle) -> ZVulkanTexture* {
+    if (!handle.valid() || handle.backend != RenderBackend::Vulkan) {
+      return nullptr;
+    }
+    return reinterpret_cast<ZVulkanTexture*>(handle.id);
+  };
+
+  auto ensureUse = [&](ZVulkanTexture* texture) -> size_t {
+    CHECK(texture != nullptr);
+    auto [it, inserted] = useIndex.emplace(texture, uses.size());
+    if (inserted) {
+      uses.push_back(Z3DScratchResourcePool::VulkanScratchTextureUse{.texture = texture, .contentsRequired = false});
+    }
+    return it->second;
+  };
+
+  auto requireInitialContents = [&](ZVulkanTexture* texture) {
+    if (texture == nullptr) {
+      return;
+    }
+    const size_t index = ensureUse(texture);
+    if (availableWithinFlush.find(texture) == availableWithinFlush.end()) {
+      uses[index].contentsRequired = true;
+    }
+  };
+
+  auto markWrite = [&](ZVulkanTexture* texture, bool loadExistingContents) {
+    if (texture == nullptr) {
+      return;
+    }
+    if (loadExistingContents) {
+      requireInitialContents(texture);
+    } else {
+      (void)ensureUse(texture);
+    }
+    availableWithinFlush.insert(texture);
+  };
+
+  auto appendOrderedUsesFromBatch = [&](const RenderBatch& batch) {
+    for (const auto& attachment : batch.pass.colorAttachments) {
+      markWrite(textureFromHandle(attachment.handle), attachment.loadOp == LoadOp::Load);
+    }
+    if (batch.pass.depthAttachment) {
+      markWrite(textureFromHandle(batch.pass.depthAttachment->handle),
+                batch.pass.depthAttachment->loadOp == LoadOp::Load);
+    }
+    if (batch.pass.resolveAttachment) {
+      markWrite(textureFromHandle(batch.pass.resolveAttachment->handle),
+                batch.pass.resolveAttachment->loadOp == LoadOp::Load);
+    }
+
+    for (const auto& use : batch.pass.externalImageUses) {
+      auto* texture = textureFromHandle(use.handle);
+      if (externalImageUseRequiresContents(use.kind)) {
+        requireInitialContents(texture);
+      } else if (texture != nullptr) {
+        (void)ensureUse(texture);
+      }
+      if (texture != nullptr &&
+          (use.kind == ExternalImageUseKind::StorageWrite || use.kind == ExternalImageUseKind::StorageReadWrite ||
+           use.kind == ExternalImageUseKind::TransferDst)) {
+        availableWithinFlush.insert(texture);
+      }
+    }
+
+    std::vector<ExternalImageUseDesc> sampledUses;
+    appendBindlessSampledImageUsesFromBatch(batch, sampledUses, nullptr);
+    for (const auto& use : sampledUses) {
+      requireInitialContents(textureFromHandle(use.handle));
+    }
+
+    auto requireLeaseColors = [&](const std::shared_ptr<Z3DScratchResourcePool::RenderTargetLease>& lease,
+                                  uint32_t requestedAttachments) {
+      if (!lease || !lease->hasVulkanImage()) {
+        return;
+      }
+      const uint32_t count =
+        requestedAttachments == 0u ? lease->attachments : std::min(requestedAttachments, lease->attachments);
+      for (uint32_t i = 0; i < count; ++i) {
+        requireInitialContents(lease->colorAttachment(i));
+      }
+    };
+
+    std::visit(
+      [&](auto&& payload) {
+        using T = std::decay_t<decltype(payload)>;
+        if constexpr (std::is_same_v<T, ImgRaycasterPayload>) {
+          if (payload.stage == ImgRaycasterPayload::Stage::ProgressiveCompaction) {
+            requireLeaseColors(payload.blockIdLease, payload.blockIdEffectiveAttachmentCount);
+          }
+        } else if constexpr (std::is_same_v<T, ImgSlicePayload>) {
+          if (payload.stage == ImgSlicePayload::Stage::BlockIdDiscovery && payload.blockIdLease) {
+            requireLeaseColors(payload.blockIdLease, 1u);
+          }
+        } else {
+        }
+      },
+      batch.geometry);
+  };
+
+  uses.reserve(64);
+  useIndex.reserve(64);
+  for (const auto& node : nodes) {
+    if (const auto* rasterNode = std::get_if<RasterNode>(&node)) {
+      for (const auto& batch : rasterNode->state.batches) {
+        appendOrderedUsesFromBatch(batch);
+      }
+      continue;
+    }
+    if (const auto* replayNode = std::get_if<ReplayNode>(&node)) {
+      if (replayNode->state) {
+        for (const auto& batch : replayNode->state->batches) {
+          appendOrderedUsesFromBatch(batch);
+        }
+      }
+      continue;
+    }
+  }
+  return uses;
+}
+
+std::vector<ZVulkanTexture*> ZVulkanLinearScript::collectTexturePointersForNodes(std::span<const Node> nodes) const
+{
+  std::vector<Z3DScratchResourcePool::VulkanScratchTextureUse> uses;
+  uses.reserve(64);
+  for (const auto& node : nodes) {
+    if (const auto* rasterNode = std::get_if<RasterNode>(&node)) {
+      appendTextureUsesFromState(rasterNode->state, uses);
+      continue;
+    }
+    if (const auto* replayNode = std::get_if<ReplayNode>(&node)) {
+      if (replayNode->state) {
+        appendTextureUsesFromState(*replayNode->state, uses);
+      }
+      continue;
+    }
+  }
+
+  std::vector<ZVulkanTexture*> textures;
+  textures.reserve(uses.size());
+  std::unordered_set<ZVulkanTexture*> seen;
+  seen.reserve(uses.size());
+  for (const auto& use : uses) {
+    if (use.texture == nullptr || !seen.insert(use.texture).second) {
+      continue;
+    }
+    textures.push_back(use.texture);
+  }
+  return textures;
+}
+
 void ZVulkanLinearScript::flushNodes(std::string_view reason, /*nullable*/ const ReadbackBufferSpec* readback)
 {
   if (m_nodes.empty() && readback == nullptr) {
     CHECK(m_preRecordNodes.empty()) << "ZVulkanLinearScript: preRecord actions enqueued without any GPU work";
     return;
   }
-  CHECK(!m_nodes.empty() || readback == nullptr) << "ZVulkanLinearScript: readback requested without any GPU work";
 
-  std::string_view firstLabel;
+  std::string firstLabelStorage;
   if (!m_nodes.empty()) {
     const auto& first = m_nodes.front();
     if (const auto* rasterNode = std::get_if<RasterNode>(&first)) {
-      firstLabel = rasterNode->label;
+      firstLabelStorage = rasterNode->label;
     } else if (const auto* replayNode = std::get_if<ReplayNode>(&first)) {
-      firstLabel = replayNode->label;
+      firstLabelStorage = replayNode->label;
     } else if (const auto* cmdNode = std::get_if<CommandsNode>(&first)) {
-      firstLabel = cmdNode->label;
+      firstLabelStorage = cmdNode->label;
     }
   } else if (readback != nullptr) {
-    firstLabel = readback->label;
+    firstLabelStorage = readback->label;
   }
+  const std::string_view firstLabel = firstLabelStorage;
 
   // Uniform arena sizing: beginRender() suballocates per-frame lighting slices,
   // and some pipelines suballocate per-batch UBOs from the same arena. Provide
@@ -677,6 +962,12 @@ void ZVulkanLinearScript::flushNodes(std::string_view reason, /*nullable*/ const
     stats.batchCount = batchCount;
     m_backend.setPendingBeginRenderScriptStats(std::move(stats));
   }
+
+  const auto pendingNodeSpan = std::span<const Node>(m_nodes.data(), m_nodes.size());
+  const std::vector<ZVulkanTexture*> hotTextures = collectTexturePointersForNodes(pendingNodeSpan);
+  const std::vector<Z3DScratchResourcePool::VulkanScratchTextureUse> scratchTextureUses =
+    collectScratchTextureUsesForNodes(pendingNodeSpan);
+  auto scratchHotProtection = std::make_shared<std::optional<Z3DScratchResourcePool::VulkanScratchProtectionScope>>();
 
   // Bindless pre-registration:
   // Scan all nodes to discover sampled image usage before opening the Vulkan
@@ -1164,39 +1455,6 @@ void ZVulkanLinearScript::flushNodes(std::string_view reason, /*nullable*/ const
       }
     }
 
-    if (!sampledUses.empty()) {
-      std::unordered_set<BindlessUseKey, BindlessUseKeyHash> seen;
-      seen.reserve(sampledUses.size());
-
-      std::vector<ExternalImageUseDesc> uniqueUses;
-      uniqueUses.reserve(sampledUses.size());
-      for (const auto& use : sampledUses) {
-        if (!use.handle.valid() || use.handle.backend != RenderBackend::Vulkan) {
-          continue;
-        }
-        BindlessUseKey key{};
-        key.id = use.handle.id;
-        key.kind = use.kind;
-        key.aspectHint = use.aspectHint;
-        if (seen.insert(key).second) {
-          uniqueUses.push_back(use);
-        }
-      }
-
-      if (!uniqueUses.empty()) {
-        auto sharedUses = std::make_shared<std::vector<ExternalImageUseDesc>>(std::move(uniqueUses));
-        PreRecordNode bindlessNode;
-        bindlessNode.label = "bindless_register_sampled_images";
-        bindlessNode.fn = [uses = std::move(sharedUses)](Z3DRendererVulkanBackend& backend, Z3DRendererBase& renderer) {
-          (void)renderer;
-          backend.bindlessPreRegisterExternalSampledImageUses(
-            std::span<const ExternalImageUseDesc>(uses->data(), uses->size()),
-            "linear_script");
-        };
-        m_preRecordNodes.emplace_back(std::move(bindlessNode));
-      }
-    }
-
     if (!raycasterWarmupChannels.empty()) {
       std::vector<RaycasterWarmupGroup> groups;
       groups.reserve(raycasterWarmupChannels.size());
@@ -1266,6 +1524,88 @@ void ZVulkanLinearScript::flushNodes(std::string_view reason, /*nullable*/ const
           }
         };
         m_preRecordNodes.emplace_back(std::move(warmupNode));
+      }
+    }
+
+    if (!hotTextures.empty()) {
+      auto sharedTextures = std::make_shared<std::vector<ZVulkanTexture*>>(hotTextures);
+      PreRecordNode residencyNode;
+      residencyNode.label = "prepare_managed_texture_residency";
+      residencyNode.fn = [textures = std::move(sharedTextures)](Z3DRendererVulkanBackend& backend,
+                                                                Z3DRendererBase& renderer) {
+        (void)renderer;
+        auto& residency = backend.device().residencyManager();
+        auto protection =
+          residency.protectTextures(std::span<ZVulkanTexture* const>(textures->data(), textures->size()));
+        (void)protection;
+        for (auto* texture : *textures) {
+          if (residency.ensureResidentIfManaged(texture, "linear_script")) {
+            backend.pinTextureForActiveSubmission(texture);
+          }
+        }
+      };
+      m_preRecordNodes.emplace_back(std::move(residencyNode));
+    }
+
+    if (!scratchTextureUses.empty()) {
+      auto sharedUses =
+        std::make_shared<std::vector<Z3DScratchResourcePool::VulkanScratchTextureUse>>(scratchTextureUses);
+      PreRecordNode scratchNode;
+      scratchNode.label = "prepare_scratch_texture_residency";
+      scratchNode.fn = [uses = std::move(sharedUses),
+                        protection = scratchHotProtection](Z3DRendererVulkanBackend& backend,
+                                                           Z3DRendererBase& renderer) {
+        (void)backend;
+        (void)renderer;
+        auto& scratchPool = Z3DRenderGlobalState::instance().scratchPool();
+        scratchPool.prepareVulkanScratchTexturesForPass(
+          std::span<const Z3DScratchResourcePool::VulkanScratchTextureUse>(uses->data(), uses->size()),
+          "linear_script");
+        std::vector<ZVulkanTexture*> protectedTextures;
+        protectedTextures.reserve(uses->size());
+        for (const auto& use : *uses) {
+          if (use.texture == nullptr ||
+              std::find(protectedTextures.begin(), protectedTextures.end(), use.texture) != protectedTextures.end()) {
+            continue;
+          }
+          protectedTextures.push_back(use.texture);
+        }
+        protection->emplace(scratchPool.protectVulkanScratchTextures(
+          std::span<ZVulkanTexture* const>(protectedTextures.data(), protectedTextures.size())));
+      };
+      m_preRecordNodes.emplace_back(std::move(scratchNode));
+    }
+
+    if (!sampledUses.empty()) {
+      std::unordered_set<BindlessUseKey, BindlessUseKeyHash> seen;
+      seen.reserve(sampledUses.size());
+
+      std::vector<ExternalImageUseDesc> uniqueUses;
+      uniqueUses.reserve(sampledUses.size());
+      for (const auto& use : sampledUses) {
+        if (!use.handle.valid() || use.handle.backend != RenderBackend::Vulkan) {
+          continue;
+        }
+        BindlessUseKey key{};
+        key.id = use.handle.id;
+        key.kind = use.kind;
+        key.aspectHint = use.aspectHint;
+        if (seen.insert(key).second) {
+          uniqueUses.push_back(use);
+        }
+      }
+
+      if (!uniqueUses.empty()) {
+        auto sharedUses = std::make_shared<std::vector<ExternalImageUseDesc>>(std::move(uniqueUses));
+        PreRecordNode bindlessNode;
+        bindlessNode.label = "bindless_register_sampled_images";
+        bindlessNode.fn = [uses = std::move(sharedUses)](Z3DRendererVulkanBackend& backend, Z3DRendererBase& renderer) {
+          (void)renderer;
+          backend.bindlessPreRegisterExternalSampledImageUses(
+            std::span<const ExternalImageUseDesc>(uses->data(), uses->size()),
+            "linear_script");
+        };
+        m_preRecordNodes.emplace_back(std::move(bindlessNode));
       }
     }
 
@@ -1356,12 +1696,21 @@ void ZVulkanLinearScript::flushNodes(std::string_view reason, /*nullable*/ const
     }
   }
 
-  openFrame(firstLabel);
+  std::vector<Node> nodes;
+  drainNodesIntoExecutionOrder(nodes);
+
+  {
+    auto managedHotProtection = m_backend.device().residencyManager().protectTextures(
+      std::span<ZVulkanTexture* const>(hotTextures.data(), hotTextures.size()));
+    (void)managedHotProtection;
+    openFrame(firstLabel);
+  }
   auto frameGuard = folly::makeGuard([&]() {
     if (!m_frameOpen) {
       return;
     }
     // Best-effort close on exceptional exits; do not mask the original error.
+    scratchHotProtection->reset();
     try {
       closeFrame("flush_abort");
     }
@@ -1369,9 +1718,12 @@ void ZVulkanLinearScript::flushNodes(std::string_view reason, /*nullable*/ const
     }
   });
 
-  std::vector<Node> nodes;
-  drainNodesIntoExecutionOrder(nodes);
   executeNodes(std::span<Node>(nodes.data(), nodes.size()));
+
+  // Recording is finished. Drop lease keep-alives before registering readback
+  // completion hooks so scratch release hooks are ordered first at the frame
+  // completion safe point.
+  m_keepAlives.clear();
 
   if (readback != nullptr) {
     ZVulkanBuffer* src = readback->src;
@@ -1400,8 +1752,18 @@ void ZVulkanLinearScript::flushNodes(std::string_view reason, /*nullable*/ const
       readback->label);
   }
 
+  // These CPU-side protections only guard pre-record/resource-assembly work.
+  // Submitted command buffers are protected by managed texture pins, Vulkan
+  // scratch lease lifetimes, and the frame fence. Release before closeFrame()
+  // reaches completion hooks so post-fence readback/staging work can reclaim
+  // resources from the just-finished submission.
+  scratchHotProtection->reset();
+
+  if (readback == nullptr && strictResidencyFlushEachNode()) {
+    m_backend.requireCompletionSafePointWaitForActiveSubmission("strict_residency_node");
+  }
+
   closeFrame(reason);
-  m_keepAlives.clear();
   frameGuard.dismiss();
   m_pendingSubmissionHasGpuNodes = false;
 }

@@ -721,21 +721,31 @@ void ZVulkanPipelineCommandRecorder::beginRenderingSegment(const ZVulkanRenderin
   std::vector<vk::RenderingAttachmentInfo> colorInfos;
   colorInfos.reserve(spec.colorAttachments.size());
   for (const auto& attachment : spec.colorAttachments) {
-    colorInfos.emplace_back(vk::RenderingAttachmentInfo{.imageView = attachment.view,
-                                                        .imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
-                                                        .loadOp = attachment.loadOp,
-                                                        .storeOp = attachment.storeOp,
-                                                        .clearValue = attachment.clearValue});
+    vk::RenderingAttachmentInfo info{};
+    info.imageView = attachment.view;
+    info.imageLayout = vk::ImageLayout::eColorAttachmentOptimal;
+    info.resolveMode = vk::ResolveModeFlagBits::eNone;
+    info.resolveImageView = vk::ImageView{};
+    info.resolveImageLayout = vk::ImageLayout::eUndefined;
+    info.loadOp = attachment.loadOp;
+    info.storeOp = attachment.storeOp;
+    info.clearValue = attachment.clearValue;
+    colorInfos.emplace_back(info);
   }
   std::optional<vk::RenderingAttachmentInfo> depthAttachmentInfo{};
   std::optional<vk::RenderingAttachmentInfo> stencilAttachmentInfo{};
   if (spec.depthStencilAttachment) {
     const auto layout = depthAttachmentLayoutForAspect(spec.depthStencilAttachment->aspect);
-    depthAttachmentInfo = vk::RenderingAttachmentInfo{.imageView = spec.depthStencilAttachment->view,
-                                                      .imageLayout = layout,
-                                                      .loadOp = spec.depthStencilAttachment->loadOp,
-                                                      .storeOp = spec.depthStencilAttachment->storeOp,
-                                                      .clearValue = spec.depthStencilAttachment->clearValue};
+    vk::RenderingAttachmentInfo info{};
+    info.imageView = spec.depthStencilAttachment->view;
+    info.imageLayout = layout;
+    info.resolveMode = vk::ResolveModeFlagBits::eNone;
+    info.resolveImageView = vk::ImageView{};
+    info.resolveImageLayout = vk::ImageLayout::eUndefined;
+    info.loadOp = spec.depthStencilAttachment->loadOp;
+    info.storeOp = spec.depthStencilAttachment->storeOp;
+    info.clearValue = spec.depthStencilAttachment->clearValue;
+    depthAttachmentInfo = info;
     if (spec.depthStencilAttachment->aspect & vk::ImageAspectFlagBits::eStencil) {
       stencilAttachmentInfo = depthAttachmentInfo;
     }

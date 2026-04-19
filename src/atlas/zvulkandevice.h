@@ -6,6 +6,7 @@
 #include <limits>
 #include <memory>
 #include <string>
+#include <string_view>
 
 namespace nim {
 
@@ -46,6 +47,9 @@ public:
                                                 vk::Format format,
                                                 vk::ImageUsageFlags usage,
                                                 vk::MemoryPropertyFlags memoryProperties);
+  void
+  reclaimBeforeTextureAllocation(const ZVulkanTexture::CreateInfo& createInfo, bool force, std::string_view reason);
+  void enforceTextureAllocationBudgetAfter(const ZVulkanTexture::CreateInfo& createInfo, std::string_view reason);
 
   std::unique_ptr<ZVulkanShader> createShader(const std::string& vertexCode, const std::string& fragmentCode);
 
@@ -74,6 +78,14 @@ public:
   // Vulkan-only GPU residency manager (host-backed eviction for large caches).
   ZVulkanResidencyManager& residencyManager();
   const ZVulkanResidencyManager& residencyManager() const;
+
+  // Thread-local guard used while the residency broker is reclaiming memory.
+  // Reclaim callbacks may need staging buffers (for example host backups for
+  // dirty paged-image caches); those allocations must not recursively enter the
+  // broker while it already holds residency state.
+  void enterAllocationRecoveryScope() const;
+  void leaveAllocationRecoveryScope() const;
+  [[nodiscard]] bool allocationRecoveryScopeActive() const;
 
   // VMA allocator handle
   VmaAllocator allocator() const

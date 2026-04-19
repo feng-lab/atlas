@@ -2278,8 +2278,10 @@ void Z3DRenderingEngine::takeFixedSizeScreenShotWithoutResetCanvasSizePrivate(
     endDeferredRenderingErrorFrame(startedDeferredErrorFrame);
   });
   CHECK(tileSize >= 0 && tileBorder >= 0);
-  const int resolvedTileSize = tileSize > 0 ? tileSize : 2048;
-  const int resolvedTileBorder = (tileSize > 0 || tileBorder > 0) ? tileBorder : 128;
+  constexpr int kDefaultTileSize = 2048;
+  constexpr int kDefaultTileBorder = 128;
+  int resolvedTileSize = tileSize > 0 ? tileSize : kDefaultTileSize;
+  const int resolvedTileBorder = (tileSize > 0 || tileBorder > 0) ? tileBorder : kDefaultTileBorder;
 
   maybeCancel(cancellationToken);
 

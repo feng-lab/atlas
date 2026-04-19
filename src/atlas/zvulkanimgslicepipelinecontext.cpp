@@ -285,9 +285,10 @@ void ZVulkanImgSlicePipelineContext::preRecordBindlessWarmup(const BindlessWarmu
     ChannelResources& resources = m_channelResources[channelIndex];
 
     if (desc.wantsVolume3D) {
-      const ZImg& channelImage = *image.channelImageShared(channelIndex);
+      auto channelImage = image.channelImageShared(channelIndex);
+      CHECK(channelImage != nullptr) << "Slice bindless warmup: missing channel image";
       const uint64_t generation = image.volumeGeneration(channelIndex);
-      ZVulkanTexture& vol = ensureVolumeTexture(channelIndex, generation, channelImage, resources);
+      ZVulkanTexture& vol = ensureVolumeTexture(image, channelIndex, generation, channelImage);
       (void)m_backend.bindlessRegisterSampledImageAuto(vol, "slice_volume");
     }
 
@@ -302,9 +303,9 @@ void ZVulkanImgSlicePipelineContext::preRecordBindlessWarmup(const BindlessWarmu
 
     if (desc.wantsPaging) {
       CHECK(m_imageBlockUploader != nullptr) << "Slice bindless warmup: paging uploader missing";
+      ZVulkanTexture* imageCache = m_imageBlockUploader->imageCacheTexture(image, channelIndex);
       ZVulkanTexture* pageDirectory = m_imageBlockUploader->pageDirectoryTexture(image, channelIndex);
       ZVulkanTexture* pageTable = m_imageBlockUploader->pageTableTexture(image, channelIndex);
-      ZVulkanTexture* imageCache = m_imageBlockUploader->imageCacheTexture(image, channelIndex);
       CHECK(pageDirectory && pageTable && imageCache)
         << "Slice bindless warmup: paging textures missing for channel " << channelIndex;
       (void)m_backend.bindlessRegisterSampledImageAuto(*pageDirectory, "slice_page_directory");
@@ -508,17 +509,18 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
     const ZColorMap* colorMap = (*payload.colormaps)[channelIndex];
     CHECK(colorMap != nullptr) << "Slice payload has null ZColorMap at channel " << channelIndex;
 
-    const ZImg& channelImage = *payload.image->channelImageShared(channelIndex);
+    auto channelImage = payload.image->channelImageShared(channelIndex);
+    CHECK(channelImage != nullptr) << "Slice payload missing channel image";
     const uint64_t generation = payload.image->volumeGeneration(channelIndex);
     auto& resources = m_channelResources[channelIndex];
-    inputs.volume = &ensureVolumeTexture(channelIndex, generation, channelImage, resources);
+    inputs.volume = &ensureVolumeTexture(*payload.image, channelIndex, generation, channelImage);
     inputs.colormap = &ensureColormapTexture(channelIndex, colorMap, resources);
 
     if (usePaging) {
       CHECK(m_imageBlockUploader != nullptr) << "Slice paging expected block uploader";
+      inputs.imageCache = m_imageBlockUploader->imageCacheTexture(*payload.image, channelIndex);
       inputs.pageDirectory = m_imageBlockUploader->pageDirectoryTexture(*payload.image, channelIndex);
       inputs.pageTable = m_imageBlockUploader->pageTableTexture(*payload.image, channelIndex);
-      inputs.imageCache = m_imageBlockUploader->imageCacheTexture(*payload.image, channelIndex);
       CHECK(inputs.pageDirectory && inputs.pageTable && inputs.imageCache)
         << "Slice paging missing page directory/table for channel " << channelIndex;
     }
@@ -1501,50 +1503,20 @@ void ZVulkanImgSlicePipelineContext::uploadSliceGeometry(std::span<const ZMesh> 
   m_vertexBuffer->copyData(vertices.data(), vertices.size() * sizeof(SliceVertex));
 }
 
-ZVulkanTexture& ZVulkanImgSlicePipelineContext::ensureVolumeTexture(size_t channel,
+ZVulkanTexture& ZVulkanImgSlicePipelineContext::ensureVolumeTexture(Z3DImg& owner,
+                                                                    size_t channel,
                                                                     uint64_t generation,
-                                                                    const ZImg& image,
-                                                                    ChannelResources& resources)
+                                                                    std::shared_ptr<const ZImg> image)
 {
-  (void)channel;
-
-  const uint32_t width = static_cast<uint32_t>(image.width());
-  const uint32_t height = static_cast<uint32_t>(image.height());
-  const uint32_t depth = static_cast<uint32_t>(image.depth());
-  const size_t byteSize = image.byteNumber();
-  CHECK_EQ(image.info().bytesPerVoxel, 1u) << "Vulkan slice renderer expects 8-bit single-channel volumes.";
-  const uint8_t* data = image.channelData<uint8_t>(0);
-
-  auto& device = m_backend.device();
-
-  const bool needsRecreate = !resources.volumeTexture || resources.volumeTexture->extent().width != width ||
-                             resources.volumeTexture->extent().height != height ||
-                             resources.volumeTexture->extent().depth != depth;
-
-  if (needsRecreate) {
-    auto info =
-      ZVulkanTexture::CreateInfo::make3D(width,
-                                         height,
-                                         depth,
-                                         vk::Format::eR8Unorm,
-                                         vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
-                                         vk::MemoryPropertyFlagBits::eDeviceLocal,
-                                         1u,
-                                         true,
-                                         vk::ImageLayout::eShaderReadOnlyOptimal);
-    resources.volumeTexture = device.createTexture(info);
-    CHECK(resources.volumeTexture != nullptr)
-      << "Slice: failed to create 3D volume texture (" << width << "x" << height << "x" << depth << ")";
-  } else if (resources.volumeGeneration == generation && resources.volumeTexture) {
-    return *resources.volumeTexture;
-  }
-
-  if (byteSize > 0 && data != nullptr) {
-    resources.volumeTexture->uploadData(data, byteSize, vk::ImageLayout::eShaderReadOnlyOptimal);
-  }
-
-  resources.volumeGeneration = generation;
-  return *resources.volumeTexture;
+  CHECK(channel <= static_cast<size_t>(std::numeric_limits<uint32_t>::max()))
+    << "Slice channel index exceeds Vulkan residency key range";
+  ZVulkanTexture* texture = m_backend.device().residencyManager().denseVolumeTexture(owner,
+                                                                                     static_cast<uint32_t>(channel),
+                                                                                     std::move(image),
+                                                                                     generation);
+  CHECK(texture != nullptr) << "Slice: managed 3D volume texture missing";
+  m_backend.pinTextureForActiveSubmission(texture);
+  return *texture;
 }
 
 ZVulkanTexture& ZVulkanImgSlicePipelineContext::ensureColormapTexture(size_t channel,

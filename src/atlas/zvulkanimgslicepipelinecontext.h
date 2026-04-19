@@ -150,8 +150,6 @@ private:
 
   struct ChannelResources
   {
-    uint64_t volumeGeneration = 0;
-    std::unique_ptr<ZVulkanTexture> volumeTexture;
     std::unique_ptr<ZVulkanTexture> colormapTexture;
     uint64_t colormapGeneration = 0;
     uint32_t colormapWidth = 0;
@@ -221,7 +219,7 @@ private:
   void ensureQuadVertexBuffer();
   void uploadSliceGeometry(std::span<const ZMesh> slices);
   ZVulkanTexture&
-  ensureVolumeTexture(size_t channel, uint64_t generation, const ZImg& image, ChannelResources& resources);
+  ensureVolumeTexture(Z3DImg& owner, size_t channel, uint64_t generation, std::shared_ptr<const ZImg> image);
   ZVulkanTexture& ensureColormapTexture(size_t channel, const ZColorMap* colorMap, ChannelResources& resources);
 
   PipelineInstance& ensureSlicePipeline(const SlicePipelineKey& key, const vulkan::AttachmentFormats& formats);

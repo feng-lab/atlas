@@ -19,6 +19,16 @@ class ZVulkanDevice;
 class ZVulkanTexture
 {
 public:
+  enum class ResidencyClassHint : uint8_t
+  {
+    Auto,
+    ScratchBacking,
+    DenseImageTexture,
+    DenseVolumeTexture,
+    PagedImageCacheR8,
+    PersistentCompositorTarget,
+  };
+
   struct CreateInfo
   {
     vk::ImageType imageType = vk::ImageType::e2D;
@@ -34,7 +44,13 @@ public:
     vk::ImageTiling tiling = vk::ImageTiling::eOptimal;
     vk::ImageLayout initialLayout = vk::ImageLayout::eUndefined;
     vk::ImageLayout descriptorLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
+    ResidencyClassHint residencyClassHint = ResidencyClassHint::Auto;
     bool createDefaultSampler = true;
+    // When true, construct only the logical texture object and sampler state;
+    // callers must explicitly call recreateDeviceResources() before using the
+    // image/view. This is used by residency-managed scratch textures whose
+    // backing VkImage is demand-resident.
+    bool deferAllocation = false;
     std::optional<vk::SamplerCreateInfo> samplerInfo = std::nullopt;
 
     static CreateInfo make1D(uint32_t width,

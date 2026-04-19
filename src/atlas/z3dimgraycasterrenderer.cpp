@@ -23,6 +23,8 @@
 #include <array>
 #include <cmath>
 #include <optional>
+#include <span>
+#include <vector>
 
 DEFINE_uint32(atlas_volume_rendering_maximum_round,
               100,
@@ -695,19 +697,11 @@ Z3DImgRaycasterRenderer::recordVulkanStagesToScript(ZVulkanLinearScript& script,
           return;
         }
 
-        auto& cmd = backend.commandBuffer();
         const vk::ClearColorValue clear = vk::ClearColorValue(std::array<float, 4>{0.f, 0.f, 0.f, 0.f});
         const auto range = vk::ImageSubresourceRange{vk::ImageAspectFlagBits::eColor, 0u, 1u, 0u, 1u};
 
-        auto clearTex = [&](ZVulkanTexture& tex) {
-          tex.transitionLayout(cmd, tex.layout(), vk::ImageLayout::eTransferDstOptimal);
-          cmd.clearColorImage(tex.image(), vk::ImageLayout::eTransferDstOptimal, clear, range);
-          tex.transitionLayout(cmd, vk::ImageLayout::eTransferDstOptimal, vk::ImageLayout::eShaderReadOnlyOptimal);
-          tex.setDescriptorLayout(vk::ImageLayout::eShaderReadOnlyOptimal);
-        };
-
-        clearTex(*lastColor);
-        clearTex(*lastDepth);
+        backend.clearColorTextureToShaderReadOnly(*lastColor, clear, range, "ray_clear_last_accum");
+        backend.clearColorTextureToShaderReadOnly(*lastDepth, clear, range, "ray_clear_last_accum");
       };
 
       prevStage = prevStage ? script.commands("ray_clear_last_accum", {prevStage}, recordClear)

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "z3drendercommands.h"
+#include "z3dscratchresourcepool.h"
 #include "zvulkan.h"
 
 #include <cstdint>
@@ -19,6 +20,7 @@ namespace nim {
 class Z3DRendererBase;
 class Z3DRendererVulkanBackend;
 class ZVulkanBuffer;
+class ZVulkanTexture;
 
 // Callsite-facing helper for expressing Vulkan compositor logic in a linear,
 // GL-like style ("segments + explicit CPU readbacks + C++ branches"), while the
@@ -298,6 +300,10 @@ private:
   void flushNodes(std::string_view reason, /*nullable*/ const ReadbackBufferSpec* readback);
   void drainNodesIntoExecutionOrder(std::vector<Node>& out);
   void executeNodes(std::span<Node> nodes);
+  [[nodiscard]] std::vector<Z3DScratchResourcePool::VulkanScratchTextureUse>
+  collectScratchTextureUsesForNodes(std::span<const Node> nodes) const;
+  [[nodiscard]] std::vector<ZVulkanTexture*> collectTexturePointersForNodes(std::span<const Node> nodes) const;
+  [[nodiscard]] bool strictResidencyFlushEachNode() const;
   void openFrame(std::string_view firstPassLabel);
   void closeFrame(std::string_view reason);
   void validateDeps(std::string_view label, std::span<const SegmentHandle> deps) const;

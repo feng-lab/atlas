@@ -1648,6 +1648,7 @@ void ZVulkanMeshPipelineContext::uploadGeometry(const MeshPayload& payload)
           ZVulkanMeshStreamCoordinator::stateMatches(ZVulkanMeshStreamCoordinator::replacementStateForEntry(*entry),
                                                      currentState)) {
         m_streamCoordinator.activateReplacement(*entry);
+        m_streamCoordinator.touchStaticStream(key.streamKey);
       }
 
       const bool wantTex = (texBinding != TexBinding::None);
@@ -2060,6 +2061,7 @@ void ZVulkanMeshPipelineContext::uploadGeometry(const MeshPayload& payload)
           payload.pickingPass);
         insertedEntry.promoted = true;
         insertedEntry.usedStaticOnce = false;
+        m_streamCoordinator.touchStaticStream(key.streamKey);
       }
     } else {
       CacheEntry& entry = *entryPtr;
@@ -2174,6 +2176,7 @@ void ZVulkanMeshPipelineContext::uploadGeometry(const MeshPayload& payload)
             payload.pickingPass);
           entry.promoted = true;
           entry.usedStaticOnce = false;
+          m_streamCoordinator.touchStaticStream(key.streamKey);
         } else {
           VLOG(2) << "Mesh static promotion skipped: arena out of space";
         }

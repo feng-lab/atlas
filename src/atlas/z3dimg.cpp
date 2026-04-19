@@ -59,6 +59,7 @@ DEFINE_uint32(
 
 DECLARE_double(atlas_image_cache_memory_proportion);
 DECLARE_double(atlas_image_region_cache_memory_proportion);
+DECLARE_uint64(atlas_vk_residency_budget_bytes);
 
 namespace nim {
 
@@ -125,6 +126,16 @@ double cappedAxisScale(size_t dim, uint32_t maxDim)
 {
   CHECK_GT(maxDim, 0u) << "atlas_3d_preview_max_dimension must be > 0";
   return dim <= maxDim ? 1.0 : static_cast<double>(maxDim) / static_cast<double>(dim);
+}
+
+size_t pagedImageCacheSizingMemoryMB()
+{
+  uint64_t memoryMB = Z3DGpuInfo::instance().dedicatedVideoMemoryMB();
+  if (FLAGS_atlas_vk_residency_budget_bytes > 0u) {
+    constexpr uint64_t bytesPerMiB = 1024ull * 1024ull;
+    memoryMB = std::min<uint64_t>(memoryMB, FLAGS_atlas_vk_residency_budget_bytes / bytesPerMiB);
+  }
+  return static_cast<size_t>(memoryMB);
 }
 
 } // namespace
@@ -197,32 +208,33 @@ Z3DImg::Z3DImg(const ZImgPack& imgPack, const glm::vec3& scale, const std::vecto
       m_imageBlockSize = glm::uvec3(defaultImageBlockSize) - m_imageBlockSizePad;
     }
 
-    if (Z3DGpuInfo::instance().dedicatedVideoMemoryMB() >= 32000) {
+    const size_t cacheSizingMemoryMB = pagedImageCacheSizingMemoryMB();
+    if (cacheSizingMemoryMB >= 32000) {
 #ifdef Q_OS_MACOS
       m_maxMemoryForImageCache = 8_uz * 1024 * 1024 * 1024; // 8G
 #else
       m_maxMemoryForImageCache = 8_uz * 1024 * 1024 * 1024; // 8G
 #endif
       m_maxMemoryForPageTableCache = 1024_uz * 1024 * 1024; // 1G
-    } else if (Z3DGpuInfo::instance().dedicatedVideoMemoryMB() >= 20000) {
+    } else if (cacheSizingMemoryMB >= 20000) {
       m_maxMemoryForImageCache = 8_uz * 1024 * 1024 * 1024; // 8G
       m_maxMemoryForPageTableCache = 1024_uz * 1024 * 1024; // 1G
-    } else if (Z3DGpuInfo::instance().dedicatedVideoMemoryMB() >= 16000) {
+    } else if (cacheSizingMemoryMB >= 16000) {
       m_maxMemoryForImageCache = 6_uz * 1024 * 1024 * 1024; // 6G
       m_maxMemoryForPageTableCache = 512_uz * 1024 * 1024; // 0.5G
-    } else if (Z3DGpuInfo::instance().dedicatedVideoMemoryMB() >= 12000) {
+    } else if (cacheSizingMemoryMB >= 12000) {
       m_maxMemoryForImageCache = 4_uz * 1024 * 1024 * 1024; // 4G
       m_maxMemoryForPageTableCache = 512_uz * 1024 * 1024; // 0.5G
-    } else if (Z3DGpuInfo::instance().dedicatedVideoMemoryMB() >= 8000) {
+    } else if (cacheSizingMemoryMB >= 8000) {
       m_maxMemoryForImageCache = 2_uz * 1024 * 1024 * 1024; // 2G
       m_maxMemoryForPageTableCache = 512_uz * 1024 * 1024; // 0.5G
-    } else if (Z3DGpuInfo::instance().dedicatedVideoMemoryMB() >= 4000) {
+    } else if (cacheSizingMemoryMB >= 4000) {
       m_maxMemoryForImageCache = 1024_uz * 1024 * 1024; // 1G
       m_maxMemoryForPageTableCache = 256_uz * 1024 * 1024; // 0.25G
-    } else if (Z3DGpuInfo::instance().dedicatedVideoMemoryMB() >= 2000) {
+    } else if (cacheSizingMemoryMB >= 2000) {
       m_maxMemoryForImageCache = 512_uz * 1024 * 1024; // 0.5G
       m_maxMemoryForPageTableCache = 128_uz * 1024 * 1024; // 0.125G
-    } else if (Z3DGpuInfo::instance().dedicatedVideoMemoryMB() >= 1000) {
+    } else if (cacheSizingMemoryMB >= 1000) {
       m_maxMemoryForImageCache = 256_uz * 1024 * 1024; // 0.25G
       m_maxMemoryForPageTableCache = 64_uz * 1024 * 1024; // 64MB
     } else {

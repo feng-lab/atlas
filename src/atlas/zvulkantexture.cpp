@@ -4,6 +4,7 @@
 #include "zvulkanbuffer.h"
 #include "zvulkancontext.h"
 #include "zvulkanframeexecutor.h"
+#include "zvulkanresidencymanager.h"
 #include "zimg.h"
 #include "zimgformat.h"
 #include "zglmutils.h"
@@ -68,6 +69,37 @@ bool isAspectValidForFormat(vk::Format format, vk::ImageAspectFlags aspect)
       return aspect == vk::ImageAspectFlagBits::eColor;
   }
 }
+
+class ScopedManagedTexturePin
+{
+public:
+  ScopedManagedTexturePin(ZVulkanDevice& device, ZVulkanTexture& texture)
+    : m_device(&device)
+    , m_texture(&texture)
+  {
+    // Residency-manager restore/evict paths already run inside allocation recovery,
+    // where broker recursion is disabled and the manager mutex may already be held.
+    if (!device.allocationRecoveryScopeActive()) {
+      m_pinned = device.residencyManager().pinIfManaged(&texture);
+    }
+  }
+
+  ScopedManagedTexturePin(const ScopedManagedTexturePin&) = delete;
+  ScopedManagedTexturePin& operator=(const ScopedManagedTexturePin&) = delete;
+
+  ~ScopedManagedTexturePin()
+  {
+    if (m_pinned) {
+      CHECK(m_device != nullptr);
+      m_device->residencyManager().unpinIfManaged(m_texture);
+    }
+  }
+
+private:
+  ZVulkanDevice* m_device = nullptr;
+  ZVulkanTexture* m_texture = nullptr;
+  bool m_pinned = false;
+};
 
 } // namespace
 
@@ -219,14 +251,16 @@ ZVulkanTexture::ZVulkanTexture(ZVulkanDevice& device, const CreateInfo& createIn
   , m_currentLayout(createInfo.initialLayout)
 {
   try {
-    createImage();
-    allocateMemory();
-    createImageView();
     createSampler();
-    if (m_arrayLayers > 1u) {
-      m_layerImageViews.resize(m_arrayLayers);
-      m_layerDepthViews.resize(m_arrayLayers);
-      m_layerStencilViews.resize(m_arrayLayers);
+    if (!m_createInfo.deferAllocation) {
+      createImage();
+      allocateMemory();
+      createImageView();
+      if (m_arrayLayers > 1u) {
+        m_layerImageViews.resize(m_arrayLayers);
+        m_layerDepthViews.resize(m_arrayLayers);
+        m_layerStencilViews.resize(m_arrayLayers);
+      }
     }
   }
   catch (...) {
@@ -385,6 +419,10 @@ void ZVulkanTexture::downloadData(void* data, size_t size)
   if (!data || size == 0) {
     throw ZException("Invalid download buffer");
   }
+  ScopedManagedTexturePin residencyPin(m_device, *this);
+  if (!m_image) {
+    throw ZException("Texture resources not initialized before download");
+  }
 
   auto stagingBuffer =
     m_device.createBuffer(size,
@@ -438,6 +476,10 @@ void ZVulkanTexture::downloadSubImage(void* data,
   if (!data || size == 0) {
     throw ZException("Invalid download buffer (subimage)");
   }
+  ScopedManagedTexturePin residencyPin(m_device, *this);
+  if (!m_image) {
+    throw ZException("Texture resources not initialized before subimage download");
+  }
 
   auto stagingBuffer =
     m_device.createBuffer(size,
@@ -481,6 +523,10 @@ void ZVulkanTexture::downloadArrayLayer(void* data, size_t size, uint32_t arrayL
 {
   if (!data || size == 0) {
     throw ZException("Invalid download buffer (array layer)");
+  }
+  ScopedManagedTexturePin residencyPin(m_device, *this);
+  if (!m_image) {
+    throw ZException("Texture resources not initialized before array-layer download");
   }
 
   auto stagingBuffer =
@@ -1259,6 +1305,8 @@ void ZVulkanTexture::createImage()
 
 void ZVulkanTexture::allocateMemory()
 {
+  m_device.reclaimBeforeTextureAllocation(m_createInfo, false, "texture_allocate_preallocate");
+
   vk::ImageCreateInfo imageInfo{};
   imageInfo.flags = createFlagsForView(m_createInfo.viewType);
   imageInfo.imageType = m_createInfo.imageType;
@@ -1349,6 +1397,9 @@ void ZVulkanTexture::allocateMemory()
   // Track each successful VkImage creation so downstream caches can detect when
   // descriptor image views become stale (e.g., after eviction/recreate).
   ++m_imageGeneration;
+  if (!m_device.allocationRecoveryScopeActive()) {
+    m_device.enforceTextureAllocationBudgetAfter(m_createInfo, "texture_allocate_postallocate");
+  }
 }
 
 void ZVulkanTexture::createImageView()
@@ -1409,6 +1460,7 @@ void ZVulkanTexture::uploadInternal(const void* data, size_t size, const UploadR
   if (!data || size == 0) {
     throw ZException("Cannot upload empty texture payload");
   }
+  ScopedManagedTexturePin residencyPin(m_device, *this);
   if (!m_image) {
     throw ZException("Texture resources not initialized before upload");
   }
