@@ -6649,7 +6649,7 @@ void Z3DRendererVulkanBackend::ensureReadbackSlots(size_t minBytes, uint32_t min
                                                    vk::MemoryPropertyFlagBits::eHostVisible |
                                                      vk::MemoryPropertyFlagBits::eHostCoherent |
                                                      vk::MemoryPropertyFlagBits::eHostCached,
-                                                   device().uploadStagingPool());
+                                                   device().readbackStagingPool());
       void* newMapped = newBuffer->map(0, minBytes);
       if (slot.buffer && slot.mapped != nullptr) {
         slot.buffer->unmap();

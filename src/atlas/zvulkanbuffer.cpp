@@ -89,6 +89,9 @@ void ZVulkanBuffer::createBuffer()
   if (m_memoryProperties & vk::MemoryPropertyFlagBits::eDeviceLocal) {
     allocInfo.requiredFlags |= VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
   }
+  if (m_memoryProperties & vk::MemoryPropertyFlagBits::eHostCached) {
+    allocInfo.preferredFlags |= VK_MEMORY_PROPERTY_HOST_CACHED_BIT;
+  }
   // Prefer usage-based automatic memory selection
   if (m_memoryProperties & vk::MemoryPropertyFlagBits::eHostVisible) {
     allocInfo.usage = VMA_MEMORY_USAGE_AUTO_PREFER_HOST;
@@ -132,11 +135,12 @@ void ZVulkanBuffer::createBuffer()
   // Heuristic: if size is large relative to common pool block sizes, prefer dedicated upfront
   const VkDeviceSize sz = static_cast<VkDeviceSize>(m_size);
   bool preferDedicated = false;
-  if (chosenPool == m_device.deviceLocalPool()) {
+  if (chosenPool != VK_NULL_HANDLE && chosenPool == m_device.deviceLocalPool()) {
     preferDedicated = (sz >= (128ull * 1024ull * 1024ull) / 2); // >= 64 MiB
-  } else if (chosenPool == m_device.uploadStagingPool()) {
+  } else if (chosenPool != VK_NULL_HANDLE &&
+             (chosenPool == m_device.uploadStagingPool() || chosenPool == m_device.readbackStagingPool())) {
     preferDedicated = (sz >= (64ull * 1024ull * 1024ull) / 2); // >= 32 MiB
-  } else if (chosenPool == m_device.uploadTransientPool()) {
+  } else if (chosenPool != VK_NULL_HANDLE && chosenPool == m_device.uploadTransientPool()) {
     preferDedicated = (sz >= (32ull * 1024ull * 1024ull) / 2); // >= 16 MiB
   }
 

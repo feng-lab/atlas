@@ -92,7 +92,7 @@ public:
   {
     return m_allocator;
   }
-  // VMA pools: host-visible transient/staging and device-local pools
+  // VMA pools: host-visible transient/upload/readback staging and device-local pools
   VmaPool uploadTransientPool() const
   {
     return m_uploadTransientPool;
@@ -100,6 +100,10 @@ public:
   VmaPool uploadStagingPool() const
   {
     return m_uploadStagingPool;
+  }
+  VmaPool readbackStagingPool() const
+  {
+    return m_readbackStagingPool;
   }
   VmaPool deviceLocalPool() const
   {
@@ -130,6 +134,7 @@ private:
   VmaAllocator m_allocator = nullptr;
   VmaPool m_uploadTransientPool = nullptr;
   VmaPool m_uploadStagingPool = nullptr;
+  VmaPool m_readbackStagingPool = nullptr;
   VmaPool m_deviceLocalPool = nullptr;
   vk::DeviceSize m_maxMemoryAllocationSize = std::numeric_limits<vk::DeviceSize>::max();
 };

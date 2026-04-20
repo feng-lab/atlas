@@ -123,8 +123,11 @@ ZVulkanResidencyManager::ResourceClass classifyBufferAllocation(vk::BufferUsageF
                                                                 VmaPool poolOverride,
                                                                 const ZVulkanDevice& device)
 {
-  if (poolOverride == device.uploadTransientPool()) {
+  if (poolOverride != nullptr && poolOverride == device.uploadTransientPool()) {
     return ZVulkanResidencyManager::ResourceClass::TransientUploadPage;
+  }
+  if (poolOverride != nullptr && poolOverride == device.readbackStagingPool()) {
+    return ZVulkanResidencyManager::ResourceClass::ReadbackStaging;
   }
   if (properties & vk::MemoryPropertyFlagBits::eHostVisible) {
     return ZVulkanResidencyManager::ResourceClass::ReadbackStaging;
@@ -414,33 +417,44 @@ ZVulkanDevice::ZVulkanDevice(ZVulkanContext& context)
   }
 
   // Create tuned VMA pools
-  auto createPool = [&](VkMemoryPropertyFlags reqFlags, VkDeviceSize blockSize) -> VmaPool {
+  auto createPool = [&](VkMemoryPropertyFlags reqFlags, VkDeviceSize blockSize, std::string_view label) -> VmaPool {
     VmaPoolCreateInfo pci{};
     const uint32_t typeIndex = findMemoryTypeIndex(reqFlags);
     if (typeIndex == UINT32_MAX) {
-      LOG(ERROR) << "VMA: no memory type for pool flags=" << std::hex << reqFlags;
+      LOG(ERROR) << "VMA: no memory type for " << label << " pool flags=" << std::hex << reqFlags;
       return nullptr;
     }
     pci.memoryTypeIndex = typeIndex;
     pci.blockSize = blockSize;
     VmaPool pool = nullptr;
     if (vmaCreatePool(m_allocator, &pci, &pool) != VK_SUCCESS) {
-      LOG(ERROR) << "VMA: pool creation failed for type=" << typeIndex;
+      LOG(ERROR) << "VMA: " << label << " pool creation failed for type=" << typeIndex;
       return nullptr;
     }
     return pool;
   };
+  const auto hostVisibleCoherent = static_cast<VkMemoryPropertyFlags>(vk::MemoryPropertyFlagBits::eHostVisible |
+                                                                      vk::MemoryPropertyFlagBits::eHostCoherent);
+  const auto hostVisibleCoherentCached = static_cast<VkMemoryPropertyFlags>(vk::MemoryPropertyFlagBits::eHostVisible |
+                                                                            vk::MemoryPropertyFlagBits::eHostCoherent |
+                                                                            vk::MemoryPropertyFlagBits::eHostCached);
   // Host-visible transient per-frame uploads
-  m_uploadTransientPool = createPool(static_cast<VkMemoryPropertyFlags>(vk::MemoryPropertyFlagBits::eHostVisible |
-                                                                        vk::MemoryPropertyFlagBits::eHostCoherent),
-                                     32ull * 1024ull * 1024ull);
+  m_uploadTransientPool = createPool(hostVisibleCoherent, 32ull * 1024ull * 1024ull, "upload transient");
   // Host-visible longer-lived staging allocations
-  m_uploadStagingPool = createPool(static_cast<VkMemoryPropertyFlags>(vk::MemoryPropertyFlagBits::eHostVisible |
-                                                                      vk::MemoryPropertyFlagBits::eHostCoherent),
-                                   64ull * 1024ull * 1024ull);
+  m_uploadStagingPool = createPool(hostVisibleCoherent, 64ull * 1024ull * 1024ull, "upload staging");
+  // GPU-to-CPU readback is CPU-read-heavy. Prefer cached coherent host memory,
+  // but keep coherent-only as the portable fallback so mapped reads stay valid
+  // without explicit invalidate calls.
+  if (findMemoryTypeIndex(hostVisibleCoherentCached) != UINT32_MAX) {
+    m_readbackStagingPool = createPool(hostVisibleCoherentCached, 64ull * 1024ull * 1024ull, "readback staging");
+  } else {
+    LOG(INFO) << "VMA: HOST_CACHED coherent readback staging memory unavailable; using coherent readback staging";
+    m_readbackStagingPool = createPool(hostVisibleCoherent, 64ull * 1024ull * 1024ull, "readback staging fallback");
+  }
   // Device-local static content
   m_deviceLocalPool = createPool(static_cast<VkMemoryPropertyFlags>(vk::MemoryPropertyFlagBits::eDeviceLocal),
-                                 128ull * 1024ull * 1024ull);
+                                 128ull * 1024ull * 1024ull,
+                                 "device local");
 
   // Residency manager (device-owned, Vulkan-only).
   m_residencyManager = std::make_unique<ZVulkanResidencyManager>(*this);
@@ -525,6 +539,10 @@ ZVulkanDevice::~ZVulkanDevice()
   if (m_uploadStagingPool != nullptr) {
     vmaDestroyPool(m_allocator, m_uploadStagingPool);
     m_uploadStagingPool = nullptr;
+  }
+  if (m_readbackStagingPool != nullptr) {
+    vmaDestroyPool(m_allocator, m_readbackStagingPool);
+    m_readbackStagingPool = nullptr;
   }
   if (m_deviceLocalPool != nullptr) {
     vmaDestroyPool(m_allocator, m_deviceLocalPool);
