@@ -168,6 +168,16 @@ private:
     }
   };
 
+  struct ObjectTransformsCacheEntry
+  {
+    RendererParameterState params{};
+    bool followCoordTransform = true;
+    bool followSizeScale = true;
+    ClipPlanesState clipPlanes{};
+    vk::DeviceSize objectTransformsOffset = 0;
+    uint32_t lastSubmissionId = 0;
+  };
+
   struct MaterialCacheEntry
   {
     RendererParameterState params{};
@@ -176,18 +186,13 @@ private:
     bool useCustomColor = false;
     glm::vec4 customColor{1.0f};
     vk::DeviceSize materialOffset = 0;
+    uint32_t lastSubmissionId = 0;
   };
 
   struct StreamUboCache
   {
-    RendererParameterState params{};
-    bool followCoordTransform = true;
-    bool followSizeScale = true;
-    ClipPlanesState clipPlanes{};
-    vk::DeviceSize objectTransformsOffset = 0;
-    bool objectTransformsValid = false;
-
-    std::unordered_map<MaterialKey, MaterialCacheEntry, MaterialKeyHash> materials;
+    std::vector<ObjectTransformsCacheEntry> objectTransforms;
+    std::unordered_map<MaterialKey, std::vector<MaterialCacheEntry>, MaterialKeyHash> materials;
   };
 
   struct FrameUboCache
@@ -320,10 +325,45 @@ private:
   bool m_usedStaticVBThisFrame{false};
 
   std::vector<MeshDraw> m_draws;
-  // Device-local indirect args per mesh for DDP peel; prepared during init and
-  // reused for subsequent peel passes in the same frame.
-  std::vector<vk::DeviceSize> m_ddpArgsOffsets;
-  std::vector<uint8_t> m_ddpArgsPrepared;
+  struct DDPStreamKey
+  {
+    uint64_t streamKey = 0;
+    uint32_t streamSegmentOrdinal = 0;
+
+    bool operator==(const DDPStreamKey& rhs) const
+    {
+      return streamKey == rhs.streamKey && streamSegmentOrdinal == rhs.streamSegmentOrdinal;
+    }
+  };
+
+  struct DDPStreamKeyHash
+  {
+    size_t operator()(const DDPStreamKey& key) const noexcept
+    {
+      size_t h = std::hash<uint64_t>{}(key.streamKey);
+      h ^= std::hash<uint32_t>{}(key.streamSegmentOrdinal) + 0x9e3779b97f4a7c15ull + (h << 6) + (h >> 2);
+      return h;
+    }
+  };
+
+  struct DDPMeshArgs
+  {
+    vk::DeviceSize offset = 0;
+    bool prepared = false;
+    bool indexed = false;
+    uint32_t vertexCount = 0;
+    uint32_t indexCount = 0;
+  };
+
+  struct DDPArgs
+  {
+    std::vector<DDPMeshArgs> meshes;
+  };
+
+  // Device-local indirect args per mesh and stream for DDP peel; normally
+  // prepared during init, but the first peel in a strict-residency chunk can
+  // prepare them and then draw direct until the upload copy is flushed.
+  std::unordered_map<DDPStreamKey, DDPArgs, DDPStreamKeyHash> m_ddpArgsByStream;
 
   // No GL texture bridging: Vulkan mesh pipeline uses placeholders or
   // backend-native textures only.

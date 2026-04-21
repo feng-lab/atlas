@@ -17,7 +17,6 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
@@ -30,28 +29,53 @@ class BenchmarkPathConfig:
     animation_filenames: tuple[str, ...]
 
 
-# Edit this block when moving the benchmark to another machine or OS.
-# The rest of the script derives its default Atlas/input/output paths from here.
-# `atlas_path` must point to the actual Atlas executable:
-# - macOS: `.../Atlas.app/Contents/MacOS/Atlas`
-# - Windows: `...\\Atlas.exe`
-# - Linux: exact `Atlas` executable file produced on that machine
+DEFAULT_SCENE_FILENAMES = (
+    "testscene3.scene",
+    "testscene2.scene",
+    "testscene5.scene",
+    "testscene4.scene",
+    "testscene1.scene",
+    "testsene7.scene",
+    # "testscene6.scene",
+)
+DEFAULT_ANIMATION_FILENAMES = ("test.animation3d",)
+
+
+def _default_atlas_path() -> Path:
+    if sys.platform == "darwin":
+        return (
+            REPO_ROOT
+            / "build"
+            / "Release"
+            / "src"
+            / "atlas"
+            / "Atlas.app"
+            / "Contents"
+            / "MacOS"
+            / "Atlas"
+        )
+
+    if sys.platform.startswith("win"):
+        return REPO_ROOT / "deploy" / "Atlas" / "Atlas.exe"
+
+    return REPO_ROOT / "build" / "Release" / "src" / "atlas" / "Atlas"
+
+
+def _default_output_parent() -> Path:
+    if sys.platform.startswith("win"):
+        return Path("D:/test_folder")
+
+    return Path.home() / "Documents" / "test_folder"
+
+
+# Platform defaults for the known benchmark machine layouts. Override the CLI
+# flags when running from a different build/deploy or test-data location.
 DEFAULT_PATH_CONFIG = BenchmarkPathConfig(
-    atlas_path=Path(
-        "/Users/feng/code/atlas/build/Release/src/atlas/Atlas.app/Contents/MacOS/Atlas"
-    ),
-    input_root=Path("/Users/feng/Dropbox/atlas_test"),
-    output_parent=Path("/Users/feng/Documents/test_folder"),
-    scene_filenames=(
-        "testscene3.scene",
-        "testscene2.scene",
-        "testscene5.scene",
-        "testscene4.scene",
-        "testscene1.scene",
-        "testsene7.scene",
-        "testscene6.scene",
-    ),
-    animation_filenames=("test.animation3d",),
+    atlas_path=_default_atlas_path(),
+    input_root=Path.home() / "Dropbox" / "atlas_test",
+    output_parent=_default_output_parent(),
+    scene_filenames=DEFAULT_SCENE_FILENAMES,
+    animation_filenames=DEFAULT_ANIMATION_FILENAMES,
 )
 
 

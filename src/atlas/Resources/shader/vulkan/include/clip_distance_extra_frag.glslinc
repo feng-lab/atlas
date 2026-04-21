@@ -1,9 +1,9 @@
-// Fragment-stage helper for applying clip planes beyond the fixed-function clip
-// distance budget.
+// Fragment-stage helper for applying Vulkan geometry clip planes.
 //
 // Vertex stage writes up to ATLAS_MAX_CLIP_DISTANCES into gl_ClipDistance for
-// early clipping. Remaining planes (up to 4) are exported as interpolated
-// distances and applied via discard here.
+// early clipping. It also exports all planes as ordinary interpolated distances
+// so every pipeline has a fragment-stage fallback for the full local/global cut
+// set.
 //
 // This include is intentionally self-contained (does not require matrices_material.glslinc)
 // so depth-only OIT passes can use it without pulling in extra descriptor bindings.
@@ -13,7 +13,7 @@
 
 #include "clip_distance_config.glslinc"
 
-layout(location = ATLAS_EXTRA_CLIP_DISTANCE_LOCATION) in float atlas_extra_clip_distance[ATLAS_MAX_EXTRA_CLIP_PLANES];
+layout(location = ATLAS_CLIP_DISTANCE_LOCATION) in float atlas_clip_distance[ATLAS_MAX_CLIP_PLANES];
 
 // Some Vulkan OIT shaders perform SSBO atomics. On some drivers (notably on
 // MoltenVK/Metal), mixing fragment kill (discard) with atomics has caused
@@ -28,10 +28,10 @@ layout(location = ATLAS_EXTRA_CLIP_DISTANCE_LOCATION) in float atlas_extra_clip_
 
 bool atlas_should_reject_extra_clip_planes()
 {
-  // Unused entries are written as +1.0 in the vertex shader, so this loop is a
-  // no-op unless additional clip planes are active.
-  for (int i = 0; i < ATLAS_MAX_EXTRA_CLIP_PLANES; ++i) {
-    if (atlas_extra_clip_distance[i] < 0.0) {
+  // Unused entries are written as +1.0 in the vertex shader, so this loop is
+  // a no-op unless clip planes are active.
+  for (int i = 0; i < ATLAS_MAX_CLIP_PLANES; ++i) {
+    if (atlas_clip_distance[i] < 0.0) {
       return true;
     }
   }

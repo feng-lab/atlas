@@ -10,7 +10,7 @@ out gl_PerVertex {
   float gl_ClipDistance[ATLAS_MAX_CLIP_DISTANCES];
 };
 
-layout(location = ATLAS_EXTRA_CLIP_DISTANCE_LOCATION) out float atlas_extra_clip_distance[ATLAS_MAX_EXTRA_CLIP_PLANES];
+layout(location = ATLAS_CLIP_DISTANCE_LOCATION) out float atlas_clip_distance[ATLAS_MAX_CLIP_PLANES];
 
 void atlas_write_clip_distances(vec4 world_pos)
 {
@@ -20,8 +20,8 @@ void atlas_write_clip_distances(vec4 world_pos)
   for (int i = 0; i < ATLAS_MAX_CLIP_DISTANCES; ++i) {
     gl_ClipDistance[i] = 1.0;
   }
-  for (int i = 0; i < ATLAS_MAX_EXTRA_CLIP_PLANES; ++i) {
-    atlas_extra_clip_distance[i] = 1.0;
+  for (int i = 0; i < ATLAS_MAX_CLIP_PLANES; ++i) {
+    atlas_clip_distance[i] = 1.0;
   }
 
   if (xo.clip_params.x == 0) {
@@ -31,11 +31,12 @@ void atlas_write_clip_distances(vec4 world_pos)
   const int planeCount = clamp(xo.clip_params.y, 0, ATLAS_MAX_CLIP_PLANES);
   const int clipDistanceCount = min(planeCount, ATLAS_MAX_CLIP_DISTANCES);
   for (int i = 0; i < clipDistanceCount; ++i) {
-    gl_ClipDistance[i] = dot(xo.clip_planes[i], world_pos);
+    float d = dot(xo.clip_planes[i], world_pos);
+    gl_ClipDistance[i] = d;
+    atlas_clip_distance[i] = d;
   }
 
-  const int extraCount = clamp(planeCount - ATLAS_MAX_CLIP_DISTANCES, 0, ATLAS_MAX_EXTRA_CLIP_PLANES);
-  for (int i = 0; i < extraCount; ++i) {
-    atlas_extra_clip_distance[i] = dot(xo.clip_planes[ATLAS_MAX_CLIP_DISTANCES + i], world_pos);
+  for (int i = clipDistanceCount; i < planeCount; ++i) {
+    atlas_clip_distance[i] = dot(xo.clip_planes[i], world_pos);
   }
 }

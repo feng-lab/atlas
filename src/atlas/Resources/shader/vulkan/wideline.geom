@@ -4,9 +4,12 @@ layout(lines) in;
 layout(triangle_strip, max_vertices = 4) out;
 
 #include "include/wideline_common.glslinc"
+#include "include/clip_distance_config.glslinc"
 
 layout(location = 0) in vec4 colorIn[];
 layout(location = 0) out vec4 color;
+layout(location = ATLAS_CLIP_DISTANCE_LOCATION) in float atlas_clip_distance_in[][ATLAS_MAX_CLIP_PLANES];
+layout(location = ATLAS_CLIP_DISTANCE_LOCATION) out float atlas_clip_distance[ATLAS_MAX_CLIP_PLANES];
 
 // Outputs to fragment to match wideline_func1.glslinc
 layout(location = 1) flat out vec3 plane1;
@@ -66,12 +69,16 @@ void main()
 
   // Emit vertices v0, v3, v1, v2
   color = colorIn[0];
+  atlas_clip_distance = atlas_clip_distance_in[0];
   gl_Position = v0; EmitVertex();
   color = colorIn[0];
+  atlas_clip_distance = atlas_clip_distance_in[0];
   gl_Position = v3; EmitVertex();
   color = colorIn[1];
+  atlas_clip_distance = atlas_clip_distance_in[1];
   gl_Position = v1; EmitVertex();
   color = colorIn[1];
+  atlas_clip_distance = atlas_clip_distance_in[1];
   gl_Position = v2; EmitVertex();
   EndPrimitive();
 }

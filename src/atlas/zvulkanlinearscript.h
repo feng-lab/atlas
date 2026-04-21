@@ -57,6 +57,20 @@ class ZVulkanTexture;
 class ZVulkanLinearScript final
 {
 public:
+  class ScopedSubmissionGroup
+  {
+  public:
+    ScopedSubmissionGroup(const ScopedSubmissionGroup&) = delete;
+    ScopedSubmissionGroup& operator=(const ScopedSubmissionGroup&) = delete;
+    explicit ScopedSubmissionGroup(ZVulkanLinearScript& script);
+    ScopedSubmissionGroup(ScopedSubmissionGroup&& rhs) noexcept;
+    ScopedSubmissionGroup& operator=(ScopedSubmissionGroup&& rhs) noexcept = delete;
+    ~ScopedSubmissionGroup();
+
+  private:
+    ZVulkanLinearScript* m_script = nullptr;
+  };
+
   template<typename T>
   class Slot
   {
@@ -196,6 +210,21 @@ public:
     return commands(label, std::span<const SegmentHandle>(deps.begin(), deps.size()), record);
   }
 
+  // Record backend-specific command buffer work that must remain in the same
+  // pending submission as neighboring raster nodes. Use this only for commands
+  // whose resource effects are fully accounted for by adjacent nodes (for
+  // example frame-local buffer barriers/counters); generic commands() remains a
+  // safe-point because opaque texture effects cannot be pre-scanned.
+  SegmentHandle commandsInSubmission(std::string_view label,
+                                     std::span<const SegmentHandle> deps,
+                                     const std::function<void(Z3DRendererVulkanBackend&)>& record);
+  SegmentHandle commandsInSubmission(std::string_view label,
+                                     std::initializer_list<SegmentHandle> deps,
+                                     const std::function<void(Z3DRendererVulkanBackend&)>& record)
+  {
+    return commandsInSubmission(label, std::span<const SegmentHandle>(deps.begin(), deps.size()), record);
+  }
+
   // Request an end-of-submission buffer readback and block until the value is
   // available on CPU. This creates a submission boundary: pending GPU work is
   // submitted, the fence is waited, and frame-completion safe-point hooks run.
@@ -256,6 +285,11 @@ public:
     return readbackU32(label, std::span<const SegmentHandle>(deps.begin(), deps.size()), srcSlot, srcOffset);
   }
 
+  // Suppress strict-residency's per-node auto-flush inside a deliberately
+  // bounded submission group. DDP chunks use this because reset/peel/count
+  // nodes share per-submission state (changed flag and optional indirect args).
+  [[nodiscard]] ScopedSubmissionGroup scopedSubmissionGroup();
+
 private:
   struct PreRecordNode
   {
@@ -304,6 +338,8 @@ private:
   collectScratchTextureUsesForNodes(std::span<const Node> nodes) const;
   [[nodiscard]] std::vector<ZVulkanTexture*> collectTexturePointersForNodes(std::span<const Node> nodes) const;
   [[nodiscard]] bool strictResidencyFlushEachNode() const;
+  void enterSubmissionGroup();
+  void leaveSubmissionGroup();
   void openFrame(std::string_view firstPassLabel);
   void closeFrame(std::string_view reason);
   void validateDeps(std::string_view label, std::span<const SegmentHandle> deps) const;
@@ -321,6 +357,7 @@ private:
 
   std::vector<Node> m_nodes;
   bool m_frameOpen = false;
+  uint32_t m_submissionGroupDepth = 0;
 };
 
 } // namespace nim

@@ -231,8 +231,7 @@ void ZVulkanMeshPipelineContext::resetFrame()
   m_indexUploadBuffer = nullptr;
   m_indexUploadOffset = 0;
   m_texBinding = TexBinding::None;
-  m_ddpArgsOffsets.clear();
-  m_ddpArgsPrepared.clear();
+  m_ddpArgsByStream.clear();
   m_streamCoordinator.resetFrame();
 }
 
@@ -255,6 +254,14 @@ void ZVulkanMeshPipelineContext::evictStream(uint64_t streamKey)
   for (auto& [frameKey, cache] : m_uboCacheByFrameKey) {
     (void)frameKey;
     cache.byStream.erase(streamKey);
+  }
+
+  for (auto it = m_ddpArgsByStream.begin(); it != m_ddpArgsByStream.end();) {
+    if (it->first.streamKey == streamKey) {
+      it = m_ddpArgsByStream.erase(it);
+    } else {
+      ++it;
+    }
   }
 }
 
@@ -479,12 +486,67 @@ void ZVulkanMeshPipelineContext::record(Z3DRendererBase& renderer,
 
   std::array<std::vector<DrawCallInfo>, kVariantCount> groupedDraws;
 
+  auto ensureDdpArgsForStream = [&](const char* context) -> DDPArgs& {
+    CHECK(payload.streamKey != 0) << context << ": missing streamKey";
+    const size_t meshCount = payload.meshes.size();
+    DDPArgs& ddp = m_ddpArgsByStream[DDPStreamKey{payload.streamKey, payload.streamSegmentOrdinal}];
+    if (!ddp.meshes.empty()) {
+      CHECK(ddp.meshes.size() == meshCount) << context << ": args table size changed for stream";
+    } else {
+      ddp.meshes.resize(meshCount);
+    }
+    return ddp;
+  };
+
+  auto prepareDdpMeshArgs = [&](DDPMeshArgs& args, const MeshDraw& draw, const char* context) -> bool {
+    const bool indexedDraw = draw.indexed && draw.indexCount > 0 && m_indexUploadBuffer;
+    if (args.prepared) {
+      CHECK(args.indexed == indexedDraw) << context << ": indexed mode mismatch for mesh";
+      CHECK(args.indexCount == draw.indexCount) << context << ": index count mismatch for mesh";
+      CHECK(args.vertexCount == draw.vertexCount) << context << ": vertex count mismatch for mesh";
+      return false;
+    }
+
+    const vk::Buffer argsBuffer = m_backend.ddpDeviceArgsBuffer();
+    CHECK(argsBuffer != vk::Buffer{}) << context << ": device args buffer missing";
+    if (indexedDraw) {
+      struct Cmd
+      {
+        uint32_t indexCount, instanceCount, firstIndex;
+        int32_t vertexOffset;
+        uint32_t firstInstance;
+      } cmd{draw.indexCount, 1, draw.firstIndex, static_cast<int32_t>(draw.firstVertex), 0};
+      const vk::DeviceSize off = m_backend.ddpAllocDeviceArgsSlot(sizeof(Cmd));
+      auto slice = m_backend.suballocateUpload(sizeof(Cmd), alignof(Cmd));
+      CHECK(slice.buffer != vk::Buffer{} && slice.mapped != nullptr)
+        << context << ": failed to allocate indexed args upload slice";
+      std::memcpy(slice.mapped, &cmd, sizeof(Cmd));
+      m_backend.scheduleStaticCopyIndirect(argsBuffer, off, slice);
+      args.offset = off;
+    } else {
+      struct Cmd
+      {
+        uint32_t vertexCount, instanceCount, firstVertex, firstInstance;
+      } cmd{draw.vertexCount, 1, draw.firstVertex, 0};
+      const vk::DeviceSize off = m_backend.ddpAllocDeviceArgsSlot(sizeof(Cmd));
+      auto slice = m_backend.suballocateUpload(sizeof(Cmd), alignof(Cmd));
+      CHECK(slice.buffer != vk::Buffer{} && slice.mapped != nullptr)
+        << context << ": failed to allocate args upload slice";
+      std::memcpy(slice.mapped, &cmd, sizeof(Cmd));
+      m_backend.scheduleStaticCopyIndirect(argsBuffer, off, slice);
+      args.offset = off;
+    }
+    args.prepared = true;
+    args.indexed = indexedDraw;
+    args.vertexCount = draw.vertexCount;
+    args.indexCount = draw.indexCount;
+    return true;
+  };
+
   // DDP indirect-count: prepare a stable per-mesh args table during the init pass
   // so peel passes can reference offsets by payload mesh index (order-independent).
   if (m_backend.ddpIndirectCountEnabled() && shaderHook == Z3DRendererBase::ShaderHookType::DualDepthPeelingInit) {
-    const size_t meshCount = payload.meshes.size();
-    m_ddpArgsOffsets.assign(meshCount, vk::DeviceSize(0));
-    m_ddpArgsPrepared.assign(meshCount, 0u);
+    (void)ensureDdpArgsForStream("Mesh DDP init");
   }
 
   for (const auto& draw : m_draws) {
@@ -611,6 +673,11 @@ void ZVulkanMeshPipelineContext::record(Z3DRendererBase& renderer,
   const vk::DescriptorSet dsOit = m_backend.sharedOITDescriptorSet();
   CHECK(dsOit) << "Mesh pipeline shared OIT descriptor set missing";
 
+  std::vector<uint8_t> ddpPreparedDuringRecord;
+  if (m_backend.ddpIndirectCountEnabled() && shaderHook == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel) {
+    ddpPreparedDuringRecord.assign(payload.meshes.size(), 0u);
+  }
+
   for (size_t variant = 0; variant < groupedDraws.size(); ++variant) {
     auto& draws = groupedDraws[variant];
     if (draws.empty()) {
@@ -696,39 +763,10 @@ void ZVulkanMeshPipelineContext::record(Z3DRendererBase& renderer,
             if (shaderHook == Z3DRendererBase::ShaderHookType::DualDepthPeelingInit) {
               // Prepare device-local args once per payload mesh index (shared by wireframe/surface draws).
               const size_t meshIndex = draw.payloadMeshIndex;
-              CHECK(meshIndex < m_ddpArgsPrepared.size()) << "Mesh DDP init: args table size mismatch";
-              if (!m_ddpArgsPrepared[meshIndex]) {
-                if (static_cast<VkBuffer>(m_backend.ddpDeviceArgsBuffer()) != VK_NULL_HANDLE) {
-                  if (draw.indexed && draw.indexCount > 0 && m_indexUploadBuffer) {
-                    struct Cmd
-                    {
-                      uint32_t indexCount, instanceCount, firstIndex;
-                      int32_t vertexOffset;
-                      uint32_t firstInstance;
-                    } cmd{draw.indexCount, 1, draw.firstIndex, static_cast<int32_t>(draw.firstVertex), 0};
-                    const vk::DeviceSize off = m_backend.ddpAllocDeviceArgsSlot(sizeof(Cmd));
-                    auto slice = m_backend.suballocateUpload(sizeof(Cmd), alignof(Cmd));
-                    if (slice.buffer && slice.mapped) {
-                      std::memcpy(slice.mapped, &cmd, sizeof(Cmd));
-                    }
-                    m_backend.scheduleStaticCopyIndirect(m_backend.ddpDeviceArgsBuffer(), off, slice);
-                    m_ddpArgsOffsets[meshIndex] = off;
-                  } else {
-                    struct Cmd
-                    {
-                      uint32_t vertexCount, instanceCount, firstVertex, firstInstance;
-                    } cmd{draw.vertexCount, 1, draw.firstVertex, 0};
-                    const vk::DeviceSize off = m_backend.ddpAllocDeviceArgsSlot(sizeof(Cmd));
-                    auto slice = m_backend.suballocateUpload(sizeof(Cmd), alignof(Cmd));
-                    if (slice.buffer && slice.mapped) {
-                      std::memcpy(slice.mapped, &cmd, sizeof(Cmd));
-                    }
-                    m_backend.scheduleStaticCopyIndirect(m_backend.ddpDeviceArgsBuffer(), off, slice);
-                    m_ddpArgsOffsets[meshIndex] = off;
-                  }
-                  m_ddpArgsPrepared[meshIndex] = 1u;
-                }
-              }
+              DDPArgs& ddp = ensureDdpArgsForStream("Mesh DDP init");
+              CHECK(meshIndex < ddp.meshes.size()) << "Mesh DDP init: args table size mismatch";
+              DDPMeshArgs& args = ddp.meshes[meshIndex];
+              (void)prepareDdpMeshArgs(args, draw, "Mesh DDP init");
               // Emit init draw as usual
               if (draw.indexed && draw.indexCount > 0 && m_indexUploadBuffer) {
                 cb.drawIndexed(draw.indexCount, 1, draw.firstIndex, static_cast<int32_t>(draw.firstVertex), 0);
@@ -737,15 +775,38 @@ void ZVulkanMeshPipelineContext::record(Z3DRendererBase& renderer,
               }
             } else if (shaderHook == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel) {
               const size_t meshIndex = draw.payloadMeshIndex;
-              CHECK(meshIndex < m_ddpArgsPrepared.size()) << "Mesh DDP peel: args table size mismatch";
-              CHECK(m_ddpArgsPrepared[meshIndex]) << "Mesh DDP peel: args not prepared in init";
-              const vk::DeviceSize off = m_ddpArgsOffsets[meshIndex];
+              DDPArgs& ddp = ensureDdpArgsForStream("Mesh DDP peel");
+              CHECK(meshIndex < ddp.meshes.size()) << "Mesh DDP peel: args table size mismatch";
+              DDPMeshArgs& args = ddp.meshes[meshIndex];
+              const bool indexedDraw = draw.indexed && draw.indexCount > 0 && m_indexUploadBuffer;
+              const bool preparedNow = prepareDdpMeshArgs(args, draw, "Mesh DDP peel");
+              CHECK(meshIndex < ddpPreparedDuringRecord.size()) << "Mesh DDP peel: prepared-record table size mismatch";
+              if (preparedNow) {
+                ddpPreparedDuringRecord[meshIndex] = 1u;
+              }
+              if (ddpPreparedDuringRecord[meshIndex] != 0u) {
+                // Upload->indirect copies flush after this peel node, so any
+                // mesh whose args were prepared here must draw direct for the
+                // rest of the node (surface and wireframe variants included).
+                if (indexedDraw) {
+                  cb.drawIndexed(draw.indexCount, 1, draw.firstIndex, static_cast<int32_t>(draw.firstVertex), 0);
+                } else {
+                  cb.draw(draw.vertexCount, 1, draw.firstVertex, 0);
+                }
+                continue;
+              }
+              CHECK(args.indexed == indexedDraw) << "Mesh DDP peel: indexed mode mismatch for mesh";
+              CHECK(args.indexCount == draw.indexCount) << "Mesh DDP peel: index count mismatch";
+              CHECK(args.vertexCount == draw.vertexCount) << "Mesh DDP peel: vertex count mismatch";
+              const vk::DeviceSize off = args.offset;
               const vk::Buffer argsBuf = m_backend.ddpDeviceArgsBuffer();
               const vk::Buffer cntBuf = m_backend.ddpIndirectCountBuffer();
-              if (draw.indexed && draw.indexCount > 0 && m_indexUploadBuffer) {
+              CHECK(argsBuf != vk::Buffer{}) << "Mesh DDP peel: device args buffer missing";
+              CHECK(cntBuf != vk::Buffer{}) << "Mesh DDP peel: indirect count buffer missing";
+              if (indexedDraw) {
                 cb.drawIndexedIndirectCount(argsBuf, off, cntBuf, 0, 1, sizeof(VkDrawIndexedIndirectCommand));
               } else {
-                cb.drawIndirectCount(argsBuf, off, cntBuf, 0, 1, sizeof(uint32_t) * 4);
+                cb.drawIndirectCount(argsBuf, off, cntBuf, 0, 1, sizeof(VkDrawIndirectCommand));
               }
             } else {
               // Non-DDP
@@ -1091,34 +1152,50 @@ void ZVulkanMeshPipelineContext::updateTransformUBO(Z3DRendererBase& renderer,
   void* frameKey = m_backend.activeFrameKey();
   CHECK(frameKey != nullptr) << "Mesh updateTransformUBO called without an active Vulkan frame-slot key";
   if (payload.streamKey != 0) {
+    const uint32_t submissionId = m_backend.activeSubmissionId();
     FrameUboCache& frameCache = m_uboCacheByFrameKey[frameKey];
     StreamUboCache& streamCache = frameCache.byStream[payload.streamKey];
+    ObjectTransformsCacheEntry* reusableEntry = nullptr;
 
-    if (streamCache.objectTransformsValid && streamCache.params == payload.params &&
-        streamCache.followCoordTransform == payload.followCoordTransform &&
-        streamCache.followSizeScale == payload.followSizeScale &&
-        clipPlanesEqual(streamCache.clipPlanes, batch.clipPlanes)) {
-      m_dynObjectTransformsOffset = streamCache.objectTransformsOffset;
+    for (auto& cached : streamCache.objectTransforms) {
+      if (cached.params == payload.params && cached.followCoordTransform == payload.followCoordTransform &&
+          cached.followSizeScale == payload.followSizeScale && clipPlanesEqual(cached.clipPlanes, batch.clipPlanes)) {
+        cached.lastSubmissionId = submissionId;
+        m_dynObjectTransformsOffset = cached.objectTransformsOffset;
+        return;
+      }
+
+      if (cached.lastSubmissionId != submissionId && reusableEntry == nullptr) {
+        reusableEntry = &cached;
+      }
+    }
+
+    if (reusableEntry != nullptr) {
+      std::memcpy(
+        m_backend.persistentUniformMappedAt(reusableEntry->objectTransformsOffset, sizeof(ObjectTransformsUBOStd140)),
+        &transforms,
+        sizeof(transforms));
+      reusableEntry->params = payload.params;
+      reusableEntry->followCoordTransform = payload.followCoordTransform;
+      reusableEntry->followSizeScale = payload.followSizeScale;
+      reusableEntry->clipPlanes = batch.clipPlanes;
+      reusableEntry->lastSubmissionId = submissionId;
+      m_dynObjectTransformsOffset = reusableEntry->objectTransformsOffset;
       return;
     }
 
-    if (!streamCache.objectTransformsValid) {
-      auto slice = m_backend.suballocatePersistentUniformFor(payload, sizeof(ObjectTransformsUBOStd140));
-      std::memcpy(slice.mapped, &transforms, sizeof(transforms));
-      streamCache.objectTransformsOffset = slice.offset;
-      streamCache.objectTransformsValid = true;
-    } else {
-      std::memcpy(
-        m_backend.persistentUniformMappedAt(streamCache.objectTransformsOffset, sizeof(ObjectTransformsUBOStd140)),
-        &transforms,
-        sizeof(transforms));
-    }
+    auto slice = m_backend.suballocatePersistentUniformFor(payload, sizeof(ObjectTransformsUBOStd140));
+    std::memcpy(slice.mapped, &transforms, sizeof(transforms));
+    m_dynObjectTransformsOffset = slice.offset;
 
-    streamCache.params = payload.params;
-    streamCache.followCoordTransform = payload.followCoordTransform;
-    streamCache.followSizeScale = payload.followSizeScale;
-    streamCache.clipPlanes = batch.clipPlanes;
-    m_dynObjectTransformsOffset = streamCache.objectTransformsOffset;
+    ObjectTransformsCacheEntry entry{};
+    entry.params = payload.params;
+    entry.followCoordTransform = payload.followCoordTransform;
+    entry.followSizeScale = payload.followSizeScale;
+    entry.clipPlanes = batch.clipPlanes;
+    entry.objectTransformsOffset = slice.offset;
+    entry.lastSubmissionId = submissionId;
+    streamCache.objectTransforms.push_back(std::move(entry));
     return;
   }
 
@@ -1178,6 +1255,7 @@ void ZVulkanMeshPipelineContext::updateMaterialUBO(Z3DRendererBase& renderer,
   void* frameKey = m_backend.activeFrameKey();
   CHECK(frameKey != nullptr) << "Mesh updateMaterialUBO called without an active Vulkan frame-slot key";
   if (usePersistentTransforms && payload.streamKey != 0) {
+    const uint32_t submissionId = m_backend.activeSubmissionId();
     FrameUboCache& frameCache = m_uboCacheByFrameKey[frameKey];
     StreamUboCache& streamCache = frameCache.byStream[payload.streamKey];
 
@@ -1197,24 +1275,33 @@ void ZVulkanMeshPipelineContext::updateMaterialUBO(Z3DRendererBase& renderer,
       key.kind = MaterialKey::Kind::SharedSurface;
     }
 
-    auto it = streamCache.materials.find(key);
-    if (it != streamCache.materials.end()) {
-      MaterialCacheEntry& cached = it->second;
-      m_dynMaterialOffset = cached.materialOffset;
+    auto& entries = streamCache.materials[key];
+    MaterialCacheEntry* reusableEntry = nullptr;
+    for (auto& cached : entries) {
       if (cached.params == payload.params && cached.followOpacity == payload.followOpacity &&
           cached.pickingPass == pickingPass && cached.useCustomColor == useCustomColor &&
           vec4Equal(cached.customColor, colorValue)) {
+        cached.lastSubmissionId = submissionId;
+        m_dynMaterialOffset = cached.materialOffset;
         return;
       }
 
-      std::memcpy(m_backend.persistentUniformMappedAt(cached.materialOffset, sizeof(MaterialUBOStd140)),
+      if (cached.lastSubmissionId != submissionId && reusableEntry == nullptr) {
+        reusableEntry = &cached;
+      }
+    }
+
+    if (reusableEntry != nullptr) {
+      std::memcpy(m_backend.persistentUniformMappedAt(reusableEntry->materialOffset, sizeof(MaterialUBOStd140)),
                   &material,
                   sizeof(material));
-      cached.params = payload.params;
-      cached.followOpacity = payload.followOpacity;
-      cached.pickingPass = pickingPass;
-      cached.useCustomColor = useCustomColor;
-      cached.customColor = colorValue;
+      reusableEntry->params = payload.params;
+      reusableEntry->followOpacity = payload.followOpacity;
+      reusableEntry->pickingPass = pickingPass;
+      reusableEntry->useCustomColor = useCustomColor;
+      reusableEntry->customColor = colorValue;
+      reusableEntry->lastSubmissionId = submissionId;
+      m_dynMaterialOffset = reusableEntry->materialOffset;
       return;
     }
 
@@ -1229,7 +1316,8 @@ void ZVulkanMeshPipelineContext::updateMaterialUBO(Z3DRendererBase& renderer,
     entry.useCustomColor = useCustomColor;
     entry.customColor = colorValue;
     entry.materialOffset = slice.offset;
-    streamCache.materials.emplace(key, std::move(entry));
+    entry.lastSubmissionId = submissionId;
+    entries.push_back(std::move(entry));
     return;
   }
 

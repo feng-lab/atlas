@@ -489,10 +489,9 @@ void ZVulkanResidencyManager::reclaimBeforeManagedTextureAllocation(ResourceClas
                                                            .reason = reason});
     totalStats.add(reclaimStats);
 
-    if (!strictBudgetActive()) {
-      break;
-    }
-
+    // Released bytes are provider estimates; use the latest driver/broker
+    // pressure report as the stop condition so a reclaim pass cannot under-free
+    // after allocations with different alignment or residency costs.
     const AllocationPressure retryPressure = allocationPressureFor(allocationBytes);
     if (!retryPressure.needsReclaim()) {
       pressure = retryPressure;
@@ -500,6 +499,10 @@ void ZVulkanResidencyManager::reclaimBeforeManagedTextureAllocation(ResourceClas
     }
 
     if (reclaimStats.resourcesReleased == 0u && reclaimStats.bytesReleased == 0u) {
+      if (!strictBudgetActive()) {
+        pressure = retryPressure;
+        break;
+      }
       if (!waitedForCompletion) {
         const uint32_t inFlightBefore = m_device.frameExecutor().inFlightCount();
         VLOG(1) << fmt::format(

@@ -65,6 +65,7 @@ std::unique_ptr<ZVulkanTexture> createUint3DTexture(ZVulkanDevice& device, glm::
                                        false,
                                        vk::ImageLayout::eShaderReadOnlyOptimal);
   info.createDefaultSampler = false;
+  info.residencyClassHint = ZVulkanTexture::ResidencyClassHint::PagedImageMetadataTexture;
   info.samplerInfo = makeNearestSampler();
   return device.createTexture(info);
 }

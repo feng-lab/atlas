@@ -26,98 +26,6 @@ namespace {
 
 thread_local uint32_t s_allocationRecoveryScopeDepth = 0;
 
-uint64_t checkedMul(uint64_t lhs, uint64_t rhs)
-{
-  if (lhs == 0u || rhs == 0u) {
-    return 0;
-  }
-  if (lhs > std::numeric_limits<uint64_t>::max() / rhs) {
-    return std::numeric_limits<uint64_t>::max();
-  }
-  return lhs * rhs;
-}
-
-uint64_t bytesPerTexel(vk::Format format)
-{
-  constexpr uint64_t kConservativeUnknownFormatBytesPerTexel = 16;
-  switch (format) {
-    case vk::Format::eR8Unorm:
-    case vk::Format::eR8Uint:
-    case vk::Format::eR8Sint:
-      return 1;
-    case vk::Format::eR16Unorm:
-    case vk::Format::eR16Sfloat:
-      return 2;
-    case vk::Format::eR32Sfloat:
-    case vk::Format::eR32Uint:
-    case vk::Format::eR8G8B8A8Unorm:
-    case vk::Format::eB8G8R8A8Unorm:
-    case vk::Format::eD24UnormS8Uint:
-    case vk::Format::eD32Sfloat:
-      return 4;
-    case vk::Format::eR16G16B16A16Unorm:
-    case vk::Format::eR16G16B16A16Sfloat:
-    case vk::Format::eR32G32Sfloat:
-    case vk::Format::eD32SfloatS8Uint:
-      return 8;
-    case vk::Format::eR32G32B32A32Sfloat:
-    case vk::Format::eR32G32B32A32Uint:
-      return 16;
-    default:
-      // Conservative diagnostic estimate for uncommon formats. VMA remains the
-      // source of truth after allocation succeeds.
-      return kConservativeUnknownFormatBytesPerTexel;
-  }
-}
-
-uint64_t sampleCount(vk::SampleCountFlagBits samples)
-{
-  switch (samples) {
-    case vk::SampleCountFlagBits::e1:
-      return 1;
-    case vk::SampleCountFlagBits::e2:
-      return 2;
-    case vk::SampleCountFlagBits::e4:
-      return 4;
-    case vk::SampleCountFlagBits::e8:
-      return 8;
-    case vk::SampleCountFlagBits::e16:
-      return 16;
-    case vk::SampleCountFlagBits::e32:
-      return 32;
-    case vk::SampleCountFlagBits::e64:
-      return 64;
-  }
-  return 1;
-}
-
-uint64_t estimateImageBytes(const ZVulkanTexture::CreateInfo& createInfo)
-{
-  uint64_t total = 0;
-  uint32_t width = std::max(1u, createInfo.extent.width);
-  uint32_t height = std::max(1u, createInfo.extent.height);
-  uint32_t depth = std::max(1u, createInfo.extent.depth);
-  const uint64_t layers = std::max(1u, createInfo.arrayLayers);
-  const uint64_t texelBytes = bytesPerTexel(createInfo.format);
-  const uint64_t samples = sampleCount(createInfo.samples);
-  const uint32_t levels = std::max(1u, createInfo.mipLevels);
-  for (uint32_t level = 0; level < levels; ++level) {
-    uint64_t levelBytes = checkedMul(width, height);
-    levelBytes = checkedMul(levelBytes, depth);
-    levelBytes = checkedMul(levelBytes, layers);
-    levelBytes = checkedMul(levelBytes, samples);
-    levelBytes = checkedMul(levelBytes, texelBytes);
-    if (total > std::numeric_limits<uint64_t>::max() - levelBytes) {
-      return std::numeric_limits<uint64_t>::max();
-    }
-    total += levelBytes;
-    width = std::max(1u, width / 2u);
-    height = std::max(1u, height / 2u);
-    depth = std::max(1u, depth / 2u);
-  }
-  return total;
-}
-
 ZVulkanResidencyManager::ResourceClass classifyBufferAllocation(vk::BufferUsageFlags usage,
                                                                 vk::MemoryPropertyFlags properties,
                                                                 VmaPool poolOverride,
@@ -150,6 +58,8 @@ ZVulkanResidencyManager::ResourceClass classifyTextureAllocation(const ZVulkanTe
       return ZVulkanResidencyManager::ResourceClass::DenseImageTexture;
     case ZVulkanTexture::ResidencyClassHint::DenseVolumeTexture:
       return ZVulkanResidencyManager::ResourceClass::DenseVolumeTexture;
+    case ZVulkanTexture::ResidencyClassHint::PagedImageMetadataTexture:
+      return ZVulkanResidencyManager::ResourceClass::PagedImageMetadataTexture;
     case ZVulkanTexture::ResidencyClassHint::PagedImageCacheR8:
       return ZVulkanResidencyManager::ResourceClass::PagedImageCacheR8;
     case ZVulkanTexture::ResidencyClassHint::PersistentCompositorTarget:
@@ -241,16 +151,20 @@ void brokerReclaimBeforeAllocation(ZVulkanDevice& device,
                                               .reason = reason});
     totalStats.add(stats);
 
-    if (!strictBudget) {
-      break;
-    }
-
+    // Released bytes are provider estimates; use the latest driver/broker
+    // pressure report as the stop condition so a reclaim pass cannot under-free
+    // after allocations with different alignment or residency costs.
     const auto retryPressure = device.residencyManager().allocationPressureFor(strictAllocationBytes);
     if (!retryPressure.needsReclaim()) {
       pressure = retryPressure;
       break;
     }
+
     if (stats.resourcesReleased == 0u && stats.bytesReleased == 0u) {
+      if (!strictBudget) {
+        pressure = retryPressure;
+        break;
+      }
       if (!waitedForCompletion) {
         const uint32_t inFlightBefore = device.frameExecutor().inFlightCount();
         VLOG(1) << fmt::format(
@@ -582,7 +496,7 @@ ZVulkanDevice::createBuffer(size_t size, vk::BufferUsageFlags usage, vk::MemoryP
 
 std::unique_ptr<ZVulkanTexture> ZVulkanDevice::createTexture(const ZVulkanTexture::CreateInfo& createInfo)
 {
-  const uint64_t requestedBytes = estimateImageBytes(createInfo);
+  const uint64_t requestedBytes = ZVulkanTexture::estimateImageBytes(createInfo);
   const auto requestClass = classifyTextureAllocation(createInfo);
   reclaimBeforeTextureAllocation(createInfo, false, "image_preallocate");
   try {
@@ -622,7 +536,7 @@ void ZVulkanDevice::reclaimBeforeTextureAllocation(const ZVulkanTexture::CreateI
                                                    bool force,
                                                    std::string_view reason)
 {
-  const uint64_t requestedBytes = estimateImageBytes(createInfo);
+  const uint64_t requestedBytes = ZVulkanTexture::estimateImageBytes(createInfo);
   const auto requestClass = classifyTextureAllocation(createInfo);
   const bool enforceBudget = countsAgainstDeviceLocalBudget(createInfo.memoryProperties);
   brokerReclaimBeforeAllocation(*this, requestClass, requestedBytes, enforceBudget, force, reason);
@@ -631,7 +545,7 @@ void ZVulkanDevice::reclaimBeforeTextureAllocation(const ZVulkanTexture::CreateI
 void ZVulkanDevice::enforceTextureAllocationBudgetAfter(const ZVulkanTexture::CreateInfo& createInfo,
                                                         std::string_view reason)
 {
-  const uint64_t requestedBytes = estimateImageBytes(createInfo);
+  const uint64_t requestedBytes = ZVulkanTexture::estimateImageBytes(createInfo);
   const auto requestClass = classifyTextureAllocation(createInfo);
   const bool enforceBudget = countsAgainstDeviceLocalBudget(createInfo.memoryProperties);
   enforceStrictBudgetAfterAllocation(*this, requestClass, requestedBytes, enforceBudget, reason);

@@ -125,8 +125,7 @@ void ZVulkanConePipelineContext::resetFrame()
   m_indexUploadOffset = 0;
   // Per-stream UBO offsets are cached per frame-slot in the backend's persistent
   // uniform arena; keep them across submissions to stabilize dynamic offsets.
-  m_ddpArgsPrepared = false;
-  m_ddpArgsOffset = 0;
+  m_ddpArgsByStream.clear();
   m_geometryStreamCache.resetFrame();
   m_appearanceStreamCache.resetFrame();
 }
@@ -161,6 +160,14 @@ void ZVulkanConePipelineContext::evictStream(uint64_t streamKey)
   for (auto& [frameKey, cache] : m_uboCacheByFrameKey) {
     (void)frameKey;
     cache.byStream.erase(streamKey);
+  }
+
+  for (auto it = m_ddpArgsByStream.begin(); it != m_ddpArgsByStream.end();) {
+    if (it->first.streamKey == streamKey) {
+      it = m_ddpArgsByStream.erase(it);
+    } else {
+      ++it;
+    }
   }
 }
 
@@ -583,52 +590,79 @@ void ZVulkanConePipelineContext::record(Z3DRendererBase& renderer,
   }
 
   ZVulkanPipelineCommandRecorder recorder(cmd);
+  auto prepareDdpArgs = [&](DDPArgs& ddp, bool indexed, const char* context) {
+    if (ddp.prepared) {
+      CHECK(ddp.indexed == indexed) << context << ": indexed mode mismatch for streamKey";
+      CHECK(ddp.indexCount == drawSpec.indexCount) << context << ": index count mismatch for streamKey";
+      CHECK(ddp.vertexCount == drawSpec.vertexCount) << context << ": vertex count mismatch for streamKey";
+      return;
+    }
+
+    const vk::Buffer argsBuffer = m_backend.ddpDeviceArgsBuffer();
+    CHECK(argsBuffer != vk::Buffer{}) << context << ": device args buffer missing";
+    ddp.offset =
+      m_backend.ddpAllocDeviceArgsSlot(indexed ? sizeof(VkDrawIndexedIndirectCommand) : sizeof(VkDrawIndirectCommand));
+    if (indexed) {
+      struct Cmd
+      {
+        uint32_t indexCount, instanceCount, firstIndex;
+        int32_t vertexOffset;
+        uint32_t firstInstance;
+      } cmdPayload{drawSpec.indexCount,
+                   drawSpec.instanceCount,
+                   drawSpec.firstIndex,
+                   drawSpec.vertexOffset,
+                   drawSpec.firstInstance};
+      auto slice = m_backend.suballocateUpload(sizeof(Cmd), alignof(Cmd));
+      CHECK(slice.buffer != vk::Buffer{} && slice.mapped != nullptr)
+        << context << ": failed to allocate indexed args upload slice";
+      std::memcpy(slice.mapped, &cmdPayload, sizeof(Cmd));
+      m_backend.scheduleStaticCopyIndirect(argsBuffer, ddp.offset, slice);
+    } else {
+      struct Cmd
+      {
+        uint32_t vertexCount, instanceCount, firstVertex, firstInstance;
+      } cmdPayload{drawSpec.vertexCount, drawSpec.instanceCount, drawSpec.firstVertex, drawSpec.firstInstance};
+      auto slice = m_backend.suballocateUpload(sizeof(Cmd), alignof(Cmd));
+      CHECK(slice.buffer != vk::Buffer{} && slice.mapped != nullptr)
+        << context << ": failed to allocate args upload slice";
+      std::memcpy(slice.mapped, &cmdPayload, sizeof(Cmd));
+      m_backend.scheduleStaticCopyIndirect(argsBuffer, ddp.offset, slice);
+    }
+    ddp.prepared = true;
+    ddp.indexed = indexed;
+    ddp.vertexCount = drawSpec.vertexCount;
+    ddp.indexCount = drawSpec.indexCount;
+  };
+
   if (m_backend.ddpIndirectCountEnabled() && shaderHook == Z3DRendererBase::ShaderHookType::DualDepthPeelingInit) {
     const bool indexed = (drawSpec.indexCount > 0);
-    if (static_cast<VkBuffer>(m_backend.ddpDeviceArgsBuffer()) != VK_NULL_HANDLE) {
-      m_ddpArgsOffset = m_backend.ddpAllocDeviceArgsSlot(indexed ? sizeof(VkDrawIndexedIndirectCommand)
-                                                                 : sizeof(VkDrawIndirectCommand));
-      if (indexed) {
-        struct Cmd
-        {
-          uint32_t indexCount, instanceCount, firstIndex;
-          int32_t vertexOffset;
-          uint32_t firstInstance;
-        } cmdPayload{drawSpec.indexCount,
-                     drawSpec.instanceCount,
-                     drawSpec.firstIndex,
-                     drawSpec.vertexOffset,
-                     drawSpec.firstInstance};
-        auto slice = m_backend.suballocateUpload(sizeof(Cmd), alignof(Cmd));
-        if (slice.buffer && slice.mapped) {
-          std::memcpy(slice.mapped, &cmdPayload, sizeof(Cmd));
-        }
-        m_backend.scheduleStaticCopyIndirect(m_backend.ddpDeviceArgsBuffer(), m_ddpArgsOffset, slice);
-      } else {
-        struct Cmd
-        {
-          uint32_t vertexCount, instanceCount, firstVertex, firstInstance;
-        } cmdPayload{drawSpec.vertexCount, drawSpec.instanceCount, drawSpec.firstVertex, drawSpec.firstInstance};
-        auto slice = m_backend.suballocateUpload(sizeof(Cmd), alignof(Cmd));
-        if (slice.buffer && slice.mapped) {
-          std::memcpy(slice.mapped, &cmdPayload, sizeof(Cmd));
-        }
-        m_backend.scheduleStaticCopyIndirect(m_backend.ddpDeviceArgsBuffer(), m_ddpArgsOffset, slice);
-      }
-      m_ddpArgsPrepared = true;
-    }
+    CHECK(payload.streamKey != 0) << "Cone DDP init: missing streamKey";
+    DDPArgs& ddp = m_ddpArgsByStream[DDPStreamKey{payload.streamKey, payload.streamSegmentOrdinal}];
+    prepareDdpArgs(ddp, indexed, "Cone DDP init");
     recorder.recordGraphicsDraw(drawSpec);
   } else if (m_backend.ddpIndirectCountEnabled() &&
              shaderHook == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel) {
     const bool indexed = (drawSpec.indexCount > 0);
+    CHECK(payload.streamKey != 0) << "Cone DDP peel: missing streamKey";
+    DDPArgs& ddp = m_ddpArgsByStream[DDPStreamKey{payload.streamKey, payload.streamSegmentOrdinal}];
+    if (!ddp.prepared) {
+      prepareDdpArgs(ddp, indexed, "Cone DDP peel");
+      recorder.recordGraphicsDraw(drawSpec);
+      return;
+    }
+    CHECK(ddp.indexed == indexed) << "Cone DDP peel: indexed mode mismatch for streamKey";
+    CHECK(ddp.indexCount == drawSpec.indexCount) << "Cone DDP peel: index count mismatch";
+    CHECK(ddp.vertexCount == drawSpec.vertexCount) << "Cone DDP peel: vertex count mismatch";
     recorder.recordGraphicsDraw(drawSpec, [&](vk::raii::CommandBuffer& c) {
       const vk::Buffer argsBuf = m_backend.ddpDeviceArgsBuffer();
       const vk::Buffer cntBuf = m_backend.ddpIndirectCountBuffer();
-      CHECK(m_ddpArgsPrepared) << "Cone DDP peel: args not prepared in init";
+      CHECK(argsBuf != vk::Buffer{}) << "Cone DDP peel: device args buffer missing";
+      CHECK(cntBuf != vk::Buffer{}) << "Cone DDP peel: indirect count buffer missing";
       if (indexed) {
-        c.drawIndexedIndirectCount(argsBuf, m_ddpArgsOffset, cntBuf, 0, 1, sizeof(VkDrawIndexedIndirectCommand));
+        c.drawIndexedIndirectCount(argsBuf, ddp.offset, cntBuf, 0, 1, sizeof(VkDrawIndexedIndirectCommand));
       } else {
-        c.drawIndirectCount(argsBuf, m_ddpArgsOffset, cntBuf, 0, 1, sizeof(VkDrawIndirectCommand));
+        c.drawIndirectCount(argsBuf, ddp.offset, cntBuf, 0, 1, sizeof(VkDrawIndirectCommand));
       }
     });
   } else {
@@ -688,35 +722,47 @@ void ZVulkanConePipelineContext::updateTransformUBO(Z3DRendererBase& renderer,
   void* frameKey = m_backend.activeFrameKey();
   CHECK(frameKey != nullptr) << "Cone updateTransformUBO called without an active Vulkan frame-slot key";
   if (payload.streamKey != 0) {
+    const uint32_t submissionId = m_backend.activeSubmissionId();
     FrameUboCache& frameCache = m_uboCacheByFrameKey[frameKey];
     auto& entries = frameCache.byStream[payload.streamKey];
+    UboCacheEntry* reusableEntry = nullptr;
 
     for (auto& cached : entries) {
       if (cached.pickingPass != pickingPass) {
         continue;
       }
 
-      m_dynObjectTransformsOffset = cached.objectTransformsOffset;
-      m_dynMaterialOffset = cached.materialOffset;
-
       if (cached.params == payload.params && cached.followCoordTransform == payload.followCoordTransform &&
           cached.followSizeScale == payload.followSizeScale && cached.followOpacity == payload.followOpacity &&
           clipPlanesEqual(cached.clipPlanes, batch.clipPlanes)) {
+        cached.lastSubmissionId = submissionId;
+        m_dynObjectTransformsOffset = cached.objectTransformsOffset;
+        m_dynMaterialOffset = cached.materialOffset;
         return;
       }
 
-      std::memcpy(m_backend.persistentUniformMappedAt(cached.objectTransformsOffset, sizeof(ObjectTransformsUBOStd140)),
-                  &objectTransforms,
-                  sizeof(objectTransforms));
-      std::memcpy(m_backend.persistentUniformMappedAt(cached.materialOffset, sizeof(MaterialUBOStd140)),
+      if (cached.lastSubmissionId != submissionId && reusableEntry == nullptr) {
+        reusableEntry = &cached;
+      }
+    }
+
+    if (reusableEntry != nullptr) {
+      std::memcpy(
+        m_backend.persistentUniformMappedAt(reusableEntry->objectTransformsOffset, sizeof(ObjectTransformsUBOStd140)),
+        &objectTransforms,
+        sizeof(objectTransforms));
+      std::memcpy(m_backend.persistentUniformMappedAt(reusableEntry->materialOffset, sizeof(MaterialUBOStd140)),
                   &material,
                   sizeof(material));
 
-      cached.params = payload.params;
-      cached.followCoordTransform = payload.followCoordTransform;
-      cached.followSizeScale = payload.followSizeScale;
-      cached.followOpacity = payload.followOpacity;
-      cached.clipPlanes = batch.clipPlanes;
+      reusableEntry->params = payload.params;
+      reusableEntry->followCoordTransform = payload.followCoordTransform;
+      reusableEntry->followSizeScale = payload.followSizeScale;
+      reusableEntry->followOpacity = payload.followOpacity;
+      reusableEntry->clipPlanes = batch.clipPlanes;
+      reusableEntry->lastSubmissionId = submissionId;
+      m_dynObjectTransformsOffset = reusableEntry->objectTransformsOffset;
+      m_dynMaterialOffset = reusableEntry->materialOffset;
       return;
     }
 
@@ -737,6 +783,7 @@ void ZVulkanConePipelineContext::updateTransformUBO(Z3DRendererBase& renderer,
     entry.clipPlanes = batch.clipPlanes;
     entry.objectTransformsOffset = objectSlice.offset;
     entry.materialOffset = materialSlice.offset;
+    entry.lastSubmissionId = submissionId;
     entries.push_back(std::move(entry));
     return;
   }

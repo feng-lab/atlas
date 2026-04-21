@@ -35,7 +35,8 @@ DEFINE_int32(atlas_ddp_max_passes, 100, "Maximum dual-depth peeling peel passes 
 DEFINE_int32(atlas_vk_ddp_cpu_chunk_passes,
              4,
              "Vulkan DDP: number of peel passes per submission for chunked early-stop. "
-             "drawIndirectCount, when available, gates draws inside each chunk. Use <=0 to record the full loop.");
+             "drawIndirectCount, when available, gates draws after each chunk's first peel pass. "
+             "Use <=0 to record the full loop in one submission.");
 
 namespace {
 using namespace nim;
@@ -4891,41 +4892,49 @@ void Z3DCompositor::renderTransparentDDPVulkan(const std::vector<Z3DBoundedFilte
   auto recordDdpPeelPass = [&](uint32_t pass,
                                ZVulkanLinearScript::SegmentHandle dep,
                                bool firstPassInSubmission) -> ZVulkanLinearScript::SegmentHandle {
-    const auto segReset =
-      script.commands("transparency_ddp_reset", {dep}, [firstPassInSubmission](Z3DRendererVulkanBackend& be) {
-        auto& cmd = be.commandBuffer();
-        if (!firstPassInSubmission) {
-          be.ddpBarrierComputeToTransfer(cmd);
-        }
-        be.ddpResetForPass(cmd, firstPassInSubmission);
-        be.ddpBarrierTransferToFrag(cmd);
-      });
+    const auto segReset = script.commandsInSubmission("transparency_ddp_reset",
+                                                      {dep},
+                                                      [firstPassInSubmission](Z3DRendererVulkanBackend& be) {
+                                                        auto& cmd = be.commandBuffer();
+                                                        if (!firstPassInSubmission) {
+                                                          be.ddpBarrierComputeToTransfer(cmd);
+                                                        }
+                                                        be.ddpResetForPass(cmd, firstPassInSubmission);
+                                                        be.ddpBarrierTransferToFrag(cmd);
+                                                      });
 
     const auto segBlend = drawPass(pass, segReset);
 
     const bool useIndirectCountLocal = useIndirectCount;
-    return script.commands("transparency_ddp_count", {segBlend}, [useIndirectCountLocal](Z3DRendererVulkanBackend& be) {
-      auto& cmd = be.commandBuffer();
-      be.ddpBarrierFragToCompute(cmd);
-      be.ddpDispatchCountCompute(cmd);
-      if (useIndirectCountLocal) {
-        be.ddpBarrierComputeToIndirect(cmd);
-      }
-    });
+    return script.commandsInSubmission("transparency_ddp_count",
+                                       {segBlend},
+                                       [useIndirectCountLocal](Z3DRendererVulkanBackend& be) {
+                                         auto& cmd = be.commandBuffer();
+                                         be.ddpBarrierFragToCompute(cmd);
+                                         be.ddpDispatchCountCompute(cmd);
+                                         if (useIndirectCountLocal) {
+                                           be.ddpBarrierComputeToIndirect(cmd);
+                                         }
+                                       });
   };
 
   if (FLAGS_atlas_vk_ddp_cpu_chunk_passes <= 0) {
     // Compatibility/debug path: record the whole peel loop in one submission.
-    bool firstPassInSubmission = true;
-    for (uint32_t pass = 0; pass < totalOrchestratedPasses; ++pass) {
-      segLast = recordDdpPeelPass(pass, segLast, firstPassInSubmission);
-      firstPassInSubmission = false;
+    // The scoped group prevents strict-residency mode from splitting the
+    // reset/peel/count nodes that share DDP state.
+    {
+      [[maybe_unused]] auto submissionGroup = script.scopedSubmissionGroup();
+      bool firstPassInSubmission = true;
+      for (uint32_t pass = 0; pass < totalOrchestratedPasses; ++pass) {
+        segLast = recordDdpPeelPass(pass, segLast, firstPassInSubmission);
+        firstPassInSubmission = false;
+      }
     }
   } else {
     // Chunked path: keep each DDP submission bounded and read back the changed
     // flag between chunks so later chunks are not recorded after convergence.
-    // When drawIndirectCount is supported, each chunk also uses device-side
-    // gating to skip draws after convergence within that chunk.
+    // When indirect count is enabled, the first peel pass in each chunk prepares
+    // per-submission indirect draw args for later passes in that same chunk.
     const uint32_t chunkPasses = static_cast<uint32_t>(std::max<int32_t>(1, FLAGS_atlas_vk_ddp_cpu_chunk_passes));
     uint32_t passBase = 0;
     while (passBase < totalOrchestratedPasses) {
@@ -4941,22 +4950,25 @@ void Z3DCompositor::renderTransparentDDPVulkan(const std::vector<Z3DBoundedFilte
                              useIndirectCount);
 
       ZVulkanLinearScript::SegmentHandle segChunkLast = segLast;
-      const auto ddpChangedFlagSlot = script.makeSlot<ZVulkanBuffer*>();
-      if (needReadback) {
-        segChunkLast = script.preRecord("transparency_ddp_prime_changedflag",
-                                        {segChunkLast},
-                                        [ddpChangedFlagSlot](Z3DRendererVulkanBackend& be, Z3DRendererBase&) {
-                                          ZVulkanBuffer* flag = be.ddpChangedFlagBufferObj();
-                                          CHECK(flag != nullptr)
-                                            << "DDP Vulkan: missing ddpChangedFlag buffer for CPU early-stop";
-                                          ddpChangedFlagSlot.set(flag);
-                                        });
-      }
+      auto ddpChangedFlagSlot = script.makeSlot<ZVulkanBuffer*>();
+      {
+        [[maybe_unused]] auto submissionGroup = script.scopedSubmissionGroup();
+        if (needReadback) {
+          segChunkLast = script.preRecord("transparency_ddp_prime_changedflag",
+                                          {segChunkLast},
+                                          [ddpChangedFlagSlot](Z3DRendererVulkanBackend& be, Z3DRendererBase&) {
+                                            ZVulkanBuffer* flag = be.ddpChangedFlagBufferObj();
+                                            CHECK(flag != nullptr)
+                                              << "DDP Vulkan: missing ddpChangedFlag buffer for CPU early-stop";
+                                            ddpChangedFlagSlot.set(flag);
+                                          });
+        }
 
-      for (uint32_t local = 0; local < thisChunk; ++local) {
-        const uint32_t pass = passBase + local;
-        const bool firstPassInSubmission = (local == 0);
-        segChunkLast = recordDdpPeelPass(pass, segChunkLast, firstPassInSubmission);
+        for (uint32_t local = 0; local < thisChunk; ++local) {
+          const uint32_t pass = passBase + local;
+          const bool firstPassInSubmission = (local == 0);
+          segChunkLast = recordDdpPeelPass(pass, segChunkLast, firstPassInSubmission);
+        }
       }
 
       segLast = segChunkLast;

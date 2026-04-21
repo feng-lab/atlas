@@ -558,9 +558,9 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
 {
   const auto beginRenderEntry = std::chrono::steady_clock::now();
 
-  // Only expose the thread-local "current backend" while actively recording a
-  // Vulkan frame. This avoids call sites (debug validation, descriptor helpers)
-  // observing a partially-initialised backend before ensureDevice/beginFrame.
+  // Expose the thread-local "current backend" only after a frame slot is active.
+  // This avoids call sites (debug validation, descriptor helpers) observing a
+  // partially-initialised backend before ensureDevice/beginFrame.
   s_currentBackend = nullptr;
   m_submissionResourcePinningOpen = false;
   m_activeRenderer = &renderer;
@@ -764,6 +764,11 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
   // Expose frame resources early so suballocateUniform can target this frame.
   m_activeFrame = &frameResources;
   m_submissionResourcePinningOpen = true;
+  // Pre-record warmups can create/register residency-managed or externally
+  // brokered resources that are later consumed by this submission. Publish the
+  // active backend before those warmups so resource helpers can attach
+  // completion-safe pins even though command recording has not begun yet.
+  s_currentBackend = this;
   // Compute and publish the shared per-frame lighting UBO slice before descriptor priming.
   {
     const size_t align = uniformAlignment();
@@ -1014,7 +1019,6 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
   }
 
   m_frameRecording = true;
-  s_currentBackend = this;
 
   // Install scratch-pool deferred release scheduler for this backend.
   // (Used by RenderTargetLease to delay Vulkan slot reuse until the frame-slot
@@ -4456,8 +4460,10 @@ void Z3DRendererVulkanBackend::ddpBarrierTransferToFrag(vk::raii::CommandBuffer&
 {
   vk::MemoryBarrier2 mb{.srcStageMask = vk::PipelineStageFlagBits2::eTransfer,
                         .srcAccessMask = vk::AccessFlagBits2::eTransferWrite,
-                        .dstStageMask = vk::PipelineStageFlagBits2::eFragmentShader,
-                        .dstAccessMask = vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eShaderWrite};
+                        .dstStageMask =
+                          vk::PipelineStageFlagBits2::eFragmentShader | vk::PipelineStageFlagBits2::eDrawIndirect,
+                        .dstAccessMask = vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eShaderWrite |
+                                         vk::AccessFlagBits2::eIndirectCommandRead};
   vk::DependencyInfo dep{.memoryBarrierCount = 1, .pMemoryBarriers = &mb};
   cmd.pipelineBarrier2(dep);
 }
@@ -4713,6 +4719,13 @@ void* Z3DRendererVulkanBackend::persistentUniformMappedAt(vk::DeviceSize offset,
   CHECK(off + bytes <= arena.capacity)
     << fmt::format("Persistent uniform arena mappedAt OOB: off={}B bytes={}B cap={}B", off, bytes, arena.capacity);
   return static_cast<char*>(arena.mapped) + off;
+}
+
+uint32_t Z3DRendererVulkanBackend::activeSubmissionId() const
+{
+  CHECK(m_activeFrame != nullptr) << "activeSubmissionId called without an active frame";
+  CHECK_NE(m_activeFrame->submissionId, 0u) << "activeSubmissionId called before beginRender assigned a submission";
+  return m_activeFrame->submissionId;
 }
 
 bool Z3DRendererVulkanBackend::prepareStaticPromotionBudget(StaticPressureDomain domain,

@@ -70,6 +70,69 @@ bool isAspectValidForFormat(vk::Format format, vk::ImageAspectFlags aspect)
   }
 }
 
+uint64_t checkedMul(uint64_t lhs, uint64_t rhs)
+{
+  if (lhs == 0u || rhs == 0u) {
+    return 0u;
+  }
+  if (lhs > std::numeric_limits<uint64_t>::max() / rhs) {
+    return std::numeric_limits<uint64_t>::max();
+  }
+  return lhs * rhs;
+}
+
+uint64_t bytesPerTexel(vk::Format format)
+{
+  constexpr uint64_t kConservativeUnknownFormatBytesPerTexel = 16u;
+  switch (format) {
+    case vk::Format::eR8Unorm:
+    case vk::Format::eR8Uint:
+    case vk::Format::eR8Sint:
+      return 1u;
+    case vk::Format::eR16Unorm:
+    case vk::Format::eR16Sfloat:
+      return 2u;
+    case vk::Format::eR32Sfloat:
+    case vk::Format::eR32Uint:
+    case vk::Format::eR8G8B8A8Unorm:
+    case vk::Format::eB8G8R8A8Unorm:
+    case vk::Format::eD24UnormS8Uint:
+    case vk::Format::eD32Sfloat:
+      return 4u;
+    case vk::Format::eR16G16B16A16Unorm:
+    case vk::Format::eR16G16B16A16Sfloat:
+    case vk::Format::eR32G32Sfloat:
+    case vk::Format::eD32SfloatS8Uint:
+      return 8u;
+    case vk::Format::eR32G32B32A32Sfloat:
+    case vk::Format::eR32G32B32A32Uint:
+      return 16u;
+    default:
+      return kConservativeUnknownFormatBytesPerTexel;
+  }
+}
+
+uint64_t sampleCount(vk::SampleCountFlagBits samples)
+{
+  switch (samples) {
+    case vk::SampleCountFlagBits::e1:
+      return 1u;
+    case vk::SampleCountFlagBits::e2:
+      return 2u;
+    case vk::SampleCountFlagBits::e4:
+      return 4u;
+    case vk::SampleCountFlagBits::e8:
+      return 8u;
+    case vk::SampleCountFlagBits::e16:
+      return 16u;
+    case vk::SampleCountFlagBits::e32:
+      return 32u;
+    case vk::SampleCountFlagBits::e64:
+      return 64u;
+  }
+  return 1u;
+}
+
 class ScopedManagedTexturePin
 {
 public:
@@ -104,6 +167,33 @@ private:
 } // namespace
 
 // ----- CreateInfo helpers ---------------------------------------------------------------------
+
+uint64_t ZVulkanTexture::estimateImageBytes(const ZVulkanTexture::CreateInfo& createInfo)
+{
+  uint64_t total = 0u;
+  uint32_t width = std::max(1u, createInfo.extent.width);
+  uint32_t height = std::max(1u, createInfo.extent.height);
+  uint32_t depth = std::max(1u, createInfo.extent.depth);
+  const uint64_t layers = std::max(1u, createInfo.arrayLayers);
+  const uint64_t texelBytes = bytesPerTexel(createInfo.format);
+  const uint64_t samples = sampleCount(createInfo.samples);
+  const uint32_t levels = std::max(1u, createInfo.mipLevels);
+  for (uint32_t level = 0; level < levels; ++level) {
+    uint64_t levelBytes = checkedMul(width, height);
+    levelBytes = checkedMul(levelBytes, depth);
+    levelBytes = checkedMul(levelBytes, layers);
+    levelBytes = checkedMul(levelBytes, samples);
+    levelBytes = checkedMul(levelBytes, texelBytes);
+    if (total > std::numeric_limits<uint64_t>::max() - levelBytes) {
+      return std::numeric_limits<uint64_t>::max();
+    }
+    total += levelBytes;
+    width = std::max(1u, width / 2u);
+    height = std::max(1u, height / 2u);
+    depth = std::max(1u, depth / 2u);
+  }
+  return total;
+}
 
 ZVulkanTexture::CreateInfo ZVulkanTexture::CreateInfo::make1D(uint32_t width,
                                                               vk::Format format,
@@ -1359,9 +1449,8 @@ void ZVulkanTexture::allocateMemory()
     return r;
   };
 
-  // Heuristic: prefer dedicated for large images
-  const VkDeviceSize approxSize = static_cast<VkDeviceSize>(m_extent.width) * m_extent.height *
-                                  std::max<VkDeviceSize>(1, m_extent.depth) * 4; // 4B/px guess
+  // Heuristic: prefer dedicated for large images.
+  const VkDeviceSize approxSize = static_cast<VkDeviceSize>(estimateImageBytes(m_createInfo));
   bool preferDedicated = (approxSize >= (128ull * 1024ull * 1024ull) / 2); // >=64MiB
 
   vk::Result res = vk::Result::eErrorInitializationFailed;

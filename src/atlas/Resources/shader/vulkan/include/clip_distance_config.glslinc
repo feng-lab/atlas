@@ -7,9 +7,11 @@
 // Notes:
 // - Planes: Atlas may provide up to 12 clip planes (6 local + 6 global).
 // - Clip distances: Many devices expose maxClipDistances=8, so Vulkan shaders
-//   only export the first 8 planes via gl_ClipDistance for early clipping.
-// - Extra planes: remaining planes are applied via fragment discard using
-//   interpolated signed distances.
+//   export the first 8 planes via gl_ClipDistance for early clipping.
+// - Fragment fallback: all planes are also exported as ordinary varyings and
+//   discarded in the fragment shader. This keeps Windows Vulkan drivers from
+//   silently rendering unclipped geometry if fixed-function clip distances are
+//   ineffective for a pipeline, while preserving early clipping where it works.
 
 #ifndef ATLAS_CLIP_DISTANCE_CONFIG_GLSLINC
 #define ATLAS_CLIP_DISTANCE_CONFIG_GLSLINC
@@ -17,6 +19,7 @@
 #define ATLAS_MAX_CLIP_PLANES 12
 #define ATLAS_MAX_CLIP_DISTANCES 8
 #define ATLAS_MAX_EXTRA_CLIP_PLANES (ATLAS_MAX_CLIP_PLANES - ATLAS_MAX_CLIP_DISTANCES)
-#define ATLAS_EXTRA_CLIP_DISTANCE_LOCATION 9
+#define ATLAS_CLIP_DISTANCE_LOCATION 9
+#define ATLAS_EXTRA_CLIP_DISTANCE_LOCATION ATLAS_CLIP_DISTANCE_LOCATION
 
 #endif // ATLAS_CLIP_DISTANCE_CONFIG_GLSLINC

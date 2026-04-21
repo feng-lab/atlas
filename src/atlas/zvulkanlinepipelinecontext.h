@@ -425,6 +425,7 @@ private:
     ClipPlanesState clipPlanes{};
     vk::DeviceSize objectTransformsOffset = 0;
     vk::DeviceSize materialOffset = 0;
+    uint32_t lastSubmissionId = 0;
   };
   struct FrameUboCache
   {

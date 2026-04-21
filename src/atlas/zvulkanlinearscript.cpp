@@ -20,6 +20,7 @@
 #include <algorithm>
 #include <chrono>
 #include <exception>
+#include <limits>
 #include <unordered_map>
 #include <unordered_set>
 #include <type_traits>
@@ -507,6 +508,25 @@ ZVulkanLinearScript::ZVulkanLinearScript(Z3DRendererBase& renderer,
   CHECK(currentRenderThreadExecutorOrNull() != nullptr) << "ZVulkanLinearScript must run on the rendering thread";
 }
 
+ZVulkanLinearScript::ScopedSubmissionGroup::ScopedSubmissionGroup(ZVulkanLinearScript& script)
+  : m_script(&script)
+{
+  m_script->enterSubmissionGroup();
+}
+
+ZVulkanLinearScript::ScopedSubmissionGroup::ScopedSubmissionGroup(ScopedSubmissionGroup&& rhs) noexcept
+  : m_script(rhs.m_script)
+{
+  rhs.m_script = nullptr;
+}
+
+ZVulkanLinearScript::ScopedSubmissionGroup::~ScopedSubmissionGroup()
+{
+  if (m_script != nullptr) {
+    m_script->leaveSubmissionGroup();
+  }
+}
+
 ZVulkanLinearScript::~ZVulkanLinearScript()
 {
   if (m_nodes.empty() && m_preRecordNodes.empty() && !m_frameOpen) {
@@ -540,6 +560,7 @@ ZVulkanLinearScript::~ZVulkanLinearScript()
 
 void ZVulkanLinearScript::flush(std::string_view reason)
 {
+  CHECK_EQ(m_submissionGroupDepth, 0u) << "ZVulkanLinearScript::flush called inside a scoped submission group";
   if (m_nodes.empty() && m_preRecordNodes.empty() && !m_frameOpen) {
     return;
   }
@@ -629,6 +650,7 @@ ZVulkanLinearScript::commands(std::string_view label,
                               const std::function<void(Z3DRendererVulkanBackend&)>& record)
 {
   validateDeps(label, deps);
+  CHECK(record) << "ZVulkanLinearScript::commands requires a valid function";
   const auto handle = nextHandle();
   m_pendingSubmissionHasGpuNodes = true;
   CommandsNode node;
@@ -643,6 +665,27 @@ ZVulkanLinearScript::commands(std::string_view label,
   // subsequent raster nodes infer their texture contents requirements.
   flushNodes(strictResidencyFlushEachNode() ? "strict_residency_node" : "command_node", nullptr);
   return handle;
+}
+
+ZVulkanLinearScript::SegmentHandle
+ZVulkanLinearScript::commandsInSubmission(std::string_view label,
+                                          std::span<const SegmentHandle> deps,
+                                          const std::function<void(Z3DRendererVulkanBackend&)>& record)
+{
+  validateDeps(label, deps);
+  CHECK(record) << "ZVulkanLinearScript::commandsInSubmission requires a valid function";
+  const auto handle = nextHandle();
+  m_pendingSubmissionHasGpuNodes = true;
+  CommandsNode node;
+  node.label = std::string(label);
+  node.record = record;
+  m_nodes.emplace_back(std::move(node));
+  return handle;
+}
+
+ZVulkanLinearScript::ScopedSubmissionGroup ZVulkanLinearScript::scopedSubmissionGroup()
+{
+  return ScopedSubmissionGroup(*this);
 }
 
 void ZVulkanLinearScript::setReadbackSource(ReadbackBufferSpec& spec, ZVulkanBuffer& src)
@@ -664,6 +707,8 @@ void ZVulkanLinearScript::readbackBufferTo(std::string_view label,
                                            void* dst,
                                            size_t bytes)
 {
+  CHECK_EQ(m_submissionGroupDepth, 0u)
+    << "ZVulkanLinearScript::readbackBufferTo called inside a scoped submission group";
   validateDeps(label, deps);
   CHECK(dst != nullptr) << "ZVulkanLinearScript::readbackBufferTo requires dst";
   CHECK_GT(bytes, 0u) << "ZVulkanLinearScript::readbackBufferTo requires bytes > 0";
@@ -684,6 +729,8 @@ void ZVulkanLinearScript::readbackBufferTo(std::string_view label,
                                            void* dst,
                                            size_t bytes)
 {
+  CHECK_EQ(m_submissionGroupDepth, 0u)
+    << "ZVulkanLinearScript::readbackBufferTo called inside a scoped submission group";
   validateDeps(label, deps);
   CHECK(dst != nullptr) << "ZVulkanLinearScript::readbackBufferTo requires dst";
   CHECK_GT(bytes, 0u) << "ZVulkanLinearScript::readbackBufferTo requires bytes > 0";
@@ -729,7 +776,20 @@ void ZVulkanLinearScript::drainNodesIntoExecutionOrder(std::vector<Node>& out)
 
 bool ZVulkanLinearScript::strictResidencyFlushEachNode() const
 {
-  return m_backend.device().residencyManager().strictBudgetActive();
+  return m_submissionGroupDepth == 0u && m_backend.device().residencyManager().strictBudgetActive();
+}
+
+void ZVulkanLinearScript::enterSubmissionGroup()
+{
+  CHECK(m_submissionGroupDepth < std::numeric_limits<uint32_t>::max())
+    << "ZVulkanLinearScript submission group depth overflow";
+  ++m_submissionGroupDepth;
+}
+
+void ZVulkanLinearScript::leaveSubmissionGroup()
+{
+  CHECK_GT(m_submissionGroupDepth, 0u) << "ZVulkanLinearScript submission group underflow";
+  --m_submissionGroupDepth;
 }
 
 std::vector<Z3DScratchResourcePool::VulkanScratchTextureUse>

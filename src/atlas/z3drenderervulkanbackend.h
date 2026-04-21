@@ -1387,6 +1387,7 @@ public:
   // Obtain a mapped pointer into the persistent uniform arena for a previously
   // allocated offset range (debug-checked).
   [[nodiscard]] void* persistentUniformMappedAt(vk::DeviceSize offset, size_t bytes);
+  [[nodiscard]] uint32_t activeSubmissionId() const;
   // Dynamic offset of the shared per-frame lighting UBO slice
   [[nodiscard]] vk::DeviceSize frameSharedLightingOffset() const
   {

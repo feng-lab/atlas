@@ -25,6 +25,7 @@ public:
     ScratchBacking,
     DenseImageTexture,
     DenseVolumeTexture,
+    PagedImageMetadataTexture,
     PagedImageCacheR8,
     PersistentCompositorTarget,
   };
@@ -167,6 +168,11 @@ public:
 
   // Best-effort: returns the VMA allocation size when resident, otherwise 0.
   [[nodiscard]] uint64_t allocationSizeBytes() const;
+
+  // Best-effort image byte estimate used for allocation pressure accounting
+  // before VMA returns the exact allocation size. Handles format texel size,
+  // mip levels, array layers, depth, and sample count.
+  [[nodiscard]] static uint64_t estimateImageBytes(const CreateInfo& createInfo);
 
   // Release the underlying VkImage + view, freeing device memory via VMA.
   // After this call, the texture is non-resident and cannot be used for

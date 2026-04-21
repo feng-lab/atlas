@@ -1298,6 +1298,14 @@ double Z3DImgFilter::process(Z3DEye eye)
           });
         }
 
+        if (runSlicePass && (runTransparentPass && (doImage || doBBoxOnly))) {
+          // Raycaster/overlay and slice rendering target independent outputs.
+          // Keep a submission safe point between them so Vulkan residency can
+          // swap the first path's scratch/cache before restoring slice scratch
+          // on memory-constrained exports.
+          script.flush("imgfilter_image_done");
+        }
+
         if (runSlicePass) {
           const bool progressiveStep = (useProgressiveSlices && m_imgSliceRenderer.renderingStarted(eye));
           if (!progressiveStep) {

@@ -400,35 +400,47 @@ void ZVulkanLinePipelineContext::updateUBOs(Z3DRendererBase& renderer,
   void* frameKey = m_backend.activeFrameKey();
   CHECK(frameKey != nullptr) << "Line updateUBOs called without an active Vulkan frame-slot key";
   if (payload.streamKey != 0) {
+    const uint32_t submissionId = m_backend.activeSubmissionId();
     FrameUboCache& frameCache = m_uboCacheByFrameKey[frameKey];
     auto& entries = frameCache.byStream[payload.streamKey];
+    UboCacheEntry* reusableEntry = nullptr;
 
     for (auto& cached : entries) {
       if (cached.pickingPass != payload.pickingPass) {
         continue;
       }
 
-      m_dynObjectTransformsOffset = cached.objectTransformsOffset;
-      m_dynMaterialOffset = cached.materialOffset;
-
       if (cached.params == payload.params && cached.followCoordTransform == payload.followCoordTransform &&
           cached.followSizeScale == payload.followSizeScale && cached.followOpacity == payload.followOpacity &&
           clipPlanesEqual(cached.clipPlanes, batch.clipPlanes)) {
+        cached.lastSubmissionId = submissionId;
+        m_dynObjectTransformsOffset = cached.objectTransformsOffset;
+        m_dynMaterialOffset = cached.materialOffset;
         return;
       }
 
-      std::memcpy(m_backend.persistentUniformMappedAt(cached.objectTransformsOffset, sizeof(ObjectTransformsUBOStd140)),
-                  &transforms,
-                  sizeof(transforms));
-      std::memcpy(m_backend.persistentUniformMappedAt(cached.materialOffset, sizeof(MaterialUBOStd140)),
+      if (cached.lastSubmissionId != submissionId && reusableEntry == nullptr) {
+        reusableEntry = &cached;
+      }
+    }
+
+    if (reusableEntry != nullptr) {
+      std::memcpy(
+        m_backend.persistentUniformMappedAt(reusableEntry->objectTransformsOffset, sizeof(ObjectTransformsUBOStd140)),
+        &transforms,
+        sizeof(transforms));
+      std::memcpy(m_backend.persistentUniformMappedAt(reusableEntry->materialOffset, sizeof(MaterialUBOStd140)),
                   &material,
                   sizeof(material));
 
-      cached.params = payload.params;
-      cached.followCoordTransform = payload.followCoordTransform;
-      cached.followSizeScale = payload.followSizeScale;
-      cached.followOpacity = payload.followOpacity;
-      cached.clipPlanes = batch.clipPlanes;
+      reusableEntry->params = payload.params;
+      reusableEntry->followCoordTransform = payload.followCoordTransform;
+      reusableEntry->followSizeScale = payload.followSizeScale;
+      reusableEntry->followOpacity = payload.followOpacity;
+      reusableEntry->clipPlanes = batch.clipPlanes;
+      reusableEntry->lastSubmissionId = submissionId;
+      m_dynObjectTransformsOffset = reusableEntry->objectTransformsOffset;
+      m_dynMaterialOffset = reusableEntry->materialOffset;
       return;
     }
 
@@ -449,6 +461,7 @@ void ZVulkanLinePipelineContext::updateUBOs(Z3DRendererBase& renderer,
     entry.clipPlanes = batch.clipPlanes;
     entry.objectTransformsOffset = transformsSlice.offset;
     entry.materialOffset = materialSlice.offset;
+    entry.lastSubmissionId = submissionId;
     entries.push_back(std::move(entry));
     return;
   }
@@ -1966,30 +1979,32 @@ void ZVulkanLinePipelineContext::record(Z3DRendererBase& renderer,
       // flushed after the init pass ends).
       CHECK(payload.streamKey != 0) << "Line DDP init: missing streamKey";
       auto& ddp = m_ddpArgsByStream[DDPStreamKey{payload.streamKey, payload.streamSegmentOrdinal}];
-      const auto widths = payload.perSegmentWidths;
-      const uint32_t segmentCount = m_wideUploadIndexCount / 6u;
-      const bool perSegment = !widths.empty();
-      const uint32_t drawSegments =
-        perSegment ? std::min<uint32_t>(segmentCount, static_cast<uint32_t>(widths.size())) : 0u;
+      auto prepareWideDdpArgs = [&](DDPArgs& args, const char* context) {
+        const auto widths = payload.perSegmentWidths;
+        const uint32_t segmentCount = m_wideUploadIndexCount / 6u;
+        const bool perSegment = !widths.empty();
+        const uint32_t drawSegments =
+          perSegment ? std::min<uint32_t>(segmentCount, static_cast<uint32_t>(widths.size())) : 0u;
 
-      if (ddp.widePrepared) {
-        CHECK(ddp.widePerSegment == perSegment) << "Line DDP init: wide args mode mismatch for streamKey";
-        if (perSegment) {
-          CHECK(ddp.wideOffsets.size() == static_cast<size_t>(drawSegments))
-            << "Line DDP init: wide args segment count mismatch for streamKey";
-        } else {
-          CHECK(ddp.wideOffsets.size() == 1u) << "Line DDP init: wide args table mismatch for streamKey";
-          CHECK(ddp.wideIndexCount == m_wideUploadIndexCount)
-            << "Line DDP init: wide args index count mismatch for streamKey";
+        if (args.widePrepared) {
+          CHECK(args.widePerSegment == perSegment) << context << ": wide args mode mismatch for streamKey";
+          if (perSegment) {
+            CHECK(args.wideOffsets.size() == static_cast<size_t>(drawSegments))
+              << context << ": wide args segment count mismatch for streamKey";
+          } else {
+            CHECK(args.wideOffsets.size() == 1u) << context << ": wide args table mismatch for streamKey";
+            CHECK(args.wideIndexCount == m_wideUploadIndexCount)
+              << context << ": wide args index count mismatch for streamKey";
+          }
+          return;
         }
-      } else {
-        CHECK(static_cast<VkBuffer>(m_backend.ddpDeviceArgsBuffer()) != VK_NULL_HANDLE)
-          << "Line DDP init: device args buffer missing (fatal)";
-        ddp.widePerSegment = perSegment;
+
+        CHECK(m_backend.ddpDeviceArgsBuffer() != vk::Buffer{}) << context << ": device args buffer missing";
+        args.widePerSegment = perSegment;
         if (perSegment) {
-          ddp.wideOffsets.assign(drawSegments, vk::DeviceSize(0));
-          ddp.wideSegments = drawSegments;
-          ddp.wideIndexCount = 6u;
+          args.wideOffsets.assign(drawSegments, vk::DeviceSize(0));
+          args.wideSegments = drawSegments;
+          args.wideIndexCount = 6u;
           for (uint32_t i = 0; i < drawSegments; ++i) {
             struct Cmd
             {
@@ -1999,16 +2014,15 @@ void ZVulkanLinePipelineContext::record(Z3DRendererBase& renderer,
             } drawCmd{6u, 1u, i * 6u, static_cast<int32_t>(i * 4u), 0u};
             const vk::DeviceSize off = m_backend.ddpAllocDeviceArgsSlot(sizeof(Cmd));
             auto slice = m_backend.suballocateUpload(sizeof(Cmd), alignof(Cmd));
-            if (slice.buffer && slice.mapped) {
-              std::memcpy(slice.mapped, &drawCmd, sizeof(Cmd));
-            }
+            CHECK(slice.buffer && slice.mapped) << context << ": failed to allocate wide per-segment args upload slice";
+            std::memcpy(slice.mapped, &drawCmd, sizeof(Cmd));
             m_backend.scheduleStaticCopyIndirect(m_backend.ddpDeviceArgsBuffer(), off, slice);
-            ddp.wideOffsets[i] = off;
+            args.wideOffsets[i] = off;
           }
         } else {
-          ddp.wideOffsets.assign(1u, vk::DeviceSize(0));
-          ddp.wideSegments = segmentCount;
-          ddp.wideIndexCount = m_wideUploadIndexCount;
+          args.wideOffsets.assign(1u, vk::DeviceSize(0));
+          args.wideSegments = segmentCount;
+          args.wideIndexCount = m_wideUploadIndexCount;
           struct Cmd
           {
             uint32_t indexCount, instanceCount, firstIndex;
@@ -2017,14 +2031,14 @@ void ZVulkanLinePipelineContext::record(Z3DRendererBase& renderer,
           } drawCmd{m_wideUploadIndexCount, 1u, 0u, 0, 0u};
           const vk::DeviceSize off = m_backend.ddpAllocDeviceArgsSlot(sizeof(Cmd));
           auto slice = m_backend.suballocateUpload(sizeof(Cmd), alignof(Cmd));
-          if (slice.buffer && slice.mapped) {
-            std::memcpy(slice.mapped, &drawCmd, sizeof(Cmd));
-          }
+          CHECK(slice.buffer && slice.mapped) << context << ": failed to allocate wide args upload slice";
+          std::memcpy(slice.mapped, &drawCmd, sizeof(Cmd));
           m_backend.scheduleStaticCopyIndirect(m_backend.ddpDeviceArgsBuffer(), off, slice);
-          ddp.wideOffsets[0] = off;
+          args.wideOffsets[0] = off;
         }
-        ddp.widePrepared = true;
-      }
+        args.widePrepared = true;
+      };
+      prepareWideDdpArgs(ddp, "Line DDP init");
     }
 
     ZVulkanPipelineCommandRecorder::GraphicsDrawSpec drawSpec{};
@@ -2086,12 +2100,55 @@ void ZVulkanLinePipelineContext::record(Z3DRendererBase& renderer,
         (m_backend.ddpIndirectCountEnabled() && shaderHook == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel);
       const DDPArgs* ddpArgs = nullptr;
       if (ddpPeelIndirect) {
-        auto it = m_ddpArgsByStream.find(DDPStreamKey{payload.streamKey, payload.streamSegmentOrdinal});
-        CHECK(it != m_ddpArgsByStream.end()) << "Line DDP peel: args not prepared in init";
-        ddpArgs = &it->second;
-        CHECK(ddpArgs->widePrepared) << "Line DDP peel: wide args not prepared in init";
+        CHECK(payload.streamKey != 0) << "Line DDP peel: missing streamKey";
+        auto& ddp = m_ddpArgsByStream[DDPStreamKey{payload.streamKey, payload.streamSegmentOrdinal}];
         const bool perSegment = !widths.empty();
-        CHECK(ddpArgs->widePerSegment == perSegment) << "Line DDP peel: wide args mode mismatch for streamKey";
+        const uint32_t segmentCount = m_wideUploadIndexCount / 6u;
+        const uint32_t drawSegments =
+          perSegment ? std::min<uint32_t>(segmentCount, static_cast<uint32_t>(widths.size())) : 0u;
+        if (!ddp.widePrepared) {
+          CHECK(m_backend.ddpDeviceArgsBuffer() != vk::Buffer{}) << "Line DDP peel: device args buffer missing";
+          ddp.widePerSegment = perSegment;
+          if (perSegment) {
+            ddp.wideOffsets.assign(drawSegments, vk::DeviceSize(0));
+            ddp.wideSegments = drawSegments;
+            ddp.wideIndexCount = 6u;
+            for (uint32_t i = 0; i < drawSegments; ++i) {
+              struct Cmd
+              {
+                uint32_t indexCount, instanceCount, firstIndex;
+                int32_t vertexOffset;
+                uint32_t firstInstance;
+              } drawCmd{6u, 1u, i * 6u, static_cast<int32_t>(i * 4u), 0u};
+              const vk::DeviceSize off = m_backend.ddpAllocDeviceArgsSlot(sizeof(Cmd));
+              auto slice = m_backend.suballocateUpload(sizeof(Cmd), alignof(Cmd));
+              CHECK(slice.buffer && slice.mapped) << "Line DDP peel: failed to allocate wide args upload slice";
+              std::memcpy(slice.mapped, &drawCmd, sizeof(Cmd));
+              m_backend.scheduleStaticCopyIndirect(m_backend.ddpDeviceArgsBuffer(), off, slice);
+              ddp.wideOffsets[i] = off;
+            }
+          } else {
+            ddp.wideOffsets.assign(1u, vk::DeviceSize(0));
+            ddp.wideSegments = segmentCount;
+            ddp.wideIndexCount = m_wideUploadIndexCount;
+            struct Cmd
+            {
+              uint32_t indexCount, instanceCount, firstIndex;
+              int32_t vertexOffset;
+              uint32_t firstInstance;
+            } drawCmd{m_wideUploadIndexCount, 1u, 0u, 0, 0u};
+            const vk::DeviceSize off = m_backend.ddpAllocDeviceArgsSlot(sizeof(Cmd));
+            auto slice = m_backend.suballocateUpload(sizeof(Cmd), alignof(Cmd));
+            CHECK(slice.buffer && slice.mapped) << "Line DDP peel: failed to allocate wide args upload slice";
+            std::memcpy(slice.mapped, &drawCmd, sizeof(Cmd));
+            m_backend.scheduleStaticCopyIndirect(m_backend.ddpDeviceArgsBuffer(), off, slice);
+            ddp.wideOffsets[0] = off;
+          }
+          ddp.widePrepared = true;
+        } else {
+          CHECK(ddp.widePerSegment == perSegment) << "Line DDP peel: wide args mode mismatch for streamKey";
+          ddpArgs = &ddp;
+        }
       }
       if (!widths.empty()) {
         VLOG(1) << fmt::format(
@@ -2103,7 +2160,7 @@ void ZVulkanLinePipelineContext::record(Z3DRendererBase& renderer,
           payload.resolvedLineWidth);
         const uint32_t segmentCount = m_wideUploadIndexCount / 6u;
         const uint32_t drawSegments = std::min<uint32_t>(segmentCount, static_cast<uint32_t>(widths.size()));
-        if (ddpPeelIndirect) {
+        if (ddpArgs != nullptr) {
           CHECK(ddpArgs != nullptr);
           CHECK(ddpArgs->wideOffsets.size() == static_cast<size_t>(drawSegments))
             << "Line DDP peel: wide args segment table mismatch";
@@ -2114,7 +2171,7 @@ void ZVulkanLinePipelineContext::record(Z3DRendererBase& renderer,
                                                   vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment,
                                                   0,
                                                   pc);
-          if (ddpPeelIndirect) {
+          if (ddpArgs != nullptr) {
             CHECK(ddpArgs != nullptr);
             const vk::Buffer argsBuf = m_backend.ddpDeviceArgsBuffer();
             const vk::Buffer cntBuf = m_backend.ddpIndirectCountBuffer();
@@ -2133,7 +2190,7 @@ void ZVulkanLinePipelineContext::record(Z3DRendererBase& renderer,
                                                 vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment,
                                                 0,
                                                 pc);
-        if (ddpPeelIndirect) {
+        if (ddpArgs != nullptr) {
           CHECK(ddpArgs != nullptr);
           CHECK(ddpArgs->wideOffsets.size() == 1u) << "Line DDP peel: wide args table mismatch";
           const vk::Buffer argsBuf = m_backend.ddpDeviceArgsBuffer();
@@ -2193,61 +2250,62 @@ void ZVulkanLinePipelineContext::record(Z3DRendererBase& renderer,
   }
   drawSpec.instanceCount = 1;
 
+  auto prepareThinDdpArgs = [&](DDPArgs& ddp, bool indexed, const char* context) {
+    if (ddp.thinPrepared) {
+      CHECK(ddp.thinIndexed == indexed) << context << ": thin args indexed mismatch for streamKey";
+      if (indexed) {
+        CHECK(ddp.thinIndexCount == drawSpec.indexCount) << context << ": thin args index count mismatch for streamKey";
+      } else {
+        CHECK(ddp.thinVertexCount == drawSpec.vertexCount)
+          << context << ": thin args vertex count mismatch for streamKey";
+      }
+      return;
+    }
+
+    CHECK(m_backend.ddpDeviceArgsBuffer() != vk::Buffer{}) << context << ": device args buffer missing";
+    if (indexed) {
+      struct Cmd
+      {
+        uint32_t indexCount, instanceCount, firstIndex;
+        int32_t vertexOffset;
+        uint32_t firstInstance;
+      } drawCmd{drawSpec.indexCount,
+                drawSpec.instanceCount,
+                drawSpec.firstIndex,
+                drawSpec.vertexOffset,
+                drawSpec.firstInstance};
+      const vk::DeviceSize off = m_backend.ddpAllocDeviceArgsSlot(sizeof(Cmd));
+      auto slice = m_backend.suballocateUpload(sizeof(Cmd), alignof(Cmd));
+      CHECK(slice.buffer && slice.mapped) << context << ": failed to allocate thin indexed args upload slice";
+      std::memcpy(slice.mapped, &drawCmd, sizeof(Cmd));
+      m_backend.scheduleStaticCopyIndirect(m_backend.ddpDeviceArgsBuffer(), off, slice);
+      ddp.thinOffset = off;
+      ddp.thinIndexed = true;
+      ddp.thinIndexCount = drawSpec.indexCount;
+    } else {
+      struct Cmd
+      {
+        uint32_t vertexCount, instanceCount, firstVertex, firstInstance;
+      } drawCmd{drawSpec.vertexCount, drawSpec.instanceCount, drawSpec.firstVertex, drawSpec.firstInstance};
+      const vk::DeviceSize off = m_backend.ddpAllocDeviceArgsSlot(sizeof(Cmd));
+      auto slice = m_backend.suballocateUpload(sizeof(Cmd), alignof(Cmd));
+      CHECK(slice.buffer && slice.mapped) << context << ": failed to allocate thin args upload slice";
+      std::memcpy(slice.mapped, &drawCmd, sizeof(Cmd));
+      m_backend.scheduleStaticCopyIndirect(m_backend.ddpDeviceArgsBuffer(), off, slice);
+      ddp.thinOffset = off;
+      ddp.thinIndexed = false;
+      ddp.thinVertexCount = drawSpec.vertexCount;
+    }
+    ddp.thinPrepared = true;
+  };
+
   if (m_backend.ddpIndirectCountEnabled() && shaderHook == Z3DRendererBase::ShaderHookType::DualDepthPeelingInit) {
     // Prepare device-local indirect args during init; copies are flushed after
     // the init pass ends. Peel passes reference the prepared offset.
     CHECK(payload.streamKey != 0) << "Line DDP init: missing streamKey";
     auto& ddp = m_ddpArgsByStream[DDPStreamKey{payload.streamKey, payload.streamSegmentOrdinal}];
     const bool indexed = (drawSpec.indexCount > 0);
-    if (ddp.thinPrepared) {
-      CHECK(ddp.thinIndexed == indexed) << "Line DDP init: thin args indexed mismatch for streamKey";
-      if (indexed) {
-        CHECK(ddp.thinIndexCount == drawSpec.indexCount)
-          << "Line DDP init: thin args index count mismatch for streamKey";
-      } else {
-        CHECK(ddp.thinVertexCount == drawSpec.vertexCount)
-          << "Line DDP init: thin args vertex count mismatch for streamKey";
-      }
-    } else {
-      CHECK(static_cast<VkBuffer>(m_backend.ddpDeviceArgsBuffer()) != VK_NULL_HANDLE)
-        << "Line DDP init: device args buffer missing (fatal)";
-      if (indexed) {
-        struct Cmd
-        {
-          uint32_t indexCount, instanceCount, firstIndex;
-          int32_t vertexOffset;
-          uint32_t firstInstance;
-        } drawCmd{drawSpec.indexCount,
-                  drawSpec.instanceCount,
-                  drawSpec.firstIndex,
-                  drawSpec.vertexOffset,
-                  drawSpec.firstInstance};
-        const vk::DeviceSize off = m_backend.ddpAllocDeviceArgsSlot(sizeof(Cmd));
-        auto slice = m_backend.suballocateUpload(sizeof(Cmd), alignof(Cmd));
-        if (slice.buffer && slice.mapped) {
-          std::memcpy(slice.mapped, &drawCmd, sizeof(Cmd));
-        }
-        m_backend.scheduleStaticCopyIndirect(m_backend.ddpDeviceArgsBuffer(), off, slice);
-        ddp.thinOffset = off;
-        ddp.thinIndexed = true;
-        ddp.thinIndexCount = drawSpec.indexCount;
-      } else {
-        struct Cmd
-        {
-          uint32_t vertexCount, instanceCount, firstVertex, firstInstance;
-        } drawCmd{drawSpec.vertexCount, drawSpec.instanceCount, drawSpec.firstVertex, drawSpec.firstInstance};
-        const vk::DeviceSize off = m_backend.ddpAllocDeviceArgsSlot(sizeof(Cmd));
-        auto slice = m_backend.suballocateUpload(sizeof(Cmd), alignof(Cmd));
-        if (slice.buffer && slice.mapped) {
-          std::memcpy(slice.mapped, &drawCmd, sizeof(Cmd));
-        }
-        m_backend.scheduleStaticCopyIndirect(m_backend.ddpDeviceArgsBuffer(), off, slice);
-        ddp.thinOffset = off;
-        ddp.thinIndexed = false;
-        ddp.thinVertexCount = drawSpec.vertexCount;
-      }
-      ddp.thinPrepared = true;
-    }
+    prepareThinDdpArgs(ddp, indexed, "Line DDP init");
   }
 
   void* frameKey = m_backend.activeFrameKey();
@@ -2443,12 +2501,16 @@ void ZVulkanLinePipelineContext::record(Z3DRendererBase& renderer,
   ZVulkanPipelineCommandRecorder recorder(cmd);
   if (m_backend.ddpIndirectCountEnabled() && shaderHook == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel) {
     const bool indexed = (drawSpec.indexCount > 0);
+    CHECK(payload.streamKey != 0) << "Line DDP peel: missing streamKey";
+    auto& ddp = m_ddpArgsByStream[DDPStreamKey{payload.streamKey, payload.streamSegmentOrdinal}];
+    if (!ddp.thinPrepared) {
+      prepareThinDdpArgs(ddp, indexed, "Line DDP peel");
+      recorder.recordGraphicsDraw(drawSpec);
+      return;
+    }
     recorder.recordGraphicsDraw(drawSpec, [&](vk::raii::CommandBuffer& c) {
       const vk::Buffer argsBuf = m_backend.ddpDeviceArgsBuffer();
       const vk::Buffer cntBuf = m_backend.ddpIndirectCountBuffer();
-      auto it = m_ddpArgsByStream.find(DDPStreamKey{payload.streamKey, payload.streamSegmentOrdinal});
-      CHECK(it != m_ddpArgsByStream.end()) << "Line DDP peel: args not prepared in init";
-      const DDPArgs& ddp = it->second;
       CHECK(ddp.thinPrepared) << "Line DDP peel: thin args not prepared in init";
       CHECK(ddp.thinIndexed == indexed) << "Line DDP peel: thin args indexed mismatch for streamKey";
       if (indexed) {

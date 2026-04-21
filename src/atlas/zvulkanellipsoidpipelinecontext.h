@@ -128,9 +128,36 @@ private:
   vk::DeviceSize m_dynFrameTransformsOffset{0};
   vk::DeviceSize m_dynObjectTransformsOffset{0};
   vk::DeviceSize m_dynMaterialOffset{0};
-  // Device-local indirect args for DDP
-  bool m_ddpArgsPrepared{false};
-  vk::DeviceSize m_ddpArgsOffset{0};
+  // Device-local indirect args prepared per stream during DDP init. The draw
+  // args arena is reset per submission, so resetFrame() clears this map.
+  struct DDPArgs
+  {
+    bool prepared = false;
+    bool indexed = false;
+    vk::DeviceSize offset = 0;
+    uint32_t vertexCount = 0;
+    uint32_t indexCount = 0;
+  };
+  struct DDPStreamKey
+  {
+    uint64_t streamKey = 0;
+    uint32_t streamSegmentOrdinal = 0;
+
+    bool operator==(const DDPStreamKey& rhs) const
+    {
+      return streamKey == rhs.streamKey && streamSegmentOrdinal == rhs.streamSegmentOrdinal;
+    }
+  };
+  struct DDPStreamKeyHash
+  {
+    size_t operator()(const DDPStreamKey& key) const noexcept
+    {
+      size_t h = std::hash<uint64_t>{}(key.streamKey);
+      h ^= std::hash<uint32_t>{}(key.streamSegmentOrdinal) + 0x9e3779b97f4a7c15ull + (h << 6) + (h >> 2);
+      return h;
+    }
+  };
+  std::unordered_map<DDPStreamKey, DDPArgs, DDPStreamKeyHash> m_ddpArgsByStream;
 
   // Cache per-stream dynamic UBO offsets in the persistent uniform arena so
   // Vulkan command buffers can be reused across frames (steady-state).
@@ -141,6 +168,7 @@ private:
     ClipPlanesState clipPlanes{};
     vk::DeviceSize objectTransformsOffset = 0;
     vk::DeviceSize materialOffset = 0;
+    uint32_t lastSubmissionId = 0;
   };
   struct FrameUboCache
   {
