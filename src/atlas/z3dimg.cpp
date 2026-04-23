@@ -1907,6 +1907,19 @@ void Z3DImg::setVulkanImageBlockUploader(ZVulkanImageBlockUploader* uploader)
   }
 }
 
+void Z3DImg::invalidateVulkanPagedImageCache(size_t c)
+{
+  CHECK(m_isVolumeDownsampled) << "Vulkan paged image-cache invalidation requires paged image state";
+  CHECK_LT(c, m_nChannels) << "Vulkan paged image-cache invalidation channel out of range";
+
+  resetCacheSystem(c);
+  if (m_vulkanImageBlockUploader) {
+    m_vulkanImageBlockUploader->invalidatePageCaches(*this, c);
+  }
+
+  VLOG(1) << "Invalidated Vulkan paged image-cache mappings for channel " << c;
+}
+
 void Z3DImg::clearPendingPagingWarnings()
 {
   m_pendingPagingWarnings.clear();

@@ -82,7 +82,7 @@ ZVulkanPagedImageBlockUploader::ZVulkanPagedImageBlockUploader(ZVulkanDevice& de
     .owner = this,
     .label = "paged_image_metadata",
     .collectCandidates =
-      [this]() {
+      [this](const ZVulkanResidencyManager::ReclaimRequest&) {
         return metadataEvictionCandidates();
       },
     .evictCandidate =
@@ -141,6 +141,23 @@ void ZVulkanPagedImageBlockUploader::ensureImageResources(Z3DImg& image)
   }
 }
 
+void ZVulkanPagedImageBlockUploader::invalidatePageCaches(Z3DImg& image, size_t channel)
+{
+  std::scoped_lock lock(m_mutex);
+  auto imageIt = m_resources.find(&image);
+  if (imageIt == m_resources.end()) {
+    return;
+  }
+
+  CHECK_LT(channel, imageIt->second.channels.size()) << "Paged-image cache invalidation channel out of range";
+  auto& resources = imageIt->second.channels[channel];
+  CHECK_EQ(resources.pageDirectoryPinCount, 0u) << "Cannot invalidate pinned Vulkan page directory metadata";
+  CHECK_EQ(resources.pageTableCachePinCount, 0u) << "Cannot invalidate pinned Vulkan page-table metadata";
+
+  resources.pageDirectoryUploaded = false;
+  resources.pageTableCacheUploaded = false;
+}
+
 size_t ZVulkanPagedImageBlockUploader::readAndUploadImageBlocks(
   Z3DImg& image,
   size_t channel,
@@ -159,7 +176,7 @@ size_t ZVulkanPagedImageBlockUploader::readAndUploadImageBlocks(
   CHECK(channel <= static_cast<size_t>(std::numeric_limits<uint32_t>::max())) << "Channel index too large";
   const auto cacheSize = image.imageCacheSize();
   ZVulkanTexture* imageCacheTexture =
-    m_device.residencyManager().pagedImageCacheTexture(&image, static_cast<uint32_t>(channel), cacheSize);
+    m_device.residencyManager().pagedImageCacheTexture(image, static_cast<uint32_t>(channel), cacheSize);
 
   CHECK(imageCacheTexture) << "Vulkan image cache texture missing for channel " << channel;
 
@@ -171,11 +188,46 @@ size_t ZVulkanPagedImageBlockUploader::readAndUploadImageBlocks(
   const size_t bytesPerBlock = image.imageBlockByteSize();
   const ZImgInfo resInfo(extent.x, extent.y, extent.z, 1);
 
+  size_t restoredFromHostShadow = 0;
+  std::vector<std::tuple<glm::uvec4, glm::uvec4*>> sourcePendingTasks;
+  sourcePendingTasks.reserve(pendingTasks.size());
+  std::vector<uint8_t> hostBlockData;
+  for (const auto& task : pendingTasks) {
+    const auto& [pageTableEntryKey, pageTableEntryPtr] = task;
+    if (!m_device.residencyManager().copyPagedImageCacheBlockShadow(image,
+                                                                    static_cast<uint32_t>(channel),
+                                                                    pageTableEntryKey,
+                                                                    extent,
+                                                                    hostBlockData)) {
+      sourcePendingTasks.push_back(task);
+      continue;
+    }
+
+    image.mapImageBlockToCache(channel, pageTableEntryKey, *pageTableEntryPtr);
+    const glm::uvec3 cacheOffset(pageTableEntryPtr->x, pageTableEntryPtr->y, pageTableEntryPtr->z);
+    ZVulkanTexture::UploadRegion uploadRegion{};
+    uploadRegion.offset = vk::Offset3D{static_cast<int32_t>(cacheOffset.x),
+                                       static_cast<int32_t>(cacheOffset.y),
+                                       static_cast<int32_t>(cacheOffset.z)};
+    uploadRegion.extent = vk::Extent3D{extent.x, extent.y, extent.z};
+    uploadRegion.finalLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
+    imageCacheTexture->uploadSubImage(hostBlockData.data(), hostBlockData.size(), uploadRegion);
+    ++restoredFromHostShadow;
+  }
+  if (restoredFromHostShadow > 0u) {
+    VLOG(1) << "Restored " << restoredFromHostShadow << " Vulkan paged image blocks from host shadow for channel "
+            << channel;
+  }
+  if (sourcePendingTasks.empty()) {
+    timer.recordEvent("image blocks uploading");
+    return 0;
+  }
+
   folly::UMPSCQueue<std::tuple<size_t, std::shared_ptr<ZImg>, std::optional<std::string>>, true> imgQueue;
   auto readFuture =
     folly::coro::toFuture(folly::coro::co_withCancellation(
                             cancellationToken,
-                            image.readImageBlocksToQueueAsync(channel, pendingTasks, resInfo, imgQueue, timer)),
+                            image.readImageBlocksToQueueAsync(channel, sourcePendingTasks, resInfo, imgQueue, timer)),
                           cpuExecutor);
   // The reader coroutine captures references to imgQueue/pendingTasks/timer. If we return early (e.g. cancellation),
   // we must wait for it to finish so background tasks don't enqueue into a destroyed queue, corrupting memory.
@@ -197,10 +249,9 @@ size_t ZVulkanPagedImageBlockUploader::readAndUploadImageBlocks(
   });
 
   size_t emptyBlockCount = 0;
-  int remainingBlocks = static_cast<int>(pendingTasks.size());
+  int remainingBlocks = static_cast<int>(sourcePendingTasks.size());
   std::tuple<size_t, std::shared_ptr<ZImg>, std::optional<std::string>> elem;
   auto lastLog = std::chrono::steady_clock::now();
-  bool markedDirty = false;
 
   while (remainingBlocks > 0) {
     maybeCancel(cancellationToken);
@@ -209,7 +260,7 @@ size_t ZVulkanPagedImageBlockUploader::readAndUploadImageBlocks(
           elem,
           std::chrono::steady_clock::now() + std::chrono::milliseconds(FLAGS_atlas_3d_paging_queue_poll_interval_ms))) {
       const auto taskIndex = std::get<0>(elem);
-      const auto& [pageTableEntryKey, pageTableEntryPtr] = pendingTasks[taskIndex];
+      const auto& [pageTableEntryKey, pageTableEntryPtr] = sourcePendingTasks[taskIndex];
 
       if (std::get<2>(elem).has_value()) {
         image.recordPagingFailure(pageTableEntryKey, *std::get<2>(elem));
@@ -229,11 +280,14 @@ size_t ZVulkanPagedImageBlockUploader::readAndUploadImageBlocks(
         uploadRegion.extent = vk::Extent3D{extent.x, extent.y, extent.z};
         uploadRegion.finalLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
 
-        if (!markedDirty) {
-          m_device.residencyManager().notifyPagedImageCacheWritten(&image, static_cast<uint32_t>(channel));
-          markedDirty = true;
-        }
-        imageCacheTexture->uploadSubImage(std::get<1>(elem)->channelData(0), bytesPerBlock, uploadRegion);
+        const void* blockData = std::get<1>(elem)->channelData(0);
+        imageCacheTexture->uploadSubImage(blockData, bytesPerBlock, uploadRegion);
+        m_device.residencyManager().recordPagedImageCacheBlockUpload(image,
+                                                                     static_cast<uint32_t>(channel),
+                                                                     pageTableEntryKey,
+                                                                     extent,
+                                                                     blockData,
+                                                                     bytesPerBlock);
       }
 
       --remainingBlocks;
@@ -391,7 +445,7 @@ ZVulkanTexture* ZVulkanPagedImageBlockUploader::imageCacheTexture(Z3DImg& image,
   CHECK(channel <= static_cast<size_t>(std::numeric_limits<uint32_t>::max())) << "Channel index too large";
   const glm::uvec3 cacheSize = image.imageCacheSize();
   ZVulkanTexture* tex =
-    m_device.residencyManager().pagedImageCacheTexture(&image, static_cast<uint32_t>(channel), cacheSize);
+    m_device.residencyManager().pagedImageCacheTexture(image, static_cast<uint32_t>(channel), cacheSize);
   if (auto* backend = Z3DRendererVulkanBackend::current()) {
     backend->pinTextureForActiveSubmission(tex);
   }

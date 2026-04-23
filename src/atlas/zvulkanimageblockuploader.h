@@ -24,6 +24,8 @@ public:
 
   void bindToImage(Z3DImg& image);
 
+  virtual void invalidatePageCaches(Z3DImg& image, size_t channel) = 0;
+
   virtual size_t readAndUploadImageBlocks(Z3DImg& image,
                                           size_t channel,
                                           const std::vector<std::tuple<glm::uvec4, glm::uvec4*>>& pendingTasks,

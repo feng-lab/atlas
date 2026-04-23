@@ -1593,11 +1593,8 @@ void ZVulkanTexture::uploadInternal(const void* data, size_t size, const UploadR
     }
   }
 
-  auto stagingBuffer =
-    m_device.createBuffer(size,
-                          vk::BufferUsageFlagBits::eTransferSrc,
-                          vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
-  stagingBuffer->copyData(data, size);
+  auto& stagingBuffer = m_device.immediateUploadStagingBuffer(size);
+  stagingBuffer.copyData(data, size);
 
   CHECK(region.finalLayout != vk::ImageLayout::eUndefined) << "UploadRegion finalLayout must be specified";
   const vk::ImageLayout finalLayout = region.finalLayout;
@@ -1617,7 +1614,7 @@ void ZVulkanTexture::uploadInternal(const void* data, size_t size, const UploadR
       copyRegion.imageOffset = region.offset;
       copyRegion.imageExtent = region.extent;
 
-      cmdBuffer.copyBufferToImage(stagingBuffer->buffer(), m_image, vk::ImageLayout::eTransferDstOptimal, copyRegion);
+      cmdBuffer.copyBufferToImage(stagingBuffer.buffer(), m_image, vk::ImageLayout::eTransferDstOptimal, copyRegion);
 
       transitionLayout(cmdBuffer, vk::ImageLayout::eTransferDstOptimal, finalLayout, m_aspectMask);
     },

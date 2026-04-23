@@ -25,6 +25,8 @@ public:
 
   void ensureImageResources(Z3DImg& image) override;
 
+  void invalidatePageCaches(Z3DImg& image, size_t channel) override;
+
   size_t readAndUploadImageBlocks(Z3DImg& image,
                                   size_t channel,
                                   const std::vector<std::tuple<glm::uvec4, glm::uvec4*>>& pendingTasks,

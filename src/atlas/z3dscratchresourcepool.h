@@ -435,7 +435,8 @@ public:
   reclaimColdVulkanScratchBacking(std::span<ZVulkanTexture* const> protectedTextures,
                                   std::string_view reason = {},
                                   uint64_t targetBytes = 0);
-  [[nodiscard]] std::vector<VulkanScratchBackingCandidate> vulkanScratchBackingCandidates() const;
+  [[nodiscard]] std::vector<VulkanScratchBackingCandidate>
+  vulkanScratchBackingCandidates(bool includeLeasedScratchBacking) const;
   [[nodiscard]] VulkanScratchBackingReclaimStats
   reclaimVulkanScratchBackingCandidate(ScratchImageUsage usage, size_t slotIndex, std::string_view reason = {});
   [[nodiscard]] VulkanScratchProtectionScope protectVulkanScratchTextures(std::span<ZVulkanTexture* const> textures);

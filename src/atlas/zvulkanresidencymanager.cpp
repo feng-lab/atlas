@@ -12,6 +12,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cstring>
 #include <cmath>
 #include <limits>
 #include <map>
@@ -422,7 +423,21 @@ void ZVulkanResidencyManager::resetRecordForSizeLocked(ManagedTexture& record, g
   record.knownZero = true;
   record.hostValid = false;
   record.lastUsedTick = 0;
-  record.hostData.clear();
+  record.hostBlocks.clear();
+}
+
+size_t ZVulkanResidencyManager::ManagedTexture::PagedBlockKeyHash::operator()(const PagedBlockKey& key) const noexcept
+{
+  uint64_t h = 1469598103934665603ull;
+  auto mix = [&h](uint32_t v) {
+    h ^= static_cast<uint64_t>(v);
+    h *= 1099511628211ull;
+  };
+  mix(key.x);
+  mix(key.y);
+  mix(key.z);
+  mix(key.level);
+  return static_cast<size_t>(h);
 }
 
 uint64_t ZVulkanResidencyManager::effectiveResidencyBudgetBytesLocked() const
@@ -552,14 +567,12 @@ void ZVulkanResidencyManager::reclaimBeforeManagedTextureAllocation(ResourceClas
   }
 }
 
-ZVulkanTexture*
-ZVulkanResidencyManager::pagedImageCacheTexture(const void* owner, uint32_t channel, glm::uvec3 cacheSize)
+ZVulkanTexture* ZVulkanResidencyManager::pagedImageCacheTexture(Z3DImg& owner, uint32_t channel, glm::uvec3 cacheSize)
 {
-  CHECK(owner != nullptr) << "pagedImageCacheTexture called with null owner";
   CHECK(cacheSize.x > 0u && cacheSize.y > 0u && cacheSize.z > 0u) << "Invalid Vulkan imageCacheSize";
 
   TextureKey key{};
-  key.owner = owner;
+  key.owner = &owner;
   key.kind = TextureKind::PagedImageCacheR8;
   key.index = channel;
 
@@ -567,6 +580,7 @@ ZVulkanResidencyManager::pagedImageCacheTexture(const void* owner, uint32_t chan
   const uint64_t neededBytes = static_cast<uint64_t>(cacheSize.x) * cacheSize.y * std::max<uint32_t>(1u, cacheSize.z);
   {
     std::scoped_lock lock(m_mutex);
+    registerImageOwnerDestructionCallbackLocked(owner);
     auto& record = ensureRecordLocked(key);
     resetRecordForSizeLocked(record, cacheSize);
     needsAllocation = !record.texture || !record.texture->resident();
@@ -579,6 +593,7 @@ ZVulkanResidencyManager::pagedImageCacheTexture(const void* owner, uint32_t chan
   }
 
   std::scoped_lock lock(m_mutex);
+  registerImageOwnerDestructionCallbackLocked(owner);
   auto& record = ensureRecordLocked(key);
   resetRecordForSizeLocked(record, cacheSize);
   ensurePagedImageCacheResidentLocked(key, record, cacheSize);
@@ -659,26 +674,81 @@ ZVulkanTexture* ZVulkanResidencyManager::denseImage2DTexture(Z3DImg& owner,
   return record.texture.get();
 }
 
-void ZVulkanResidencyManager::notifyPagedImageCacheWritten(const void* owner, uint32_t channel)
+void ZVulkanResidencyManager::recordPagedImageCacheBlockUpload(Z3DImg& owner,
+                                                               uint32_t channel,
+                                                               const glm::uvec4& pageTableEntryKey,
+                                                               glm::uvec3 extent,
+                                                               const void* data,
+                                                               size_t size)
 {
-  CHECK(owner != nullptr) << "notifyPagedImageCacheWritten called with null owner";
+  CHECK(data != nullptr) << "Paged image-cache host-shadow upload requires source data";
+  CHECK(extent.x > 0u && extent.y > 0u && extent.z > 0u)
+    << "Paged image-cache host-shadow upload requires a non-empty extent";
+  const uint64_t blockBytes = static_cast<uint64_t>(extent.x) * extent.y * extent.z;
+  CHECK_EQ(static_cast<uint64_t>(size), blockBytes) << "Paged image-cache block byte count must match R8 extent";
+
   TextureKey key{};
-  key.owner = owner;
+  key.owner = &owner;
+  key.kind = TextureKind::PagedImageCacheR8;
+  key.index = channel;
+
+  std::scoped_lock lock(m_mutex);
+  auto it = m_textures.find(key);
+  CHECK(it != m_textures.end()) << "recordPagedImageCacheBlockUpload called for unknown texture";
+  ManagedTexture& record = it->second;
+  CHECK(record.logicalSize.x > 0u && record.logicalSize.y > 0u && record.logicalSize.z > 0u)
+    << "Paged image-cache host-shadow upload has no logical cache size";
+  ManagedTexture::PagedBlockKey blockKey{pageTableEntryKey.x,
+                                         pageTableEntryKey.y,
+                                         pageTableEntryKey.z,
+                                         pageTableEntryKey.w};
+  auto& shadow = record.hostBlocks[blockKey];
+  shadow.extent = extent;
+  shadow.data.resize(size);
+  std::memcpy(shadow.data.data(), data, size);
+
+  record.hostValid = true;
+  record.dirty = false;
+  record.knownZero = false;
+  record.lastUsedTick = m_usageTick++;
+}
+
+bool ZVulkanResidencyManager::copyPagedImageCacheBlockShadow(Z3DImg& owner,
+                                                             uint32_t channel,
+                                                             const glm::uvec4& pageTableEntryKey,
+                                                             glm::uvec3 extent,
+                                                             std::vector<uint8_t>& out)
+{
+  TextureKey key{};
+  key.owner = &owner;
   key.kind = TextureKind::PagedImageCacheR8;
   key.index = channel;
 
   std::scoped_lock lock(m_mutex);
   auto it = m_textures.find(key);
   if (it == m_textures.end()) {
-    // Be strict: writes should only occur to managed caches.
-    CHECK(false) << "notifyPagedImageCacheWritten called for unknown texture (owner/channel not managed)";
-    return;
+    return false;
   }
-  auto& record = it->second;
-  record.dirty = true;
-  record.knownZero = false;
-  record.hostValid = false;
+
+  ManagedTexture& record = it->second;
+  ManagedTexture::PagedBlockKey blockKey{pageTableEntryKey.x,
+                                         pageTableEntryKey.y,
+                                         pageTableEntryKey.z,
+                                         pageTableEntryKey.w};
+  auto blockIt = record.hostBlocks.find(blockKey);
+  if (blockIt == record.hostBlocks.end()) {
+    return false;
+  }
+
+  const ManagedTexture::HostBlockShadow& shadow = blockIt->second;
+  CHECK(glm::all(glm::equal(shadow.extent, extent))) << "Paged image-cache host shadow extent mismatch";
+  const uint64_t blockBytes = static_cast<uint64_t>(extent.x) * extent.y * extent.z;
+  CHECK_EQ(static_cast<uint64_t>(shadow.data.size()), blockBytes)
+    << "Paged image-cache host shadow byte count does not match extent";
+
+  out = shadow.data;
   record.lastUsedTick = m_usageTick++;
+  return true;
 }
 
 bool ZVulkanResidencyManager::pinIfManaged(ZVulkanTexture* texture)
@@ -982,7 +1052,7 @@ ZVulkanResidencyManager::ReclaimStats ZVulkanResidencyManager::reclaimMemory(con
         if (provider.resourceClass != resourceClass || !provider.collectCandidates || !provider.evictCandidate) {
           continue;
         }
-        for (auto candidate : provider.collectCandidates()) {
+        for (auto candidate : provider.collectCandidates(request)) {
           if (candidate.resourceClass == ResourceClass::PersistentCompositorTarget) {
             candidate.resourceClass = provider.resourceClass;
           }
@@ -1496,36 +1566,33 @@ void ZVulkanResidencyManager::evictLocked(ManagedTexture& victim)
   CHECK(victim.key.kind == TextureKind::PagedImageCacheR8)
     << "Unknown managed Vulkan texture kind during eviction: " << textureKindName(victim.key.kind);
 
-  // Preserve contents in host memory when needed.
-  const bool needsHostBackup = victim.dirty;
-  const bool canSkipBackup = victim.knownZero && !victim.dirty;
+  const uint64_t bytes = pagedImageCacheByteSizeFor(*victim.texture);
+  CHECK(bytes > 0) << "Invalid cache byte size for eviction";
 
-  if (canSkipBackup) {
-    // Known-zero contents: no host backup required.
-    victim.hostData.clear();
-    victim.hostValid = false;
-    victim.dirty = false;
-    victim.knownZero = true;
-  } else if (!needsHostBackup && victim.hostValid && !victim.hostData.empty()) {
-    // Host backup is already valid; keep it.
-    victim.dirty = false;
-    victim.knownZero = false;
-  } else {
-    const uint64_t bytes = pagedImageCacheByteSizeFor(*victim.texture);
-    CHECK(bytes > 0) << "Invalid cache byte size for eviction";
-    CHECK(bytes <= static_cast<uint64_t>(std::numeric_limits<size_t>::max())) << "Cache too large for host backup";
-    victim.hostData.resize(static_cast<size_t>(bytes));
-    VLOG(1) << fmt::format("VK evict paged imageCache: owner={} idx={} bytes={} dirty={} hostValid={} tick={}",
+  if (victim.knownZero) {
+    VLOG(1) << fmt::format("VK evict paged imageCache zero: owner={} idx={} bytes={} dirty={} hostValid={} tick={}",
                            victim.key.owner,
                            victim.key.index,
                            bytes,
                            victim.dirty ? 1 : 0,
                            victim.hostValid ? 1 : 0,
                            victim.lastUsedTick);
-    victim.texture->downloadData(victim.hostData.data(), victim.hostData.size());
-    victim.hostValid = true;
     victim.dirty = false;
-    victim.knownZero = false;
+  } else {
+    auto* owner = const_cast<Z3DImg*>(static_cast<const Z3DImg*>(victim.key.owner));
+    CHECK(owner != nullptr) << "Paged image-cache eviction requires a Z3DImg owner";
+    CHECK(victim.hostValid && !victim.hostBlocks.empty())
+      << "Paged image-cache eviction requires a valid host shadow for non-zero contents";
+    VLOG(1) << fmt::format(
+      "VK evict paged imageCache host-shadow: owner={} idx={} bytes={} dirty={} hostBlocks={} tick={}",
+      victim.key.owner,
+      victim.key.index,
+      bytes,
+      victim.dirty ? 1 : 0,
+      victim.hostBlocks.size(),
+      victim.lastUsedTick);
+    owner->invalidateVulkanPagedImageCache(victim.key.index);
+    victim.dirty = false;
   }
 
   victim.texture->releaseDeviceResources();
@@ -1585,18 +1652,11 @@ void ZVulkanResidencyManager::ensurePagedImageCacheResidentLocked(const TextureK
                                                   "paged_image_cache_create_postallocate");
         m_reverse.emplace(record.texture.get(), key);
 
-        // Initialize contents deterministically (either restore from host or clear).
-        if (record.hostValid && !record.hostData.empty()) {
-          record.texture->uploadData(record.hostData.data(),
-                                     record.hostData.size(),
-                                     vk::ImageLayout::eShaderReadOnlyOptimal);
-          record.knownZero = false;
-        } else {
-          clearPagedImageCacheToZero(m_device, *record.texture);
-          record.knownZero = true;
-        }
+        // Initialize deterministically. Eviction clears page mappings, then
+        // demanded blocks are restored from the sparse host shadow or reread.
+        clearPagedImageCacheToZero(m_device, *record.texture);
+        record.knownZero = true;
         record.dirty = false;
-        record.hostValid = record.hostValid && !record.hostData.empty();
         return;
       }
       catch (const std::exception& e) {
@@ -1625,15 +1685,8 @@ void ZVulkanResidencyManager::ensurePagedImageCacheResidentLocked(const TextureK
       enforceBudgetAfterManagedAllocationLocked(ResourceClass::PagedImageCacheR8,
                                                 neededBytes,
                                                 "paged_image_cache_recreate_postallocate");
-      if (record.hostValid && !record.hostData.empty()) {
-        record.texture->uploadData(record.hostData.data(),
-                                   record.hostData.size(),
-                                   vk::ImageLayout::eShaderReadOnlyOptimal);
-        record.knownZero = false;
-      } else {
-        clearPagedImageCacheToZero(m_device, *record.texture);
-        record.knownZero = true;
-      }
+      clearPagedImageCacheToZero(m_device, *record.texture);
+      record.knownZero = true;
       record.dirty = false;
       return;
     }

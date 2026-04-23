@@ -1833,7 +1833,7 @@ Z3DScratchResourcePool::reclaimFreeVulkanScratchBacking(std::string_view reason,
 }
 
 std::vector<Z3DScratchResourcePool::VulkanScratchBackingCandidate>
-Z3DScratchResourcePool::vulkanScratchBackingCandidates() const
+Z3DScratchResourcePool::vulkanScratchBackingCandidates(bool includeLeasedScratchBacking) const
 {
   std::vector<VulkanScratchBackingCandidate> candidates;
   const bool canHostBackLeasedScratch =
@@ -1848,6 +1848,9 @@ Z3DScratchResourcePool::vulkanScratchBackingCandidates() const
       }
       const uint64_t residentBytes = slot->image->estimatedResidentBytes();
       if (residentBytes == 0u) {
+        continue;
+      }
+      if (slot->inUse && !includeLeasedScratchBacking) {
         continue;
       }
 
@@ -2056,11 +2059,17 @@ Z3DScratchResourcePool::reclaimColdVulkanScratchBacking(std::span<ZVulkanTexture
     return false;
   };
 
+  const bool allowLeasedScratchHostBackup =
+    m_externalVkDevice != nullptr && m_externalVkDevice->frameExecutor().inFlightCount() == 0u;
+
   std::vector<EvictCandidate> candidates;
   for (size_t usageIndex = 0; usageIndex < m_vulkanSlots.size(); ++usageIndex) {
     auto& slots = m_vulkanSlots[usageIndex];
     for (auto& slot : slots) {
       if (!slot->image || slot->releasePending || slotIsProtected(*slot)) {
+        continue;
+      }
+      if (slot->inUse && !allowLeasedScratchHostBackup) {
         continue;
       }
       const uint64_t slotBytes = slot->image->estimatedResidentBytes();
@@ -2210,14 +2219,6 @@ void Z3DScratchResourcePool::prepareVulkanScratchTexturesForPass(std::span<const
       }
       pumpVulkanScratchReleases(VulkanScratchReclaimMode::WaitForIdle);
 
-      const auto coldScratchStats = reclaimColdVulkanScratchBacking(
-        std::span<ZVulkanTexture* const>(protectedTextures.data(), protectedTextures.size()),
-        reason,
-        targetBytes);
-      if (coldScratchStats.bytesReleased > 0u || coldScratchStats.slotsEvicted > 0u) {
-        continue;
-      }
-
       const auto stats = dev.residencyManager().reclaimMemory(
         ZVulkanResidencyManager::ReclaimRequest{.requestClass = ZVulkanResidencyManager::ResourceClass::ScratchBacking,
                                                 .requestedBytes = targetBytes,
@@ -2225,6 +2226,13 @@ void Z3DScratchResourcePool::prepareVulkanScratchTexturesForPass(std::span<const
                                                 .reason = reason});
 
       if (stats.resourcesReleased == 0u && stats.bytesReleased == 0u) {
+        const auto coldScratchStats = reclaimColdVulkanScratchBacking(
+          std::span<ZVulkanTexture* const>(protectedTextures.data(), protectedTextures.size()),
+          reason,
+          targetBytes);
+        if (coldScratchStats.bytesReleased > 0u || coldScratchStats.slotsEvicted > 0u) {
+          continue;
+        }
         return;
       }
     }

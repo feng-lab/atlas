@@ -445,6 +445,8 @@ ZVulkanDevice::~ZVulkanDevice()
   // so they must be released before the allocator/pools are torn down.
   m_residencyManager.reset();
   m_frameExecutor.reset();
+  m_immediateUploadStagingBuffer.reset();
+  m_immediateUploadStagingBufferSize = 0;
 
   if (m_uploadTransientPool != nullptr) {
     vmaDestroyPool(m_allocator, m_uploadTransientPool);
@@ -653,6 +655,21 @@ std::unique_ptr<ZVulkanBuffer> ZVulkanDevice::createBufferInPool(size_t size,
       throw;
     }
   }
+}
+
+ZVulkanBuffer& ZVulkanDevice::immediateUploadStagingBuffer(size_t size)
+{
+  CHECK(size > 0u) << "Immediate upload staging buffer requires a non-empty request";
+  if (m_immediateUploadStagingBuffer == nullptr || m_immediateUploadStagingBufferSize < size) {
+    m_immediateUploadStagingBuffer =
+      createBufferInPool(size,
+                         vk::BufferUsageFlagBits::eTransferSrc,
+                         vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent,
+                         m_uploadStagingPool);
+    m_immediateUploadStagingBufferSize = size;
+  }
+  CHECK(m_immediateUploadStagingBuffer != nullptr);
+  return *m_immediateUploadStagingBuffer;
 }
 
 uint32_t ZVulkanDevice::findMemoryTypeIndex(VkMemoryPropertyFlags requiredFlags,

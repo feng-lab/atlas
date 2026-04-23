@@ -5234,13 +5234,14 @@ void Z3DRendererVulkanBackend::installMemoryBrokerProviders()
                                                      .bytesReleased = stats.bytesReleased};
       },
     .collectCandidates =
-      []() {
+      [](const ZVulkanResidencyManager::ReclaimRequest& request) {
         std::vector<ZVulkanResidencyManager::EvictionCandidate> out;
         if (currentRenderThreadExecutorOrNull() == nullptr) {
           return out;
         }
         auto& pool = Z3DRenderGlobalState::instance().scratchPool();
-        const auto scratchCandidates = pool.vulkanScratchBackingCandidates();
+        const bool includeLeasedScratchBacking = request.force;
+        const auto scratchCandidates = pool.vulkanScratchBackingCandidates(includeLeasedScratchBacking);
         out.reserve(scratchCandidates.size());
         for (const auto& candidate : scratchCandidates) {
           out.push_back(ZVulkanResidencyManager::EvictionCandidate{
@@ -5300,7 +5301,7 @@ void Z3DRendererVulkanBackend::installMemoryBrokerProviders()
         return reclaimStaticGeometryForMemoryPressure(request.requestedBytes, request.reason);
       },
     .collectCandidates =
-      [this]() {
+      [this](const ZVulkanResidencyManager::ReclaimRequest&) {
         return staticGeometryEvictionCandidates();
       },
     .evictCandidate =

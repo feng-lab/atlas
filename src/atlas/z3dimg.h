@@ -255,6 +255,8 @@ public:
     insertImageBlockToCache(channel, pageTableEntryKey, pageTableEntryRef);
   }
 
+  void invalidateVulkanPagedImageCache(size_t c);
+
   template<typename QueueType>
   folly::coro::Task<void>
   readImageBlockToQueueAsync(size_t c,

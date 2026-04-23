@@ -132,7 +132,7 @@ public:
     const void* owner = nullptr;
     std::string label;
     std::function<ReclaimStats(const ReclaimRequest&)> reclaim;
-    std::function<std::vector<EvictionCandidate>()> collectCandidates;
+    std::function<std::vector<EvictionCandidate>(const ReclaimRequest&)> collectCandidates;
     std::function<ReclaimStats(const EvictionCandidate&, const ReclaimRequest&)> evictCandidate;
     std::function<ResourceReport()> report;
   };
@@ -166,11 +166,22 @@ public:
 
   // Ensure a paged image-cache texture (R8 3D) is resident and ready for sampling.
   // The returned pointer is owned by the manager.
-  [[nodiscard]] ZVulkanTexture* pagedImageCacheTexture(const void* owner, uint32_t channel, glm::uvec3 cacheSize);
+  [[nodiscard]] ZVulkanTexture* pagedImageCacheTexture(Z3DImg& owner, uint32_t channel, glm::uvec3 cacheSize);
 
-  // Notify the manager that the paged image-cache contents for (owner, channel)
-  // have been modified on GPU (host backup no longer matches).
-  void notifyPagedImageCacheWritten(const void* owner, uint32_t channel);
+  // Record an image-cache block upload in the CPU shadow used to restore paged
+  // cache backing after Vulkan memory-pressure eviction.
+  void recordPagedImageCacheBlockUpload(Z3DImg& owner,
+                                        uint32_t channel,
+                                        const glm::uvec4& pageTableEntryKey,
+                                        glm::uvec3 extent,
+                                        const void* data,
+                                        size_t size);
+
+  [[nodiscard]] bool copyPagedImageCacheBlockShadow(Z3DImg& owner,
+                                                    uint32_t channel,
+                                                    const glm::uvec4& pageTableEntryKey,
+                                                    glm::uvec3 extent,
+                                                    std::vector<uint8_t>& out);
 
   // Ensure a dense, host-backed R8 3D volume texture is resident. The returned
   // pointer is owned by the manager and remains stable across eviction/recreate
@@ -226,6 +237,30 @@ private:
 
   struct ManagedTexture
   {
+    struct PagedBlockKey
+    {
+      uint32_t x = 0;
+      uint32_t y = 0;
+      uint32_t z = 0;
+      uint32_t level = 0;
+
+      bool operator==(const PagedBlockKey& other) const
+      {
+        return x == other.x && y == other.y && z == other.z && level == other.level;
+      }
+    };
+
+    struct PagedBlockKeyHash
+    {
+      size_t operator()(const PagedBlockKey& key) const noexcept;
+    };
+
+    struct HostBlockShadow
+    {
+      glm::uvec3 extent{0u};
+      std::vector<uint8_t> data;
+    };
+
     TextureKey key{};
     glm::uvec3 logicalSize{0u};
     std::unique_ptr<ZVulkanTexture> texture;
@@ -237,7 +272,7 @@ private:
     bool hostValid = false;
     uint64_t lastUsedTick = 0;
     uint32_t pinCount = 0;
-    std::vector<uint8_t> hostData;
+    std::unordered_map<PagedBlockKey, HostBlockShadow, PagedBlockKeyHash> hostBlocks;
   };
 
   struct ResourceProviderRecord

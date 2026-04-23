@@ -1544,7 +1544,7 @@ Use **Help → Shortcuts** in either the 2D or 3D window to open this section di
 | `--output_image_name_prefix`, `--output_image_name_field_width` | Control image sequence naming. |
 | `--output_tile_size`, `--output_tile_border` | Enable tiled rendering for high-resolution outputs. Scene export uses its built-in still-image defaults unless either flag is provided explicitly. |
 | `--limit_memory_usage_in_gb_to` | Cap GPU memory usage (GB). |
-| `--atlas_vk_residency_budget_bytes` | Strict byte cap for Atlas-owned Vulkan device-local residency. When set, Atlas keeps each existing Vulkan pass hot set within the cap by making needed resources resident and evicting cold backing at safe points; if one required pass working set exceeds the cap, export fails with a memory diagnostic instead of allocating past the cap. |
+| `--atlas_vk_residency_budget_bytes` | Strict byte cap for Atlas-owned Vulkan device-local residency. When set, Atlas keeps each existing Vulkan pass hot set within the cap by making needed resources resident and evicting cold backing at safe points; paged image caches are sized from the effective Vulkan budget rather than uncapped physical VRAM. If one required pass working set exceeds the cap, export fails with a memory diagnostic instead of allocating past the cap. |
 | `--use_gpu_devices` | Specify GPU indices (Linux). |
 | `--__use_EGL` | Force EGL context creation (Linux headless). |
 | `--v=LEVEL` | Adjust log verbosity; `--v=1` prints additional diagnostics. |

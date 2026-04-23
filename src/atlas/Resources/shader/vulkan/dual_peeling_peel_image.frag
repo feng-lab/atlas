@@ -5,7 +5,7 @@ layout(location = 0) out vec4 FragData0; // depth blender
 layout(location = 1) out vec4 FragData1; // front blender
 layout(location = 2) out vec4 FragData2; // back temp
 
-// DDP indirect-count: mark when this pass updates any pixel
+// DDP indirect-count: match GL's occlusion query on the back-temp blend pass.
 layout(set = 3, binding = 1) buffer DDPFlag { uint changed; } ddp_flag;
 
 #define ATLAS_PPLL 1
@@ -41,7 +41,6 @@ void main()
   }
   if (fragDepth > nearestDepth && fragDepth < farthestDepth) {
     FragData0.xy = vec2(-fragDepth, fragDepth);
-    atomicOr(ddp_flag.changed, 1u);
     return;
   }
 
@@ -50,6 +49,8 @@ void main()
     FragData1 = forwardTemp + (1.0 - forwardTemp.a) * color;
   } else {
     FragData2 += color;
+    if (color.a != 0.0) {
+      atomicOr(ddp_flag.changed, 1u);
+    }
   }
-  atomicOr(ddp_flag.changed, 1u);
 }

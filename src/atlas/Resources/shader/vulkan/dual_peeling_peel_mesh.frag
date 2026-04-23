@@ -37,7 +37,6 @@ void main()
   }
   if (fragDepth > nearestDepth && fragDepth < farthestDepth) {
     FragData0.xy = vec2(-fragDepth, fragDepth);
-    atomicOr(ddp_flag.changed, 1u);
     return;
   }
 
@@ -46,6 +45,8 @@ void main()
     FragData1 = forwardTemp + (1.0 - forwardTemp.a) * color;
   } else {
     FragData2 += color;
+    if (color.a != 0.0) {
+      atomicOr(ddp_flag.changed, 1u);
+    }
   }
-  atomicOr(ddp_flag.changed, 1u);
 }

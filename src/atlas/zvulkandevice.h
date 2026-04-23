@@ -122,6 +122,12 @@ public:
   std::unique_ptr<class ZVulkanBuffer>
   createBufferInPool(size_t size, vk::BufferUsageFlags usage, vk::MemoryPropertyFlags properties, VmaPool poolOverride);
 
+  // Reusable host-visible transfer source for immediate texture uploads. Upload
+  // commands currently wait for completion before returning, so one device-owned
+  // staging buffer can be safely reused across dense texture restores without
+  // reallocating a large VMA buffer per channel.
+  ZVulkanBuffer& immediateUploadStagingBuffer(size_t size);
+
 private:
   ZVulkanContext& m_context;
   std::unique_ptr<ZVulkanFrameExecutor> m_frameExecutor;
@@ -136,6 +142,8 @@ private:
   VmaPool m_uploadStagingPool = nullptr;
   VmaPool m_readbackStagingPool = nullptr;
   VmaPool m_deviceLocalPool = nullptr;
+  std::unique_ptr<ZVulkanBuffer> m_immediateUploadStagingBuffer;
+  size_t m_immediateUploadStagingBufferSize = 0;
   vk::DeviceSize m_maxMemoryAllocationSize = std::numeric_limits<vk::DeviceSize>::max();
 };
 
