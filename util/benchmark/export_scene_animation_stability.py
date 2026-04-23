@@ -36,7 +36,7 @@ DEFAULT_SCENE_FILENAMES = (
     "testscene4.scene",
     "testscene1.scene",
     "testsene7.scene",
-    # "testscene6.scene",
+    "testscene6.scene",
 )
 DEFAULT_ANIMATION_FILENAMES = ("test.animation3d",)
 

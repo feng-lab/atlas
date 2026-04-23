@@ -212,6 +212,12 @@ size_t ZVulkanPagedImageBlockUploader::readAndUploadImageBlocks(
     uploadRegion.extent = vk::Extent3D{extent.x, extent.y, extent.z};
     uploadRegion.finalLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
     imageCacheTexture->uploadSubImage(hostBlockData.data(), hostBlockData.size(), uploadRegion);
+    m_device.residencyManager().recordPagedImageCacheBlockUpload(image,
+                                                                 static_cast<uint32_t>(channel),
+                                                                 pageTableEntryKey,
+                                                                 extent,
+                                                                 hostBlockData.data(),
+                                                                 hostBlockData.size());
     ++restoredFromHostShadow;
   }
   if (restoredFromHostShadow > 0u) {
@@ -249,7 +255,7 @@ size_t ZVulkanPagedImageBlockUploader::readAndUploadImageBlocks(
   });
 
   size_t emptyBlockCount = 0;
-  int remainingBlocks = static_cast<int>(sourcePendingTasks.size());
+  size_t remainingBlocks = sourcePendingTasks.size();
   std::tuple<size_t, std::shared_ptr<ZImg>, std::optional<std::string>> elem;
   auto lastLog = std::chrono::steady_clock::now();
 

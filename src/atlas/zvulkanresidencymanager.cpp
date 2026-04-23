@@ -426,17 +426,18 @@ void ZVulkanResidencyManager::resetRecordForSizeLocked(ManagedTexture& record, g
   record.hostBlocks.clear();
 }
 
-size_t ZVulkanResidencyManager::ManagedTexture::PagedBlockKeyHash::operator()(const PagedBlockKey& key) const noexcept
+size_t
+ZVulkanResidencyManager::ManagedTexture::PagedBlockKeyHash::operator()(const PagedBlockKey& blockKey) const noexcept
 {
   uint64_t h = 1469598103934665603ull;
   auto mix = [&h](uint32_t v) {
     h ^= static_cast<uint64_t>(v);
     h *= 1099511628211ull;
   };
-  mix(key.x);
-  mix(key.y);
-  mix(key.z);
-  mix(key.level);
+  mix(blockKey.x);
+  mix(blockKey.y);
+  mix(blockKey.z);
+  mix(blockKey.level);
   return static_cast<size_t>(h);
 }
 
