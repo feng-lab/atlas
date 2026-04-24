@@ -705,8 +705,88 @@ void ZVulkanResidencyManager::recordPagedImageCacheBlockUpload(Z3DImg& owner,
                                          pageTableEntryKey.w};
   auto& shadow = record.hostBlocks[blockKey];
   shadow.extent = extent;
+  shadow.imageBlock.reset();
   shadow.data.resize(size);
   std::memcpy(shadow.data.data(), data, size);
+
+  record.hostValid = true;
+  record.dirty = false;
+  record.knownZero = false;
+  record.lastUsedTick = m_usageTick++;
+}
+
+void ZVulkanResidencyManager::recordPagedImageCacheBlockUpload(Z3DImg& owner,
+                                                               uint32_t channel,
+                                                               const glm::uvec4& pageTableEntryKey,
+                                                               glm::uvec3 extent,
+                                                               std::shared_ptr<const ZImg> imageBlock)
+{
+  CHECK(imageBlock != nullptr) << "Paged image-cache host-shadow upload requires an image block";
+  CHECK(extent.x > 0u && extent.y > 0u && extent.z > 0u)
+    << "Paged image-cache host-shadow upload requires a non-empty extent";
+  CHECK(imageBlock->info().bytesPerVoxel == 1u) << "Paged image-cache host-shadow blocks must be R8";
+  CHECK(imageBlock->numChannels() == 1u) << "Paged image-cache host-shadow blocks must be single-channel";
+  const uint64_t blockBytes = static_cast<uint64_t>(extent.x) * extent.y * extent.z;
+  CHECK_EQ(static_cast<uint64_t>(imageBlock->byteNumber()), blockBytes)
+    << "Paged image-cache block byte count must match R8 extent";
+  CHECK(imageBlock->channelData<uint8_t>(0) != nullptr) << "Paged image-cache host-shadow image block has no data";
+
+  TextureKey key{};
+  key.owner = &owner;
+  key.kind = TextureKind::PagedImageCacheR8;
+  key.index = channel;
+
+  std::scoped_lock lock(m_mutex);
+  auto it = m_textures.find(key);
+  CHECK(it != m_textures.end()) << "recordPagedImageCacheBlockUpload called for unknown texture";
+  ManagedTexture& record = it->second;
+  CHECK(record.logicalSize.x > 0u && record.logicalSize.y > 0u && record.logicalSize.z > 0u)
+    << "Paged image-cache host-shadow upload has no logical cache size";
+  ManagedTexture::PagedBlockKey blockKey{pageTableEntryKey.x,
+                                         pageTableEntryKey.y,
+                                         pageTableEntryKey.z,
+                                         pageTableEntryKey.w};
+  auto& shadow = record.hostBlocks[blockKey];
+  shadow.extent = extent;
+  shadow.data.clear();
+  shadow.imageBlock = std::move(imageBlock);
+
+  record.hostValid = true;
+  record.dirty = false;
+  record.knownZero = false;
+  record.lastUsedTick = m_usageTick++;
+}
+
+void ZVulkanResidencyManager::recordPagedImageCacheBlockRestoredFromShadow(Z3DImg& owner,
+                                                                           uint32_t channel,
+                                                                           const glm::uvec4& pageTableEntryKey,
+                                                                           glm::uvec3 extent)
+{
+  CHECK(extent.x > 0u && extent.y > 0u && extent.z > 0u)
+    << "Paged image-cache host-shadow restore requires a non-empty extent";
+
+  TextureKey key{};
+  key.owner = &owner;
+  key.kind = TextureKind::PagedImageCacheR8;
+  key.index = channel;
+
+  std::scoped_lock lock(m_mutex);
+  auto it = m_textures.find(key);
+  CHECK(it != m_textures.end()) << "recordPagedImageCacheBlockRestoredFromShadow called for unknown texture";
+  ManagedTexture& record = it->second;
+  ManagedTexture::PagedBlockKey blockKey{pageTableEntryKey.x,
+                                         pageTableEntryKey.y,
+                                         pageTableEntryKey.z,
+                                         pageTableEntryKey.w};
+  auto blockIt = record.hostBlocks.find(blockKey);
+  CHECK(blockIt != record.hostBlocks.end()) << "Paged image-cache host-shadow restore missing source block";
+
+  const ManagedTexture::HostBlockShadow& shadow = blockIt->second;
+  CHECK(glm::all(glm::equal(shadow.extent, extent))) << "Paged image-cache restored shadow extent mismatch";
+  const uint64_t blockBytes = static_cast<uint64_t>(extent.x) * extent.y * extent.z;
+  const uint64_t shadowBytes = shadow.imageBlock ? static_cast<uint64_t>(shadow.imageBlock->byteNumber())
+                                                 : static_cast<uint64_t>(shadow.data.size());
+  CHECK_EQ(shadowBytes, blockBytes) << "Paged image-cache restored shadow byte count does not match extent";
 
   record.hostValid = true;
   record.dirty = false;
@@ -744,10 +824,18 @@ bool ZVulkanResidencyManager::copyPagedImageCacheBlockShadow(Z3DImg& owner,
   const ManagedTexture::HostBlockShadow& shadow = blockIt->second;
   CHECK(glm::all(glm::equal(shadow.extent, extent))) << "Paged image-cache host shadow extent mismatch";
   const uint64_t blockBytes = static_cast<uint64_t>(extent.x) * extent.y * extent.z;
-  CHECK_EQ(static_cast<uint64_t>(shadow.data.size()), blockBytes)
-    << "Paged image-cache host shadow byte count does not match extent";
-
-  out = shadow.data;
+  if (shadow.imageBlock != nullptr) {
+    CHECK_EQ(static_cast<uint64_t>(shadow.imageBlock->byteNumber()), blockBytes)
+      << "Paged image-cache host shadow byte count does not match extent";
+    const uint8_t* sourceData = shadow.imageBlock->channelData<uint8_t>(0);
+    CHECK(sourceData != nullptr) << "Paged image-cache host shadow image block has no data";
+    out.resize(static_cast<size_t>(blockBytes));
+    std::memcpy(out.data(), sourceData, out.size());
+  } else {
+    CHECK_EQ(static_cast<uint64_t>(shadow.data.size()), blockBytes)
+      << "Paged image-cache host shadow byte count does not match extent";
+    out = shadow.data;
+  }
   record.lastUsedTick = m_usageTick++;
   return true;
 }

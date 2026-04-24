@@ -685,8 +685,23 @@ Z3DImgRaycasterRenderer::recordVulkanStagesToScript(ZVulkanLinearScript& script,
       // GL parity: clear the "last" raycast accumulators at the start of a channel (round 0)
       // before any block-ID or raycast shaders sample them.
       //
-      // This must run outside dynamic rendering; express it as a commands() node so the backend
-      // closes any open rendering segment before recording the transfer clear commands.
+      // This must run outside dynamic rendering. The scratch-use declaration
+      // tells the linear script that these accumulators are fully overwritten
+      // before later stages sample them, so residency prep must not restore
+      // stale contents after cold reclaim.
+      std::array<Z3DScratchResourcePool::VulkanScratchTextureUse, 2> scratchWrites{};
+      size_t scratchWriteCount = 0;
+      if (stagePayload.lastAccumLease && stagePayload.lastAccumLease->hasVulkanImage()) {
+        if (auto* lastColor = stagePayload.lastAccumLease->colorAttachment(0)) {
+          scratchWrites[scratchWriteCount++] =
+            Z3DScratchResourcePool::VulkanScratchTextureUse{.texture = lastColor, .contentsRequired = false};
+        }
+        if (auto* lastDepth = stagePayload.lastAccumLease->colorAttachment(1)) {
+          scratchWrites[scratchWriteCount++] =
+            Z3DScratchResourcePool::VulkanScratchTextureUse{.texture = lastDepth, .contentsRequired = false};
+        }
+      }
+
       auto recordClear = [lastAccumLease = stagePayload.lastAccumLease](Z3DRendererVulkanBackend& backend) {
         if (!lastAccumLease || !lastAccumLease->hasVulkanImage()) {
           return;
@@ -704,8 +719,15 @@ Z3DImgRaycasterRenderer::recordVulkanStagesToScript(ZVulkanLinearScript& script,
         backend.clearColorTextureToShaderReadOnly(*lastDepth, clear, range, "ray_clear_last_accum");
       };
 
-      prevStage = prevStage ? script.commands("ray_clear_last_accum", {prevStage}, recordClear)
-                            : script.commands("ray_clear_last_accum", {}, recordClear);
+      const std::span<const Z3DScratchResourcePool::VulkanScratchTextureUse> scratchWriteSpan(scratchWrites.data(),
+                                                                                              scratchWriteCount);
+      prevStage =
+        prevStage
+          ? script.commandsInSubmissionWithScratchUses("ray_clear_last_accum",
+                                                       {prevStage},
+                                                       scratchWriteSpan,
+                                                       recordClear)
+          : script.commandsInSubmissionWithScratchUses("ray_clear_last_accum", {}, scratchWriteSpan, recordClear);
     }
 
     auto recordStage = [&]() {

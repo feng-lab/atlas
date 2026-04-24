@@ -212,12 +212,10 @@ size_t ZVulkanPagedImageBlockUploader::readAndUploadImageBlocks(
     uploadRegion.extent = vk::Extent3D{extent.x, extent.y, extent.z};
     uploadRegion.finalLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
     imageCacheTexture->uploadSubImage(hostBlockData.data(), hostBlockData.size(), uploadRegion);
-    m_device.residencyManager().recordPagedImageCacheBlockUpload(image,
-                                                                 static_cast<uint32_t>(channel),
-                                                                 pageTableEntryKey,
-                                                                 extent,
-                                                                 hostBlockData.data(),
-                                                                 hostBlockData.size());
+    m_device.residencyManager().recordPagedImageCacheBlockRestoredFromShadow(image,
+                                                                             static_cast<uint32_t>(channel),
+                                                                             pageTableEntryKey,
+                                                                             extent);
     ++restoredFromHostShadow;
   }
   if (restoredFromHostShadow > 0u) {
@@ -276,6 +274,7 @@ size_t ZVulkanPagedImageBlockUploader::readAndUploadImageBlocks(
         ++emptyBlockCount;
         *pageTableEntryPtr = image.emptyPageTableEntry();
       } else {
+        const auto& imageBlock = std::get<1>(elem);
         image.mapImageBlockToCache(channel, pageTableEntryKey, *pageTableEntryPtr);
 
         const glm::uvec3 cacheOffset(pageTableEntryPtr->x, pageTableEntryPtr->y, pageTableEntryPtr->z);
@@ -286,14 +285,13 @@ size_t ZVulkanPagedImageBlockUploader::readAndUploadImageBlocks(
         uploadRegion.extent = vk::Extent3D{extent.x, extent.y, extent.z};
         uploadRegion.finalLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
 
-        const void* blockData = std::get<1>(elem)->channelData(0);
+        const void* blockData = imageBlock->channelData(0);
         imageCacheTexture->uploadSubImage(blockData, bytesPerBlock, uploadRegion);
         m_device.residencyManager().recordPagedImageCacheBlockUpload(image,
                                                                      static_cast<uint32_t>(channel),
                                                                      pageTableEntryKey,
                                                                      extent,
-                                                                     blockData,
-                                                                     bytesPerBlock);
+                                                                     imageBlock);
       }
 
       --remainingBlocks;

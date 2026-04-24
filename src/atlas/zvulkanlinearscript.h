@@ -224,6 +224,25 @@ public:
   {
     return commandsInSubmission(label, std::span<const SegmentHandle>(deps.begin(), deps.size()), record);
   }
+  // Variant for opaque command nodes that directly read/write scratch textures.
+  // The declared uses are consumed by residency pre-scanning so a full overwrite
+  // can satisfy later same-submission reads without restoring stale contents.
+  SegmentHandle commandsInSubmissionWithScratchUses(
+    std::string_view label,
+    std::span<const SegmentHandle> deps,
+    std::span<const Z3DScratchResourcePool::VulkanScratchTextureUse> scratchTextureUses,
+    const std::function<void(Z3DRendererVulkanBackend&)>& record);
+  SegmentHandle commandsInSubmissionWithScratchUses(
+    std::string_view label,
+    std::initializer_list<SegmentHandle> deps,
+    std::span<const Z3DScratchResourcePool::VulkanScratchTextureUse> scratchTextureUses,
+    const std::function<void(Z3DRendererVulkanBackend&)>& record)
+  {
+    return commandsInSubmissionWithScratchUses(label,
+                                               std::span<const SegmentHandle>(deps.begin(), deps.size()),
+                                               scratchTextureUses,
+                                               record);
+  }
 
   // Request an end-of-submission buffer readback and block until the value is
   // available on CPU. This creates a submission boundary: pending GPU work is
@@ -314,6 +333,7 @@ private:
   {
     std::string label;
     std::function<void(Z3DRendererVulkanBackend&)> record;
+    std::vector<Z3DScratchResourcePool::VulkanScratchTextureUse> scratchTextureUses;
   };
 
   using Node = std::variant<RasterNode, ReplayNode, CommandsNode>;

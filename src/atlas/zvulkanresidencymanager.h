@@ -177,6 +177,17 @@ public:
                                         const void* data,
                                         size_t size);
 
+  void recordPagedImageCacheBlockUpload(Z3DImg& owner,
+                                        uint32_t channel,
+                                        const glm::uvec4& pageTableEntryKey,
+                                        glm::uvec3 extent,
+                                        std::shared_ptr<const ZImg> imageBlock);
+
+  void recordPagedImageCacheBlockRestoredFromShadow(Z3DImg& owner,
+                                                    uint32_t channel,
+                                                    const glm::uvec4& pageTableEntryKey,
+                                                    glm::uvec3 extent);
+
   [[nodiscard]] bool copyPagedImageCacheBlockShadow(Z3DImg& owner,
                                                     uint32_t channel,
                                                     const glm::uvec4& pageTableEntryKey,
@@ -259,6 +270,7 @@ private:
     {
       glm::uvec3 extent{0u};
       std::vector<uint8_t> data;
+      std::shared_ptr<const ZImg> imageBlock;
     };
 
     TextureKey key{};

@@ -672,13 +672,23 @@ ZVulkanLinearScript::commandsInSubmission(std::string_view label,
                                           std::span<const SegmentHandle> deps,
                                           const std::function<void(Z3DRendererVulkanBackend&)>& record)
 {
+  return commandsInSubmissionWithScratchUses(label, deps, {}, record);
+}
+
+ZVulkanLinearScript::SegmentHandle ZVulkanLinearScript::commandsInSubmissionWithScratchUses(
+  std::string_view label,
+  std::span<const SegmentHandle> deps,
+  std::span<const Z3DScratchResourcePool::VulkanScratchTextureUse> scratchTextureUses,
+  const std::function<void(Z3DRendererVulkanBackend&)>& record)
+{
   validateDeps(label, deps);
-  CHECK(record) << "ZVulkanLinearScript::commandsInSubmission requires a valid function";
+  CHECK(record) << "ZVulkanLinearScript::commandsInSubmissionWithScratchUses requires a valid function";
   const auto handle = nextHandle();
   m_pendingSubmissionHasGpuNodes = true;
   CommandsNode node;
   node.label = std::string(label);
   node.record = record;
+  node.scratchTextureUses.assign(scratchTextureUses.begin(), scratchTextureUses.end());
   m_nodes.emplace_back(std::move(node));
   return handle;
 }
@@ -912,6 +922,19 @@ ZVulkanLinearScript::collectScratchTextureUsesForNodes(std::span<const Node> nod
       if (replayNode->state) {
         for (const auto& batch : replayNode->state->batches) {
           appendOrderedUsesFromBatch(batch);
+        }
+      }
+      continue;
+    }
+    if (const auto* commandsNode = std::get_if<CommandsNode>(&node)) {
+      for (const auto& use : commandsNode->scratchTextureUses) {
+        if (use.texture == nullptr) {
+          continue;
+        }
+        if (use.contentsRequired) {
+          requireInitialContents(use.texture);
+        } else {
+          markWrite(use.texture, /*loadExistingContents=*/false);
         }
       }
       continue;
