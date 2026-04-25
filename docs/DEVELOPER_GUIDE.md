@@ -1017,7 +1017,9 @@ Testing and Diagnostics
 
 - Prefer small, focused tests for views/components (where available).
 - Use verbose logging (`--v=1`) to trace rendering progress and apply order.
-- For headless animation export, try small sizes first, then scale up with `--output_tile_size` and `--output_tile_border`.
+- For headless animation export, the default tile settings are `--output_tile_size=1024 --output_tile_border=64`.
+  Use `--output_tile_size=512 --output_tile_border=64` for huge out-of-core or low-VRAM exports where smaller
+  tiles improve temporal page-cache reuse across frames.
 Image Rendering Pipeline
 Invariant Checks and GL Parity (Vulkan)
 

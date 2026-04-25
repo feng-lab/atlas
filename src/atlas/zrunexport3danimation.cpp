@@ -44,7 +44,7 @@ DEFINE_bool(only_compress_video,
 DEFINE_uint64(limit_memory_usage_in_gb_to,
               0,
               "Limit memory usage to a specific GB value. Only valid for values >= 32. Default: 0 (no limit)");
-DEFINE_int32(output_tile_size, 512, "Tile size for segmented rendering. Default: 512");
+DEFINE_int32(output_tile_size, 1024, "Tile size for segmented rendering. Default: 1024");
 DEFINE_int32(output_tile_border, 64, "Tile border size for segmented rendering. Default: 64");
 DEFINE_int32(maximum_output_width, 15360, "Maximum possible output video width. Default: 15360");
 DEFINE_int32(maximum_output_height, 8640, "Maximum possible output video height. Default: 8640");
