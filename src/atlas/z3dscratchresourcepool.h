@@ -364,6 +364,14 @@ public:
     uint64_t residentBytes = 0;
   };
 
+  struct VulkanScratchPassEstimate
+  {
+    uint32_t textureCount = 0;
+    uint32_t hotImageCount = 0;
+    uint64_t hotTotalBytes = 0;
+    uint64_t missingBytes = 0;
+  };
+
   struct VulkanScratchBackingCandidate
   {
     ScratchImageUsage usage = ScratchImageUsage::BlockId;
@@ -440,6 +448,8 @@ public:
   [[nodiscard]] VulkanScratchBackingReclaimStats
   reclaimVulkanScratchBackingCandidate(ScratchImageUsage usage, size_t slotIndex, std::string_view reason = {});
   [[nodiscard]] VulkanScratchProtectionScope protectVulkanScratchTextures(std::span<ZVulkanTexture* const> textures);
+  [[nodiscard]] VulkanScratchPassEstimate
+  estimateVulkanScratchTexturesForPass(std::span<const VulkanScratchTextureUse> uses) const;
   void prepareVulkanScratchTexturesForPass(std::span<const VulkanScratchTextureUse> uses, std::string_view reason = {});
   [[nodiscard]] VulkanScratchBackingReport vulkanScratchBackingReport() const;
 

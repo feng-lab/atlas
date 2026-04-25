@@ -129,6 +129,13 @@ public:
   // create an explicit fence-wait boundary when control-flow depends on GPU data.
   void flush(std::string_view reason = {});
 
+  // Decide whether pending script nodes should be submitted before recording
+  // independent follow-up work that may grow the Vulkan residency working set.
+  // This preserves explicit strict-budget behavior while avoiding extra
+  // submission boundaries when the pending scratch set fits the current broker
+  // budget.
+  [[nodiscard]] bool shouldFlushForResidencyBeforeIndependentWork(std::string_view reason) const;
+
   template<typename T>
   [[nodiscard]] Slot<T> makeSlot() const
   {

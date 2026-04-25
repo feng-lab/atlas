@@ -182,6 +182,9 @@ uint64_t staticCandidateOwnerDomainKey(Z3DRendererVulkanBackend::StaticCacheOwne
   return (static_cast<uint64_t>(owner) << 8u) | static_cast<uint64_t>(domain);
 }
 
+constexpr uint64_t kRecentStaticGeometryProtectedEpochs = 1u;
+constexpr size_t kStaticEvictionTelemetryLimit = 512u;
+
 Z3DRendererVulkanBackend::StaticCacheOwner staticCandidateOwner(uint64_t key)
 {
   return static_cast<Z3DRendererVulkanBackend::StaticCacheOwner>((key >> 8u) & 0xffu);
@@ -4811,7 +4814,11 @@ Z3DRendererVulkanBackend::StaticSlice Z3DRendererVulkanBackend::allocateStaticVB
 
   size_t requiredBytes = std::max(bytes, align);
   auto tryPressureEviction = [&](bool force) -> bool {
-    if (evictColdStaticCacheForPressure(StaticPressureDomain::Vertex, requiredBytes, force) == 0) {
+    if (evictColdStaticCacheForPressure(StaticPressureDomain::Vertex,
+                                        requiredBytes,
+                                        force,
+                                        ZVulkanResidencyManager::ReclaimScope::PressureLadder,
+                                        force ? "static_vb_forced_reuse" : "static_vb_reuse") == 0) {
       return false;
     }
     for (const auto& seg : m_staticArena.vb) {
@@ -4918,7 +4925,11 @@ Z3DRendererVulkanBackend::StaticSlice Z3DRendererVulkanBackend::allocateStaticIB
 
   size_t requiredBytes = std::max(bytes, align);
   auto tryPressureEviction = [&](bool force) -> bool {
-    if (evictColdStaticCacheForPressure(StaticPressureDomain::Index, requiredBytes, force) == 0) {
+    if (evictColdStaticCacheForPressure(StaticPressureDomain::Index,
+                                        requiredBytes,
+                                        force,
+                                        ZVulkanResidencyManager::ReclaimScope::PressureLadder,
+                                        force ? "static_ib_forced_reuse" : "static_ib_reuse") == 0) {
       return false;
     }
     for (const auto& seg : m_staticArena.ib) {
@@ -5049,8 +5060,97 @@ void Z3DRendererVulkanBackend::requestEvictStream(uint64_t streamKey)
   m_pendingEvictStreamKeys.insert(streamKey);
 }
 
-size_t
-Z3DRendererVulkanBackend::evictColdStaticCacheForPressure(StaticPressureDomain domain, size_t growthBytes, bool force)
+void Z3DRendererVulkanBackend::noteStaticStreamPromoted(StaticCacheOwner owner,
+                                                        uint64_t streamKey,
+                                                        size_t stagedBytes,
+                                                        std::string_view reason)
+{
+  if (streamKey == 0u || stagedBytes == 0u || m_recentStaticEvictions.empty()) {
+    return;
+  }
+
+  for (size_t index = m_recentStaticEvictions.size(); index-- > 0u;) {
+    const auto& eviction = m_recentStaticEvictions[index];
+    if (eviction.owner != owner || eviction.streamKey != streamKey) {
+      continue;
+    }
+
+    const uint64_t reuseEpochs =
+      m_staticCacheEpoch >= eviction.evictionEpoch ? (m_staticCacheEpoch - eviction.evictionEpoch) : 0u;
+    VLOG(1) << fmt::format(
+      "VK static restore after eviction: owner={} streamKey={} reuse_epochs={} staged={}B evicted_resident={}B evicted_virtual={}B evict_reason='{}' promote_reason='{}'",
+      staticCacheOwnerName(owner),
+      streamKey,
+      reuseEpochs,
+      stagedBytes,
+      eviction.residentBytes,
+      eviction.virtualBytes,
+      eviction.reason.empty() ? "<unspecified>" : eviction.reason,
+      reason.empty() ? "<unspecified>" : std::string(reason));
+    m_recentStaticEvictions.erase(m_recentStaticEvictions.begin() + static_cast<std::ptrdiff_t>(index));
+    return;
+  }
+}
+
+void Z3DRendererVulkanBackend::recordStaticStreamEviction(StaticCacheOwner owner,
+                                                          uint64_t streamKey,
+                                                          uint64_t residentBytes,
+                                                          uint64_t virtualBytes,
+                                                          std::string_view reason)
+{
+  if (streamKey == 0u || (residentBytes == 0u && virtualBytes == 0u)) {
+    return;
+  }
+
+  for (auto& eviction : m_recentStaticEvictions) {
+    if (eviction.owner != owner || eviction.streamKey != streamKey) {
+      continue;
+    }
+    eviction.evictionEpoch = m_staticCacheEpoch;
+    eviction.residentBytes = residentBytes;
+    eviction.virtualBytes = virtualBytes;
+    eviction.reason = std::string(reason);
+    return;
+  }
+
+  m_recentStaticEvictions.push_back(StaticEvictionTelemetry{.owner = owner,
+                                                            .streamKey = streamKey,
+                                                            .evictionEpoch = m_staticCacheEpoch,
+                                                            .residentBytes = residentBytes,
+                                                            .virtualBytes = virtualBytes,
+                                                            .reason = std::string(reason)});
+  if (m_recentStaticEvictions.size() > kStaticEvictionTelemetryLimit) {
+    m_recentStaticEvictions.erase(
+      m_recentStaticEvictions.begin(),
+      m_recentStaticEvictions.begin() +
+        static_cast<std::ptrdiff_t>(m_recentStaticEvictions.size() - kStaticEvictionTelemetryLimit));
+  }
+}
+
+uint64_t
+Z3DRendererVulkanBackend::staticGeometryProtectedEpochForRequest(bool force,
+                                                                 ZVulkanResidencyManager::ReclaimScope scope) const
+{
+  uint64_t protectedEpoch = m_submissionResourcePinningOpen ? m_staticCacheEpoch : std::numeric_limits<uint64_t>::max();
+
+  const bool protectRecentStatic = !force && scope != ZVulkanResidencyManager::ReclaimScope::RequestedClassOnly &&
+                                   m_sharedDevice != nullptr &&
+                                   !m_sharedDevice->residencyManager().strictBudgetActive();
+  if (!protectRecentStatic) {
+    return protectedEpoch;
+  }
+
+  const uint64_t recentProtectedEpoch = m_staticCacheEpoch > kRecentStaticGeometryProtectedEpochs
+                                          ? (m_staticCacheEpoch - kRecentStaticGeometryProtectedEpochs)
+                                          : 0u;
+  return std::min(protectedEpoch, recentProtectedEpoch);
+}
+
+size_t Z3DRendererVulkanBackend::evictColdStaticCacheForPressure(StaticPressureDomain domain,
+                                                                 size_t growthBytes,
+                                                                 bool force,
+                                                                 ZVulkanResidencyManager::ReclaimScope scope,
+                                                                 std::string_view reason)
 {
   if (growthBytes == 0 || m_sharedDevice == nullptr || m_staticCacheEpoch == 0) {
     return 0;
@@ -5076,8 +5176,7 @@ Z3DRendererVulkanBackend::evictColdStaticCacheForPressure(StaticPressureDomain d
                                  ? std::numeric_limits<size_t>::max()
                                  : static_cast<size_t>(pressureBytes64);
   const size_t targetBytes = std::max(growthBytes, pressureBytes);
-  const uint64_t protectedEpoch =
-    m_submissionResourcePinningOpen ? m_staticCacheEpoch : std::numeric_limits<uint64_t>::max();
+  const uint64_t protectedEpoch = staticGeometryProtectedEpochForRequest(force, scope);
 
   size_t releasedBytes = 0;
   size_t evictedStreams = 0;
@@ -5151,18 +5250,22 @@ Z3DRendererVulkanBackend::evictColdStaticCacheForPressure(StaticPressureDomain d
     }
     releasedBytes += bytesFreed;
     ++evictedStreams;
+    recordStaticStreamEviction(candidate.owner, candidate.streamKey, 0u, bytesFreed, reason);
+    const uint64_t age =
+      m_staticCacheEpoch >= candidate.lastUsedEpoch ? (m_staticCacheEpoch - candidate.lastUsedEpoch) : 0u;
     VLOG(1) << fmt::format(
-      "VK static pressure eviction: owner={} domain={} streamKey={} age={} released={}B estimated={}B progress={}/{}B usage={}B budget={}B",
+      "VK static pressure eviction: owner={} domain={} streamKey={} age={} released={}B estimated={}B progress={}/{}B usage={}B budget={}B reason='{}'",
       staticCacheOwnerName(candidate.owner),
       domain == StaticPressureDomain::Vertex ? "VB" : "IB",
       candidate.streamKey,
-      protectedEpoch - candidate.lastUsedEpoch,
+      age,
       bytesFreed,
       candidate.bytes,
       releasedBytes,
       targetBytes,
       budget.usageBytes,
-      budgetBytes);
+      budgetBytes,
+      reason.empty() ? "<unspecified>" : std::string(reason));
   }
 
   if (releasedBytes > 0) {
@@ -5298,11 +5401,11 @@ void Z3DRendererVulkanBackend::installMemoryBrokerProviders()
     .label = "renderer_static_geometry",
     .reclaim =
       [this](const ZVulkanResidencyManager::ReclaimRequest& request) {
-        return reclaimStaticGeometryForMemoryPressure(request.requestedBytes, request.reason);
+        return reclaimStaticGeometryForMemoryPressure(request);
       },
     .collectCandidates =
-      [this](const ZVulkanResidencyManager::ReclaimRequest&) {
-        return staticGeometryEvictionCandidates();
+      [this](const ZVulkanResidencyManager::ReclaimRequest& request) {
+        return staticGeometryEvictionCandidates(request);
       },
     .evictCandidate =
       [this](const ZVulkanResidencyManager::EvictionCandidate& candidate,
@@ -5393,19 +5496,20 @@ Z3DRendererVulkanBackend::reclaimCompletedUploadPagesForMemoryPressure(std::stri
 }
 
 std::vector<ZVulkanResidencyManager::EvictionCandidate>
-Z3DRendererVulkanBackend::staticGeometryEvictionCandidates() const
+Z3DRendererVulkanBackend::staticGeometryEvictionCandidates(const ZVulkanResidencyManager::ReclaimRequest& request) const
 {
   std::vector<ZVulkanResidencyManager::EvictionCandidate> candidates;
   if (m_sharedDevice == nullptr || m_staticCacheEpoch == 0) {
     return candidates;
   }
 
-  const uint64_t protectedEpoch =
-    m_submissionResourcePinningOpen ? m_staticCacheEpoch : std::numeric_limits<uint64_t>::max();
+  const uint64_t protectedEpoch = staticGeometryProtectedEpochForRequest(request.force, request.scope);
   auto addCandidate = [&](std::optional<StaticPressureEvictionCandidate> candidate, StaticPressureDomain domain) {
     if (!candidate || candidate->bytes == 0u) {
       return;
     }
+    const uint64_t age =
+      m_staticCacheEpoch >= candidate->lastUsedEpoch ? (m_staticCacheEpoch - candidate->lastUsedEpoch) : 0u;
     candidates.push_back(ZVulkanResidencyManager::EvictionCandidate{
       .resourceClass = ZVulkanResidencyManager::ResourceClass::StaticGeometry,
       .priority = 0,
@@ -5419,6 +5523,13 @@ Z3DRendererVulkanBackend::staticGeometryEvictionCandidates() const
                            staticCacheOwnerName(candidate->owner),
                            domain == StaticPressureDomain::Vertex ? "vb" : "ib",
                            candidate->streamKey)});
+    VLOG(2) << fmt::format("VK static broker candidate: owner={} domain={} streamKey={} age={} bytes={}B reason='{}'",
+                           staticCacheOwnerName(candidate->owner),
+                           domain == StaticPressureDomain::Vertex ? "VB" : "IB",
+                           candidate->streamKey,
+                           age,
+                           candidate->bytes,
+                           request.reason.empty() ? "<unspecified>" : std::string(request.reason));
   };
 
   for (StaticPressureDomain domain : {StaticPressureDomain::Vertex, StaticPressureDomain::Index}) {
@@ -5492,11 +5603,15 @@ Z3DRendererVulkanBackend::evictStaticGeometryCandidate(const ZVulkanResidencyMan
   }
   stats.resourcesReleased = 1u;
   stats.bytesReleased = residentBytesFreed;
+  const uint64_t age =
+    m_staticCacheEpoch >= candidate.lastUsedEpoch ? (m_staticCacheEpoch - candidate.lastUsedEpoch) : 0u;
+  recordStaticStreamEviction(owner, streamKey, residentBytesFreed, virtualBytesFreed, reason);
   VLOG(1) << fmt::format(
-    "VK static broker candidate evict: owner={} domain={} streamKey={} resident_released={}B virtual_released={}B reason='{}'",
+    "VK static broker candidate evict: owner={} domain={} streamKey={} age={} resident_released={}B virtual_released={}B reason='{}'",
     staticCacheOwnerName(owner),
     domain == StaticPressureDomain::Vertex ? "VB" : "IB",
     streamKey,
+    age,
     residentBytesFreed,
     virtualBytesFreed,
     reason.empty() ? "<unspecified>" : std::string(reason));
@@ -5504,16 +5619,17 @@ Z3DRendererVulkanBackend::evictStaticGeometryCandidate(const ZVulkanResidencyMan
 }
 
 ZVulkanResidencyManager::ReclaimStats
-Z3DRendererVulkanBackend::reclaimStaticGeometryForMemoryPressure(uint64_t requestedBytes, std::string_view reason)
+Z3DRendererVulkanBackend::reclaimStaticGeometryForMemoryPressure(const ZVulkanResidencyManager::ReclaimRequest& request)
 {
   const size_t maxSize = std::numeric_limits<size_t>::max();
-  const size_t target = requestedBytes == 0u || requestedBytes > static_cast<uint64_t>(maxSize)
+  const size_t target = request.requestedBytes == 0u || request.requestedBytes > static_cast<uint64_t>(maxSize)
                           ? maxSize
-                          : static_cast<size_t>(requestedBytes);
+                          : static_cast<size_t>(request.requestedBytes);
 
   ZVulkanResidencyManager::ReclaimStats stats{};
   const uint64_t residentBytesBefore = staticGeometryMemoryReport().residentBytes;
-  const size_t vbReleased = evictColdStaticCacheForPressure(StaticPressureDomain::Vertex, target, true);
+  const size_t vbReleased =
+    evictColdStaticCacheForPressure(StaticPressureDomain::Vertex, target, request.force, request.scope, request.reason);
   if (vbReleased > 0u) {
     stats.resourcesReleased++;
   }
@@ -5523,7 +5639,11 @@ Z3DRendererVulkanBackend::reclaimStaticGeometryForMemoryPressure(uint64_t reques
     remaining = vbReleased >= target ? 0u : (target - vbReleased);
   }
   if (remaining > 0u) {
-    const size_t ibReleased = evictColdStaticCacheForPressure(StaticPressureDomain::Index, remaining, true);
+    const size_t ibReleased = evictColdStaticCacheForPressure(StaticPressureDomain::Index,
+                                                              remaining,
+                                                              request.force,
+                                                              request.scope,
+                                                              request.reason);
     if (ibReleased > 0u) {
       stats.resourcesReleased++;
     }
@@ -5535,7 +5655,7 @@ Z3DRendererVulkanBackend::reclaimStaticGeometryForMemoryPressure(uint64_t reques
     VLOG(1) << fmt::format("VK static-geometry broker reclaim: bytes={}B target={}B reason='{}'",
                            stats.bytesReleased,
                            target == maxSize ? 0u : target,
-                           reason.empty() ? "<unspecified>" : std::string(reason));
+                           request.reason.empty() ? "<unspecified>" : std::string(request.reason));
   }
   return stats;
 }

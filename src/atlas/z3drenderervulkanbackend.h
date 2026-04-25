@@ -562,6 +562,8 @@ public:
   // Request eviction of all cached static geometry for a given streamKey.
   // This is processed on the render thread during beginRender().
   void requestEvictStream(uint64_t streamKey);
+  void
+  noteStaticStreamPromoted(StaticCacheOwner owner, uint64_t streamKey, size_t stagedBytes, std::string_view reason);
 
   [[nodiscard]] uint64_t currentStaticCacheEpoch() const
   {
@@ -1583,15 +1585,27 @@ public:
   void flushPendingFreesAndMaybeTrimStaticSegment(StaticArena::Segment* segment);
   [[nodiscard]] bool
   prepareStaticPromotionBudget(StaticPressureDomain domain, size_t promotionBytes, std::string_view reason);
-  size_t evictColdStaticCacheForPressure(StaticPressureDomain domain, size_t growthBytes, bool force);
+  [[nodiscard]] uint64_t staticGeometryProtectedEpochForRequest(bool force,
+                                                                ZVulkanResidencyManager::ReclaimScope scope) const;
+  size_t evictColdStaticCacheForPressure(StaticPressureDomain domain,
+                                         size_t growthBytes,
+                                         bool force,
+                                         ZVulkanResidencyManager::ReclaimScope scope,
+                                         std::string_view reason);
+  void recordStaticStreamEviction(StaticCacheOwner owner,
+                                  uint64_t streamKey,
+                                  uint64_t residentBytes,
+                                  uint64_t virtualBytes,
+                                  std::string_view reason);
 
   void installMemoryBrokerProviders();
   void uninstallMemoryBrokerProviders();
   [[nodiscard]] ZVulkanResidencyManager::ReclaimStats
   reclaimCompletedUploadPagesForMemoryPressure(std::string_view reason);
-  [[nodiscard]] ZVulkanResidencyManager::ReclaimStats reclaimStaticGeometryForMemoryPressure(uint64_t requestedBytes,
-                                                                                             std::string_view reason);
-  [[nodiscard]] std::vector<ZVulkanResidencyManager::EvictionCandidate> staticGeometryEvictionCandidates() const;
+  [[nodiscard]] ZVulkanResidencyManager::ReclaimStats
+  reclaimStaticGeometryForMemoryPressure(const ZVulkanResidencyManager::ReclaimRequest& request);
+  [[nodiscard]] std::vector<ZVulkanResidencyManager::EvictionCandidate>
+  staticGeometryEvictionCandidates(const ZVulkanResidencyManager::ReclaimRequest& request) const;
   [[nodiscard]] ZVulkanResidencyManager::ReclaimStats
   evictStaticGeometryCandidate(const ZVulkanResidencyManager::EvictionCandidate& candidate, std::string_view reason);
   [[nodiscard]] ZVulkanResidencyManager::ReclaimStats reclaimReadbackStagingForMemoryPressure(std::string_view reason);
@@ -1606,6 +1620,16 @@ public:
   std::mutex m_pendingEvictionsMutex;
   std::unordered_set<uint64_t> m_pendingEvictStreamKeys;
   uint64_t m_staticCacheEpoch = 0;
+  struct StaticEvictionTelemetry
+  {
+    StaticCacheOwner owner = StaticCacheOwner::Mesh;
+    uint64_t streamKey = 0;
+    uint64_t evictionEpoch = 0;
+    uint64_t residentBytes = 0;
+    uint64_t virtualBytes = 0;
+    std::string reason;
+  };
+  std::vector<StaticEvictionTelemetry> m_recentStaticEvictions;
 
   // PPLL (exact OIT): per-pixel fragment list resources are maintained in a
   // small ring keyed by the UI/perf frame token (not by Vulkan frame-executor

@@ -1300,10 +1300,12 @@ double Z3DImgFilter::process(Z3DEye eye)
 
         if (runSlicePass && (runTransparentPass && (doImage || doBBoxOnly))) {
           // Raycaster/overlay and slice rendering target independent outputs.
-          // Keep a submission safe point between them so Vulkan residency can
-          // swap the first path's scratch/cache before restoring slice scratch
-          // on memory-constrained exports.
-          script.flush("imgfilter_image_done");
+          // Keep the safe point only when the pending raycaster scratch set
+          // already needs residency relief. On normal devices this preserves a
+          // combined submission and avoids redundant pre-record budget scans.
+          if (script.shouldFlushForResidencyBeforeIndependentWork("imgfilter_image_done")) {
+            script.flush("imgfilter_image_done");
+          }
         }
 
         if (runSlicePass) {

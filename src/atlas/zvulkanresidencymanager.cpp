@@ -1018,11 +1018,11 @@ ZVulkanResidencyManager::ReclaimStats ZVulkanResidencyManager::reclaimMemory(con
     ResourceClass::TransientUploadPage,
     ResourceClass::ScratchBacking,
     ResourceClass::ReadbackStaging,
-    ResourceClass::StaticGeometry,
     ResourceClass::DenseImageTexture,
     ResourceClass::PagedImageCacheR8,
     ResourceClass::DenseVolumeTexture,
     ResourceClass::PagedImageMetadataTexture,
+    ResourceClass::StaticGeometry,
     ResourceClass::PersistentCompositorTarget,
   };
 

@@ -2124,6 +2124,62 @@ Z3DScratchResourcePool::reclaimColdVulkanScratchBacking(std::span<ZVulkanTexture
   return stats;
 }
 
+Z3DScratchResourcePool::VulkanScratchPassEstimate
+Z3DScratchResourcePool::estimateVulkanScratchTexturesForPass(std::span<const VulkanScratchTextureUse> uses) const
+{
+  VulkanScratchPassEstimate estimate{};
+  if (uses.empty()) {
+    return estimate;
+  }
+
+  std::vector<ZVulkanTexture*> textures;
+  textures.reserve(uses.size());
+  for (const auto& use : uses) {
+    if (use.texture == nullptr) {
+      continue;
+    }
+    if (std::find(textures.begin(), textures.end(), use.texture) == textures.end()) {
+      textures.push_back(use.texture);
+    }
+  }
+  estimate.textureCount = static_cast<uint32_t>(textures.size());
+  if (textures.empty()) {
+    return estimate;
+  }
+
+  std::vector<const ZVulkanScratchImage*> hotImages;
+  auto addHotImageForTexture = [&](ZVulkanTexture* texture) {
+    for (const auto& slots : m_vulkanSlots) {
+      for (const auto& slot : slots) {
+        CHECK(slot != nullptr);
+        if (!slot->image || !slot->image->containsTexture(texture)) {
+          continue;
+        }
+        const auto* image = slot->image.get();
+        if (std::find(hotImages.begin(), hotImages.end(), image) == hotImages.end()) {
+          hotImages.push_back(image);
+        }
+        return;
+      }
+    }
+  };
+  for (auto* texture : textures) {
+    addHotImageForTexture(texture);
+  }
+
+  estimate.hotImageCount = static_cast<uint32_t>(hotImages.size());
+  for (const auto* image : hotImages) {
+    CHECK(image != nullptr);
+    const uint64_t total = image->estimatedTotalBytes();
+    const uint64_t resident = image->estimatedResidentBytes();
+    estimate.hotTotalBytes += total;
+    if (total > resident) {
+      estimate.missingBytes += total - resident;
+    }
+  }
+  return estimate;
+}
+
 void Z3DScratchResourcePool::prepareVulkanScratchTexturesForPass(std::span<const VulkanScratchTextureUse> uses,
                                                                  std::string_view reason)
 {

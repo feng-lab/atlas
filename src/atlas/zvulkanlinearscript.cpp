@@ -789,6 +789,39 @@ bool ZVulkanLinearScript::strictResidencyFlushEachNode() const
   return m_submissionGroupDepth == 0u && m_backend.device().residencyManager().strictBudgetActive();
 }
 
+bool ZVulkanLinearScript::shouldFlushForResidencyBeforeIndependentWork(std::string_view reason) const
+{
+  if (m_nodes.empty() && m_preRecordNodes.empty() && !m_frameOpen) {
+    return false;
+  }
+
+  auto& residency = m_backend.device().residencyManager();
+  if (residency.strictBudgetActive()) {
+    VLOG(1) << fmt::format("Vulkan script residency split enabled by strict budget: reason='{}'",
+                           reason.empty() ? "<unspecified>" : std::string(reason));
+    return true;
+  }
+
+  const auto pendingNodeSpan = std::span<const Node>(m_nodes.data(), m_nodes.size());
+  const auto scratchUses = collectScratchTextureUsesForNodes(pendingNodeSpan);
+  const auto scratchEstimate =
+    Z3DRenderGlobalState::instance().scratchPool().estimateVulkanScratchTexturesForPass(scratchUses);
+  const auto pressure = residency.allocationPressureFor(scratchEstimate.missingBytes);
+  const bool shouldFlush = pressure.needsReclaim();
+  VLOG(2) << fmt::format(
+    "Vulkan script residency split check: reason='{}' flush={} pending_scratch_missing={}B pending_scratch_hot={}B scratch_images={} scratch_textures={} usage={}B budget={}B reclaim={}B",
+    reason.empty() ? "<unspecified>" : std::string(reason),
+    shouldFlush,
+    scratchEstimate.missingBytes,
+    scratchEstimate.hotTotalBytes,
+    scratchEstimate.hotImageCount,
+    scratchEstimate.textureCount,
+    pressure.usageBytes,
+    pressure.budgetBytes,
+    pressure.reclaimBytes);
+  return shouldFlush;
+}
+
 void ZVulkanLinearScript::enterSubmissionGroup()
 {
   CHECK(m_submissionGroupDepth < std::numeric_limits<uint32_t>::max())

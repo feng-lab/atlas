@@ -2147,6 +2147,10 @@ void ZVulkanMeshPipelineContext::uploadGeometry(const MeshPayload& payload)
           m_indexCount,
           stagedBytes,
           payload.pickingPass);
+        m_backend.noteStaticStreamPromoted(Z3DRendererVulkanBackend::StaticCacheOwner::Mesh,
+                                           key.streamKey,
+                                           stagedBytes,
+                                           "cache_miss");
         insertedEntry.promoted = true;
         insertedEntry.usedStaticOnce = false;
         m_streamCoordinator.touchStaticStream(key.streamKey);
@@ -2262,6 +2266,10 @@ void ZVulkanMeshPipelineContext::uploadGeometry(const MeshPayload& payload)
             entry.unchangedFrames,
             stagedBytes,
             payload.pickingPass);
+          m_backend.noteStaticStreamPromoted(Z3DRendererVulkanBackend::StaticCacheOwner::Mesh,
+                                             key.streamKey,
+                                             stagedBytes,
+                                             "stable");
           entry.promoted = true;
           entry.usedStaticOnce = false;
           m_streamCoordinator.touchStaticStream(key.streamKey);
