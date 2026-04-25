@@ -829,19 +829,23 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
       const std::string_view debugLabel = "VK slice blockid compaction parse";
       const std::string_view readbackLabel = "slice_block_id_compact_readback";
 
-      // Request end-of-frame readbacks for each slice output. The backend will
-      // insert buffer->staging copies at endRender() and expose the results via
-      // readback tickets once the submission fence signals.
+      // Request only the fixed-size header first. The payload range is copied
+      // later only when the header reports IDs, avoiding full-capacity
+      // readbacks on tiles with no missing blocks.
       std::vector<Z3DRendererVulkanBackend::EndOfFrameBufferReadbackTicket> readbackTickets;
       readbackTickets.reserve(frameOutputs.sliceOutputs.size());
+      std::vector<ZVulkanBuffer*> outputBuffers;
+      outputBuffers.reserve(frameOutputs.sliceOutputs.size());
       for (auto& bufOwner : frameOutputs.sliceOutputs) {
         if (!bufOwner) {
           continue;
         }
         CHECK((bufOwner->usage() & vk::BufferUsageFlagBits::eTransferSrc) != vk::BufferUsageFlags{})
           << "Slice Block-ID compaction output must support end-of-frame buffer readback (eTransferSrc usage missing)";
+        CHECK_LE(headerBytes, bufOwner->size()) << "Slice Block-ID compaction header exceeds output buffer size";
+        outputBuffers.push_back(bufOwner.get());
         readbackTickets.emplace_back(
-          m_backend.requestEndOfFrameBufferReadbackTicket(*bufOwner, /*srcOffset=*/0, bytesPerSlice, readbackLabel));
+          m_backend.requestEndOfFrameBufferReadbackTicket(*bufOwner, /*srcOffset=*/0, headerBytes, readbackLabel));
       }
 
       // Block-ID discovery cache upload is a CPU control-flow boundary: force the
@@ -856,13 +860,14 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
          imgW,
          imgH,
          tickets = std::move(readbackTickets),
+         outputBuffers = std::move(outputBuffers),
          streamKey = payload.streamKey,
          eye = batch.eye,
          channelCountU32 = static_cast<uint32_t>(channelCount),
          channelIndexSize = channelIndex,
          roundIndexU32,
          cancellationToken,
-         imagePtr = payload.image](Z3DRendererVulkanBackend&) mutable -> folly::coro::Task<void> {
+         imagePtr = payload.image](Z3DRendererVulkanBackend& backend) mutable -> folly::coro::Task<void> {
           if (!imagePtr) {
             // Still release any staging slots we acquired.
             for (auto& ticket : tickets) {
@@ -876,13 +881,7 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
 
           CHECK_GT(bytesPerSlice, 0u);
           CHECK((bytesPerSlice % sizeof(uint32_t)) == 0u) << "Slice block-ID readback bytes not u32-aligned";
-          const size_t mapWords = bytesPerSlice / sizeof(uint32_t);
-          CHECK_GE(mapWords, static_cast<size_t>(kBlockIdCompactionHeaderWords))
-            << "Slice block-ID readback smaller than header";
-
-          std::vector<uint32_t> words;
-          words.resize(mapWords);
-          const size_t mapBytes = bytesPerSlice;
+          CHECK_EQ(tickets.size(), outputBuffers.size()) << "Slice block-ID readback ticket/source count mismatch";
 
           for (size_t i = 0; i < tickets.size(); ++i) {
             if (cancellationToken.isCancellationRequested()) {
@@ -895,7 +894,8 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
             }
 
             auto& ticket = tickets[i];
-            co_await ticket.awaitCopyTo(words.data(), mapBytes);
+            std::array<uint32_t, kBlockIdCompactionHeaderWords> headerWords{};
+            co_await ticket.awaitCopyTo(headerWords.data(), headerWords.size() * sizeof(uint32_t));
             if (cancellationToken.isCancellationRequested()) {
               for (size_t j = i + 1; j < tickets.size(); ++j) {
                 co_await tickets[j].awaitAndDiscard();
@@ -904,15 +904,29 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
             }
 
             // Unified format: [count][counts[8]][ids...]
-            const uint32_t count = words[0];
+            const uint32_t count = headerWords[0];
             CHECK_LE(count, capacityIDs) << fmt::format(
               "Slice block-ID compaction count exceeds capacity (would truncate): {}x{} cap={} count={}",
               imgW,
               imgH,
               capacityIDs,
               count);
+            std::vector<uint32_t> idWords;
+            if (count > 0u) {
+              ZVulkanBuffer* outputBuffer = outputBuffers[i];
+              CHECK(outputBuffer != nullptr) << "Slice block-ID compaction payload source is null";
+              const size_t idBytes = static_cast<size_t>(count) * sizeof(uint32_t);
+              auto payloadBytes = backend.readBufferRangeAfterCompletion(
+                *outputBuffer,
+                static_cast<vk::DeviceSize>(kBlockIdCompactionHeaderWords * sizeof(uint32_t)),
+                idBytes,
+                "slice_block_id_compact_payload_readback");
+              CHECK_EQ(payloadBytes.size(), idBytes) << "Slice block-ID compaction payload readback size mismatch";
+              idWords.resize(count);
+              std::memcpy(idWords.data(), payloadBytes.data(), idBytes);
+            }
             for (uint32_t id = 0; id < count; ++id) {
-              const uint32_t v = words[kBlockIdCompactionHeaderWords + id];
+              const uint32_t v = idWords[id];
               if (v != kInvalidBlockID && v != kUnmappedBlockID) {
                 unique.insert(v);
               }

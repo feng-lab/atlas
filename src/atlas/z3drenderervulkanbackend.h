@@ -961,6 +961,15 @@ public:
                                                                                      size_t bytes,
                                                                                      std::string_view debugLabel = {});
 
+  // Synchronous follow-up readback for a buffer range whose producer submission
+  // has already reached the completion safe point. This is intentionally not an
+  // active-frame readback API; it is used by completion hooks that first read a
+  // small header, then decide whether an exact payload range is needed.
+  [[nodiscard]] std::vector<uint8_t> readBufferRangeAfterCompletion(class ZVulkanBuffer& src,
+                                                                    vk::DeviceSize srcOffset,
+                                                                    size_t bytes,
+                                                                    std::string_view debugLabel = {});
+
   // Telemetry hook: record a perf-frame-start → host-ready latency sample for
   // the submission that just reached the backend's frame completion safe point.
   //

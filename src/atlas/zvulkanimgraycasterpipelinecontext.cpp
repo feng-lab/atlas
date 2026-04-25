@@ -2945,10 +2945,12 @@ void ZVulkanImgRaycasterPipelineContext::recordBlockIdCompaction(Z3DRendererBase
   // hook below runs before we return to client code.
   m_backend.requireCompletionSafePointWaitForActiveSubmission("block_id_compact_readback");
 
+  const size_t headerBytes = static_cast<size_t>(kBlockIdCompactionHeaderWords) * sizeof(uint32_t);
+  CHECK_LE(headerBytes, compactOutputBytes) << "Block-ID compaction header exceeds output buffer size";
   auto readbackTicket = m_backend.requestEndOfFrameBufferReadbackTicket(*compactOutput,
                                                                         /*srcOffset=*/0,
-                                                                        compactOutputBytes,
-                                                                        "block_id_compact_readback");
+                                                                        headerBytes,
+                                                                        "block_id_compact_header_readback");
 
   const std::string_view debugLabel = "VK raycaster compaction output parse";
   m_backend.registerAfterCurrentFrameCompletionHook(
@@ -2956,6 +2958,7 @@ void ZVulkanImgRaycasterPipelineContext::recordBlockIdCompaction(Z3DRendererBase
     [this,
      rendererPtr = &renderer,
      ticket = std::move(readbackTicket),
+     compactOutput,
      cancellationToken,
      imgW,
      imgH,
@@ -2981,22 +2984,19 @@ void ZVulkanImgRaycasterPipelineContext::recordBlockIdCompaction(Z3DRendererBase
       const uint32_t capacityIDs = imgW * imgH * 4u;
       const uint32_t idsOffsetWords = kBlockIdCompactionHeaderWords;
       CHECK_LE(attCount, 8u) << "Unified header supports up to 8 attachments";
-      const uint32_t mapWords = idsOffsetWords + capacityIDs;
-      const size_t mapBytes = static_cast<size_t>(mapWords) * sizeof(uint32_t);
 
-      std::vector<uint32_t> words;
-      words.resize(static_cast<size_t>(mapWords));
-      co_await ticket.awaitCopyTo(words.data(), mapBytes);
+      std::array<uint32_t, kBlockIdCompactionHeaderWords> headerWords{};
+      co_await ticket.awaitCopyTo(headerWords.data(), headerWords.size() * sizeof(uint32_t));
       if (cancellationToken.isCancellationRequested()) {
         co_return;
       }
 
       std::vector<uint32_t> missingBlocks;
       // Unified format: [count][counts[8]][ids...]
-      const uint32_t count = words[0];
+      const uint32_t count = headerWords[0];
       std::array<uint32_t, 8> counts{};
       for (uint32_t att = 0; att < attCount; ++att) {
-        counts[att] = words[1 + att];
+        counts[att] = headerWords[1 + att];
       }
       CHECK_LE(count, capacityIDs) << fmt::format(
         "Block-ID compaction count exceeds capacity (would truncate): {}x{} cap={} count={}",
@@ -3004,10 +3004,22 @@ void ZVulkanImgRaycasterPipelineContext::recordBlockIdCompaction(Z3DRendererBase
         imgH,
         capacityIDs,
         count);
+      std::vector<uint32_t> idWords;
+      if (count > 0u) {
+        const size_t idBytes = static_cast<size_t>(count) * sizeof(uint32_t);
+        auto payloadBytes =
+          m_backend.readBufferRangeAfterCompletion(*compactOutput,
+                                                   static_cast<vk::DeviceSize>(idsOffsetWords * sizeof(uint32_t)),
+                                                   idBytes,
+                                                   "block_id_compact_payload_readback");
+        CHECK_EQ(payloadBytes.size(), idBytes) << "Block-ID compaction payload readback size mismatch";
+        idWords.resize(count);
+        std::memcpy(idWords.data(), payloadBytes.data(), idBytes);
+      }
 
       missingBlocks.reserve(count);
       for (uint32_t i = 0; i < count; ++i) {
-        uint32_t v = words[idsOffsetWords + i];
+        uint32_t v = idWords[i];
         if (v != kEmptyBlockID && v != 0u) {
           missingBlocks.push_back(v);
         }

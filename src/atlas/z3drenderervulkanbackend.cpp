@@ -7105,6 +7105,57 @@ Z3DRendererVulkanBackend::requestEndOfFrameBufferReadbackTicket(ZVulkanBuffer& s
   return ticket;
 }
 
+std::vector<uint8_t> Z3DRendererVulkanBackend::readBufferRangeAfterCompletion(ZVulkanBuffer& src,
+                                                                              vk::DeviceSize srcOffset,
+                                                                              size_t bytes,
+                                                                              std::string_view debugLabel)
+{
+  CHECK(currentRenderThreadExecutorOrNull() != nullptr)
+    << "readBufferRangeAfterCompletion must be called on the rendering thread" << (debugLabel.empty() ? "" : " (")
+    << (debugLabel.empty() ? "" : debugLabel) << (debugLabel.empty() ? "" : ")");
+  CHECK_GT(bytes, 0u) << "readBufferRangeAfterCompletion requires bytes > 0";
+  const size_t offset = static_cast<size_t>(srcOffset);
+  CHECK_LE(offset, src.size()) << "readBufferRangeAfterCompletion offset out of bounds";
+  CHECK_LE(bytes, src.size() - offset) << "readBufferRangeAfterCompletion range out of bounds";
+  CHECK((src.usage() & vk::BufferUsageFlagBits::eTransferSrc) != vk::BufferUsageFlags{})
+    << "readBufferRangeAfterCompletion requires a transfer-src buffer";
+
+  auto staging =
+    device().createBufferInPool(bytes,
+                                vk::BufferUsageFlagBits::eTransferDst,
+                                vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent |
+                                  vk::MemoryPropertyFlagBits::eHostCached,
+                                device().readbackStagingPool());
+  CHECK(staging != nullptr) << "readBufferRangeAfterCompletion failed to allocate staging buffer";
+  void* mapped = staging->map(0, bytes);
+  CHECK(mapped != nullptr) << "readBufferRangeAfterCompletion staging buffer is not mapped";
+
+  device().frameExecutor().executeImmediate(
+    [&](vk::raii::CommandBuffer& cmd) {
+      vk::BufferMemoryBarrier2 barrier{};
+      barrier.srcStageMask = vk::PipelineStageFlagBits2::eAllCommands;
+      barrier.srcAccessMask = vk::AccessFlagBits2::eMemoryWrite;
+      barrier.dstStageMask = vk::PipelineStageFlagBits2::eTransfer;
+      barrier.dstAccessMask = vk::AccessFlagBits2::eTransferRead;
+      barrier.buffer = src.buffer();
+      barrier.offset = srcOffset;
+      barrier.size = bytes;
+      vk::DependencyInfo dep{};
+      dep.bufferMemoryBarrierCount = 1;
+      dep.pBufferMemoryBarriers = &barrier;
+      cmd.pipelineBarrier2(dep);
+
+      const vk::BufferCopy region{.srcOffset = srcOffset, .dstOffset = 0, .size = bytes};
+      cmd.copyBuffer(src.buffer(), staging->buffer(), region);
+    },
+    debugLabel.empty() ? "buffer_range_readback_after_completion" : debugLabel);
+
+  std::vector<uint8_t> out(bytes);
+  std::memcpy(out.data(), mapped, bytes);
+  staging->unmap();
+  return out;
+}
+
 folly::coro::Task<void> Z3DRendererVulkanBackend::EndOfFrameHostImageReadbackTicket::awaitReady()
 {
   CHECK(m_hostBytes != nullptr) << "EndOfFrameHostImageReadbackTicket used without host bytes";
