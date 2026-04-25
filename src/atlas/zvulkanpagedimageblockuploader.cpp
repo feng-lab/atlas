@@ -21,6 +21,7 @@
 #include <algorithm>
 #include <chrono>
 #include <limits>
+#include <optional>
 
 DECLARE_uint32(atlas_log_folly_global_executor_status_interval_in_seconds);
 DECLARE_uint32(atlas_3d_paging_queue_poll_interval_ms);
@@ -252,29 +253,36 @@ size_t ZVulkanPagedImageBlockUploader::readAndUploadImageBlocks(
     LOG(ERROR) << "Vulkan paged-image block reader failed: " << result.exception().what();
   });
 
+  struct PendingReadResult
+  {
+    std::shared_ptr<ZImg> imageBlock;
+    std::optional<std::string> failureMessage;
+  };
+
   size_t emptyBlockCount = 0;
-  size_t remainingBlocks = sourcePendingTasks.size();
+  size_t completedReads = 0;
+  size_t processedReads = 0;
+  std::vector<std::optional<PendingReadResult>> readyResults(sourcePendingTasks.size());
   std::tuple<size_t, std::shared_ptr<ZImg>, std::optional<std::string>> elem;
   auto lastLog = std::chrono::steady_clock::now();
 
-  while (remainingBlocks > 0) {
-    maybeCancel(cancellationToken);
-
-    if (imgQueue.try_dequeue_until(
-          elem,
-          std::chrono::steady_clock::now() + std::chrono::milliseconds(FLAGS_atlas_3d_paging_queue_poll_interval_ms))) {
-      const auto taskIndex = std::get<0>(elem);
+  // Cache-slot assignment affects later eviction decisions, so commit completed
+  // reads in request order while still allowing the reads themselves to run in parallel.
+  auto processReadyPrefix = [&]() {
+    while (processedReads < readyResults.size() && readyResults[processedReads].has_value()) {
+      const auto taskIndex = processedReads;
+      auto& result = *readyResults[taskIndex];
       const auto& [pageTableEntryKey, pageTableEntryPtr] = sourcePendingTasks[taskIndex];
 
-      if (std::get<2>(elem).has_value()) {
-        image.recordPagingFailure(pageTableEntryKey, *std::get<2>(elem));
+      if (result.failureMessage.has_value()) {
+        image.recordPagingFailure(pageTableEntryKey, *result.failureMessage);
       }
 
-      if (!std::get<1>(elem)) {
+      if (!result.imageBlock) {
         ++emptyBlockCount;
         *pageTableEntryPtr = image.emptyPageTableEntry();
       } else {
-        const auto& imageBlock = std::get<1>(elem);
+        const auto& imageBlock = result.imageBlock;
         image.mapImageBlockToCache(channel, pageTableEntryKey, *pageTableEntryPtr);
 
         const glm::uvec3 cacheOffset(pageTableEntryPtr->x, pageTableEntryPtr->y, pageTableEntryPtr->z);
@@ -294,7 +302,24 @@ size_t ZVulkanPagedImageBlockUploader::readAndUploadImageBlocks(
                                                                      imageBlock);
       }
 
-      --remainingBlocks;
+      readyResults[taskIndex].reset();
+      ++processedReads;
+    }
+  };
+
+  while (processedReads < sourcePendingTasks.size()) {
+    maybeCancel(cancellationToken);
+
+    if (imgQueue.try_dequeue_until(elem,
+                                   std::chrono::steady_clock::now() +
+                                     std::chrono::milliseconds(FLAGS_atlas_3d_paging_queue_poll_interval_ms))) {
+      const auto taskIndex = std::get<0>(elem);
+      CHECK_LT(taskIndex, sourcePendingTasks.size()) << "Vulkan block reader returned an out-of-range task index";
+      CHECK(!readyResults[taskIndex].has_value()) << "Vulkan block reader returned a duplicate task index";
+      readyResults[taskIndex] =
+        PendingReadResult{.imageBlock = std::move(std::get<1>(elem)), .failureMessage = std::move(std::get<2>(elem))};
+      ++completedReads;
+      processReadyPrefix();
     } else if (readFuture.isReady() && imgQueue.size() == 0) {
       // Reader finished but no more blocks will arrive. Break to surface the underlying error
       // (or crash if it finished "successfully" but failed to enqueue all blocks).
@@ -310,15 +335,16 @@ size_t ZVulkanPagedImageBlockUploader::readAndUploadImageBlocks(
         stats.totalTaskCount,
         stats.activeThreadCount,
         stats.idleThreadCount,
-        imgQueue.size(),
-        remainingBlocks);
+        completedReads - processedReads,
+        sourcePendingTasks.size() - processedReads);
       lastLog = std::chrono::steady_clock::now();
     }
   }
 
   // Ensure the reader finished and propagate any unexpected failures.
   std::move(readFuture).get();
-  CHECK(remainingBlocks == 0) << "Vulkan block reader ended before delivering all blocks";
+  processReadyPrefix();
+  CHECK_EQ(processedReads, sourcePendingTasks.size()) << "Vulkan block reader ended before delivering all blocks";
 
   timer.recordEvent("image blocks uploading");
   VLOG(2) << "Uploaded " << (pendingTasks.size() - emptyBlockCount) << " image blocks to Vulkan image cache.";

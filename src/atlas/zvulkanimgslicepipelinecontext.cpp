@@ -922,6 +922,7 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
           std::vector<uint32_t> missingBlocks;
           missingBlocks.reserve(unique.size());
           missingBlocks.insert(missingBlocks.end(), unique.begin(), unique.end());
+          std::ranges::sort(missingBlocks);
 
           if (!missingBlocks.empty()) {
             ZBenchTimer timer(fmt::format("vulkan_slice_channel_{}", channelIndexSize));
