@@ -727,7 +727,8 @@ See also
          "xRatio"_a = 1,
          "yRatio"_a = 1,
          "zRatio"_a = 1,
-         "format"_a = FileFormat::Unknown)
+         "format"_a = FileFormat::Unknown,
+         nb::call_guard<nb::gil_scoped_release>())
     .def(nb::init<const QStringList&,
                   Dimension,
                   bool,
@@ -749,12 +750,14 @@ See also
          "zRatio"_a = 1,
          "format"_a = FileFormat::Unknown,
          "expandXY"_a = true,
-         "expandWithMaxValue"_a = false)
+         "expandWithMaxValue"_a = false,
+         nb::call_guard<nb::gil_scoped_release>())
     .def(nb::init<const ZImgSource&, size_t, size_t, size_t>(),
          "imgSource"_a,
          "xRatio"_a = 1,
          "yRatio"_a = 1,
-         "zRatio"_a = 1)
+         "zRatio"_a = 1,
+         nb::call_guard<nb::gil_scoped_release>())
     .def(
       "__init__",
       [](nb::pointer_and_handle<ZImg> v,
@@ -976,6 +979,7 @@ See also
       "scene"_a,
       "blockIndex"_a,
       "format"_a = FileFormat::Unknown,
+      nb::call_guard<nb::gil_scoped_release>(),
       "Read an individual sub-block from a single file by scene and block index.")
     .def_static(
       "readSubBlock",
@@ -995,6 +999,7 @@ See also
       "blockIndex"_a,
       "format"_a = FileFormat::Unknown,
       "expandXY"_a = true,
+      nb::call_guard<nb::gil_scoped_release>(),
       "Read an individual sub-block from a list of files with concatenation options.")
     .def_static(
       "getInternalSubRegions",
@@ -1161,8 +1166,8 @@ See also
   // positive triggered by the placeholder expression templates.
   // Suppress it narrowly for this block on MSVC only.
 #if defined(_MSC_VER)
-#  pragma warning(push)
-#  pragma warning(disable : 4686)
+#pragma warning(push)
+#pragma warning(disable : 4686)
 #endif
     .def(nb::self + nb::self)
     .def(nb::self += nb::self)
@@ -1227,7 +1232,7 @@ See also
     .def(nb::self / uint64_t())
     .def(nb::self /= uint64_t())
 #if defined(_MSC_VER)
-#  pragma warning(pop)
+#pragma warning(pop)
 #endif
     .def("__repr__", [](const ZImg& v) {
       return fmt::format("<_imgpy.ZImg {}>", v.info().toString());

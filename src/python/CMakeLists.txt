@@ -296,7 +296,6 @@ install(DIRECTORY "${_ZIMG_PY_PACKAGE_DIR}/" # canonical pure-Python package sou
 install(TARGETS ${module_name} DESTINATION zimg)
 
 if (WIN32)
-  #  install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/bin/h5ls.exe DESTINATION ${CMAKE_INSTALL_PREFIX}/zimg)
   if (NOT ZIMG_DISABLE_FREEIMAGE)
     install(FILES ${FREEIMAGE_DLLS} DESTINATION zimg)
   endif ()
