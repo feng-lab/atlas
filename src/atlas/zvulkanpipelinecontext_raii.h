@@ -11,7 +11,7 @@
 #include <vector>
 #include <string>
 
-#include <folly/experimental/coro/Task.h>
+#include <folly/coro/Task.h>
 
 namespace nim {
 

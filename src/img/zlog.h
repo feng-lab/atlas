@@ -278,6 +278,22 @@ concept HaveToStringFunction = requires(const T& a) {
   { a.toString() } -> std::same_as<std::string>;
 };
 
+template<typename T>
+concept IsEigenDenseLike = requires {
+  typename std::remove_cvref_t<T>::Scalar;
+  typename std::remove_cvref_t<T>::StorageKind;
+  typename std::remove_cvref_t<T>::StorageIndex;
+  { std::remove_cvref_t<T>::RowsAtCompileTime } -> std::convertible_to<int>;
+  { std::remove_cvref_t<T>::ColsAtCompileTime } -> std::convertible_to<int>;
+};
+
+template<typename T>
+concept IsFmtTupleLoggable = (!IsEigenDenseLike<T>) && fmt::is_tuple_like<T>::value;
+
+template<typename T>
+concept IsFmtRangeLoggable =
+  (!CanConvertToUtf8QByteArray<T>) && (!IsEigenDenseLike<T>) && fmt::is_range<T, char>::value;
+
 template<class T>
 concept IsUtf8ArrayType = IsAnyOf<T,
                                   QByteArray
@@ -316,15 +332,13 @@ std::ostream& operator<<(std::ostream& s, const T& v)
   return (s << v.toString());
 }
 
-template<typename T>
-  requires fmt::is_tuple_like<T>::value
+template<IsFmtTupleLoggable T>
 std::ostream& operator<<(std::ostream& s, const T& v)
 {
   return (s << fmt::format("{}", v));
 }
 
-template<typename T>
-  requires(!CanConvertToUtf8QByteArray<T>) && fmt::is_range<T, char>::value
+template<IsFmtRangeLoggable T>
 std::ostream& operator<<(std::ostream& s, const T& v)
 {
   return (s << fmt::format("{}", v));

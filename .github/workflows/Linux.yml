@@ -32,6 +32,8 @@ env:
   QT_VERSION: "6.9.2"
   # Minimum Python version used by CI build environments
   PYTHON_VERSION_MIN: "3.12"
+  # Python used by the 3rdparty source build. It does not need the final conda env.
+  LIB_BUILD_PYTHON_VERSION: "3.14"
 
 jobs:
   build-env:
@@ -131,46 +133,20 @@ jobs:
           test -d /opt/intel/oneapi || { echo "/opt/intel/oneapi not found" >&2; exit 1; }
           test -d /opt/intel/oneapi/tbb/latest/lib/cmake/tbb || { echo "TBB CMake config missing" >&2; exit 1; }
 
-      - name: Detect existing conda
+      - name: Setup Python for external deps
         if: steps.cache-extlibs.outputs.cache-hit != 'true'
-        id: detect-conda-linux-be
-        shell: bash
-        run: |
-          if command -v conda >/dev/null 2>&1; then
-            echo "found=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "found=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Setup Miniconda
-        if: steps.cache-extlibs.outputs.cache-hit != 'true' && steps.detect-conda-linux-be.outputs.found != 'true'
-        uses: conda-incubator/setup-miniconda@v3
+        uses: actions/setup-python@v6
         with:
-          auto-update-conda: true
-          activate-environment: ""
-          auto-activate: false
-          channels: defaults
+          python-version: ${{ env.LIB_BUILD_PYTHON_VERSION }}
 
-      - name: Create/Reset atlas-ci conda env
+      - name: Install Python deps for external deps
         if: steps.cache-extlibs.outputs.cache-hit != 'true'
         shell: bash -l {0}
         run: |
-          conda info || true
-          conda env remove -n atlas-ci -y || true
-          conda create -n atlas-ci -y python=${{ env.PYTHON_VERSION_MIN }}
-
-      - name: Install conda tooling
-        if: steps.cache-extlibs.outputs.cache-hit != 'true'
-        shell: bash -l {0}
-        run: |
-          eval "$(conda shell.bash hook)"
-          conda activate atlas-ci
-          conda info
-          conda update --all -y
-          conda install -y anaconda-client conda-build pip
+          set -euo pipefail
+          python --version
           python -m pip install --upgrade pip
           python -m pip install --no-cache-dir requests packaging boto3
-          conda clean --all -y
 
       - name: Cache atlas_deps (download archives)
         if: steps.cache-extlibs.outputs.cache-hit != 'true'
@@ -190,8 +166,6 @@ jobs:
           ATLAS_CLANG_MAJOR: ${{ env.CLANG_MAJOR }}
         run: |
           set -euo pipefail
-          eval "$(conda shell.bash hook)"
-          conda activate atlas-ci
           cd "$GITHUB_WORKSPACE"
           python util/build_ext_libs.py all
 
@@ -367,15 +341,6 @@ jobs:
           path: |
             src/3rdparty/build
           key: ${{ runner.os }}-ext-${{ env.CLANG_MAJOR }}-${{ hashFiles('util/atlas_deps_filelist.py') }}
-
-      - name: Cache atlas_deps (download archives)
-        uses: actions/cache@v5
-        with:
-          path: |
-            atlas_deps
-          key: ${{ runner.os }}-atlasdeps-${{ hashFiles('util/atlas_deps_filelist.py') }}
-          restore-keys: |
-            ${{ runner.os }}-atlasdeps-
 
       - name: Cache atlas test data
         uses: actions/cache@v5

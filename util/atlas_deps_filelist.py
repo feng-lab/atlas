@@ -1,272 +1,247 @@
 files_to_download = [
     {
-        "expected_size": 22400365,
-        "expected_sha256": "0d4efcaf6a098430a708e0af694a84792938921fa126162787ae98c6151d7a95",
-        "filename": "ffmpeg80arm.zip"
+        "expected_size": 218530643,
+        "expected_sha256": "626334955bc3f32eaaeccc1a18f1a2952b073fd9a62810db88cc6bf301e88e03",
+        "filename": "ffmpeg-n8.1-latest-win64-gpl-8.1.zip",
     },
     {
         "expected_size": 2035354,
         "expected_sha256": "15fbc5aba6beee0b17aecb04602ae39432393aba1ebd8e39b7cabf7db883299f",
-        "filename": "pcre2-10.46.tar.bz2"
-    },
-    {
-        "expected_size": 41748699,
-        "expected_sha256": "67c25c5e1196b3c02687722d30cda605f40a1ea64be2affaf98130ea99c7417a",
-        "filename": "hdf5-1.14.6.zip"
+        "filename": "pcre2-10.46.tar.bz2",
     },
     {
         "expected_size": 728187,
         "expected_sha256": "391cdd24ba8839ca179ddebe860ae0950f72a2e8a38edfc5e8aadbc60b78f2be",
-        "filename": "brotli-1.2.0.zip"
+        "filename": "brotli-1.2.0.zip",
     },
     {
-        "expected_size": 48627947,
-        "expected_sha256": "6f531bd4ba31a7aa0c3511082b544d306df50e7aecfbeef8bdbc1dd770736993",
-        "filename": "cmake-4.1.1-windows-x86_64.zip"
+        "expected_size": 53121812,
+        "expected_sha256": "deae7c80cba99c4b4f940ecadb3c3338b13cb77418409238e57d7f31f2a3b736",
+        "filename": "openssl-3.5.6.tar.gz",
     },
     {
-        "expected_size": 56395347,
-        "expected_sha256": "5a6c61cb62b38e153148a2c8d4af7b3d387f0c8c32b6dbceb5eb4af113efd65a",
-        "filename": "cmake-4.1.1-linux-x86_64.tar.gz"
+        "expected_size": 2528617,
+        "expected_sha256": "ecae8008e2cc9ade2f2c1bb9d5e6d4fb73e7c433866a056bd82980741571a022",
+        "filename": "libjpeg-turbo-3.1.4.1.tar.gz",
     },
     {
-        "expected_size": 296871,
-        "expected_sha256": "e09699d917c2c942b0e9c04af16ef1cd85a40a27793eb571453c59ec8df6669b",
-        "filename": "qwtpolar-code-r203-trunk.zip"
+        "expected_size": 1616754,
+        "expected_sha256": "e8bf55f3017aa181690990cb58a994e77885da140609fc8f94abe9b65d2cae28",
+        "filename": "zlib132.zip",
     },
     {
-        "expected_size": 51942501,
-        "expected_sha256": "968c283e104059dae86ea1d670672a80170f27a39529d815843ec9c1f0fa2a03",
-        "filename": "OpenJDK21U-jre_x64_linux_hotspot_21.0.8_9.tar.gz"
-    },
-    {
-        "expected_size": 1624377,
-        "expected_sha256": "43ae97658d0fc5b4eec4d409d85f7bed74a80945fd5704333a3599e0bd79b5fc",
-        "filename": "7z2409-extra.7z"
-    },
-    {
-        "expected_size": 2491894,
-        "expected_sha256": "4ae14daa97d9dc55cb6c665367f95a2c263b69d40784f3483ceef5ef5b59a127",
-        "filename": "openjpeg-2.5.3.zip"
-    },
-    {
-        "expected_size": 1686077,
-        "expected_sha256": "0d29bcd8a5fc617333f4549c7c1f93d1866a4a0915c40359e0a8585bb1a5aa75",
-        "filename": "nasm-2.16.03-macosx.zip"
-    },
-    {
-        "expected_size": 4387655,
-        "expected_sha256": "1a4f9d5d33b2caa539c675bc45f2bf86c8b67cf292767f2c027a5021a7055836",
-        "filename": "qwt-code-r3377-trunk.zip"
+        "expected_size": 1582074,
+        "expected_sha256": "8c9b05b675ca7301a458df2c2e46f26e1d41ff36b8863f8c33530bc58c2e6225",
+        "filename": "libpng-1.6.58.tar.gz",
     },
     {
         "expected_size": 482990,
         "expected_sha256": "6bd82d3043dadbcd58daaf903d974891128d22aab7dada5d399cb39094af49ce",
-        "filename": "jansson-2.14.1.tar.bz2"
+        "filename": "jansson-2.14.1.tar.bz2",
     },
     {
-        "expected_size": 1655249,
-        "expected_sha256": "72af66d44fcc14c22013b46b814d5d2514673dda3d115e64b690c1ad636e7b17",
-        "filename": "zlib131.zip"
+        "expected_size": 2492624,
+        "expected_sha256": "1048d084b89ac1587e3b0dca00b863a757fed2bc1804c6355eb4bce9090356b7",
+        "filename": "openjpeg-2.5.4.zip",
     },
     {
-        "expected_size": 1925167,
-        "expected_sha256": "ebb65ef6ca439333c2bb41a0c1990587288da07f6c7fd07cb3a18cc18d30ce19",
-        "filename": "libsodium-1.0.20.tar.gz"
+        "expected_size": 85312600,
+        "expected_sha256": "230b296f8d57785d24b9e5ebcee8b4947a53f10d8bef5bf2faca95b825bb4e26",
+        "filename": "oneapi-mkl-2025.3-windows-x64.7z",
     },
     {
-        "expected_size": 128158800,
-        "expected_sha256": "92f562c86ab69df4149df6b64fdb96a6a0368daa2b6d7b5bb6398e5d70f701f0",
-        "filename": "ffmpeg-n8.0-latest-linux64-gpl-8.0.tar.xz"
+        "expected_size": 64009719,
+        "expected_sha256": "791ae3604841ca03cb3889a3ad89165346e4b180ae3448efd4b0caa9ef46d245",
+        "filename": "cmake-4.3.2-linux-x86_64.tar.gz",
     },
     {
-        "expected_size": 1570835,
-        "expected_sha256": "708f4398f996325819936d447f982e0db90b6b8212b7507e7672ea232210949a",
-        "filename": "libpng-1.6.50.tar.gz"
+        "expected_size": 594502,
+        "expected_sha256": "e0ba5157007abc7b1a65118a96657a961ddf55f7e3f632ee035366dfce039ca4",
+        "filename": "nasm-3.01-win64.zip",
     },
     {
         "expected_size": 314009,
         "expected_sha256": "da7797794153629aca5570ef7c813342d0be214ba84632af886856e8f0063dd9",
-        "filename": "ninja-mac.zip"
+        "filename": "ninja-mac.zip",
     },
     {
-        "expected_size": 565546,
-        "expected_sha256": "6168baa9dbc8d527ae1ebf2631313291a1d545da268a05f4caa52ceadbe8b295",
-        "filename": "qwtpolar-1.1.1.tar.bz2"
+        "expected_size": 8514178,
+        "expected_sha256": "88913cc69a7791a350457238c12c5028ebd6b9a31707d5a4b0f5aa0aa626de2b",
+        "filename": "curl-8.20.0_1-win64-mingw.zip",
     },
     {
-        "expected_size": 189840786,
-        "expected_sha256": "b24628d8d93f332c913d45eef88c3ab2c0154031efab7f5488c070c13fe6ebbd",
-        "filename": "ffmpeg-n8.0-latest-win64-gpl-8.0.zip"
+        "expected_size": 150157261,
+        "expected_sha256": "9446c37fd86fecd95254ebe5d368a66ef9b09cec4592b2746979076657e24e65",
+        "filename": "boost_1_91_0.7z",
+    },
+    {
+        "expected_size": 8595619,
+        "expected_sha256": "0456397a5edbe3533ed0c6abb3950e9228331a2577f9fa1c69e9dfb7b7ffe667",
+        "filename": "neurolabi-internal-src.zip",
     },
     {
         "expected_size": 289808,
         "expected_sha256": "26a40fa8595694dec2fad4911e62d29e10525d2133c9a4230b66397774ae25bf",
-        "filename": "ninja-win.zip"
+        "filename": "ninja-win.zip",
     },
     {
         "expected_size": 8314627,
         "expected_sha256": "dd9256cc7ad3a140b1fa9035c56102455441c26d924d7d8443fe06ba54261607",
-        "filename": "freeimage-svn-r1911-FreeImage-trunk.zip"
+        "filename": "freeimage-svn-r1911-FreeImage-trunk.zip",
     },
     {
         "expected_size": 1448542,
         "expected_sha256": "f05128cc735e8a4a0dff027a2c54a8ce69c30b4c0774bfb2994638317927c224",
-        "filename": "gawk-3.1.6-1-bin.zip"
+        "filename": "gawk-3.1.6-1-bin.zip",
     },
     {
-        "expected_size": 53180161,
-        "expected_sha256": "c53a47e5e441c930c3928cf7bf6fb00e5d129b630e0aa873b08258656e7345ec",
-        "filename": "openssl-3.5.2.tar.gz"
+        "expected_size": 87444418,
+        "expected_sha256": "808ab43a0db04c8eec9ed7db12b90d7be1c8e2e75f4a060724d604a2043ccaf7",
+        "filename": "cmake-4.3.2-macos-universal.tar.gz",
     },
     {
-        "expected_size": 123506971,
-        "expected_sha256": "d8b0c1d593d68fe359616aa2fae4b3e258ca1f90ed57eb46c5494c29cdd1d49d",
-        "filename": "boost_1_89_0.7z"
+        "expected_size": 1746114,
+        "expected_sha256": "400b797db8fc7cb7046db0dda996fbae779f388869db39896f82cfac0534e94c",
+        "filename": "nasm-3.01-macosx.zip",
     },
     {
-        "expected_size": 81096477,
-        "expected_sha256": "3cd1da5341618645bdc85a3b99e273f29c4d48db2f545925a658db992e61f6f9",
-        "filename": "cmake-4.1.1-macos-universal.tar.gz"
+        "expected_size": 140303220,
+        "expected_sha256": "c403b53a4950ccd0d5d6d8738b06fa4b9a7aaaa529bdc80cda6ca73d1fddb5cd",
+        "filename": "ffmpeg-n8.1-latest-linux64-gpl-8.1.tar.xz",
     },
     {
-        "expected_size": 860760,
-        "expected_sha256": "1ffd6437669faed1ace848085fcaebea70ee05ddf2280b090f00f1717de1f11d",
-        "filename": "trust_stores_as_pem.tar.gz"
+        "expected_size": 48082795,
+        "expected_sha256": "c3be8c87f1a5cdc727903546eb810e112f94cd7222dac6a9d3f3146ee932008d",
+        "filename": "OpenJDK21U-jre_aarch64_mac_hotspot_21.0.10_7.tar.gz",
     },
     {
-        "expected_size": 7827096,
-        "expected_sha256": "75a8260d2ba51aa396a540d761e57e6fe0d5c0d5377d6af8c9de3efb639851b2",
-        "filename": "curl-8.11.1_1-win64-mingw.zip"
-    },
-    {
-        "expected_size": 4408268,
-        "expected_sha256": "4076de63ec2b5e84379ddfebf27c7b29b8dc9074f3db7e2ca61d11a1d8adc041",
-        "filename": "qwt-6.1.5.tar.bz2"
-    },
-    {
-        "expected_size": 513543,
-        "expected_sha256": "3ee4782247bcb874378d02f7eab4e294a84d3d15f3f6ee2de2f47a46aa7226e6",
-        "filename": "nasm-2.16.03-win64.zip"
+        "expected_size": 52961068,
+        "expected_sha256": "83d20c23f5c5f64b3b328785e35b23c532e33057a97ed6294acaca3781b78a01",
+        "filename": "cmake-4.3.2-windows-x86_64.zip",
     },
     {
         "expected_size": 134048,
         "expected_sha256": "0830252db77884957a1a4b87b05a1e2d9b5f658b8367f82999a941884cbe0238",
-        "filename": "ninja-linux.zip"
+        "filename": "ninja-linux.zip",
     },
     {
-        "expected_size": 48076322,
-        "expected_sha256": "7849fd9e0d48c6638a1f82a81000ef170e32600fd7a32fc257668e7e7ae041b4",
-        "filename": "OpenJDK21U-jre_aarch64_mac_hotspot_21.0.8_9.tar.gz"
+        "expected_size": 22547387,
+        "expected_sha256": "ebb82529562b71170807bbc6b0e7eb4f0b13af8cbb0e085bb9e8f6fe709598ad",
+        "filename": "ffmpeg81arm.zip",
     },
     {
-        "expected_size": 26155398,
-        "expected_sha256": "2d24d22db78c87f394a5822867acd5c5dc5e762cd261a44bd26923f3a5af3e07",
-        "filename": "ffmpeg80intel.zip"
+        "expected_size": 44689164,
+        "expected_sha256": "41512eb079d9637bf0d89d5893f060d8593491b3a48d61d23cede135ada11f11",
+        "filename": "hdf5-2.1.1.zip",
     },
     {
-        "expected_size": 9778734,
-        "expected_sha256": "40d6bcfdefd2b5ae1a57380510e166a18fce8883d42263f0952befbe6dd3f0e9",
-        "filename": "libqxt-libqxt-696423b68972.zip"
+        "expected_size": 17845221,
+        "expected_sha256": "07fa0fb57f28427f9d38ed43c37448df0da1f205c939bab36b50980378ad86a5",
+        "filename": "ffmpeg-8.1intel.7z",
     },
     {
-        "expected_size": 2512033,
-        "expected_sha256": "8f0012234b464ce50890c490f18194f913a7b1f4e6a03d6644179fa0f867d0cf",
-        "filename": "libjpeg-turbo-3.1.2.tar.gz"
+        "expected_size": 85375520,
+        "expected_sha256": "56044063ccdb5b0c316545fbea4cee9b723cf853f8a3460a9845311a54065460",
+        "filename": "oneapi-mkl-2023.2.0-macos-x64.tar.xz",
     },
     {
-        "expected_size": 42065507,
-        "expected_sha256": "34464861ed170ea0e5acdf870011f9e92f836e712b620ba37c4b2d0e5aeb8675",
-        "filename": "OpenJDK21U-jre_x64_mac_hotspot_21.0.8_9.tar.gz"
+        "expected_size": 1653271,
+        "expected_sha256": "51b93737bf62e8549b0e94dce0fba92169e31c8ecc160883460a9bdaa6d2c298",
+        "filename": "libsodium-1.0.22.tar.bz2",
+    },
+    {
+        "expected_size": 48963112,
+        "expected_sha256": "a6ac6789e51a2c245f41430c42e72b39ec706a449812fc5e4cbfc55ceed1e5ae",
+        "filename": "OpenJDK21U-jre_x64_windows_hotspot_21.0.10_7.zip",
     },
     {
         "expected_size": 3833512,
         "expected_sha256": "93a852c2b3efafee3723efd4636de855b46f9fe1efddd607e1f42f60fc8f2136",
-        "filename": "libwebp-1.6.0.tar.gz"
+        "filename": "libwebp-1.6.0.tar.gz",
     },
     {
-        "expected_size": 108275992,
-        "expected_sha256": "241a881670164feb0b91bb69d39fbbf84c981bec0d9f8c19959f8f48fd177768",
-        "filename": "strawberry-perl-5.32.1.1-64bit.msi"
+        "expected_size": 51947513,
+        "expected_sha256": "991be6ac6725e76109ecbd131d658f992dcbeacba3a8b4b6650302c8012b52fb",
+        "filename": "OpenJDK21U-jre_x64_linux_hotspot_21.0.10_7.tar.gz",
+    },
+    {
+        "expected_size": 42082349,
+        "expected_sha256": "008d2bb904c0e07500b92bf4b0f8d434d694b13d5189f06358a52d46b1351f37",
+        "filename": "OpenJDK21U-jre_x64_mac_hotspot_21.0.10_7.tar.gz",
     },
     {
         "expected_size": 105431,
         "expected_sha256": "413d9f5562c39c2fcac1e48b3e2155838680a0aec1ddcb95b23cb2f092962dcc",
-        "filename": "gperf-3.0.1-bin.zip"
+        "filename": "gperf-3.0.1-bin.zip",
     },
     {
-        "expected_size": 48928520,
-        "expected_sha256": "238d74ec4ec9422d416fa98805ba375eecd8bc8f971bd0c61a21051a4fe42db8",
-        "filename": "OpenJDK21U-jre_x64_windows_hotspot_21.0.8_9.zip"
-    },
-    {
-        "expected_size": 45509410,
-        "expected_sha256": "8c7557a9357a83bf40272292fbd676beb466a9a8bab34126e92a49d636c64bc2",
-        "filename": "jars/bioformats_package.jar"
+        "expected_size": 53843906,
+        "expected_sha256": "c6e60665d53a334b66e4d635340151f403dfe57a64704c573dd4c03b873befb9",
+        "filename": "jars/bioformats_package.jar",
     },
     {
         "expected_size": 13307,
         "expected_sha256": "726286d3408c2f29521bc9b7270e7add335e7b6d9b3f3962282809974576a1d1",
-        "filename": "jars/scifio-itk-bridge.jar"
+        "filename": "jars/scifio-itk-bridge.jar",
     },
     {
         "expected_size": 485,
         "expected_sha256": "7a2f4c17bed36509bd665376075762b128b11b9b90ac5ffba79a1db2d79ed64f",
-        "filename": "packages-Windows/fenglab.neutube/meta/package.xml"
+        "filename": "packages-Windows/fenglab.neutube/meta/package.xml",
     },
     {
         "expected_size": 22,
         "expected_sha256": "66188811ddafb81b874887a9414e380cceba2af430158afd62ac9f6ca00199ae",
-        "filename": "packages-Windows/fenglab.neutube/meta/license.txt"
+        "filename": "packages-Windows/fenglab.neutube/meta/license.txt",
     },
     {
         "expected_size": 368,
         "expected_sha256": "39160eb1f9f667ddb2d48d0beb040c29e0396d068f673864897f1686be8aa68b",
-        "filename": "packages-Windows/fenglab.neutube/meta/installscript.qs"
+        "filename": "packages-Windows/fenglab.neutube/meta/installscript.qs",
     },
     {
         "expected_size": 12250307,
         "expected_sha256": "b094c90b87b222690309145ea2b2b82dd5c35b58fa47ae488c3c0a059482c248",
-        "filename": "packages-Windows/fenglab.neutube/data/neuTube_win64.7z"
+        "filename": "packages-Windows/fenglab.neutube/data/neuTube_win64.7z",
     },
     {
         "expected_size": 485,
         "expected_sha256": "0fd6c60bf7a9032a9a58ff790d841516790d4656c078ada5e2488c152456828a",
-        "filename": "packages-Linux/fenglab.neutube/meta/package.xml"
+        "filename": "packages-Linux/fenglab.neutube/meta/package.xml",
     },
     {
         "expected_size": 22,
         "expected_sha256": "66188811ddafb81b874887a9414e380cceba2af430158afd62ac9f6ca00199ae",
-        "filename": "packages-Linux/fenglab.neutube/meta/license.txt"
+        "filename": "packages-Linux/fenglab.neutube/meta/license.txt",
     },
     {
         "expected_size": 368,
         "expected_sha256": "39160eb1f9f667ddb2d48d0beb040c29e0396d068f673864897f1686be8aa68b",
-        "filename": "packages-Linux/fenglab.neutube/meta/installscript.qs"
+        "filename": "packages-Linux/fenglab.neutube/meta/installscript.qs",
     },
     {
         "expected_size": 11263509,
         "expected_sha256": "95d1c2ba144703b74ef3e9793226018c007ed48d724639a78aea4490066f3cea",
-        "filename": "packages-Linux/fenglab.neutube/data/neuTube_linux.7z"
+        "filename": "packages-Linux/fenglab.neutube/data/neuTube_linux.7z",
     },
     {
         "expected_size": 485,
         "expected_sha256": "1429320a4e34c18b0445e85c76f83702e22f3876a2752705aa4c84448c81248a",
-        "filename": "packages-macOS/fenglab.neutube/meta/package.xml"
+        "filename": "packages-macOS/fenglab.neutube/meta/package.xml",
     },
     {
         "expected_size": 22,
         "expected_sha256": "66188811ddafb81b874887a9414e380cceba2af430158afd62ac9f6ca00199ae",
-        "filename": "packages-macOS/fenglab.neutube/meta/license.txt"
+        "filename": "packages-macOS/fenglab.neutube/meta/license.txt",
     },
     {
         "expected_size": 368,
         "expected_sha256": "39160eb1f9f667ddb2d48d0beb040c29e0396d068f673864897f1686be8aa68b",
-        "filename": "packages-macOS/fenglab.neutube/meta/installscript.qs"
+        "filename": "packages-macOS/fenglab.neutube/meta/installscript.qs",
     },
     {
         "expected_size": 13996165,
         "expected_sha256": "88f5a155f43f6637a63667c0b6dc32c2239b95f8ab5044dc1d112b3b000d3dfa",
-        "filename": "packages-macOS/fenglab.neutube/data/neuTube.7z"
-    }
+        "filename": "packages-macOS/fenglab.neutube/data/neuTube.7z",
+    },
 ]

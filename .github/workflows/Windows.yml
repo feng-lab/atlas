@@ -24,17 +24,17 @@ permissions:
   contents: read
 
 env:
-  # Official Intel oneAPI BaseKit offline installer URL (mirrors oneapi-ci)
-  # Used to install MKL + oneTBB components silently on Windows runners.
-  ONEAPI_BASEKIT_URL: https://registrationcenter-download.intel.com/akdlm/IRC_NAS/1f18901e-877d-469d-a41a-a10f11b39336/intel-oneapi-base-toolkit-2025.3.0.372_offline.exe
   # Centralize Qt version to make upgrades easy
   QT_VERSION: "6.9.2"
   # Minimum Python version used by CI build environments
   PYTHON_VERSION_MIN: "3.12"
+  # Python used by the 3rdparty source build. It does not need the final conda env.
+  LIB_BUILD_PYTHON_VERSION: "3.14"
   # Pin a Vulkan SDK version
   VULKAN_SDK_VERSION: 1.4.341.1
-  # Split point for 3rdparty build; job1 stops before this lib, job2 starts from this lib
-  EXT_SPLIT_LIB: hdf5
+  # Split point for 3rdparty build; job1 stops before this lib, job2 starts from this lib.
+  # Keep HDF5 in part 1 because its build expects Perl and part 1 installs Perl.
+  EXT_SPLIT_LIB: freeimage
 
 jobs:
   ext-cache-probe:
@@ -103,75 +103,22 @@ jobs:
         run: |
           & .\util\install_llvm_windows.ps1
 
-      - name: Restore Intel oneAPI cache
+      - name: Setup Python for external deps
         if: steps.cache-extlibs-p1.outputs.cache-hit != 'true'
-        id: cache-oneapi-restore-buildenv
-        uses: actions/cache/restore@v5
+        uses: actions/setup-python@v6
         with:
-          path: |
-            C:\\Program Files (x86)\\Intel\\oneAPI
-          key: ${{ runner.os }}-oneapi-${{ env.ONEAPI_BASEKIT_URL }}
+          python-version: ${{ env.LIB_BUILD_PYTHON_VERSION }}
 
-      - name: Install Intel oneAPI BaseKit (installer)
-        if: steps.cache-oneapi-restore-buildenv.outputs.cache-hit != 'true' && steps.cache-extlibs-p1.outputs.cache-hit != 'true'
-        shell: pwsh
-        run: |
-          if (Test-Path "C:\Program Files (x86)\Intel\oneAPI") {
-            Write-Host 'Intel oneAPI already installed; skipping.'
-            exit 0
-          }
-          if (-not $env:ONEAPI_BASEKIT_URL) { Write-Error "ONEAPI_BASEKIT_URL is not set." }
-          $components = 'intel.oneapi.win.mkl.devel:intel.oneapi.win.tbb.devel'
-          Write-Host "Installing Intel oneAPI BaseKit via util\\install_windows.bat..."
-          cmd.exe /c "util\\install_windows.bat $env:ONEAPI_BASEKIT_URL $components"
-          if ($LASTEXITCODE -ne 0) { Write-Error "oneAPI installer exit code: $LASTEXITCODE" }
-          # Validate install paths
-          if (-not (Test-Path "C:\Program Files (x86)\Intel\oneAPI")) { Write-Error "Intel oneAPI root missing" }
-
-      - name: Always save Intel oneAPI cache
-        if: ${{ !cancelled() && steps.cache-oneapi-restore-buildenv.outputs.cache-hit != 'true' && steps.cache-extlibs-p1.outputs.cache-hit != 'true' }}
-        uses: actions/cache/save@v5
-        with:
-          path: |
-            C:\\Program Files (x86)\\Intel\\oneAPI
-          key: ${{ runner.os }}-oneapi-${{ env.ONEAPI_BASEKIT_URL }}
-
-      - name: Setup conda
-        if: steps.cache-extlibs-p1.outputs.cache-hit != 'true'
-        uses: conda-incubator/setup-miniconda@v3
-        with:
-          auto-update-conda: true
-          activate-environment: ""
-          auto-activate: false
-          channels: defaults
-
-      - name: Create/Reset atlas-ci conda env
+      - name: Install Python deps for external deps
         if: steps.cache-extlibs-p1.outputs.cache-hit != 'true'
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          conda info
-          conda env remove -n atlas-ci -y
-          if ($LASTEXITCODE -ne 0) { Write-Host "No existing atlas-ci env to remove (ok)" }
-          conda create -n atlas-ci -y python=${{ env.PYTHON_VERSION_MIN }}
-          if ($LASTEXITCODE -ne 0) { Write-Error "Failed to create atlas-ci env"; exit $LASTEXITCODE }
-
-      - name: Install conda tooling and Python deps
-        if: steps.cache-extlibs-p1.outputs.cache-hit != 'true'
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Stop'
-          $condaHook = (& conda 'shell.powershell' 'hook') | Out-String
-          Invoke-Expression $condaHook
-          conda activate atlas-ci
-          conda info
-          conda install -y anaconda-client conda-build pip
-          if ($LASTEXITCODE -ne 0) { Write-Error "Failed to install conda packages into atlas-ci"; exit $LASTEXITCODE }
+          python --version
           python -m pip install --upgrade pip
-          if ($LASTEXITCODE -ne 0) { Write-Error "Failed to upgrade pip in atlas-ci"; exit $LASTEXITCODE }
+          if ($LASTEXITCODE -ne 0) { Write-Error "Failed to upgrade pip"; exit $LASTEXITCODE }
           python -m pip install --no-cache-dir requests packaging boto3
-          if ($LASTEXITCODE -ne 0) { Write-Error "Failed to install Python deps in atlas-ci"; exit $LASTEXITCODE }
-          conda clean --all -y
+          if ($LASTEXITCODE -ne 0) { Write-Error "Failed to install Python deps"; exit $LASTEXITCODE }
 
       - name: Cache atlas_deps (download archives)
         if: steps.cache-extlibs-p1.outputs.cache-hit != 'true'
@@ -188,11 +135,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $condaHook = (& conda 'shell.powershell' 'hook') | Out-String
-          Invoke-Expression $condaHook
-          conda activate atlas-ci
           cd "$env:GITHUB_WORKSPACE"
-          conda info
           python util/build_ext_libs.py all --stop-before $env:EXT_SPLIT_LIB
           if ($LASTEXITCODE -ne 0) { Write-Error "External deps build (part 1) failed with exit code $LASTEXITCODE"; exit $LASTEXITCODE }
 
@@ -222,47 +165,20 @@ jobs:
         run: |
           & .\util\install_llvm_windows.ps1
 
-      - name: Restore Intel oneAPI cache
-        id: cache-oneapi-restore-buildenv2
-        uses: actions/cache/restore@v5
+      - name: Setup Python for external deps
+        uses: actions/setup-python@v6
         with:
-          path: |
-            C:\\Program Files (x86)\\Intel\\oneAPI
-          key: ${{ runner.os }}-oneapi-${{ env.ONEAPI_BASEKIT_URL }}
-
-      - name: Setup conda
-        uses: conda-incubator/setup-miniconda@v3
-        with:
-          auto-update-conda: true
-          activate-environment: ""
-          auto-activate: false
-          channels: defaults
+          python-version: ${{ env.LIB_BUILD_PYTHON_VERSION }}
       
-      - name: Create/Reset atlas-ci conda env
+      - name: Install Python deps for external deps
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          conda info
-          conda env remove -n atlas-ci -y
-          if ($LASTEXITCODE -ne 0) { Write-Host "No existing atlas-ci env to remove (ok)" }
-          conda create -n atlas-ci -y python=${{ env.PYTHON_VERSION_MIN }}
-          if ($LASTEXITCODE -ne 0) { Write-Error "Failed to create atlas-ci env"; exit $LASTEXITCODE }
-      
-      - name: Install conda tooling and Python deps
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Stop'
-          $condaHook = (& conda 'shell.powershell' 'hook') | Out-String
-          Invoke-Expression $condaHook
-          conda activate atlas-ci
-          conda info
-          conda install -y anaconda-client conda-build pip
-          if ($LASTEXITCODE -ne 0) { Write-Error "Failed to install conda packages into atlas-ci"; exit $LASTEXITCODE }
+          python --version
           python -m pip install --upgrade pip
-          if ($LASTEXITCODE -ne 0) { Write-Error "Failed to upgrade pip in atlas-ci"; exit $LASTEXITCODE }
-          python -m pip install --no-cache-dir aqtinstall requests packaging boto3
-          if ($LASTEXITCODE -ne 0) { Write-Error "Failed to install Python deps in atlas-ci"; exit $LASTEXITCODE }
-          conda clean --all -y
+          if ($LASTEXITCODE -ne 0) { Write-Error "Failed to upgrade pip"; exit $LASTEXITCODE }
+          python -m pip install --no-cache-dir requests packaging boto3
+          if ($LASTEXITCODE -ne 0) { Write-Error "Failed to install Python deps"; exit $LASTEXITCODE }
 
       - name: Cache atlas_deps (download archives)
         uses: actions/cache@v5
@@ -288,11 +204,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $condaHook = (& conda 'shell.powershell' 'hook') | Out-String
-          Invoke-Expression $condaHook
-          conda activate atlas-ci
           cd "$env:GITHUB_WORKSPACE"
-          conda info
           python util/build_ext_libs.py all --start-from $env:EXT_SPLIT_LIB
           if ($LASTEXITCODE -ne 0) { Write-Error "External deps build (part 2) failed with exit code $LASTEXITCODE"; exit $LASTEXITCODE }
 
@@ -334,38 +246,6 @@ jobs:
         shell: pwsh
         run: |
           & .\util\install_llvm_windows.ps1
-
-      - name: Restore Intel oneAPI cache
-        id: cache-oneapi-restore-build
-        uses: actions/cache/restore@v5
-        with:
-          path: |
-            C:\\Program Files (x86)\\Intel\\oneAPI
-          key: ${{ runner.os }}-oneapi-${{ env.ONEAPI_BASEKIT_URL }}
-
-      - name: Install Intel oneAPI BaseKit (installer)
-        if: steps.cache-oneapi-restore-build.outputs.cache-hit != 'true'
-        shell: pwsh
-        run: |
-          if (Test-Path "C:\Program Files (x86)\Intel\oneAPI") {
-            Write-Host 'Intel oneAPI already installed; skipping.'
-            exit 0
-          }
-          if (-not $env:ONEAPI_BASEKIT_URL) { Write-Error "ONEAPI_BASEKIT_URL is not set." }
-          $components = 'intel.oneapi.win.mkl.devel:intel.oneapi.win.tbb.devel'
-          Write-Host "Installing Intel oneAPI BaseKit via util\\install_windows.bat..."
-          cmd.exe /c "util\\install_windows.bat $env:ONEAPI_BASEKIT_URL $components"
-          if ($LASTEXITCODE -ne 0) { Write-Error "oneAPI installer exit code: $LASTEXITCODE" }
-          # Validate install paths
-          if (-not (Test-Path "C:\Program Files (x86)\Intel\oneAPI")) { Write-Error "Intel oneAPI root missing" }
-
-      - name: Always save Intel oneAPI cache
-        if: ${{ !cancelled() && steps.cache-oneapi-restore-build.outputs.cache-hit != 'true' }}
-        uses: actions/cache/save@v5
-        with:
-          path: |
-            C:\\Program Files (x86)\\Intel\\oneAPI
-          key: ${{ runner.os }}-oneapi-${{ env.ONEAPI_BASEKIT_URL }}
 
       - name: Cache Vulkan SDK (installed)
         id: cache-vulkan
@@ -470,15 +350,6 @@ jobs:
           path: |
             src/3rdparty/build
           key: ${{ runner.os }}-ext-p2-${{ hashFiles('util/atlas_deps_filelist.py') }}
-
-      - name: Cache atlas_deps (download archives)
-        uses: actions/cache@v5
-        with:
-          path: |
-            atlas_deps
-          key: ${{ runner.os }}-atlasdeps-${{ hashFiles('util/atlas_deps_filelist.py') }}
-          restore-keys: |
-            ${{ runner.os }}-atlasdeps-
 
       - name: Cache atlas test data
         uses: actions/cache@v5
