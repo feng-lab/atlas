@@ -2975,6 +2975,7 @@ def build_grpc(src_dir: str, install_dir: str, nasm_dir: str):
                 "-DgRPC_BUILD_TESTS:BOOL=OFF",
                 "-DgRPC_MSVC_STATIC_RUNTIME:BOOL=OFF" if is_windows() else "",
                 "-DgRPC_ZLIB_PROVIDER:STRING=package",
+                "-DZLIB_USE_STATIC_LIBS:BOOL=ON",
                 "-DgRPC_PROTOBUF_PROVIDER=module",
                 "-DgRPC_CARES_PROVIDER=module",
                 "-DgRPC_SSL_PROVIDER=package",

@@ -78,6 +78,9 @@ endif (WIN32)
 message(STATUS "JPEGTURBO_INCLUDE_DIRS: ${JPEGTURBO_INCLUDE_DIRS}")
 message(STATUS "JPEGTURBO_LIBRARIES: ${JPEGTURBO_LIBRARIES}")
 
+# Our vendored zlib build is static-only. On Windows upstream zlib names that
+# archive `zs.lib`, which CMake's FindZLIB searches only in static mode.
+set(ZLIB_USE_STATIC_LIBS ON)
 find_package(ZLIB MODULE REQUIRED)
 print_target_properties(ZLIB::ZLIB)
 
