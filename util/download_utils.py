@@ -17,6 +17,21 @@ logger = logging.getLogger(__name__)
 # Progress reporting policy for non-interactive environments (e.g., CI)
 PROGRESS_LOG_INTERVAL_SEC = 5  # minimum seconds between progress log lines
 PROGRESS_LOG_PERCENT_STEP = 10  # log on each additional N% completion
+BYTE_PRESERVED_ARCHIVE_SUFFIXES = (
+    ".tar.gz",
+    ".tgz",
+    ".gz",
+    ".tar.bz2",
+    ".tbz2",
+    ".tbz",
+    ".bz2",
+    ".tar.xz",
+    ".txz",
+    ".xz",
+    ".tar.zst",
+    ".tzst",
+    ".zst",
+)
 
 
 def call_with_backoff(
@@ -104,6 +119,43 @@ def validate_checksum(file_path, expected_sha256):
     else:
         logger.warning(f"Checksum validation failed for {file_path}")
         return False
+
+
+def _response_content_length(response):
+    content_length = response.headers.get("Content-Length")
+    if content_length is None:
+        return None
+    try:
+        return int(content_length)
+    except ValueError:
+        return None
+
+
+def _has_byte_preserved_archive_suffix(file_path):
+    path_lower = str(file_path).replace("\\", "/").lower()
+    return any(
+        path_lower.endswith(suffix) for suffix in BYTE_PRESERVED_ARCHIVE_SUFFIXES
+    )
+
+
+def _should_preserve_encoded_response_body(
+    response, *, target_path, expected_size, current_size
+):
+    if expected_size is None or expected_size <= 0:
+        return False
+    if not _has_byte_preserved_archive_suffix(target_path):
+        return False
+    if not response.headers.get("Content-Encoding"):
+        return False
+
+    content_length = _response_content_length(response)
+    if content_length is None:
+        return False
+
+    expected_remaining_size = expected_size
+    if response.status_code == 206 and current_size > 0:
+        expected_remaining_size = expected_size - current_size
+    return content_length == expected_remaining_size
 
 
 def is_correct_platform(filename):
@@ -217,10 +269,9 @@ def download_file_with_resume(
                 headers = {
                     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3",
                     "Accept": "*/*",
-                    # Archive downloads are persisted byte-for-byte and validated
-                    # against manifest sizes/checksums. Some hosts mark .tar.gz
-                    # objects with Content-Encoding: gzip, so the encoded HTTP
-                    # representation is the archive bytes we need to store.
+                    # Keep compressed transfers enabled for small text metadata.
+                    # The write loop preserves raw encoded bytes only for archive
+                    # objects whose HTTP headers match the manifest byte count.
                     "Accept-Encoding": "gzip, deflate",
                     "Connection": "keep-alive",
                 }
@@ -273,11 +324,23 @@ def download_file_with_resume(
                 last_logged_pct = (
                     -1
                 )  # integer percent last logged in non-interactive mode
+                preserve_encoded_body = _should_preserve_encoded_response_body(
+                    response,
+                    target_path=target_path,
+                    expected_size=expected_size,
+                    current_size=current_size,
+                )
+
                 # Append to file if resuming, otherwise write new file
                 mode = "ab" if current_size > 0 else "wb"
                 with open(target_path, mode) as file:
                     downloaded_size = current_size
-                    for chunk in response.raw.stream(8192, decode_content=False):
+                    chunks = (
+                        response.raw.stream(8192, decode_content=False)
+                        if preserve_encoded_body
+                        else response.iter_content(chunk_size=8192)
+                    )
+                    for chunk in chunks:
                         if chunk:
                             file.write(chunk)
                             downloaded_size += len(chunk)
@@ -350,6 +413,7 @@ def download_file_with_resume(
                     logger.warning(
                         "Downloaded file size does not match expected size. Trying next URL."
                     )
+                    os.remove(target_path)
                     continue
 
                 if os.path.getsize(target_path) == 0:
