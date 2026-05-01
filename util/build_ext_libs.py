@@ -764,6 +764,9 @@ def get_cmake_cmd_common_part(
             "-DCMAKE_BUILD_TYPE=Release",
             "-DCMAKE_PREFIX_PATH=" + ext_build_dir(),
             # '-DCMAKE_MODULE_PATH=' + ext_build_dir(),
+            # zlib-ng installs the Windows static archive as zs.lib. CMake's
+            # FindZLIB only searches that name when static lookup is requested.
+            "-DZLIB_USE_STATIC_LIBS:BOOL=ON",
             "-DCMAKE_INSTALL_PREFIX=" + install_dir,
             "" if no_hidden_visibility else "-DCMAKE_VISIBILITY_INLINES_HIDDEN=ON",
             "" if no_hidden_visibility else "-DCMAKE_C_VISIBILITY_PRESET=hidden",
@@ -2975,7 +2978,6 @@ def build_grpc(src_dir: str, install_dir: str, nasm_dir: str):
                 "-DgRPC_BUILD_TESTS:BOOL=OFF",
                 "-DgRPC_MSVC_STATIC_RUNTIME:BOOL=OFF" if is_windows() else "",
                 "-DgRPC_ZLIB_PROVIDER:STRING=package",
-                "-DZLIB_USE_STATIC_LIBS:BOOL=ON",
                 "-DgRPC_PROTOBUF_PROVIDER=module",
                 "-DgRPC_CARES_PROVIDER=module",
                 "-DgRPC_SSL_PROVIDER=package",
@@ -3618,6 +3620,10 @@ def build_hdf5(src_dir: str, install_dir: str):
                 "-DHDF5_ENABLE_DEPRECATED_SYMBOLS:BOOL=ON",
                 "-DHDF5_ENABLE_ZLIB_SUPPORT:BOOL=ON",
                 "-DHDF5_USE_ZLIB_STATIC:BOOL=ON",
+                # HDF5 installs h5cc/h5c++ wrappers only when pkg-config is
+                # found. Those wrappers can make CMake FindHDF5 probe shared
+                # libraries even though our dependency build is static-only.
+                "-DCMAKE_DISABLE_FIND_PACKAGE_PkgConfig:BOOL=ON",
                 # '-DHDF5_ENABLE_SZIP_SUPPORT:BOOL=ON',
                 "-DHDF5_ENABLE_THREADSAFE:BOOL=OFF",
                 "-DHDF5_BUILD_EXAMPLES:BOOL=OFF",
@@ -4165,6 +4171,7 @@ void vtkBoundingBox::ComputeBounds(
         cmakecmd = get_cmake_cmd_common_part(install_dir, universal=True)
 
         vtk_smp_backend = "STDThread"
+        vtk_use_external_hdf5 = not (is_windows() and not use_clang_cl())
 
         # Keep these cache args aligned with the current vendored VTK tree.
         # VTK_DATA_EXCLUDE_FROM_ALL only matters when VTK_BUILD_TESTING is ON,
@@ -4179,7 +4186,7 @@ void vtkBoundingBox::ComputeBounds(
                 "-DBUILD_SHARED_LIBS:BOOL=OFF",
                 "-DVTK_MODULE_USE_EXTERNAL_VTK_eigen:BOOL=ON",
                 "-DVTK_MODULE_USE_EXTERNAL_VTK_hdf5:BOOL="
-                + ("OFF" if (is_windows() and not use_clang_cl()) else "ON"),
+                + ("ON" if vtk_use_external_hdf5 else "OFF"),
                 "-DVTK_MODULE_USE_EXTERNAL_VTK_jpeg:BOOL=ON",
                 "-DVTK_MODULE_USE_EXTERNAL_VTK_lz4:BOOL=ON",
                 "-DVTK_MODULE_USE_EXTERNAL_VTK_lzma:BOOL=ON",
@@ -4191,6 +4198,15 @@ void vtkBoundingBox::ComputeBounds(
                 "-DVTK_WRAP_PYTHON:BOOL=OFF",
             ]
         )
+        if is_linux() or (is_windows() and vtk_use_external_hdf5):
+            # Linux CI hit CMake FindHDF5's wrapper-probing fallback when
+            # pkg-config made HDF5 install h5cc wrappers. Prefer static HDF5
+            # when VTK uses our external static-only HDF5 build.
+            cmakecmd.extend(
+                [
+                    "-DHDF5_USE_STATIC_LIBRARIES:BOOL=ON",
+                ]
+            )
         if vtk_smp_backend == "TBB":
             cmakecmd.append("-DTBB_DIR:PATH=" + tbb_dir())
         if is_mac():
