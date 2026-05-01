@@ -2790,8 +2790,13 @@ include(libs)""",
             os.path.join(src_dir, "SuiteSparse_config", "cmake_modules"),
         )
 
+        # Resolve through Python so bundled oneAPI archives are unpacked before
+        # SuiteSparse's copied CMake module tries to find MKL/TBB.
+        intel_path = intel_sw_dir()
+
         cmakecmd = get_cmake_cmd_common_part(install_dir, no_hidden_visibility=True)
         cmakecmd_options = [
+            "-DINTEL_PATH:PATH=" + intel_path,
             "-DSUITESPARSE_ENABLE_PROJECTS=suitesparse_config;amd;camd;ccolamd;colamd;cholmod;spqr",
             "-DGRAPHBLAS_BUILD_STATIC_LIBS:BOOL=ON",
             "-DSUITESPARSE_USE_OPENMP:BOOL=OFF",

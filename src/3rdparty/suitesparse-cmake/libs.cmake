@@ -15,7 +15,7 @@ if (AARCH64)
 else (AARCH64)
 
   if (NOT INTEL_PATH)
-    set(ATLAS_BUNDLED_INTEL_PATH "${CMAKE_CURRENT_LIST_DIR}/../build/oneapi")
+    set(ATLAS_BUNDLED_INTEL_PATH "${CMAKE_INSTALL_PREFIX}/oneapi")
     if (WIN32)
       set(ATLAS_STANDARD_INTEL_PATH "C:\\Program Files (x86)\\Intel\\oneAPI")
       set(INTEL_PATH "${ATLAS_BUNDLED_INTEL_PATH}")
