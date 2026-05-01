@@ -217,6 +217,10 @@ def download_file_with_resume(
                 headers = {
                     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3",
                     "Accept": "*/*",
+                    # Archive downloads are persisted byte-for-byte and validated
+                    # against manifest sizes/checksums. Some hosts mark .tar.gz
+                    # objects with Content-Encoding: gzip, so the encoded HTTP
+                    # representation is the archive bytes we need to store.
                     "Accept-Encoding": "gzip, deflate",
                     "Connection": "keep-alive",
                 }
@@ -273,7 +277,7 @@ def download_file_with_resume(
                 mode = "ab" if current_size > 0 else "wb"
                 with open(target_path, mode) as file:
                     downloaded_size = current_size
-                    for chunk in response.iter_content(chunk_size=8192):
+                    for chunk in response.raw.stream(8192, decode_content=False):
                         if chunk:
                             file.write(chunk)
                             downloaded_size += len(chunk)

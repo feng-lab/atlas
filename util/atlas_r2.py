@@ -70,6 +70,21 @@ _RETRYABLE_ERROR_CODES: Final[frozenset[str]] = frozenset(
 _RETRYABLE_HTTP_STATUS_CODES: Final[frozenset[int]] = frozenset(
     {429, 500, 502, 503, 504}
 )
+_BYTE_PRESERVED_CONTENT_TYPE_BY_SUFFIX: Final[tuple[tuple[str, str], ...]] = (
+    (".tar.gz", "application/gzip"),
+    (".tgz", "application/gzip"),
+    (".gz", "application/gzip"),
+    (".tar.bz2", "application/x-bzip2"),
+    (".tbz2", "application/x-bzip2"),
+    (".tbz", "application/x-bzip2"),
+    (".bz2", "application/x-bzip2"),
+    (".tar.xz", "application/x-xz"),
+    (".txz", "application/x-xz"),
+    (".xz", "application/x-xz"),
+    (".tar.zst", "application/zstd"),
+    (".tzst", "application/zstd"),
+    (".zst", "application/zstd"),
+)
 
 
 def _normalize_target(target: str) -> str:
@@ -121,6 +136,8 @@ class RemoteObjectInfo:
     key: str
     size: int
     sha256: Optional[str]
+    content_type: Optional[str] = None
+    content_encoding: Optional[str] = None
 
 
 class UploadVerificationError(RuntimeError):
@@ -237,6 +254,10 @@ def head_object(client, *, bucket: str, key: str) -> Optional[RemoteObjectInfo]:
         key=key,
         size=size,
         sha256=sha256 if sha256 else None,
+        content_type=_response_header_value(response, "ContentType", "content-type"),
+        content_encoding=_response_header_value(
+            response, "ContentEncoding", "content-encoding"
+        ),
     )
 
 
@@ -250,25 +271,43 @@ def upload_file_if_needed(
     expected_sha256: str,
     dry_run: bool = False,
 ) -> bool:
+    extra_args = _upload_extra_args(local_path, expected_sha256=expected_sha256)
     remote = head_object(client, bucket=bucket, key=object_key)
     if (
         remote is not None
         and remote.size == expected_size
         and remote.sha256 == expected_sha256
     ):
-        logger.info("Skipping unchanged object: %s", object_key)
-        return False
+        if _remote_upload_headers_match(remote, extra_args):
+            logger.info("Skipping unchanged object: %s", object_key)
+            return False
+        if dry_run:
+            logger.info("Would update object metadata: s3://%s/%s", bucket, object_key)
+            return True
+
+        logger.info(
+            "Object bytes unchanged but upload metadata differs: %s", object_key
+        )
+        _replace_object_upload_metadata(
+            client,
+            bucket=bucket,
+            object_key=object_key,
+            extra_args=extra_args,
+        )
+        _verify_uploaded_object(
+            client,
+            bucket=bucket,
+            object_key=object_key,
+            expected_size=expected_size,
+            expected_sha256=expected_sha256,
+            expected_content_type=extra_args.get("ContentType"),
+            expected_content_encoding=extra_args.get("ContentEncoding"),
+        )
+        return True
 
     if dry_run:
         logger.info("Would upload: %s -> s3://%s/%s", local_path, bucket, object_key)
         return True
-
-    extra_args = {"Metadata": {"sha256": expected_sha256}}
-    content_type, content_encoding = mimetypes.guess_type(local_path.as_posix())
-    if content_type:
-        extra_args["ContentType"] = content_type
-    if content_encoding:
-        extra_args["ContentEncoding"] = content_encoding
 
     logger.info("Uploading: %s -> s3://%s/%s", local_path, bucket, object_key)
     _call_with_retry(
@@ -283,8 +322,61 @@ def upload_file_if_needed(
         object_key=object_key,
         expected_size=expected_size,
         expected_sha256=expected_sha256,
+        expected_content_type=extra_args.get("ContentType"),
+        expected_content_encoding=extra_args.get("ContentEncoding"),
     )
     return True
+
+
+def _upload_extra_args(local_path: Path, *, expected_sha256: str) -> dict:
+    extra_args = {"Metadata": {"sha256": expected_sha256}}
+    content_type = _guess_upload_content_type(local_path)
+    if content_type:
+        extra_args["ContentType"] = content_type
+    return extra_args
+
+
+def _guess_upload_content_type(local_path: Path) -> Optional[str]:
+    # The mimetypes module reports .tar.gz as ("application/x-tar", "gzip").
+    # In this repository those suffixes are archive bytes, not HTTP transfer
+    # encodings, so publish them without Content-Encoding.
+    path = local_path.as_posix()
+    path_lower = path.lower()
+    for suffix, content_type in _BYTE_PRESERVED_CONTENT_TYPE_BY_SUFFIX:
+        if path_lower.endswith(suffix):
+            return content_type
+
+    content_type, _content_encoding = mimetypes.guess_type(path)
+    return content_type
+
+
+def _remote_upload_headers_match(remote: RemoteObjectInfo, extra_args: dict) -> bool:
+    expected_content_type = extra_args.get("ContentType")
+    if expected_content_type and remote.content_type != expected_content_type:
+        return False
+
+    expected_content_encoding = extra_args.get("ContentEncoding")
+    return remote.content_encoding == expected_content_encoding
+
+
+def _replace_object_upload_metadata(
+    client,
+    *,
+    bucket: str,
+    object_key: str,
+    extra_args: dict,
+) -> None:
+    logger.info("Updating object metadata: s3://%s/%s", bucket, object_key)
+    _call_with_retry(
+        f"update metadata for s3://{bucket}/{object_key}",
+        lambda: client.copy_object(
+            Bucket=bucket,
+            Key=object_key,
+            CopySource={"Bucket": bucket, "Key": object_key},
+            MetadataDirective="REPLACE",
+            **extra_args,
+        ),
+    )
 
 
 def delete_objects(
@@ -381,6 +473,20 @@ def _response_content_length(response: dict) -> Optional[int]:
     return None
 
 
+def _response_header_value(
+    response: dict, response_key: str, http_header_key: str
+) -> Optional[str]:
+    value = response.get(response_key)
+    if value is None:
+        metadata = response.get("ResponseMetadata") or {}
+        headers = metadata.get("HTTPHeaders") or {}
+        value = headers.get(http_header_key)
+    if value is None:
+        return None
+    value = str(value).strip()
+    return value if value else None
+
+
 def _format_delete_errors(errors: Iterable[dict]) -> str:
     formatted: list[str] = []
     for error in errors:
@@ -426,6 +532,8 @@ def _verify_uploaded_object(
     object_key: str,
     expected_size: int,
     expected_sha256: str,
+    expected_content_type: Optional[str] = None,
+    expected_content_encoding: Optional[str] = None,
 ) -> None:
     def _verify_once() -> None:
         remote = head_object(client, bucket=bucket, key=object_key)
@@ -441,6 +549,16 @@ def _verify_uploaded_object(
             raise UploadVerificationError(
                 "uploaded object sha256 metadata mismatch for "
                 f"s3://{bucket}/{object_key}: expected {expected_sha256}, got {remote.sha256!r}"
+            )
+        if expected_content_type and remote.content_type != expected_content_type:
+            raise UploadVerificationError(
+                "uploaded object content-type mismatch for "
+                f"s3://{bucket}/{object_key}: expected {expected_content_type!r}, got {remote.content_type!r}"
+            )
+        if remote.content_encoding != expected_content_encoding:
+            raise UploadVerificationError(
+                "uploaded object content-encoding mismatch for "
+                f"s3://{bucket}/{object_key}: expected {expected_content_encoding!r}, got {remote.content_encoding!r}"
             )
 
     download_utils.call_with_backoff(
