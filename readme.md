@@ -108,16 +108,6 @@ CPython is supported as long as the wheel continues to target that configured
     aqt list-tool linux desktop
     ```
 * install Vulkan SDK 1.3+ (and ensure your GPU driver exposes Vulkan 1.3): https://vulkan.lunarg.com/home/welcome
-* install Intel oneAPI MKL/TBB packages with apt
-    ```bash
-    sudo mkdir -p /usr/share/keyrings
-    wget -O- https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB \
-      | gpg --dearmor | sudo tee /usr/share/keyrings/oneapi-archive-keyring.gpg > /dev/null
-    echo "deb [signed-by=/usr/share/keyrings/oneapi-archive-keyring.gpg] https://apt.repos.intel.com/oneapi all main" | \
-      sudo tee /etc/apt/sources.list.d/oneAPI.list
-    sudo apt-get update
-    sudo apt-get install intel-oneapi-mkl-devel intel-oneapi-tbb-devel
-    ```
 
 ### All:
 * clone atlas repo

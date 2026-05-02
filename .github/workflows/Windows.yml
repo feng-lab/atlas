@@ -120,16 +120,6 @@ jobs:
           python -m pip install --no-cache-dir requests packaging boto3
           if ($LASTEXITCODE -ne 0) { Write-Error "Failed to install Python deps"; exit $LASTEXITCODE }
 
-      - name: Cache atlas_deps (download archives)
-        if: steps.cache-extlibs-p1.outputs.cache-hit != 'true'
-        uses: actions/cache@v5
-        with:
-          path: |
-            atlas_deps
-          key: ${{ runner.os }}-atlasdeps-${{ hashFiles('util/atlas_deps_filelist.py') }}
-          restore-keys: |
-            ${{ runner.os }}-atlasdeps-
-
       - name: Build external deps
         if: steps.cache-extlibs-p1.outputs.cache-hit != 'true'
         shell: pwsh
@@ -179,15 +169,6 @@ jobs:
           if ($LASTEXITCODE -ne 0) { Write-Error "Failed to upgrade pip"; exit $LASTEXITCODE }
           python -m pip install --no-cache-dir requests packaging boto3
           if ($LASTEXITCODE -ne 0) { Write-Error "Failed to install Python deps"; exit $LASTEXITCODE }
-
-      - name: Cache atlas_deps (download archives)
-        uses: actions/cache@v5
-        with:
-          path: |
-            atlas_deps
-          key: ${{ runner.os }}-atlasdeps-${{ hashFiles('util/atlas_deps_filelist.py') }}
-          restore-keys: |
-            ${{ runner.os }}-atlasdeps-
 
       - name: Cache 3rdparty build (part 2)
         id: cache-extlibs-p2

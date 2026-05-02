@@ -131,16 +131,6 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install --no-cache-dir requests packaging boto3
 
-      - name: Cache atlas_deps (download archives)
-        if: steps.cache-extlibs.outputs.cache-hit != 'true'
-        uses: actions/cache@v5
-        with:
-          path: |
-            atlas_deps
-          key: ${{ runner.os }}-atlasdeps-${{ hashFiles('util/atlas_deps_filelist.py') }}
-          restore-keys: |
-            ${{ runner.os }}-atlasdeps-
-
       - name: Build external deps
         # Only rebuild external deps when we did not get an exact cache hit
         if: steps.cache-extlibs.outputs.cache-hit != 'true'

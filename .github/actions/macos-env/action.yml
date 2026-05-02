@@ -214,16 +214,6 @@ runs:
         fi
         ls -la "$HOME/Qt" || true
 
-    - name: Cache atlas_deps (download archives)
-      if: ${{ inputs.build-extlibs == 'true' && inputs.enable-cache == 'true' && (inputs.force-setup == 'true' || steps.cache-extlibs.outputs.cache-hit != 'true') }}
-      uses: actions/cache@v5
-      with:
-        path: |
-          atlas_deps
-        key: ${{ runner.os }}-atlasdeps-${{ hashFiles('util/atlas_deps_filelist.py') }}
-        restore-keys: |
-          ${{ runner.os }}-atlasdeps-
-
     - name: Cache atlas test data
       if: ${{ inputs.enable-cache == 'true' }}
       uses: actions/cache@v5
