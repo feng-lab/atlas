@@ -764,8 +764,9 @@ def get_cmake_cmd_common_part(
             "-DCMAKE_BUILD_TYPE=Release",
             "-DCMAKE_PREFIX_PATH=" + ext_build_dir(),
             # '-DCMAKE_MODULE_PATH=' + ext_build_dir(),
-            # zlib-ng installs the Windows static archive as zs.lib. CMake's
-            # FindZLIB only searches that name when static lookup is requested.
+            # zlib 1.3.2's CMake build installs the Windows static archive as
+            # zs.lib. CMake's FindZLIB only searches that name when static
+            # lookup is requested.
             "-DZLIB_USE_STATIC_LIBS:BOOL=ON",
             "-DCMAKE_INSTALL_PREFIX=" + install_dir,
             "" if no_hidden_visibility else "-DCMAKE_VISIBILITY_INLINES_HIDDEN=ON",
@@ -4198,13 +4199,15 @@ void vtkBoundingBox::ComputeBounds(
                 "-DVTK_WRAP_PYTHON:BOOL=OFF",
             ]
         )
-        if is_linux() or (is_windows() and vtk_use_external_hdf5):
+        if vtk_use_external_hdf5:
             # Linux CI hit CMake FindHDF5's wrapper-probing fallback when
             # pkg-config made HDF5 install h5cc wrappers. Prefer static HDF5
-            # when VTK uses our external static-only HDF5 build.
+            # when VTK uses our external static-only HDF5 build. VTK's vendored
+            # FindHDF5 also still expects the pre-2.0 parallel-state variable.
             cmakecmd.extend(
                 [
                     "-DHDF5_USE_STATIC_LIBRARIES:BOOL=ON",
+                    "-DHDF5_ENABLE_PARALLEL:BOOL=OFF",
                 ]
             )
         if vtk_smp_backend == "TBB":
