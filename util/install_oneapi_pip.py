@@ -80,7 +80,7 @@ def install_oneapi_pip() -> None:
         "--upgrade",
         "--no-cache-dir",
         "--only-binary=:all:",
-        "--target",
+        "--prefix" if common_dirs.is_linux() else "--target",
         str(target),
         *PACKAGES,
     ]
