@@ -45,11 +45,6 @@ files_to_download = [
         "filename": "openjpeg-2.5.4.zip",
     },
     {
-        "expected_size": 85312600,
-        "expected_sha256": "230b296f8d57785d24b9e5ebcee8b4947a53f10d8bef5bf2faca95b825bb4e26",
-        "filename": "oneapi-mkl-2025.3-windows-x64.7z",
-    },
-    {
         "expected_size": 64009719,
         "expected_sha256": "791ae3604841ca03cb3889a3ad89165346e4b180ae3448efd4b0caa9ef46d245",
         "filename": "cmake-4.3.2-linux-x86_64.tar.gz",

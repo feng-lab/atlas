@@ -19,17 +19,27 @@ REQUIRED_MKL_LIBS = (
     "mkl_core.lib",
 )
 
+# oneTBB's config package treats a no-component lookup as a request for tbb,
+# tbbmalloc, and tbbmalloc_proxy. Keep the minimized bundle consistent with
+# that metadata so downstream dependencies can use find_package(TBB CONFIG)
+# without carrying consumer-specific component patches.
 REQUIRED_TBB_LIBS = (
     "tbb12.lib",
+    "tbbmalloc.lib",
+    "tbbmalloc_proxy.lib",
 )
 REQUIRED_TBB_DLLS = (
     "tbb12.dll",
+    "tbbmalloc.dll",
+    "tbbmalloc_proxy.dll",
 )
 
 
 def _default_oneapi_root() -> str:
     candidates = common_dirs.installed_intel_sw_dir_candidates()
-    assert candidates, "No installed Intel oneAPI candidates are defined for this platform."
+    assert candidates, (
+        "No installed Intel oneAPI candidates are defined for this platform."
+    )
     return candidates[0]
 
 
@@ -37,15 +47,16 @@ def _component_version(component_latest_dir: Path) -> str:
     resolved = component_latest_dir.resolve()
     version_name = resolved.name
     if version_name.lower() == "latest":
-        raise AssertionError(f"Failed to resolve concrete component version for {component_latest_dir}")
+        raise AssertionError(
+            f"Failed to resolve concrete component version for {component_latest_dir}"
+        )
     return version_name
 
 
 def _default_output_path(oneapi_root: Path) -> Path:
     mkl_version = _component_version(oneapi_root / "mkl" / "latest")
     return (
-        Path(common_dirs.src_package_dir())
-        / f"oneapi-mkl-{mkl_version}-windows-x64.7z"
+        Path(common_dirs.src_package_dir()) / f"oneapi-mkl-{mkl_version}-windows-x64.7z"
     )
 
 
@@ -143,7 +154,10 @@ def _stage_bundle(oneapi_root: Path, staging_dir: Path) -> tuple[Path, dict]:
             tbb_root / "bin" / dll_name,
             bundle_root / "tbb" / "latest" / "bin" / dll_name,
         )
-    logger.info("Staging TBB CMake metadata directory from %s", tbb_root / "lib" / "cmake" / "tbb")
+    logger.info(
+        "Staging TBB CMake metadata directory from %s",
+        tbb_root / "lib" / "cmake" / "tbb",
+    )
     _copy_tree(
         tbb_root / "lib" / "cmake" / "tbb",
         bundle_root / "tbb" / "latest" / "lib" / "cmake" / "tbb",
@@ -207,10 +221,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--oneapi-root",
         default=_default_oneapi_root(),
-        help=(
-            "Installed Intel oneAPI root to package "
-            "(default: %(default)s)."
-        ),
+        help=("Installed Intel oneAPI root to package (default: %(default)s)."),
     )
     parser.add_argument(
         "--output",
@@ -234,7 +245,11 @@ def main() -> None:
     oneapi_root = Path(args.oneapi_root).resolve()
     if not oneapi_root.exists():
         raise AssertionError(f"Intel oneAPI root does not exist: {oneapi_root}")
-    output_path = Path(args.output).resolve() if args.output else _default_output_path(oneapi_root)
+    output_path = (
+        Path(args.output).resolve()
+        if args.output
+        else _default_output_path(oneapi_root)
+    )
 
     logger.info("Using oneAPI root: %s", oneapi_root)
     logger.info("Planned output archive: %s", output_path)

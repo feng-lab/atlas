@@ -42,11 +42,14 @@ from common_dirs import (
     llvm_bin_dir,
     llvm_install_dir,
     llvm_tools_version,
+    mkl_dir,
     remove_old_src_folder_with_glob,
     remove_old_src_folders_with_glob,
     rm_tree,
     src_package_dir,
     tbb_dir,
+    tbb_redist_dir,
+    tbb_root_dir,
     unpack_file_to_folder,
     unpack_tool_to_target_dir,
     use_clang_cl,
@@ -58,6 +61,7 @@ from common_dirs import (
     windows_visual_studio_major_version,
 )
 from download_atlas_deps import download_atlas_deps
+from install_oneapi_pip import install_oneapi_pip
 from logger import setup_logger
 
 logger = logging.getLogger(__name__)
@@ -596,9 +600,7 @@ def get_enviroment_from_shell_script(
 
 def get_tbb_env():
     env = {}
-    env["TBBROOT"] = (
-        ext_build_dir() if is_mac() else os.path.join(intel_sw_dir(), "tbb", "latest")
-    )
+    env["TBBROOT"] = tbb_root_dir()
     env["TBB_ROOT"] = env["TBBROOT"]
     return env
 
@@ -734,6 +736,14 @@ def get_env_for_config_make(
         else:
             env["CFLAGS"] = cbf["CFLAGS"]
             env["CXXFLAGS"] = cbf["CXXFLAGS"]
+        try:
+            oneapi_lib_dir = tbb_redist_dir()
+        except AssertionError:
+            oneapi_lib_dir = ""
+        if oneapi_lib_dir:
+            env["LD_LIBRARY_PATH"] = (
+                oneapi_lib_dir + os.pathsep + env.get("LD_LIBRARY_PATH", "")
+            ).rstrip(os.pathsep)
     elif is_windows():
         env["CFLAGS"] = cbf["CFLAGS"]
         env["CXXFLAGS"] = cbf["CXXFLAGS"]
@@ -2794,8 +2804,8 @@ include(libs)""",
             os.path.join(src_dir, "SuiteSparse_config", "cmake_modules"),
         )
 
-        # Resolve through Python so bundled oneAPI archives are unpacked before
-        # SuiteSparse's copied CMake module tries to find MKL/TBB.
+        # Resolve through Python so the Windows pip layout is prepared before
+        # SuiteSparse tries to find MKL/TBB.
         intel_path = intel_sw_dir()
 
         cmakecmd = get_cmake_cmd_common_part(install_dir, no_hidden_visibility=True)
@@ -2910,7 +2920,7 @@ def build_ceres_solver(src_dir: str, install_dir: str):
         cmakecmd.extend([src_dir])
 
         env = {}
-        env["MKLROOT"] = os.path.join(intel_sw_dir(), "mkl", "latest")
+        env["MKLROOT"] = mkl_dir()
         build_and_install_cmakecmd(cmakecmd, build_dir, additional_env=env)
 
         if is_mac():
@@ -4354,8 +4364,7 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str):
             if not arm64_build:
                 cmakecmd_options.extend(
                     [
-                        "-DMKL_ROOT_DIR="
-                        + os.path.join(intel_sw_dir(), "mkl", "latest"),
+                        "-DMKL_ROOT_DIR=" + mkl_dir(),
                     ]
                 )
 
@@ -5350,6 +5359,8 @@ def build_libs(libs: OrderedDict, use_asan: bool):
     logger.info(f"extDIR: {ext_dir()}")
 
     download_atlas_deps()
+    if is_windows() or is_linux():
+        install_oneapi_pip()
     logger.info(f"srcPackageDIR: {src_package_dir()}")
 
     remove_path_contains("miniconda")

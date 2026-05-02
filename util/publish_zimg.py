@@ -195,6 +195,10 @@ def _apply_scikit_build_core_toolchain_env(env: dict[str, str]) -> None:
                 "Install clang++ or set `ATLAS_CLANG_MAJOR` / `LLVM_VERSION` to a version available on PATH."
             )
 
+    if common_dirs.is_linux():
+        oneapi_lib_dir = Path(common_dirs.tbb_redist_dir())
+        _prepend_search_path(env, key="LD_LIBRARY_PATH", dir_path=oneapi_lib_dir)
+
     if common_dirs.is_windows() and common_dirs.use_clang_cl():
         env["PATH"] = common_dirs.llvm_bin_dir() + os.pathsep + env["PATH"]
         env["LLVMInstallDir"] = common_dirs.llvm_install_dir()
@@ -337,6 +341,17 @@ def _repair_linux_wheel_with_auditwheel(*, wheel_path: Path, out_dir: Path) -> P
         logger.warning(
             "auditwheel: Qt lib dir not found; repair may fail (qt_lib_dir=%s)",
             qt_lib_dir.as_posix(),
+        )
+
+    try:
+        oneapi_lib_dir = Path(common_dirs.tbb_redist_dir())
+    except AssertionError:
+        oneapi_lib_dir = None
+    if oneapi_lib_dir is not None and oneapi_lib_dir.is_dir():
+        _prepend_search_path(env, key="LD_LIBRARY_PATH", dir_path=oneapi_lib_dir)
+        logger.info(
+            "auditwheel: prepending LD_LIBRARY_PATH with: %s",
+            oneapi_lib_dir.as_posix(),
         )
 
     with tempfile.TemporaryDirectory(prefix="zimg_auditwheel_") as tmp:

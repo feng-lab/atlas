@@ -499,9 +499,55 @@ def installed_intel_sw_dir_candidates() -> list[str]:
     ]
 
 
+def oneapi_pip_dir() -> str:
+    assert is_windows() or is_linux()
+    return os.path.join(ext_build_dir(), "oneapi-pip")
+
+
+def oneapi_pip_intel_dir() -> str:
+    assert is_windows() or is_linux()
+    if is_windows():
+        return os.path.join(oneapi_pip_dir(), "Library")
+    return oneapi_pip_dir()
+
+
+def _is_valid_oneapi_pip_intel_dir(candidate: str) -> bool:
+    if not (is_windows() or is_linux()) or not candidate:
+        return False
+
+    if is_windows():
+        required_paths = [
+            os.path.join(candidate, "include", "mkl.h"),
+            os.path.join(candidate, "include", "fftw", "fftw3.h"),
+            os.path.join(candidate, "lib", "mkl_intel_lp64.lib"),
+            os.path.join(candidate, "lib", "mkl_tbb_thread.lib"),
+            os.path.join(candidate, "lib", "mkl_core.lib"),
+            os.path.join(candidate, "lib", "cmake", "tbb", "TBBConfig.cmake"),
+            os.path.join(candidate, "bin", "tbb12.dll"),
+            os.path.join(candidate, "bin", "tbbmalloc.dll"),
+            os.path.join(candidate, "bin", "tbbmalloc_proxy.dll"),
+        ]
+    else:
+        required_paths = [
+            os.path.join(candidate, "include", "mkl.h"),
+            os.path.join(candidate, "include", "fftw", "fftw3.h"),
+            os.path.join(candidate, "lib", "libmkl_intel_lp64.a"),
+            os.path.join(candidate, "lib", "libmkl_tbb_thread.a"),
+            os.path.join(candidate, "lib", "libmkl_core.a"),
+            os.path.join(candidate, "lib", "cmake", "tbb", "TBBConfig.cmake"),
+            os.path.join(candidate, "lib", "libtbb.so"),
+            os.path.join(candidate, "lib", "libtbb.so.12"),
+            os.path.join(candidate, "lib", "libtbbmalloc.so"),
+            os.path.join(candidate, "lib", "libtbbmalloc_proxy.so"),
+        ]
+    return all(os.path.exists(path) for path in required_paths)
+
+
 def _is_valid_intel_sw_dir(candidate: str) -> bool:
     if not candidate:
         return False
+    if _is_valid_oneapi_pip_intel_dir(candidate):
+        return True
     if not os.path.exists(os.path.join(candidate, "mkl", "latest")):
         return False
     if is_windows():
@@ -510,6 +556,17 @@ def _is_valid_intel_sw_dir(candidate: str) -> bool:
 
 
 def intel_sw_dir() -> str:
+    if is_windows() or is_linux():
+        candidates = [
+            oneapi_pip_intel_dir(),
+            *installed_intel_sw_dir_candidates(),
+        ]
+        for candidate in candidates:
+            if _is_valid_intel_sw_dir(candidate):
+                return candidate
+
+        raise AssertionError("Intel oneAPI not found; tried: " + ", ".join(candidates))
+
     bundled_dir = os.path.join(ext_build_dir(), "oneapi")
     candidates = [bundled_dir, *installed_intel_sw_dir_candidates()]
     for candidate in candidates:
@@ -519,8 +576,6 @@ def intel_sw_dir() -> str:
     package_patterns = []
     if is_mac():
         package_patterns = ["oneapi-mkl-*-macos-x64.tar.xz"]
-    elif is_windows():
-        package_patterns = ["oneapi-mkl-*-windows-x64.7z"]
 
     tried = list(candidates)
     last_exc = None
@@ -542,17 +597,33 @@ def intel_sw_dir() -> str:
     ) from last_exc
 
 
+def mkl_dir() -> str:
+    intel_dir = intel_sw_dir()
+    if _is_valid_oneapi_pip_intel_dir(intel_dir):
+        return intel_dir
+    return os.path.join(intel_dir, "mkl", "latest")
+
+
+def tbb_root_dir() -> str:
+    if is_mac():
+        return ext_build_dir()
+
+    intel_dir = intel_sw_dir()
+    if _is_valid_oneapi_pip_intel_dir(intel_dir):
+        return intel_dir
+    return os.path.join(intel_dir, "tbb", "latest")
+
+
 def tbb_dir() -> str:
     if is_mac():
         return ext_build_dir()
-    else:
-        return intel_sw_dir() + "/tbb/latest/lib/cmake/tbb"
+    return os.path.join(tbb_root_dir(), "lib", "cmake", "tbb")
 
 
 def tbb_redist_dir() -> str:
-    assert sys.platform.startswith("win32")
+    assert is_windows() or is_linux()
 
-    res = os.path.join(intel_sw_dir(), "tbb", "latest", "bin")
+    res = os.path.join(tbb_root_dir(), "bin" if is_windows() else "lib")
     assert os.path.exists(res)
     return res
 

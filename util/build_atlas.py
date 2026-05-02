@@ -179,8 +179,6 @@ def build_atlas(
             "-DATLAS_ENABLE_CUSTOM_COMMAND:BOOL=" + ("ON" if debug_version else "OFF"),
         ]
     )
-    if common_dirs.is_mac() or common_dirs.is_windows():
-        cmakecmd.append("-DINTEL_PATH=" + common_dirs.intel_sw_dir())
     cmakecmd.extend([common_dirs.atlas_repository_dir()])
 
     print(cmakecmd)
@@ -254,9 +252,14 @@ def build_atlas(
             )
     else:
         env = os.environ.copy()
-        if common_dirs.is_linux() and build_ext_libs.use_clang_in_linux():
-            env["CC"] = build_ext_libs.get_clang_in_linux()
-            env["CXX"] = build_ext_libs.get_clangplus_in_linux()
+        if common_dirs.is_linux():
+            oneapi_lib_dir = common_dirs.tbb_redist_dir()
+            env["LD_LIBRARY_PATH"] = (
+                oneapi_lib_dir + os.pathsep + env.get("LD_LIBRARY_PATH", "")
+            ).rstrip(os.pathsep)
+            if build_ext_libs.use_clang_in_linux():
+                env["CC"] = build_ext_libs.get_clang_in_linux()
+                env["CXX"] = build_ext_libs.get_clangplus_in_linux()
         subprocess.run(
             cmakecmd,
             cwd=common_dirs.atlas_build_dir(),

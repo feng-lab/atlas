@@ -5,6 +5,8 @@ import shutil
 import subprocess
 import tempfile
 
+import common_dirs
+
 logger = logging.getLogger(__name__)
 
 _APPIMAGE_EXCLUDELIST_URL = (
@@ -563,6 +565,12 @@ def linuxdeployqt(
             "Qt lib dir not found; dependency scanning may be incomplete (qt_lib_dir=%s)",
             qt_lib_dir,
         )
+    try:
+        oneapi_lib_dir = common_dirs.tbb_redist_dir()
+    except AssertionError:
+        oneapi_lib_dir = ""
+    if oneapi_lib_dir and os.path.isdir(oneapi_lib_dir):
+        prepend_search_path(env, "LD_LIBRARY_PATH", oneapi_lib_dir)
     logger.info("ldd: using LD_LIBRARY_PATH=%s", env.get("LD_LIBRARY_PATH", ""))
     exedeps = resolve_dependencies(binary_name, blacklist, env=env)
 
@@ -611,7 +619,14 @@ def linux_deploy_deps_to_lib_dir(binary_name: str, lib_dir: str):
     logger.info(
         "Resolving shared object dependencies for '%s'", os.path.basename(binary_name)
     )
-    exedeps = resolve_dependencies(binary_name, blacklist)
+    env = os.environ.copy()
+    try:
+        oneapi_lib_dir = common_dirs.tbb_redist_dir()
+    except AssertionError:
+        oneapi_lib_dir = ""
+    if oneapi_lib_dir and os.path.isdir(oneapi_lib_dir):
+        prepend_search_path(env, "LD_LIBRARY_PATH", oneapi_lib_dir)
+    exedeps = resolve_dependencies(binary_name, blacklist, env=env)
 
     dependencies = merge_dicts(dependencies, exedeps)
     logger.info(

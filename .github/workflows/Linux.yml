@@ -116,23 +116,6 @@ jobs:
           sudo apt-get -y install clang-${CLANG_MAJOR} lld-${CLANG_MAJOR} clang-tools-${CLANG_MAJOR}
           clang-${CLANG_MAJOR} --version
 
-      - name: Install Intel oneAPI MKL/TBB (apt)
-        if: steps.cache-extlibs.outputs.cache-hit != 'true'
-        shell: bash -l {0}
-        run: |
-          set -euo pipefail
-          sudo mkdir -p /usr/share/keyrings
-          # Follow Intel's official instructions to fetch and dearmor the key
-          wget -O- https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB \
-            | gpg --dearmor | sudo tee /usr/share/keyrings/oneapi-archive-keyring.gpg > /dev/null
-          echo "deb [signed-by=/usr/share/keyrings/oneapi-archive-keyring.gpg] https://apt.repos.intel.com/oneapi all main" | \
-            sudo tee /etc/apt/sources.list.d/oneAPI.list
-          sudo apt-get update -o Acquire::Retries=3
-          sudo apt-get -y install intel-oneapi-mkl-devel intel-oneapi-tbb-devel || { echo "oneAPI apt install failed" >&2; exit 1; }
-          # Hard fail if expected directories are missing so the job stops here
-          test -d /opt/intel/oneapi || { echo "/opt/intel/oneapi not found" >&2; exit 1; }
-          test -d /opt/intel/oneapi/tbb/latest/lib/cmake/tbb || { echo "TBB CMake config missing" >&2; exit 1; }
-
       - name: Setup Python for external deps
         if: steps.cache-extlibs.outputs.cache-hit != 'true'
         uses: actions/setup-python@v6
@@ -241,22 +224,6 @@ jobs:
           sudo /tmp/llvm.sh ${CLANG_MAJOR}
           sudo apt-get -y install clang-${CLANG_MAJOR} lld-${CLANG_MAJOR} clang-tools-${CLANG_MAJOR}
           clang-${CLANG_MAJOR} --version
-
-      - name: Install Intel oneAPI MKL/TBB (apt)
-        shell: bash -l {0}
-        run: |
-          set -euo pipefail
-          sudo mkdir -p /usr/share/keyrings
-          # Follow Intel's official instructions to fetch and dearmor the key
-          wget -O- https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB \
-            | gpg --dearmor | sudo tee /usr/share/keyrings/oneapi-archive-keyring.gpg > /dev/null
-          echo "deb [signed-by=/usr/share/keyrings/oneapi-archive-keyring.gpg] https://apt.repos.intel.com/oneapi all main" | \
-            sudo tee /etc/apt/sources.list.d/oneAPI.list
-          sudo apt-get update -o Acquire::Retries=3
-          sudo apt-get -y install intel-oneapi-mkl-devel intel-oneapi-tbb-devel || { echo "oneAPI apt install failed" >&2; exit 1; }
-          # Hard fail if expected directories are missing so the job stops here
-          test -d /opt/intel/oneapi || { echo "/opt/intel/oneapi not found" >&2; exit 1; }
-          test -d /opt/intel/oneapi/tbb/latest/lib/cmake/tbb || { echo "TBB CMake config missing" >&2; exit 1; }
 
       - name: Cache Vulkan SDK (installed)
         uses: actions/cache@v5
