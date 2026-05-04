@@ -8,7 +8,8 @@ from logger import setup_logger
 logger = setup_logger(name=__name__)
 
 
-PACKAGES = ("mkl-static",)
+MKL_STATIC_VERSION = "2026.0.0"
+PACKAGES = (f"mkl-static=={MKL_STATIC_VERSION}",)
 
 
 def target_dir() -> Path:

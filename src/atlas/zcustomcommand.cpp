@@ -1231,8 +1231,9 @@ void changeDapifileType()
 
 void convertPVRawToNim()
 {
-  QList<QStringList> metaData = QtCSV::Reader::readToList("/Volumes/shared/feng/Chris/pv_img/img_srclist.txt");
-  ZImg refPYImg("/Volumes/shared/feng/Chris/slice15/slice15_L18_Sum.lsm");
+  QList<QStringList> metaData =
+    QtCSV::Reader::readToList(homePath("/Documents/atlas_legacy/Chris/pv_img/img_srclist.txt"));
+  ZImg refPYImg(homePath("/Documents/atlas_legacy/Chris/slice15/slice15_L18_Sum.lsm"));
   ZImg refPVImg("/Volumes/shared/os/PV/201602_contraPV/PV139/5/s9/PV139_5_s9_R1_GR1_B1_L19.lsm");
   for (index_t i = 0; i < metaData.size(); ++i) {
     QFileInfo fileInfo = QFileInfo(metaData[i][0]);
@@ -1264,7 +1265,7 @@ void convertPVRawToNim()
     } else {
       CHECK(false);
     }
-    QDir outpath("/Volumes/shared/feng/Chris/pv_img");
+    QDir outpath(homePath("/Documents/atlas_legacy/Chris/pv_img"));
     QString outname = outpath.filePath(fileInfo.baseName() + ".nim");
     CHECK(outname.endsWith(".nim"));
     LOG(INFO) << "to " << outname;
@@ -1274,11 +1275,11 @@ void convertPVRawToNim()
 
 void convertPYRawToNim()
 {
-  QDir dir("/Volumes/shared/feng/Chris/py_img_old");
+  QDir dir(homePath("/Documents/atlas_legacy/Chris/py_img_old"));
   QStringList filters;
   filters << "*.nim";
   QFileInfoList list = dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
-  ZImg refPYImg("/Volumes/shared/feng/Chris/slice15/slice15_L18_Sum.lsm");
+  ZImg refPYImg(homePath("/Documents/atlas_legacy/Chris/slice15/slice15_L18_Sum.lsm"));
   ZImg refPVImg("/Volumes/shared/os/PV/201602_contraPV/PV139/5/s9/PV139_5_s9_R1_GR1_B1_L19.lsm");
 
   for (index_t i = 0; i < list.size(); ++i) {
@@ -1313,7 +1314,7 @@ void convertPYRawToNim()
     } else {
       CHECK(false);
     }
-    QDir outpath("/Volumes/shared/feng/Chris/py_img");
+    QDir outpath(homePath("/Documents/atlas_legacy/Chris/py_img"));
     QString outname = outpath.filePath(fileInfo.fileName());
     CHECK(outname.endsWith(".nim"));
     LOG(INFO) << "to " << outname;
@@ -1775,8 +1776,8 @@ void createPCCellTable()
     }
     cells[std::make_tuple(cellType, somaLocationOrder, AP, ML, cellName)] = std::make_tuple(somaLocation, r2);
 
-    QString swcName = QString("/Volumes/shared/feng/PVPY/PY/PySWC/%1_layer.swc").arg(cellName);
-    QString punctaName = QString("/Volumes/shared/feng/PVPY/PY/PySWC/%1_puncta_small.apo").arg(cellName);
+    QString swcName = homePath("/Documents/atlas_legacy/PVPY/PY/PySWC/") + cellName + "_layer.swc";
+    QString punctaName = homePath("/Documents/atlas_legacy/PVPY/PY/PySWC/") + cellName + "_puncta_small.apo";
 
     for (auto& [key, value] : docObject) {
       QString qkey = QString::fromUtf8(key.data(), key.size());

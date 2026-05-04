@@ -1,0 +1,882 @@
+#include "zbioformatsbridgeclient.h"
+
+#include "bioformats_bridge.pb.h"
+#include "zexception.h"
+#include "zimginterface.h"
+#include "zlog.h"
+
+#include <QByteArray>
+#include <QDir>
+#include <QElapsedTimer>
+#include <QFileInfo>
+#include <QMap>
+#include <QProcess>
+#include <QRegularExpression>
+#include <QStringList>
+#include <algorithm>
+#include <gflags/gflags.h>
+#include <limits>
+#include <mutex>
+#include <optional>
+#include <vector>
+
+DEFINE_string(atlas_bioformats_java_xmx,
+              "2g",
+              "Maximum Java heap for the persistent Bio-Formats bridge process. Empty means no -Xmx argument.");
+DEFINE_int32(atlas_bioformats_bridge_io_timeout_ms,
+             0,
+             "Timeout for Bio-Formats bridge stdin/stdout operations in milliseconds. 0 means wait indefinitely.");
+
+namespace nim {
+
+namespace {
+
+namespace proto = atlas::bioformats::bridge;
+
+constexpr uint32_t kMaxFrameBytes = 512_u32 * 1024_u32 * 1024_u32;
+constexpr const char* kBioFormatsJar = "bioformats_package.jar";
+constexpr const char* kAtlasBioFormatsBridgeJar = "atlas-bioformats-bridge.jar";
+constexpr int kJavaVersionProbeTimeoutMs = 5000;
+
+struct JavaCandidate
+{
+  QString description;
+  QString program;
+  bool requireExecutableFile = false;
+};
+
+struct JavaCheckResult
+{
+  bool ok = false;
+  QString detail;
+};
+
+QString canonicalPath(const QString& filename)
+{
+  QFileInfo fi(filename);
+  if (!fi.exists()) {
+    throw ZException(fmt::format("Bio-Formats input file does not exist: {}", filename));
+  }
+  QString path = fi.canonicalFilePath();
+  if (path.isEmpty()) {
+    path = fi.absoluteFilePath();
+  }
+  return path;
+}
+
+QStringList repeatedStringsToQStringList(const google::protobuf::RepeatedPtrField<std::string>& values)
+{
+  QStringList result;
+  result.reserve(values.size());
+  for (const auto& value : values) {
+    result.push_back(QString::fromStdString(value));
+  }
+  return result;
+}
+
+std::string responseCaseName(const proto::Response& response)
+{
+  switch (response.result_case()) {
+    case proto::Response::kListFormats:
+      return "list_formats";
+    case proto::Response::kProbe:
+      return "probe";
+    case proto::Response::kOpenDataset:
+      return "open_dataset";
+    case proto::Response::kPixelChunk:
+      return "pixel_chunk";
+    case proto::Response::kCloseDataset:
+      return "close_dataset";
+    case proto::Response::kShutdown:
+      return "shutdown";
+    case proto::Response::kThumbnailChunk:
+      return "thumbnail_chunk";
+    case proto::Response::RESULT_NOT_SET:
+      return "unset";
+  }
+  CHECK(false);
+  return "unknown";
+}
+
+QString platformJavaExecutableName()
+{
+#ifdef _WIN32
+  return "java.exe";
+#else
+  return "java";
+#endif
+}
+
+QString javaExecutableInHome(const QString& javaHome)
+{
+  return QDir(javaHome).absoluteFilePath(QString("bin/") + platformJavaExecutableName());
+}
+
+std::optional<int> parseJavaMajorVersion(const QString& versionOutput)
+{
+  const QRegularExpression quotedVersion("\"([0-9][^\"]*)\"");
+  const QRegularExpressionMatch match = quotedVersion.match(versionOutput);
+  if (!match.hasMatch()) {
+    return std::nullopt;
+  }
+
+  const QStringList parts = match.captured(1).split('.');
+  bool ok = false;
+  const int first = parts.value(0).toInt(&ok);
+  if (!ok) {
+    return std::nullopt;
+  }
+  if (first == 1) {
+    const int second = parts.value(1).toInt(&ok);
+    if (!ok) {
+      return std::nullopt;
+    }
+    return second;
+  }
+  return first;
+}
+
+QString combinedProcessOutput(QProcess& process)
+{
+  QString output = QString::fromUtf8(process.readAllStandardError());
+  const QString stdoutText = QString::fromUtf8(process.readAllStandardOutput());
+  if (!stdoutText.isEmpty()) {
+    if (!output.isEmpty()) {
+      output += '\n';
+    }
+    output += stdoutText;
+  }
+  return output.trimmed();
+}
+
+JavaCheckResult checkJavaCandidate(const JavaCandidate& candidate)
+{
+  if (candidate.requireExecutableFile && !QFileInfo(candidate.program).isExecutable()) {
+    return {false, QString("%1: executable not found: %2").arg(candidate.description, candidate.program)};
+  }
+
+  QProcess process;
+  process.setProgram(candidate.program);
+  process.setArguments({"-version"});
+  process.setProcessChannelMode(QProcess::SeparateChannels);
+  process.start();
+  if (!process.waitForStarted(kJavaVersionProbeTimeoutMs)) {
+    return {
+      false,
+      QString("%1: failed to start '%2': %3").arg(candidate.description, candidate.program, process.errorString())};
+  }
+  if (!process.waitForFinished(kJavaVersionProbeTimeoutMs)) {
+    process.kill();
+    process.waitForFinished(1000);
+    return {false,
+            QString("%1: timed out running '%2 -version' after %3 ms")
+              .arg(candidate.description, candidate.program)
+              .arg(kJavaVersionProbeTimeoutMs)};
+  }
+
+  const QString output = combinedProcessOutput(process);
+  if (process.exitStatus() != QProcess::NormalExit || process.exitCode() != 0) {
+    return {false,
+            QString("%1: '%2 -version' exited with code %3%4")
+              .arg(candidate.description, candidate.program)
+              .arg(process.exitCode())
+              .arg(output.isEmpty() ? QString() : QString(": ") + output)};
+  }
+
+  const std::optional<int> major = parseJavaMajorVersion(output);
+  if (!major) {
+    return {false,
+            QString("%1: could not parse Java version from '%2 -version'%3")
+              .arg(candidate.description, candidate.program)
+              .arg(output.isEmpty() ? QString() : QString(": ") + output)};
+  }
+  if (*major < 11) {
+    return {
+      false,
+      QString("%1: Java %2 is too old; Bio-Formats requires Java 11 or newer").arg(candidate.description).arg(*major)};
+  }
+
+  return {true, QString("%1: Java %2").arg(candidate.description).arg(*major)};
+}
+
+QString resolveJavaExecutable()
+{
+  const QString bundledJreDir = ZImgGlobal::instance().jreDIR;
+  if (!bundledJreDir.isEmpty()) {
+    const JavaCandidate bundled{
+      QString("bundled jreDIR=%1").arg(bundledJreDir),
+      javaExecutableInHome(bundledJreDir),
+      true,
+    };
+    const JavaCheckResult check = checkJavaCandidate(bundled);
+    if (!check.ok) {
+      const QString detail = QString("Bundled Bio-Formats Java runtime is not usable. ") + check.detail;
+      throw ZException(detail);
+    }
+    return bundled.program;
+  }
+
+  QStringList diagnostics;
+  const QString javaHome = qEnvironmentVariable("JAVA_HOME");
+  if (javaHome.isEmpty()) {
+    diagnostics.push_back("JAVA_HOME: not set");
+  } else {
+    const JavaCandidate candidate{
+      QString("JAVA_HOME=%1").arg(javaHome),
+      javaExecutableInHome(javaHome),
+      true,
+    };
+    const JavaCheckResult check = checkJavaCandidate(candidate);
+    if (check.ok) {
+      return candidate.program;
+    }
+    diagnostics.push_back(check.detail);
+  }
+
+  const JavaCandidate pathCandidate{
+    "PATH java",
+    platformJavaExecutableName(),
+    false,
+  };
+  const JavaCheckResult pathCheck = checkJavaCandidate(pathCandidate);
+  if (pathCheck.ok) {
+    return pathCandidate.program;
+  }
+  diagnostics.push_back(pathCheck.detail);
+
+  const QString detail = QString("Bio-Formats requires Java 11 or newer. Tried:\n- ") + diagnostics.join("\n- ");
+  throw ZException(detail);
+}
+
+QString bridgeClasspath()
+{
+  QDir jarsDir(ZImgGlobal::instance().jarsDIR);
+#ifdef _WIN32
+  constexpr QChar separator(';');
+#else
+  constexpr QChar separator(':');
+#endif
+  return jarsDir.absoluteFilePath(kBioFormatsJar) + separator + jarsDir.absoluteFilePath(kAtlasBioFormatsBridgeJar);
+}
+
+ZBioFormatsReaderFormat convertReaderFormat(const proto::ReaderFormat& format)
+{
+  ZBioFormatsReaderFormat result;
+  result.formatName = QString::fromStdString(format.format_name());
+  result.readerClass = QString::fromStdString(format.reader_class());
+  result.suffixes = repeatedStringsToQStringList(format.suffixes());
+  result.domains = repeatedStringsToQStringList(format.domains());
+  result.hasCompanionFiles = format.has_companion_files();
+  return result;
+}
+
+ZBioFormatsResolutionInfo convertResolutionInfo(const proto::ResolutionInfo& resolution)
+{
+  ZBioFormatsResolutionInfo result;
+  result.resolution = resolution.resolution();
+  result.sizeX = resolution.size_x();
+  result.sizeY = resolution.size_y();
+  result.sizeZ = resolution.size_z();
+  result.effectiveSizeC = resolution.effective_size_c();
+  result.sizeT = resolution.size_t();
+  result.imageCount = resolution.image_count();
+  result.optimalTileWidth = resolution.optimal_tile_width();
+  result.optimalTileHeight = resolution.optimal_tile_height();
+  return result;
+}
+
+ZBioFormatsSeriesInfo convertSeriesInfo(const proto::SeriesInfo& series)
+{
+  ZBioFormatsSeriesInfo result;
+  result.series = series.series();
+  result.sizeX = series.size_x();
+  result.sizeY = series.size_y();
+  result.sizeZ = series.size_z();
+  result.effectiveSizeC = series.effective_size_c();
+  result.sizeT = series.size_t();
+  result.rgbChannelCount = std::max<uint32_t>(1, series.rgb_channel_count());
+  result.bytesPerPixel = series.bytes_per_pixel();
+  result.pixelType = QString::fromStdString(series.pixel_type());
+  result.littleEndian = series.little_endian();
+  result.dimensionOrder = QString::fromStdString(series.dimension_order());
+  result.resolutionCount = series.resolution_count();
+  result.optimalTileWidth = series.optimal_tile_width();
+  result.optimalTileHeight = series.optimal_tile_height();
+  result.hasPhysicalSizeX = series.has_physical_size_x();
+  result.hasPhysicalSizeY = series.has_physical_size_y();
+  result.hasPhysicalSizeZ = series.has_physical_size_z();
+  result.physicalSizeXUm = series.physical_size_x_um();
+  result.physicalSizeYUm = series.physical_size_y_um();
+  result.physicalSizeZUm = series.physical_size_z_um();
+  result.channelNames = repeatedStringsToQStringList(series.channel_names());
+  result.usedFiles = repeatedStringsToQStringList(series.used_files());
+  result.channelColorsRgba.reserve(series.channel_colors_rgba_size());
+  for (const uint32_t color : series.channel_colors_rgba()) {
+    result.channelColorsRgba.push_back(color);
+  }
+  result.metadata.reserve(series.metadata_size());
+  for (const auto& entry : series.metadata()) {
+    result.metadata.push_back({entry.key(), entry.value()});
+  }
+  result.resolutions.reserve(series.resolutions_size());
+  for (const auto& resolution : series.resolutions()) {
+    result.resolutions.push_back(convertResolutionInfo(resolution));
+  }
+  if (result.resolutions.empty()) {
+    result.resolutions.push_back({0,
+                                  result.sizeX,
+                                  result.sizeY,
+                                  result.sizeZ,
+                                  result.effectiveSizeC,
+                                  result.sizeT,
+                                  0,
+                                  result.optimalTileWidth,
+                                  result.optimalTileHeight});
+  }
+  return result;
+}
+
+ZBioFormatsDatasetInfo convertDatasetInfo(const proto::OpenDatasetResponse& dataset)
+{
+  ZBioFormatsDatasetInfo result;
+  result.sessionId = dataset.session_id();
+  result.path = QString::fromStdString(dataset.path());
+  result.formatName = QString::fromStdString(dataset.format_name());
+  result.readerClass = QString::fromStdString(dataset.reader_class());
+  result.usedFiles = repeatedStringsToQStringList(dataset.used_files());
+  result.series.reserve(dataset.series_size());
+  for (const auto& series : dataset.series()) {
+    result.series.push_back(convertSeriesInfo(series));
+  }
+  return result;
+}
+
+} // namespace
+
+class ZBioFormatsBridgeClient::Impl
+{
+public:
+  [[nodiscard]] std::vector<ZBioFormatsReaderFormat> listFormats()
+  {
+    std::lock_guard<std::mutex> lock(m_mutex);
+    if (!m_cachedFormats.empty()) {
+      return m_cachedFormats;
+    }
+
+    proto::Request request;
+    request.mutable_list_formats();
+    proto::Response response = transact(request);
+    requireOk(response, "list Bio-Formats readers");
+    if (!response.has_list_formats()) {
+      throw ZException(fmt::format("Bio-Formats bridge returned '{}' for list_formats", responseCaseName(response)));
+    }
+
+    m_cachedFormats.reserve(response.list_formats().formats_size());
+    for (const auto& format : response.list_formats().formats()) {
+      m_cachedFormats.push_back(convertReaderFormat(format));
+    }
+    return m_cachedFormats;
+  }
+
+  [[nodiscard]] bool canRead(const QString& filename)
+  {
+    std::lock_guard<std::mutex> lock(m_mutex);
+    proto::Request request;
+    auto* probe = request.mutable_probe();
+    probe->set_path(canonicalPath(filename).toStdString());
+    probe->set_grouping_policy(proto::FILE_GROUPING_POLICY_DEFAULT);
+    probe->set_metadata_filtered(true);
+
+    proto::Response response = transact(request);
+    requireOk(response, "probe Bio-Formats reader");
+    if (!response.has_probe()) {
+      throw ZException(fmt::format("Bio-Formats bridge returned '{}' for probe", responseCaseName(response)));
+    }
+    return response.probe().can_read();
+  }
+
+  [[nodiscard]] const ZBioFormatsDatasetInfo& openDataset(const QString& filename)
+  {
+    std::lock_guard<std::mutex> lock(m_mutex);
+    return openDatasetLocked(filename);
+  }
+
+  [[nodiscard]] std::vector<uint8_t> readRegion(const QString& filename, size_t scene, const ZImgRegion& region)
+  {
+    return readRegion(filename, scene, 0, region);
+  }
+
+  [[nodiscard]] std::vector<uint8_t>
+  readRegion(const QString& filename, size_t scene, uint32_t resolution, const ZImgRegion& region)
+  {
+    std::lock_guard<std::mutex> lock(m_mutex);
+    const auto& dataset = openDatasetLocked(filename);
+    if (scene >= dataset.series.size()) {
+      throw ZException(fmt::format("Bio-Formats scene {} is out of range for {}", scene, filename));
+    }
+
+    proto::Request request;
+    const uint64_t requestId = nextRequestId();
+    request.set_request_id(requestId);
+    auto* readRegion = request.mutable_read_region();
+    readRegion->set_session_id(dataset.sessionId);
+    readRegion->set_series(static_cast<uint32_t>(scene));
+    readRegion->set_resolution(resolution);
+    readRegion->set_x(static_cast<uint64_t>(region.start.x));
+    readRegion->set_y(static_cast<uint64_t>(region.start.y));
+    readRegion->set_z(static_cast<uint64_t>(region.start.z));
+    readRegion->set_c(static_cast<uint64_t>(region.start.c));
+    readRegion->set_t(static_cast<uint64_t>(region.start.t));
+    readRegion->set_width(static_cast<uint64_t>(region.end.x - region.start.x));
+    readRegion->set_height(static_cast<uint64_t>(region.end.y - region.start.y));
+    readRegion->set_depth(static_cast<uint64_t>(region.end.z - region.start.z));
+    readRegion->set_channel_count(static_cast<uint64_t>(region.end.c - region.start.c));
+    readRegion->set_time_count(static_cast<uint64_t>(region.end.t - region.start.t));
+
+    writeRequest(request);
+
+    std::vector<uint8_t> result;
+    uint32_t expectedSequenceIndex = 0;
+    while (true) {
+      proto::Response response = readResponse();
+      if (response.request_id() != requestId) {
+        throw ZException(fmt::format("Bio-Formats bridge returned response id {} while waiting for {}",
+                                     response.request_id(),
+                                     requestId));
+      }
+      requireOk(response, "read Bio-Formats image region");
+      if (!response.has_pixel_chunk()) {
+        throw ZException(
+          fmt::format("Bio-Formats bridge returned '{}' while streaming pixels", responseCaseName(response)));
+      }
+
+      const auto& chunk = response.pixel_chunk();
+      if (chunk.sequence_index() != expectedSequenceIndex) {
+        throw ZException(fmt::format("Bio-Formats bridge pixel chunk sequence mismatch: expected {}, got {}",
+                                     expectedSequenceIndex,
+                                     chunk.sequence_index()));
+      }
+      ++expectedSequenceIndex;
+
+      const std::string& data = chunk.data();
+      result.insert(result.end(), data.begin(), data.end());
+      if (chunk.total_bytes() != result.size()) {
+        throw ZException(fmt::format("Bio-Formats bridge pixel byte count mismatch: bridge reported {}, received {}",
+                                     chunk.total_bytes(),
+                                     result.size()));
+      }
+      if (chunk.final_chunk()) {
+        return result;
+      }
+    }
+  }
+
+  [[nodiscard]] ZBioFormatsThumbnail readThumbnail(const QString& filename, size_t scene, size_t z, size_t t)
+  {
+    std::lock_guard<std::mutex> lock(m_mutex);
+    const auto& dataset = openDatasetLocked(filename);
+    if (scene >= dataset.series.size()) {
+      throw ZException(fmt::format("Bio-Formats scene {} is out of range for {}", scene, filename));
+    }
+
+    proto::Request request;
+    const uint64_t requestId = nextRequestId();
+    request.set_request_id(requestId);
+    auto* readThumbnail = request.mutable_read_thumbnail();
+    readThumbnail->set_session_id(dataset.sessionId);
+    readThumbnail->set_series(static_cast<uint32_t>(scene));
+    readThumbnail->set_z(static_cast<uint64_t>(z));
+    readThumbnail->set_t(static_cast<uint64_t>(t));
+
+    writeRequest(request);
+
+    ZBioFormatsThumbnail result;
+    uint32_t expectedSequenceIndex = 0;
+    while (true) {
+      proto::Response response = readResponse();
+      if (response.request_id() != requestId) {
+        throw ZException(fmt::format("Bio-Formats bridge returned response id {} while waiting for {}",
+                                     response.request_id(),
+                                     requestId));
+      }
+      requireOk(response, "read Bio-Formats thumbnail");
+      if (!response.has_thumbnail_chunk()) {
+        throw ZException(
+          fmt::format("Bio-Formats bridge returned '{}' while streaming thumbnail", responseCaseName(response)));
+      }
+
+      const auto& chunk = response.thumbnail_chunk();
+      if (chunk.sequence_index() != expectedSequenceIndex) {
+        throw ZException(fmt::format("Bio-Formats bridge thumbnail chunk sequence mismatch: expected {}, got {}",
+                                     expectedSequenceIndex,
+                                     chunk.sequence_index()));
+      }
+      ++expectedSequenceIndex;
+
+      if (expectedSequenceIndex == 1) {
+        result.width = chunk.width();
+        result.height = chunk.height();
+        result.channelCount = chunk.channel_count();
+        result.bytesPerPixel = chunk.bytes_per_pixel();
+        result.pixelType = QString::fromStdString(chunk.pixel_type());
+      } else if (result.width != chunk.width() || result.height != chunk.height() ||
+                 result.channelCount != chunk.channel_count() || result.bytesPerPixel != chunk.bytes_per_pixel() ||
+                 result.pixelType != QString::fromStdString(chunk.pixel_type())) {
+        throw ZException("Bio-Formats bridge changed thumbnail metadata while streaming");
+      }
+
+      const std::string& data = chunk.data();
+      result.pixels.insert(result.pixels.end(), data.begin(), data.end());
+      if (chunk.total_bytes() != result.pixels.size()) {
+        throw ZException(
+          fmt::format("Bio-Formats bridge thumbnail byte count mismatch: bridge reported {}, received {}",
+                      chunk.total_bytes(),
+                      result.pixels.size()));
+      }
+      if (chunk.final_chunk()) {
+        return result;
+      }
+    }
+  }
+
+  void closeDataset(const QString& filename)
+  {
+    std::lock_guard<std::mutex> lock(m_mutex);
+    const QString path = canonicalPath(filename);
+    auto it = m_datasetsByPath.find(path);
+    if (it == m_datasetsByPath.end()) {
+      return;
+    }
+
+    proto::Request request;
+    request.mutable_close_dataset()->set_session_id(it.value().sessionId);
+    proto::Response response = transact(request);
+    requireOk(response, "close Bio-Formats dataset");
+    m_datasetsByPath.erase(it);
+  }
+
+  ~Impl()
+  {
+    try {
+      if (m_process.state() == QProcess::Running) {
+        proto::Request request;
+        request.set_request_id(nextRequestId());
+        request.mutable_shutdown();
+        writeRequest(request);
+        (void)readResponse();
+        m_process.waitForFinished(1000);
+      }
+    }
+    catch (...) {
+    }
+    if (m_process.state() != QProcess::NotRunning) {
+      m_process.kill();
+      m_process.waitForFinished(1000);
+    }
+  }
+
+private:
+  [[nodiscard]] const ZBioFormatsDatasetInfo& openDatasetLocked(const QString& filename)
+  {
+    const QString path = canonicalPath(filename);
+    auto it = m_datasetsByPath.find(path);
+    if (it != m_datasetsByPath.end()) {
+      return it.value();
+    }
+
+    proto::Request request;
+    auto* open = request.mutable_open_dataset();
+    open->set_path(path.toStdString());
+    open->set_grouping_policy(proto::FILE_GROUPING_POLICY_DEFAULT);
+    open->set_metadata_filtered(false);
+
+    proto::Response response = transact(request);
+    requireOk(response, "open Bio-Formats dataset");
+    if (!response.has_open_dataset()) {
+      throw ZException(fmt::format("Bio-Formats bridge returned '{}' for open_dataset", responseCaseName(response)));
+    }
+    auto inserted = m_datasetsByPath.insert(path, convertDatasetInfo(response.open_dataset()));
+    return inserted.value();
+  }
+
+  [[nodiscard]] proto::Response transact(proto::Request& request)
+  {
+    request.set_request_id(nextRequestId());
+    writeRequest(request);
+    proto::Response response = readResponse();
+    if (response.request_id() != request.request_id()) {
+      throw ZException(fmt::format("Bio-Formats bridge returned response id {} while waiting for {}",
+                                   response.request_id(),
+                                   request.request_id()));
+    }
+    return response;
+  }
+
+  uint64_t nextRequestId()
+  {
+    const uint64_t result = m_nextRequestId++;
+    CHECK(result != 0);
+    return result;
+  }
+
+  [[nodiscard]] QString javaExecutable()
+  {
+    if (m_javaExecutable.isEmpty()) {
+      m_javaExecutable = resolveJavaExecutable();
+    }
+    return m_javaExecutable;
+  }
+
+  void ensureProcess()
+  {
+    if (m_process.state() == QProcess::Running) {
+      return;
+    }
+
+    if (!ZBioFormatsBridgeClient::hasRuntimeSupport()) {
+      throw ZException(fmt::format("Bio-Formats bridge runtime is incomplete. Missing: {}",
+                                   ZBioFormatsBridgeClient::missingRuntimeFiles().join(", ")));
+    }
+
+    m_datasetsByPath.clear();
+    m_stdoutBuffer.clear();
+
+    QStringList args;
+    if (!FLAGS_atlas_bioformats_java_xmx.empty()) {
+      args.push_back(QString("-Xmx%1").arg(QString::fromStdString(FLAGS_atlas_bioformats_java_xmx)));
+    }
+    args << "-Djava.awt.headless=true"
+         << "-cp" << bridgeClasspath() << "org.fenglab.atlas.bioformats.AtlasBioFormatsBridge";
+
+    const QString java = javaExecutable();
+    m_process.setProgram(java);
+    m_process.setArguments(args);
+    m_process.setProcessChannelMode(QProcess::SeparateChannels);
+    m_process.start();
+    if (!m_process.waitForStarted(30000)) {
+      throw ZException(fmt::format("failed to start Bio-Formats bridge '{}': {}", java, m_process.errorString()));
+    }
+  }
+
+  void writeRequest(const proto::Request& request)
+  {
+    ensureProcess();
+    std::string payload;
+    if (!request.SerializeToString(&payload)) {
+      throw ZException("failed to serialize Bio-Formats bridge request");
+    }
+    if (payload.size() > kMaxFrameBytes) {
+      throw ZException(fmt::format("Bio-Formats bridge request frame is too large: {} bytes", payload.size()));
+    }
+
+    const uint32_t size = static_cast<uint32_t>(payload.size());
+    char header[4] = {
+      static_cast<char>(size & 0xff_u32),
+      static_cast<char>((size >> 8_u32) & 0xff_u32),
+      static_cast<char>((size >> 16_u32) & 0xff_u32),
+      static_cast<char>((size >> 24_u32) & 0xff_u32),
+    };
+    writeBytes(header, sizeof(header));
+    writeBytes(payload.data(), payload.size());
+    waitForBytesWritten();
+  }
+
+  void writeBytes(const char* data, size_t size)
+  {
+    CHECK(data);
+    if (size > static_cast<size_t>(std::numeric_limits<qint64>::max())) {
+      throw ZException(fmt::format("Bio-Formats bridge write is too large: {} bytes", size));
+    }
+    const qint64 written = m_process.write(data, static_cast<qint64>(size));
+    if (written != static_cast<qint64>(size)) {
+      throwProcessError("failed to write Bio-Formats bridge request");
+    }
+  }
+
+  void waitForBytesWritten()
+  {
+    QElapsedTimer timer;
+    timer.start();
+    while (m_process.bytesToWrite() > 0) {
+      if (m_process.state() != QProcess::Running) {
+        throwProcessError("Bio-Formats bridge exited while writing request");
+      }
+      const int waitMs = nextWaitMilliseconds(timer);
+      if (!m_process.waitForBytesWritten(waitMs) && FLAGS_atlas_bioformats_bridge_io_timeout_ms > 0 &&
+          timer.elapsed() >= FLAGS_atlas_bioformats_bridge_io_timeout_ms) {
+        throwProcessError("timed out writing Bio-Formats bridge request");
+      }
+    }
+  }
+
+  [[nodiscard]] proto::Response readResponse()
+  {
+    const QByteArray header = readExact(4);
+    const uint32_t size = static_cast<uint8_t>(header[0]) |
+                          (static_cast<uint32_t>(static_cast<uint8_t>(header[1])) << 8_u32) |
+                          (static_cast<uint32_t>(static_cast<uint8_t>(header[2])) << 16_u32) |
+                          (static_cast<uint32_t>(static_cast<uint8_t>(header[3])) << 24_u32);
+    if (size > kMaxFrameBytes) {
+      throw ZException(fmt::format("Bio-Formats bridge response frame is too large: {} bytes", size));
+    }
+    const QByteArray payload = readExact(size);
+    proto::Response response;
+    if (!response.ParseFromArray(payload.constData(), payload.size())) {
+      throw ZException("failed to parse Bio-Formats bridge response");
+    }
+    return response;
+  }
+
+  [[nodiscard]] QByteArray readExact(uint32_t size)
+  {
+    QElapsedTimer timer;
+    timer.start();
+    while (m_stdoutBuffer.size() < static_cast<qsizetype>(size)) {
+      m_stdoutBuffer.append(m_process.readAllStandardOutput());
+      if (m_stdoutBuffer.size() >= static_cast<qsizetype>(size)) {
+        break;
+      }
+      if (m_process.state() != QProcess::Running) {
+        throwProcessError("Bio-Formats bridge exited while reading response");
+      }
+      const int waitMs = nextWaitMilliseconds(timer);
+      if (!m_process.waitForReadyRead(waitMs) && FLAGS_atlas_bioformats_bridge_io_timeout_ms > 0 &&
+          timer.elapsed() >= FLAGS_atlas_bioformats_bridge_io_timeout_ms) {
+        throwProcessError("timed out reading Bio-Formats bridge response");
+      }
+    }
+
+    QByteArray result = m_stdoutBuffer.left(size);
+    m_stdoutBuffer.remove(0, size);
+    return result;
+  }
+
+  [[nodiscard]] int nextWaitMilliseconds(const QElapsedTimer& timer) const
+  {
+    if (FLAGS_atlas_bioformats_bridge_io_timeout_ms <= 0) {
+      return 1000;
+    }
+    const qint64 elapsed = timer.elapsed();
+    if (elapsed >= FLAGS_atlas_bioformats_bridge_io_timeout_ms) {
+      return 0;
+    }
+    return static_cast<int>(std::min<qint64>(1000, FLAGS_atlas_bioformats_bridge_io_timeout_ms - elapsed));
+  }
+
+  [[noreturn]] void throwProcessError(const char* message)
+  {
+    const QString stderrText = QString::fromUtf8(m_process.readAllStandardError());
+    QString detail = QString::fromUtf8(message);
+    if (!stderrText.isEmpty()) {
+      detail += QString(": ") + stderrText;
+    } else if (!m_process.errorString().isEmpty()) {
+      detail += QString(": ") + m_process.errorString();
+    }
+
+    if (m_process.state() != QProcess::NotRunning) {
+      m_process.kill();
+      m_process.waitForFinished(1000);
+    }
+    m_datasetsByPath.clear();
+    m_stdoutBuffer.clear();
+    throw ZException(detail);
+  }
+
+  void requireOk(const proto::Response& response, std::string_view operation) const
+  {
+    if (response.status() == proto::STATUS_CODE_OK) {
+      return;
+    }
+    throw ZException(fmt::format("Bio-Formats bridge failed to {}: {} ({})",
+                                 operation,
+                                 response.error_message(),
+                                 proto::StatusCode_Name(response.status())));
+  }
+
+  std::mutex m_mutex;
+  QProcess m_process;
+  QByteArray m_stdoutBuffer;
+  QString m_javaExecutable;
+  uint64_t m_nextRequestId = 1;
+  std::vector<ZBioFormatsReaderFormat> m_cachedFormats;
+  QMap<QString, ZBioFormatsDatasetInfo> m_datasetsByPath;
+};
+
+ZBioFormatsBridgeClient& ZBioFormatsBridgeClient::instance()
+{
+  thread_local ZBioFormatsBridgeClient client;
+  return client;
+}
+
+bool ZBioFormatsBridgeClient::hasRuntimeSupport()
+{
+  return missingRuntimeFiles().empty();
+}
+
+QStringList ZBioFormatsBridgeClient::missingRuntimeFiles()
+{
+  QStringList missing;
+  if (ZImgGlobal::instance().jarsDIR.isEmpty()) {
+    missing.push_back("jars directory");
+    return missing;
+  }
+  QDir jarsDir(ZImgGlobal::instance().jarsDIR);
+  if (!jarsDir.exists()) {
+    missing.push_back(jarsDir.absolutePath());
+    return missing;
+  }
+  if (!jarsDir.exists(kBioFormatsJar)) {
+    missing.push_back(kBioFormatsJar);
+  }
+  if (!jarsDir.exists(kAtlasBioFormatsBridgeJar)) {
+    missing.push_back(kAtlasBioFormatsBridgeJar);
+  }
+  return missing;
+}
+
+ZBioFormatsBridgeClient::ZBioFormatsBridgeClient()
+  : m_impl(std::make_unique<Impl>())
+{}
+
+ZBioFormatsBridgeClient::~ZBioFormatsBridgeClient() = default;
+
+std::vector<ZBioFormatsReaderFormat> ZBioFormatsBridgeClient::listFormats()
+{
+  return m_impl->listFormats();
+}
+
+bool ZBioFormatsBridgeClient::canRead(const QString& filename)
+{
+  return m_impl->canRead(filename);
+}
+
+const ZBioFormatsDatasetInfo& ZBioFormatsBridgeClient::openDataset(const QString& filename)
+{
+  return m_impl->openDataset(filename);
+}
+
+std::vector<uint8_t>
+ZBioFormatsBridgeClient::readRegion(const QString& filename, size_t scene, const ZImgRegion& region)
+{
+  return m_impl->readRegion(filename, scene, region);
+}
+
+std::vector<uint8_t> ZBioFormatsBridgeClient::readRegion(const QString& filename,
+                                                         size_t scene,
+                                                         uint32_t resolution,
+                                                         const ZImgRegion& region)
+{
+  return m_impl->readRegion(filename, scene, resolution, region);
+}
+
+ZBioFormatsThumbnail ZBioFormatsBridgeClient::readThumbnail(const QString& filename, size_t scene, size_t z, size_t t)
+{
+  return m_impl->readThumbnail(filename, scene, z, t);
+}
+
+void ZBioFormatsBridgeClient::closeDataset(const QString& filename)
+{
+  m_impl->closeDataset(filename);
+}
+
+} // namespace nim

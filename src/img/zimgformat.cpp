@@ -566,7 +566,8 @@ void ZImgFormat::fixDimensionOrder(const uint8_t* buf, const QString& dimensionO
 
 void ZImgFormat::createDefaultSubBlocks(const QString& filename,
                                         const std::vector<ZImgInfo>& infos,
-                                        std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks)
+                                        std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks,
+                                        FileFormat format)
 {
   if (!subBlocks) {
     return;
@@ -579,7 +580,8 @@ void ZImgFormat::createDefaultSubBlocks(const QString& filename,
           ZImgSource(filename,
                      ZImgRegion(ZVoxelCoordinate(0, 0, z, 0, t),
                                 ZVoxelCoordinate(infos[s].width, infos[s].height, z + 1, infos[s].numChannels, t + 1)),
-                     s)));
+                     s,
+                     format)));
       }
     }
   }
@@ -598,7 +600,8 @@ void ZImgFormat::createTiledSubBlocks(const QString& filename,
                                       const std::vector<ZImgInfo>& infos,
                                       std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks,
                                       size_t tileWidth,
-                                      size_t tileHeight)
+                                      size_t tileHeight,
+                                      FileFormat format)
 {
   if (!subBlocks) {
     return;
@@ -614,11 +617,20 @@ void ZImgFormat::createTiledSubBlocks(const QString& filename,
           const size_t yEnd = std::min(inf.height, y + th);
           for (size_t x = 0; x < inf.width; x += tw) {
             const size_t xEnd = std::min(inf.width, x + tw);
-            (*subBlocks)[s].emplace_back(std::make_shared<ZImgTileSubBlock>(ZImgSource(
-              filename,
-              ZImgRegion(ZVoxelCoordinate(int(x), int(y), int(z), 0, int(t)),
-                         ZVoxelCoordinate(int(xEnd), int(yEnd), int(z + 1), int(inf.numChannels), int(t + 1))),
-              s)));
+            (*subBlocks)[s].emplace_back(std::make_shared<ZImgTileSubBlock>(
+              ZImgSource(filename,
+                         ZImgRegion(ZVoxelCoordinate(static_cast<index_t>(x),
+                                                     static_cast<index_t>(y),
+                                                     static_cast<index_t>(z),
+                                                     0,
+                                                     static_cast<index_t>(t)),
+                                    ZVoxelCoordinate(static_cast<index_t>(xEnd),
+                                                     static_cast<index_t>(yEnd),
+                                                     static_cast<index_t>(z + 1),
+                                                     static_cast<index_t>(inf.numChannels),
+                                                     static_cast<index_t>(t + 1))),
+                         s,
+                         format)));
           }
         }
       }

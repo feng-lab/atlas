@@ -209,12 +209,28 @@ def static_src_package_dir() -> str:
     return res
 
 
+def static_atlas_runtime_assets_dir() -> str:
+    res = os.path.join(static_deploy_folder(), "atlas_runtime_assets")
+    assert os.path.exists(res)
+    return res
+
+
 def src_package_dir() -> str:
     if is_internal_dev_environment():
         res = static_src_package_dir()
     else:
         res = os.path.join(atlas_repository_dir(), "atlas_deps")
         assert os.path.exists(res)
+    return res
+
+
+def atlas_runtime_assets_dir() -> str:
+    static_dir = os.path.join(static_deploy_folder(), "atlas_runtime_assets")
+    if os.path.exists(static_dir):
+        return static_dir
+
+    res = os.path.join(atlas_repository_dir(), "atlas_runtime_assets")
+    assert os.path.exists(res)
     return res
 
 

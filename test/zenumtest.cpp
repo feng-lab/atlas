@@ -97,13 +97,14 @@ TEST_ENUM_CONVERSIONS(FileFormat,
                       {FileFormat::MetaImage, "MetaImage"},
                       {FileFormat::ZeissCZI, "ZeissCZI"},
                       {FileFormat::ITKImage, "ITKImage"},
-                      {FileFormat::Leica, "Leica"});
+                      {FileFormat::Leica, "Leica"},
+                      {FileFormat::BioFormats, "BioFormats"});
 
 TEST(EnumConversionTests, FileFormatInvalidEnum2)
 {
   using TEnum = FileFormat;
   EXPECT_THROW(enumToString(static_cast<TEnum>(-1)), nim::ZException);
-  EXPECT_THROW(enumToString(static_cast<TEnum>(std::to_underlying(FileFormat::Leica) + 1)), nim::ZException);
+  EXPECT_THROW(enumToString(static_cast<TEnum>(std::to_underlying(FileFormat::BioFormats) + 1)), nim::ZException);
 }
 
 TEST_ENUM_CONVERSIONS(Compression,

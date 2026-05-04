@@ -1,0 +1,219 @@
+syntax = "proto3";
+
+package atlas.bioformats.bridge;
+
+option java_package = "org.fenglab.atlas.bioformats.proto";
+option java_outer_classname = "BioFormatsBridgeProto";
+
+enum StatusCode
+{
+  STATUS_CODE_UNSPECIFIED = 0;
+  STATUS_CODE_OK = 1;
+  STATUS_CODE_INVALID_ARGUMENT = 2;
+  STATUS_CODE_NOT_FOUND = 3;
+  STATUS_CODE_UNSUPPORTED = 4;
+  STATUS_CODE_IO_ERROR = 5;
+  STATUS_CODE_CANCELLED = 6;
+  STATUS_CODE_INTERNAL = 7;
+}
+
+enum FileGroupingPolicy
+{
+  FILE_GROUPING_POLICY_DEFAULT = 0;
+  FILE_GROUPING_POLICY_ENABLED = 1;
+  FILE_GROUPING_POLICY_DISABLED = 2;
+}
+
+message Request
+{
+  uint64 request_id = 1;
+
+  oneof command
+  {
+    ListFormatsRequest list_formats = 10;
+    ProbeRequest probe = 11;
+    OpenDatasetRequest open_dataset = 12;
+    ReadRegionRequest read_region = 13;
+    CloseDatasetRequest close_dataset = 14;
+    ShutdownRequest shutdown = 15;
+    ReadThumbnailRequest read_thumbnail = 16;
+  }
+}
+
+message Response
+{
+  uint64 request_id = 1;
+  StatusCode status = 2;
+  string error_message = 3;
+
+  oneof result
+  {
+    ListFormatsResponse list_formats = 10;
+    ProbeResponse probe = 11;
+    OpenDatasetResponse open_dataset = 12;
+    PixelChunk pixel_chunk = 13;
+    CloseDatasetResponse close_dataset = 14;
+    ShutdownResponse shutdown = 15;
+    ThumbnailChunk thumbnail_chunk = 16;
+  }
+}
+
+message ListFormatsRequest {}
+
+message ReaderFormat
+{
+  string format_name = 1;
+  string reader_class = 2;
+  repeated string suffixes = 3;
+  bool has_companion_files = 4;
+  repeated string domains = 5;
+}
+
+message ListFormatsResponse
+{
+  repeated ReaderFormat formats = 1;
+}
+
+message ProbeRequest
+{
+  string path = 1;
+  FileGroupingPolicy grouping_policy = 2;
+  bool metadata_filtered = 3;
+}
+
+message ProbeResponse
+{
+  bool can_read = 1;
+  string format_name = 2;
+  string reader_class = 3;
+  repeated string used_files = 4;
+}
+
+message OpenDatasetRequest
+{
+  string path = 1;
+  FileGroupingPolicy grouping_policy = 2;
+  bool metadata_filtered = 3;
+}
+
+message MetadataEntry
+{
+  string key = 1;
+  string value = 2;
+}
+
+message ResolutionInfo
+{
+  uint32 resolution = 1;
+  uint64 size_x = 2;
+  uint64 size_y = 3;
+  uint64 size_z = 4;
+  uint64 effective_size_c = 5;
+  uint64 size_t = 6;
+  uint64 image_count = 7;
+  uint32 optimal_tile_width = 8;
+  uint32 optimal_tile_height = 9;
+}
+
+message SeriesInfo
+{
+  uint32 series = 1;
+  uint64 size_x = 2;
+  uint64 size_y = 3;
+  uint64 size_z = 4;
+  uint64 size_c = 5;
+  uint64 effective_size_c = 6;
+  uint64 size_t = 7;
+  uint64 image_count = 8;
+  uint32 rgb_channel_count = 9;
+  uint32 bytes_per_pixel = 10;
+  string pixel_type = 11;
+  bool little_endian = 12;
+  bool interleaved = 13;
+  bool rgb = 14;
+  bool indexed = 15;
+  bool false_color = 16;
+  string dimension_order = 17;
+  uint32 resolution_count = 18;
+  uint32 optimal_tile_width = 19;
+  uint32 optimal_tile_height = 20;
+  bool thumbnail_series = 21;
+  double physical_size_x_um = 22;
+  double physical_size_y_um = 23;
+  double physical_size_z_um = 24;
+  bool has_physical_size_x = 25;
+  bool has_physical_size_y = 26;
+  bool has_physical_size_z = 27;
+  repeated string channel_names = 28;
+  repeated uint32 channel_colors_rgba = 29;
+  repeated string used_files = 30;
+  repeated MetadataEntry metadata = 31;
+  repeated ResolutionInfo resolutions = 32;
+}
+
+message OpenDatasetResponse
+{
+  uint64 session_id = 1;
+  string path = 2;
+  string format_name = 3;
+  string reader_class = 4;
+  repeated string used_files = 5;
+  repeated SeriesInfo series = 6;
+}
+
+message ReadRegionRequest
+{
+  uint64 session_id = 1;
+  uint32 series = 2;
+  uint32 resolution = 3;
+  uint64 x = 4;
+  uint64 y = 5;
+  uint64 z = 6;
+  uint64 c = 7;
+  uint64 t = 8;
+  uint64 width = 9;
+  uint64 height = 10;
+  uint64 depth = 11;
+  uint64 channel_count = 12;
+  uint64 time_count = 13;
+}
+
+message PixelChunk
+{
+  uint32 sequence_index = 1;
+  bool final_chunk = 2;
+  uint64 total_bytes = 3;
+  bytes data = 4;
+}
+
+message ReadThumbnailRequest
+{
+  uint64 session_id = 1;
+  uint32 series = 2;
+  uint64 z = 3;
+  uint64 t = 4;
+}
+
+message ThumbnailChunk
+{
+  uint32 sequence_index = 1;
+  bool final_chunk = 2;
+  uint64 total_bytes = 3;
+  uint64 width = 4;
+  uint64 height = 5;
+  uint64 channel_count = 6;
+  uint32 bytes_per_pixel = 7;
+  string pixel_type = 8;
+  bytes data = 9;
+}
+
+message CloseDatasetRequest
+{
+  uint64 session_id = 1;
+}
+
+message CloseDatasetResponse {}
+
+message ShutdownRequest {}
+
+message ShutdownResponse {}

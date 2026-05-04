@@ -6,6 +6,9 @@ import atlas_r2
 import common_dirs
 import download_utils
 from atlas_deps_filelist import files_to_download as atlas_deps_files
+from atlas_runtime_assets_filelist import (
+    files_to_download as atlas_runtime_assets_files,
+)
 from atlas_test_data_filelist import files_to_download as atlas_test_data_files
 from logger import setup_logger
 
@@ -29,6 +32,8 @@ def _normalize_relpath(value: str) -> str:
 def _static_source_dir(target: str) -> Path:
     if target == "atlas_deps":
         return Path(common_dirs.src_package_dir())
+    if target == "atlas_runtime_assets":
+        return Path(common_dirs.atlas_runtime_assets_dir())
     if target == "atlas_test_data":
         return Path(common_dirs.atlas_test_data_dir())
     raise ValueError(f"Unsupported static target: {target}")
@@ -37,6 +42,8 @@ def _static_source_dir(target: str) -> Path:
 def _static_manifest(target: str) -> list[dict]:
     if target == "atlas_deps":
         return list(atlas_deps_files)
+    if target == "atlas_runtime_assets":
+        return list(atlas_runtime_assets_files)
     if target == "atlas_test_data":
         return list(atlas_test_data_files)
     raise ValueError(f"Unsupported static target: {target}")
@@ -408,7 +415,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     sync_static.add_argument(
         "target",
-        choices=("atlas_deps", "atlas_test_data", "all"),
+        choices=("atlas_deps", "atlas_runtime_assets", "atlas_test_data", "all"),
         help="Static asset target to sync.",
     )
     sync_static.add_argument(
@@ -473,7 +480,7 @@ def main() -> None:
 
     if args.command == "sync-static":
         targets = (
-            ("atlas_deps", "atlas_test_data")
+            ("atlas_deps", "atlas_runtime_assets", "atlas_test_data")
             if args.target == "all"
             else (args.target,)
         )

@@ -150,6 +150,29 @@ Testing
   - It compares Atlas’ tracing outputs against a reference implementation for a set of curated fixtures in `atlas_test_data`.
   - Some tests are developer-only and auto-skip when large local datasets are not available.
 
+Bio-Formats Image Bridge
+
+- Atlas reads Bio-Formats-backed image files through `ZImgBioFormats` and a persistent Java sidecar.
+  - Protocol definition: `src/protos/bioformats_bridge.proto`.
+  - C++ client: `src/img/zbioformatsbridgeclient.*`.
+  - Atlas reader: `src/img/zimgbioformats.*`.
+  - Java sidecar source: `src/bioformats_bridge/src/main/java/org/fenglab/atlas/bioformats/AtlasBioFormatsBridge.java`.
+- Transport: stdin/stdout frames are 4-byte little-endian lengths followed by a serialized protobuf message. Pixel reads stream one or more `PixelChunk` responses for a single request id, so large regions are chunked without changing the requested data extent.
+- Runtime requirements:
+  - `bioformats_package.jar`
+  - `atlas-bioformats-bridge.jar`
+  - Java 21 JRE for desktop Atlas, or Java 11+ when the image library is used without the bundled desktop runtime.
+- `ZImgInit` validates the jars directory before enabling Java image support. Desktop Atlas passes its bundled JRE explicitly; library users without a bundled JRE resolve Java lazily from `JAVA_HOME/bin/java`, then `java` on `PATH`.
+- Reader selection keeps native C++ readers first. `ZImgBioFormats` is registered as the fallback reader after native formats and can also probe extensionless or uncommon Bio-Formats files by content.
+- Subblocks created by the Bio-Formats reader use `FileFormat::BioFormats` explicitly. This avoids repeatedly rediscovering the reader during tiled 2D/3D paging and prevents native extension matches from stealing Bio-Formats-managed tile reads.
+- Bio-Formats sub-resolutions are exposed in the bridge metadata. Atlas keeps resolution 0 as the canonical image geometry and adds compatible integer-ratio Bio-Formats pyramid levels directly to the `ZImgPack` tile index, so large pyramidal files can serve overview tiles from Bio-Formats instead of forcing Atlas to synthesize every pyramid level from full-resolution reads.
+- Bio-Formats thumbnails are read through a dedicated streamed bridge command. Thumbnail support is best-effort because not every Bio-Formats reader provides useful thumbnail planes.
+- The bridge sidecar keeps one Bio-Formats reader session per opened file path for the lifetime of the C++ client instance. `ZBioFormatsBridgeClient` is thread-local because `QProcess` has Qt thread affinity; concurrent Atlas image workers get independent sidecars instead of sharing one process across threads.
+- Tunables:
+  - `--atlas_bioformats_java_xmx=<size>` sets the sidecar JVM heap, default `2g`.
+  - `--atlas_bioformats_bridge_io_timeout_ms=<ms>` bounds bridge stdin/stdout operations when non-zero; default `0` waits indefinitely.
+- Optional real-format breadth checks use an external corpus, not vendored image data. `util/download_bioformats_samples.py` can download a small public corpus from the OME sample image index, and `zbioformatstest` reads it when `ATLAS_BIOFORMATS_BREADTH_DIR` points at that corpus directory.
+
 Neuroglancer Precomputed (HTTP)
 
 - Atlas can load Neuroglancer “precomputed” volumes over HTTP (both unsharded and sharded storage via `"sharding": {"@type":"neuroglancer_uint64_sharded_v1", ...}`) with these chunk encodings:

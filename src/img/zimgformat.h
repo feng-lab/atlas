@@ -22,7 +22,7 @@ public:
   [[nodiscard]] virtual bool supportWrite() const = 0;
 
   // check file extension
-  [[nodiscard]] bool canRead(const QString& filename) const;
+  [[nodiscard]] virtual bool canRead(const QString& filename) const;
 
   [[nodiscard]] bool canWrite(const QString& filename) const;
 
@@ -110,7 +110,8 @@ protected:
 
   static void createDefaultSubBlocks(const QString& filename,
                                      const std::vector<ZImgInfo>& infos,
-                                     std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks);
+                                     std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks,
+                                     FileFormat format = FileFormat::Unknown);
 
   static void createEmptySubBlocks(const std::vector<ZImgInfo>& infos,
                                    std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks);
@@ -121,7 +122,8 @@ protected:
                                    const std::vector<ZImgInfo>& infos,
                                    std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks,
                                    size_t tileWidth = 512,
-                                   size_t tileHeight = 512);
+                                   size_t tileHeight = 512,
+                                   FileFormat format = FileFormat::Unknown);
 };
 
 } // namespace nim

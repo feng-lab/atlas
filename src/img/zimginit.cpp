@@ -31,39 +31,29 @@ ZImgInit::ZImgInit(const QString& resourcesDIR, const QString& jreDIR, const QSt
     LOG(WARNING) << "glog is not initialized, initialize it now";
   }
 
-  // if jarsDIR exist and is valid, try jreDIR first, then try JAVA_HOME
   ZImgGlobal::instance().jarsDIR = "";
   ZImgGlobal::instance().jreDIR = "";
   if (jarsDIR.isEmpty()) {
     LOG(INFO) << "no java support";
   } else {
     QDir jarsD(jarsDIR);
-    if (!jarsD.exists() || !jarsD.exists("bioformats_package.jar") || !jarsD.exists("scifio-itk-bridge.jar")) {
+    if (!jarsD.exists() || !jarsD.exists("bioformats_package.jar") || !jarsD.exists("atlas-bioformats-bridge.jar")) {
       throw ZException(fmt::format("invalid jarsDIR: {}", jarsDIR));
     }
-    QDir jreD;
-    QString javahome = jreDIR;
-    if (javahome.isEmpty()) {
-      javahome = qEnvironmentVariable("JAVA_HOME");
-      if (javahome.isEmpty()) {
-        ZImgGlobal::instance().jarsDIR = jarsD.absolutePath();
-        LOG(INFO) << "jarsDIR: " << ZImgGlobal::instance().jarsDIR;
-        LOG(INFO) << "no jreDIR and environment variable JAVA_HOME, will try to use java in system path";
-      } else {
-        LOG(INFO) << "try java from JAVA_HOME: " << javahome
-                  << ", note: might crash if the java version is not compatible";
-        jreD = QDir(javahome);
-      }
-    } else {
-      jreD = QDir(javahome);
+    ZImgGlobal::instance().jarsDIR = jarsD.absolutePath();
+    if (verbose) {
+      LOG(INFO) << "jarsDIR: " << ZImgGlobal::instance().jarsDIR;
     }
 
-    if (!javahome.isEmpty()) {
+    if (jreDIR.isEmpty()) {
+      LOG(INFO) << "no bundled jreDIR; Bio-Formats bridge will try JAVA_HOME, then java in system PATH when first used";
+    } else {
+      QDir jreD(jreDIR);
       if (!jreD.exists() || !jreD.exists("bin")) {
         throw ZException(fmt::format("invalid jreDIR: {}", jreD.absolutePath()));
       }
 #ifdef _WIN32
-      if (!jreD.exists("bin/javaw.exe"))
+      if (!jreD.exists("bin/java.exe"))
 #else
       if (!jreD.exists("bin/java"))
 #endif
@@ -71,10 +61,6 @@ ZImgInit::ZImgInit(const QString& resourcesDIR, const QString& jreDIR, const QSt
         throw ZException(fmt::format("no java in jreDIR: {}", jreD.absolutePath()));
       }
 
-      ZImgGlobal::instance().jarsDIR = jarsD.absolutePath();
-      if (verbose) {
-        LOG(INFO) << "jarsDIR: " << ZImgGlobal::instance().jarsDIR;
-      }
       ZImgGlobal::instance().jreDIR = jreD.absolutePath();
       if (verbose) {
         LOG(INFO) << "jreDIR: " << ZImgGlobal::instance().jreDIR;

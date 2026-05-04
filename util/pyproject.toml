@@ -32,5 +32,6 @@ qt = [
 # Paths are relative to this pyproject location (util/).
 extend-exclude = [
   "atlas_deps_filelist.py",
+  "atlas_runtime_assets_filelist.py",
   "atlas_test_data_filelist.py",
 ]

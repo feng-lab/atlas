@@ -1,13 +1,11 @@
 #include "zimgitkimage.h"
 
 #include "zimgsliceprovider.h"
-#include "zglobal.h"
 #include "zstringutils.h"
 #include <itkImageIOBase.h>
 #include <itkNiftiImageIOFactory.h>
 #include <itkNrrdImageIOFactory.h>
 #include <itkImageIOFactory.h>
-#include <itkSCIFIOImageIOFactory.h>
 #include <itkMetaDataObject.h>
 // #define ATLAS_SUPPORT_DICOM
 #ifdef ATLAS_SUPPORT_DICOM
@@ -494,9 +492,6 @@ ZImgITKImage::ZImgITKImage()
     if (itk::ObjectFactoryBase::GetRegisteredFactories().empty()) {
       itk::NiftiImageIOFactory::RegisterOneFactory();
       itk::NrrdImageIOFactory::RegisterOneFactory();
-      if (hasSCIFIOSupport()) {
-        itk::SCIFIOImageIOFactory::RegisterOneFactory();
-      }
 #ifdef ATLAS_SUPPORT_DICOM
       itk::GDCMImageIOFactory::RegisterOneFactory();
 #endif
@@ -530,9 +525,6 @@ QStringList ZImgITKImage::extensions() const
           res.last().remove(0, 1); // remove '.'
         }
       }
-    }
-    if (hasSCIFIOSupport()) {
-      res.push_back("nd2");
     }
 #ifdef ATLAS_SUPPORT_DICOM
     res.push_back("dcm");
@@ -1035,10 +1027,5 @@ void parseMetadataFromImageIO(const itk::ImageIOBase* imageIO, ZImgMetadata& met
 }
 
 } // namespace
-
-bool ZImgITKImage::hasSCIFIOSupport()
-{
-  return !ZImgGlobal::instance().jarsDIR.isEmpty();
-}
 
 } // namespace nim

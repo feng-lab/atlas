@@ -15,6 +15,7 @@
 #endif
 #include "zimgmetaimage.h"
 #include "zimgitkimage.h"
+#include "zimgbioformats.h"
 #include "zimghdf5.h"
 #include "zimgleica.h"
 #include "zioutils.h"
@@ -53,6 +54,7 @@ ZImgIO::ZImgIO()
   m_ioFormats[FileFormat::ITKImage] = std::make_unique<ZImgITKImage>();
   m_ioFormats[FileFormat::HDF5Img] = std::make_unique<ZImgHDF5>();
   m_ioFormats[FileFormat::Leica] = std::make_unique<ZImgLeica>();
+  m_ioFormats[FileFormat::BioFormats] = std::make_unique<ZImgBioFormats>();
 }
 
 void ZImgIO::readInfos(const QString& filename,
@@ -114,10 +116,8 @@ void ZImgIO::readInfos(const QString& filename,
       throw ZException("empty image");
     }
     catch (const ZException& e) {
-      throw ZException(fmt::format("Try read file {} as '{}' format, failed: {}",
-                                   filename,
-                                   it->second->fullName(),
-                                   e.what()));
+      throw ZException(
+        fmt::format("Try read file {} as '{}' format, failed: {}", filename, it->second->fullName(), e.what()));
     }
   }
 }
@@ -527,10 +527,8 @@ void ZImgIO::readMetadata(const ZImgSource& imgSource, ZImgMetadata& meta)
         return;
       }
       catch (const ZException& e) {
-        throw ZException(fmt::format("Try read file {} as '{}' format, failed: {}",
-                                     filename,
-                                     it->second->fullName(),
-                                     e.what()));
+        throw ZException(
+          fmt::format("Try read file {} as '{}' format, failed: {}", filename, it->second->fullName(), e.what()));
       }
     }
   }
@@ -583,10 +581,8 @@ void ZImgIO::readThumbnail(const QString& filename,
       return;
     }
     catch (const ZException& e) {
-      throw ZException(fmt::format("Try read file {} as '{}' format, failed: {}",
-                                   filename,
-                                   it->second->fullName(),
-                                   e.what()));
+      throw ZException(
+        fmt::format("Try read file {} as '{}' format, failed: {}", filename, it->second->fullName(), e.what()));
     }
   }
 }
@@ -641,10 +637,8 @@ void ZImgIO::readImg(const QString& filename,
       return;
     }
     catch (const ZException& e) {
-      throw ZException(fmt::format("Try read file {} as '{}' format, failed: {}",
-                                   filename,
-                                   it->second->fullName(),
-                                   e.what()));
+      throw ZException(
+        fmt::format("Try read file {} as '{}' format, failed: {}", filename, it->second->fullName(), e.what()));
     }
   }
 }
@@ -950,10 +944,8 @@ void ZImgIO::writeImg(const QString& filename, const ZImg& img, FileFormat forma
       return;
     }
     catch (const ZException& e) {
-      throw ZException(fmt::format("Try write file {} as '{}' format, failed: {}",
-                                   filename,
-                                   it->second->fullName(),
-                                   e.what()));
+      throw ZException(
+        fmt::format("Try write file {} as '{}' format, failed: {}", filename, it->second->fullName(), e.what()));
     }
   }
 }
@@ -1014,10 +1006,8 @@ void ZImgIO::writeImg(const QString& filename,
       return;
     }
     catch (const ZException& e) {
-      throw ZException(fmt::format("Try write file {} as '{}' format, failed: {}",
-                                   filename,
-                                   it->second->fullName(),
-                                   e.what()));
+      throw ZException(
+        fmt::format("Try write file {} as '{}' format, failed: {}", filename, it->second->fullName(), e.what()));
     }
   }
 }
@@ -1078,10 +1068,8 @@ void ZImgIO::writeImg(const QString& filename,
       return;
     }
     catch (const ZException& e) {
-      throw ZException(fmt::format("Try write file {} as '{}' format, failed: {}",
-                                   filename,
-                                   it->second->fullName(),
-                                   e.what()));
+      throw ZException(
+        fmt::format("Try write file {} as '{}' format, failed: {}", filename, it->second->fullName(), e.what()));
     }
   }
 }

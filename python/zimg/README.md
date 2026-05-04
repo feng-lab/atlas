@@ -241,9 +241,16 @@ Supported file formats depend on how the wheel/source was built. The
 `zimg.FileFormat` enum includes:
 
 - `Tiff`, `OmeTiff`, `Png`, `Jpeg`, `JpegXR`
-- `ZeissCZI`, `ZeissLsm`, `Leica`
+- `ZeissCZI`, `ZeissLsm`, `Leica`, `BioFormats`
 - `Vaa3DRaw`, `HDF5Img`, `MetaImage`, `ITKImage`
 - `FreeImage` (optional; omitted when built with `-DZIMG_DISABLE_FREEIMAGE=ON`)
+
+`BioFormats` uses the packaged Atlas Bio-Formats jars, but the wheel does not
+ship Java. At runtime, zimg checks `JAVA_HOME/bin/java` first, then falls back
+to `java` from `PATH` if `JAVA_HOME` is unset or unsuitable. The bridge jar is
+compiled for Java 11, so Bio-Formats reads require Java 11 or newer. Missing or
+older Java runtimes surface as Python exceptions from the Bio-Formats
+read/probe call; native formats do not start Java.
 
 ## Notes / limitations
 

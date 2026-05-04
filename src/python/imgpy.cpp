@@ -462,7 +462,8 @@ NB_MODULE(_imgpy, m)
     .value("MetaImage", FileFormat::MetaImage)
     .value("ZeissCZI", FileFormat::ZeissCZI)
     .value("ITKImage", FileFormat::ITKImage)
-    .value("Leica", FileFormat::Leica);
+    .value("Leica", FileFormat::Leica)
+    .value("BioFormats", FileFormat::BioFormats);
 
   nb::enum_<Compression>(m, "Compression", nb::is_arithmetic())
     .value("AUTO", Compression::AUTO)

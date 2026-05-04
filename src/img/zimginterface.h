@@ -220,6 +220,7 @@ enum class FileFormat
   ZeissCZI = 11,
   ITKImage = 12,
   Leica = 13,
+  BioFormats = 14,
 };
 
 enum class Compression : std::uint16_t

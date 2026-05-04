@@ -51,13 +51,13 @@ set(TIFF_SOURCES
 list(APPEND TIFF_SOURCES ${TIFFDIR}/tif_unix.c)
 source_group(libtiff FILES ${TIFF_SOURCES})
 
-# tiff srcs
-set(SCIFIODIR ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/scifio)
-set(SCIFIO_SOURCES
-        ${SCIFIODIR}/itkSCIFIOImageIO.cxx
-        ${SCIFIODIR}/itkSCIFIOImageIOFactory.cxx
-)
-source_group(scifio FILES ${SCIFIO_SOURCES})
+find_package(Protobuf CONFIG REQUIRED
+             PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build NO_DEFAULT_PATH)
+set(protobuf_PROTOC_EXE protobuf::protoc)
+set(BIOFORMATS_PROTO ${CMAKE_CURRENT_SOURCE_DIR}/../protos/bioformats_bridge.proto)
+protobuf_generate(LANGUAGE cpp APPEND_PATH PROTOC_OUT_DIR ${CMAKE_CURRENT_BINARY_DIR} OUT_VAR BIOFORMATS_PROTO_SRCS
+                  PROTOS ${BIOFORMATS_PROTO})
+set_property(SOURCE ${BIOFORMATS_PROTO_SRCS} PROPERTY SKIP_AUTOGEN ON)
 
 # main srcs
 set(IMG_SOURCES
@@ -79,6 +79,8 @@ set(IMG_SOURCES
         zimginfo.h zimginfo.cpp
         zimginterface.h zimginterface.cpp
         zimgio.h zimgio.cpp
+        zbioformatsbridgeclient.h zbioformatsbridgeclient.cpp
+        zimgbioformats.h zimgbioformats.cpp
         zimgitkimage.h zimgitkimage.cpp
         zimgjpeg.h zimgjpeg.cpp
         zimgjpegxr.h zimgjpegxr.cpp
@@ -290,7 +292,7 @@ message(STATUS "CMAKE_LINKER: ${CMAKE_LINKER}")
 
 # our target
 set(LIBRARY_NAME img)
-add_library(${LIBRARY_NAME} STATIC ${TIFF_SOURCES} ${SCIFIO_SOURCES} ${IMG_SOURCES})
+add_library(${LIBRARY_NAME} STATIC ${TIFF_SOURCES} ${IMG_SOURCES} ${BIOFORMATS_PROTO_SRCS})
 set_property(TARGET ${LIBRARY_NAME} PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELEASE ${ATLAS_ENABLE_RELEASE_IPO})
 
 if (NOT ZIMG_DISABLE_FREEIMAGE)
@@ -309,6 +311,7 @@ if (WIN32)
     target_include_directories(${LIBRARY_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/include)
 endif ()
 target_include_directories(${LIBRARY_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(${LIBRARY_NAME} PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
 if (NOT WIN32)
     target_include_directories(${LIBRARY_NAME} SYSTEM BEFORE PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/include)
 endif ()
@@ -330,7 +333,12 @@ if (NOT ZIMG_DISABLE_FREEIMAGE)
     set_source_files_properties(zimgfreeimage.cpp PROPERTIES INCLUDE_DIRECTORIES "${FREEIMAGE_INCLUDE_DIRS}")
 endif ()
 set_source_files_properties(zimgjpegxr.cpp PROPERTIES INCLUDE_DIRECTORIES "${JPEGXR_INCLUDE_DIRS}")
-set_source_files_properties(zimgitkimage.cpp zimginterpolate.cpp PROPERTIES INCLUDE_DIRECTORIES "${SCIFIODIR}")
+set_source_files_properties(zimginterpolate.cpp PROPERTIES
+        INCLUDE_DIRECTORIES "${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/ITKMorphologicalContourInterpolation")
+set_source_files_properties(zbioformatsbridgeclient.cpp ${BIOFORMATS_PROTO_SRCS}
+        PROPERTIES
+        INCLUDE_DIRECTORIES "${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/include;${CMAKE_CURRENT_BINARY_DIR}"
+        COMPILE_OPTIONS "-iquote${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/include")
 
 if (WIN32)
     target_compile_definitions(${LIBRARY_NAME} PUBLIC _CRT_SECURE_NO_WARNINGS NOMINMAX WIN32_LEAN_AND_MEAN
@@ -463,7 +471,7 @@ target_link_libraries(${LIBRARY_NAME} PUBLIC ${ITK_LIBRARIES} ${JPEGTURBO_LIBRAR
         GeometricTools glm::glm-header-only
         WebP::webp zstd::libzstd_static liblzma::liblzma ZLIB::ZLIB
         ${VTK_LIBRARIES} assimp::assimp TBB::tbb
-        glog::glog ${_QT_LIBS_})
+        glog::glog protobuf::libprotobuf ${_QT_LIBS_})
 
 if (llfio_FOUND)
     target_link_libraries(${LIBRARY_NAME} PUBLIC llfio::sl)

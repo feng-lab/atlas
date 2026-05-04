@@ -75,6 +75,7 @@ __pycache__/
 /deploy/update.rcc
 /deploy/*.log
 /deploy/*.json
+/src/bioformats_bridge/target/
 /Atlas.AppDir/
 /Atlas/
 /Atlas.app/

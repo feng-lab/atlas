@@ -14,8 +14,8 @@ if sys.version_info < (3, 12):
 # Configure resource locations for the native library so both the native install
 # layout and the PyPI wheel layout behave consistently.
 current_dir = os.path.dirname(os.path.abspath(__file__))
-os.environ["Resources_DIR"] = current_dir
-os.environ["ZIMG_JARS_DIR"] = os.path.join(current_dir, "jars")
+os.environ.setdefault("Resources_DIR", current_dir)
+os.environ.setdefault("ZIMG_JARS_DIR", os.path.join(current_dir, "jars"))
 
 try:
     from ._imgpy import *  # type: ignore[import-not-found]  # noqa: F401,F403

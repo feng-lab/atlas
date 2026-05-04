@@ -7,6 +7,7 @@ import atlas_pypi
 import build_ext_libs
 import common_dirs
 from download_atlas_test_data import download_atlas_test_data
+from download_atlas_runtime_assets import download_atlas_runtime_assets
 from logger import setup_logger
 
 logger = logging.getLogger(__name__)
@@ -161,6 +162,7 @@ def build_atlas(
     logger.info(f"srcDIR: {common_dirs.atlas_repository_dir()}")
     logger.info(f"buildDIR: {common_dirs.atlas_build_dir()}")
     logger.info(f"useNinja: {common_dirs.use_ninja()}")
+    download_atlas_runtime_assets()
 
     skip_test = _resolve_skip_test(
         skip_test, use_asan=use_asan, debug_version=debug_version
