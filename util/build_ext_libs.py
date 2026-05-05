@@ -83,6 +83,10 @@ def use_windows_clang_cl() -> bool:
     return is_windows() and use_clang_cl()
 
 
+def make_parallel_jobs_arg() -> str:
+    return "-j" + str(os.cpu_count() or 1)
+
+
 def _clang_major_env() -> str:
     # Allow CI to control clang version
     return os.environ.get("ATLAS_CLANG_MAJOR") or os.environ.get("LLVM_VERSION") or "22"
@@ -1666,6 +1670,18 @@ def build_benchmark(src_dir: str, install_dir: str):
 
 
 def build_openssl(src_dir: str, install_dir: str, nasm_dir: str):
+    def build_and_install_make(env: dict):
+        subprocess.run(
+            ["make", make_parallel_jobs_arg(), "build_sw"],
+            cwd=src_dir,
+            shell=False,
+            check=True,
+            env=env,
+        )
+        subprocess.run(
+            ["make", "install_sw"], cwd=src_dir, shell=False, check=True, env=env
+        )
+
     try:
         if is_linux():
             env = get_env_for_config_make()
@@ -1687,9 +1703,7 @@ def build_openssl(src_dir: str, install_dir: str, nasm_dir: str):
                 check=True,
                 env=env,
             )
-            subprocess.run(
-                ["make", "install_sw"], cwd=src_dir, shell=False, check=True, env=env
-            )
+            build_and_install_make(env)
         elif is_mac():
             env = get_env_for_config_make()
             subprocess.run(
@@ -1710,9 +1724,7 @@ def build_openssl(src_dir: str, install_dir: str, nasm_dir: str):
                 check=True,
                 env=env,
             )
-            subprocess.run(
-                ["make", "install_sw"], cwd=src_dir, shell=False, check=True, env=env
-            )
+            build_and_install_make(env)
             subprocess.run(
                 ["make", "clean", "distclean"],
                 cwd=src_dir,
@@ -1743,13 +1755,7 @@ def build_openssl(src_dir: str, install_dir: str, nasm_dir: str):
                     check=True,
                     env=env,
                 )
-                subprocess.run(
-                    ["make", "install_sw"],
-                    cwd=src_dir,
-                    shell=False,
-                    check=True,
-                    env=env,
-                )
+                build_and_install_make(env)
                 subprocess.run(
                     ["make", "clean", "distclean"],
                     cwd=src_dir,
