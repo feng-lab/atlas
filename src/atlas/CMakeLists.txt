@@ -465,40 +465,30 @@ add_definitions(-DBUILD_QXT -DBUILD_QXT_OBJECT)
 set(LIBQXTDIR ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/libqxt)
 set(LIBQXT_HEADERS
     ${LIBQXTDIR}/core/qxtglobal.h
-    ${LIBQXTDIR}/core/qxtcsvmodel.h
     ${LIBQXTDIR}/widgets/qxtspanslider.h
     ${LIBQXTDIR}/widgets/qxtspanslider_p.h
     ${LIBQXTDIR}/core/qxtnamespace.h
 )
 set(LIBQXT_SOURCES
     ${LIBQXTDIR}/core/qxtglobal.cpp
-    ${LIBQXTDIR}/core/qxtcsvmodel.cpp
     ${LIBQXTDIR}/widgets/qxtspanslider.cpp
 )
 source_group(libqxt FILES ${LIBQXT_HEADERS} ${LIBQXT_SOURCES})
 
-#qtcsv srcs
-add_definitions(-DQTCSV_STATIC_LIB)
-set(QTCSVDIR ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/qtcsv)
-set(QTCSV_HEADERS
-    ${QTCSVDIR}/include/qtcsv/qtcsv_global.h
-    ${QTCSVDIR}/include/qtcsv/writer.h
-    ${QTCSVDIR}/include/qtcsv/variantdata.h
-    ${QTCSVDIR}/include/qtcsv/stringdata.h
-    ${QTCSVDIR}/include/qtcsv/reader.h
-    ${QTCSVDIR}/include/qtcsv/abstractdata.h
-    ${QTCSVDIR}/sources/filechecker.h
-    ${QTCSVDIR}/sources/contentiterator.h
-    ${QTCSVDIR}/sources/symbols.h
+# csv-parser sources. Keep Atlas in control of the source list instead of importing
+# upstream CMake, which also builds example/program targets and tweaks global flags.
+set(CSVPARSERDIR ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/csv-parser)
+set(CSVPARSER_SOURCES
+    ${CSVPARSERDIR}/include/internal/basic_csv_parser.cpp
+    ${CSVPARSERDIR}/include/internal/basic_csv_parser_guessing.cpp
+    ${CSVPARSERDIR}/include/internal/col_names.cpp
+    ${CSVPARSERDIR}/include/internal/csv_format.cpp
+    ${CSVPARSERDIR}/include/internal/csv_reader.cpp
+    ${CSVPARSERDIR}/include/internal/csv_reader_iterator.cpp
+    ${CSVPARSERDIR}/include/internal/csv_row.cpp
+    ${CSVPARSERDIR}/include/internal/csv_utility.cpp
 )
-set(QTCSV_SOURCES
-    ${QTCSVDIR}/sources/writer.cpp
-    ${QTCSVDIR}/sources/variantdata.cpp
-    ${QTCSVDIR}/sources/stringdata.cpp
-    ${QTCSVDIR}/sources/reader.cpp
-    ${QTCSVDIR}/sources/contentiterator.cpp
-)
-source_group(qtcsv FILES ${QTCSV_HEADERS} ${QTCSV_SOURCES})
+source_group(csv-parser FILES ${CSVPARSER_SOURCES})
 
 # video memory sources
 set(SYSDIR ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/sys)
@@ -554,6 +544,7 @@ set(SOURCES
     zgenerateanalysistextfile.h zgenerateanalysistextfile.cpp
     zanalysisworklistdialog.h zanalysisworklistdialog.cpp
     zanalysisworklistmodel.h zanalysisworklistmodel.cpp
+    zcsvtable.h zcsvtable.cpp
     zstyleditemdelegate.h zstyleditemdelegate.cpp
     zitemeditorfactory.h zitemeditorfactory.cpp
     zflagfiledocument.h zflagfiledocument.cpp
@@ -1008,13 +999,13 @@ if (ATLAS_USE_MSVC_LIBRARY_SPLIT)
   add_library(atlas_core_private_includes INTERFACE)
   target_include_directories(atlas_core_private_includes
     SYSTEM INTERFACE
-      ${QTCSVDIR} ${QTCSVDIR}/include
+      ${CSVPARSERDIR}/include
       ${LIBQXTDIR}/core ${LIBQXTDIR}/widgets)
 
   # Support code (generated RPC stubs + small bundled sources).
   add_library(atlas_core_support STATIC
               ${SYS_SOURCES}
-              ${QTCSV_SOURCES}
+              ${CSVPARSER_SOURCES}
               ${LIBQXT_HEADERS} ${LIBQXT_SOURCES}
               ${PROTO_SRCS} ${GRPC_SRCS})
   target_link_libraries(atlas_core_support PRIVATE atlas_core_deps atlas_core_private_includes)
@@ -1075,7 +1066,7 @@ else ()
   # clang-cl, keep the original single-library Atlas layout.
   add_library(atlas_lib STATIC
               ${SYS_SOURCES}
-              ${QTCSV_SOURCES}
+              ${CSVPARSER_SOURCES}
               ${LIBQXT_HEADERS} ${LIBQXT_SOURCES}
               ${ATLAS_SOURCES_NO_MAIN}
               ${PROTO_SRCS} ${GRPC_SRCS})
@@ -1087,7 +1078,7 @@ else ()
 
   target_include_directories(atlas_lib
     SYSTEM PRIVATE
-      ${QTCSVDIR} ${QTCSVDIR}/include
+      ${CSVPARSERDIR}/include
       ${LIBQXTDIR}/core ${LIBQXTDIR}/widgets)
   # Vulkan headers are required transitively by some Atlas sources/headers (e.g. zvulkan*.h
   # included from renderer base). Ensure the SDK include path is visible to atlas_lib too.
@@ -1158,7 +1149,6 @@ add_dependencies(${APP_NAME} vulkan_shaders)
 # and clang-cl + lld-link).
 set_property(TARGET ${APP_NAME} PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELEASE ${ATLAS_ENABLE_RELEASE_IPO})
 if (WIN32)
-  set_source_files_properties(${LIBQXTDIR}/core/qxtcsvmodel.cpp PROPERTIES COMPILE_FLAGS /wd4458) # declaration of 'd_ptr' hides class member
   set_source_files_properties(${GRPC_SRCS} PROPERTIES COMPILE_FLAGS "/wd4946") # reinterpret_cast used between related classes: 'class1' and 'class2'
   set_source_files_properties(${PROTO_SRCS} PROPERTIES COMPILE_FLAGS "/wd4946") # reinterpret_cast used between related classes: 'class1' and 'class2'
   if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")

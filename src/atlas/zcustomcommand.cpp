@@ -38,10 +38,11 @@
 #include "z3dmeshview.h"
 #include "z3dpunctaview.h"
 #include "z3dswcview.h"
+#include "zcsvtable.h"
 // #include "zstructutils.h"
 #include "zconcurrentlrucache.h"
 #include "zthreadsafescalablecache.h"
-#include <qtcsv/reader.h>
+#include <QFile>
 #include <QDir>
 #include <QApplication>
 #include <tbb/global_control.h>
@@ -51,6 +52,19 @@ namespace {
 QString homePath(const char* suffix)
 {
   return QDir::homePath() + QString::fromUtf8(suffix);
+}
+
+QList<QStringList> readCsvToQStringLists(const QString& filename)
+{
+  QList<QStringList> out;
+  for (const auto& row : nim::readCsvTable(filename)) {
+    QStringList fields;
+    for (const auto& field : row) {
+      fields << QString::fromStdString(field);
+    }
+    out << fields;
+  }
+  return out;
 }
 
 } // namespace
@@ -808,10 +822,10 @@ void moveObjectToCorrectLocation(const QString& fn,
 
   QDir::setCurrent(QFileInfo(fn).absolutePath());
 
-  QList<QStringList> metaData = QtCSV::Reader::readToList(metaFiles[0]);
+  QList<QStringList> metaData = readCsvToQStringLists(metaFiles[0]);
   metaData.removeFirst();
   for (index_t i = 1; i < metaFiles.size(); ++i) {
-    QList<QStringList> tmp = QtCSV::Reader::readToList(metaFiles[i]);
+    QList<QStringList> tmp = readCsvToQStringLists(metaFiles[i]);
     tmp.removeFirst();
     metaData += tmp;
   }
@@ -907,8 +921,7 @@ void moveObjectToCorrectLocation(const QString& fn,
 
 void createCellTable()
 {
-  QList<QStringList> metaData =
-    QtCSV::Reader::readToList(homePath("/code/mgrasp-analysis/pv_figs/orig_cell_props.csv"));
+  QList<QStringList> metaData = readCsvToQStringLists(homePath("/code/mgrasp-analysis/pv_figs/orig_cell_props.csv"));
   metaData.removeFirst();
 
   std::map<QString, int> somaLocationMap;
@@ -1231,8 +1244,7 @@ void changeDapifileType()
 
 void convertPVRawToNim()
 {
-  QList<QStringList> metaData =
-    QtCSV::Reader::readToList(homePath("/Documents/atlas_legacy/Chris/pv_img/img_srclist.txt"));
+  QList<QStringList> metaData = readCsvToQStringLists(homePath("/Documents/atlas_legacy/Chris/pv_img/img_srclist.txt"));
   ZImg refPYImg(homePath("/Documents/atlas_legacy/Chris/slice15/slice15_L18_Sum.lsm"));
   ZImg refPVImg("/Volumes/shared/os/PV/201602_contraPV/PV139/5/s9/PV139_5_s9_R1_GR1_B1_L19.lsm");
   for (index_t i = 0; i < metaData.size(); ++i) {
@@ -1734,8 +1746,7 @@ void swapMeshXY()
 
 void createPCCellTable()
 {
-  QList<QStringList> metaData =
-    QtCSV::Reader::readToList(homePath("/code/mgrasp-analysis/pv_figs_1.0/orig_cell_props.csv"));
+  QList<QStringList> metaData = readCsvToQStringLists(homePath("/code/mgrasp-analysis/pv_figs_1.0/orig_cell_props.csv"));
   metaData.removeFirst();
 
   std::map<QString, int> somaLocationMap;

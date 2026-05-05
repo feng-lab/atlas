@@ -143,3 +143,6 @@
 	path = src/3rdparty/libtiff
 	url = https://gitlab.com/libtiff/libtiff.git
 	branch = master
+[submodule "src/3rdparty/csv-parser"]
+	path = src/3rdparty/csv-parser
+	url = https://github.com/vincentlaucsb/csv-parser

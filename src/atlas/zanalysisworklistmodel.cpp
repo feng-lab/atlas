@@ -1,13 +1,31 @@
 #include "zanalysisworklistmodel.h"
 
-#include <qtcsv/reader.h>
-#include <qtcsv/variantdata.h>
-#include <qtcsv/writer.h>
+#include "zcsvtable.h"
+#include "zexception.h"
+
+#include <fmt/core.h>
+
 #include <QUrl>
-#include <QFile>
-#include <QTextStream>
+#include <QFileInfo>
+
+#include <algorithm>
+#include <iterator>
+#include <string>
+#include <utility>
 
 namespace nim {
+namespace {
+
+QStringList toQStringList(const ZCsvRow& row)
+{
+  QStringList fields;
+  for (const auto& field : row) {
+    fields << QString::fromStdString(field);
+  }
+  return fields;
+}
+
+} // namespace
 
 ZAnalysisWorklistModel::ZAnalysisWorklistModel(QObject* parent)
   : QAbstractTableModel(parent)
@@ -21,16 +39,23 @@ ZAnalysisWorklistModel::ZAnalysisWorklistModel(const QString& filename, QObject*
   setSource(filename);
 }
 
-QString ZAnalysisWorklistModel::setSource(const QString& filename, QStringConverter::Encoding encoding)
+QString ZAnalysisWorklistModel::setSource(const QString& filename)
 {
   QStringList res;
   beginResetModel();
 
   reset();
 
-  QList<QStringList> allLines = QtCSV::Reader::readToList(filename, QString(","), QString("\""), encoding);
+  ZCsvTable allLines;
+  try {
+    allLines = readCsvTable(filename);
+  }
+  catch (const ZException& e) {
+    res << QString::fromUtf8(e.what());
+  }
   if (!allLines.empty()) {
-    for (const auto& list : allLines) {
+    for (const auto& row : allLines) {
+      const QStringList list = toQStringList(row);
       if (list.empty() || list.at(0).startsWith("#")) {
         continue;
       }
@@ -106,7 +131,7 @@ QString ZAnalysisWorklistModel::setSource(const QString& filename, QStringConver
       input.somaPunctaFilename = list[13];
       m_inputs.push_back(input);
     }
-  } else {
+  } else if (res.empty()) {
     res << QString("Can not parse file (%1) or file is empty.").arg(filename);
   }
 
@@ -121,37 +146,44 @@ QString ZAnalysisWorklistModel::setSource(const QString& filename, QStringConver
   return res.join("\n");
 }
 
-QString ZAnalysisWorklistModel::toCSV(const QString& filename,
-                                      bool withHeader,
-                                      QChar separator,
-                                      QStringConverter::Encoding encoding) const
+QString ZAnalysisWorklistModel::toCSV(const QString& filename, bool withHeader) const
 {
-  QtCSV::VariantData vd;
+  ZCsvTable rows;
   if (withHeader) {
-    vd.addRow(m_header);
+    ZCsvRow header;
+    header.reserve(static_cast<size_t>(m_header.size()));
+    std::transform(m_header.cbegin(), m_header.cend(), std::back_inserter(header), [](const QString& value) {
+      return value.toStdString();
+    });
+    rows.push_back(std::move(header));
   }
   for (size_t row = 0; row < static_cast<size_t>(rowCount()); ++row) {
     auto it = m_rowToInput.find(row);
     if (it != m_rowToInput.end()) {
       const ZAnalysisTextFileInput* input = it->second;
-      QList<QVariant> values;
-      values << input->imgFilename << input->swcFilename << input->punctaFilename << input->voxelSizeX
-             << input->voxelSizeY << input->voxelSizeZ << input->dendriteChannel << input->axonChannel
-             << input->maxDistToBranch << input->bluenessExtend << input->outputFolder
-             << (input->doPyramidalFunctionalSeparation ? "yes" : "no")
-             << (input->doPyramidalSubclassSeparation ? "yes" : "no") << input->somaPunctaFilename;
-      vd.addRow(values);
+      rows.push_back({
+        input->imgFilename.toStdString(),
+        input->swcFilename.toStdString(),
+        input->punctaFilename.toStdString(),
+        fmt::format("{}", input->voxelSizeX),
+        fmt::format("{}", input->voxelSizeY),
+        fmt::format("{}", input->voxelSizeZ),
+        fmt::format("{}", input->dendriteChannel),
+        fmt::format("{}", input->axonChannel),
+        fmt::format("{}", input->maxDistToBranch),
+        fmt::format("{}", input->bluenessExtend),
+        input->outputFolder.toStdString(),
+        input->doPyramidalFunctionalSeparation ? "yes" : "no",
+        input->doPyramidalSubclassSeparation ? "yes" : "no",
+        input->somaPunctaFilename.toStdString(),
+      });
     }
   }
-  if (!QtCSV::Writer::write(filename,
-                            vd,
-                            separator,
-                            QString(""),
-                            QtCSV::Writer::REWRITE,
-                            QStringList(),
-                            QStringList(),
-                            encoding)) {
-    return QString("Can not write csv to file (%1).").arg(filename);
+  try {
+    writeCsvTable(filename, rows);
+  }
+  catch (const ZException& e) {
+    return QString("Can not write csv to file (%1): %2").arg(filename, QString::fromUtf8(e.what()));
   }
   return {};
 }

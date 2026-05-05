@@ -5,12 +5,25 @@
 #include "zimgautothreshold.h"
 #include "zglmutils.h"
 #include "zioutils.h"
-#include <qtcsv/reader.h>
+#include "zcsvtable.h"
+
 #include <QFile>
 #include <QFileInfo>
 #include <QDir>
 
 namespace nim {
+namespace {
+
+QStringList toQStringList(const ZCsvRow& row)
+{
+  QStringList fields;
+  for (const auto& field : row) {
+    fields << QString::fromStdString(field);
+  }
+  return fields;
+}
+
+} // namespace
 
 void ZGenerateAnalysisTextFile::generate(const ZAnalysisTextFileInput& input)
 {
@@ -48,12 +61,13 @@ void ZGenerateAnalysisTextFile::generate(const QString& worklistFile)
          << "doPyramidalSubclassSeparation(yes or no)"
          << "somaPunctaName";
 
-  QList<QStringList> allLines = QtCSV::Reader::readToList(worklistFile);
+  const ZCsvTable allLines = readCsvTable(worklistFile);
   if (allLines.empty()) {
     throw ZException(QString("Can not parse file (%1) or file is empty").arg(worklistFile));
   }
 
-  for (const auto& list : allLines) {
+  for (const auto& row : allLines) {
+    const QStringList list = toQStringList(row);
     if (list.empty() || list.at(0).startsWith("#")) {
       continue;
     }

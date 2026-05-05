@@ -108,7 +108,7 @@ Atlas organizes data by object type so each kind of content has the right loadin
 | Images | `.tif`, `.tiff`, `.ome.tif`, `.mhd`, `.raw`, `.nii`, `.hdr`, `.png`, `.jpg`, `.bmp`, `.exr`, `.lsm`, `.v3draw`, Bio-Formats reader formats | Multi-channel, multi-timepoint volumes supported. Sequences can be imported as stacks. Bio-Formats-backed files, including multi-series and pyramidal microscopy formats, load through the bundled Java sidecar when the Bio-Formats jars are installed. Also supports Neuroglancer precomputed volumes (`raw`/`jpeg`/`png`/`compresso`/`compressed_segmentation`, sharded or unsharded) via URL. |
 | ROI Masks | `.roi`, `.mask`, `.nii`, `.mhd`, `.nrrd` | Accepts Atlas-generated ROI files or converts mask images into editable ROIs. |
 | Region Annotations | `.annotation`, `.json`, label images | Handles labeled regions and can import or export label images. |
-| Puncta Sets | `.apo`, `.csv`, `.json` | Stores point-based annotations such as synaptic puncta with undo support. |
+| Puncta Sets | `.nimp`, `.apo`, `.marker`, `.txt`, `.xyz` | Stores point-based annotations such as synaptic puncta with undo support. |
 | SWC Trees | `.swc`, `.eswc`, `.json` | Manages neuronal tree structures with per-node attributes. |
 | Meshes | `.obj`, `.ply`, `.stl`, `.off`, `.vtk`, `.gii` | Calculates common surface and volume measurements on load. |
 | SVG Overlays | `.svg` | Overlays vector graphics such as outlines and labels. |
@@ -416,7 +416,7 @@ Steps to load and manage images:
 
 ### 4.5 Puncta Sets
 
-1. **Load** – **File → Load Puncta...**; supports typical `.apo` formats.
+1. **Load** – **File → Load Puncta...**; supports Atlas `.nimp`, Vaa3D `.apo`/`.marker`, and simple `.txt`/`.xyz` point files.
 2. **Detect** – choose **Detect Puncta...** to launch automatic detection (when available) and feed results into the document.
 3. **Analysis export** – **Generate Analysis Text Files...** outputs CSV summaries of the puncta set.
 4. **Edit** – double-click to open the puncta editor; add/remove points, adjust thresholds. Undo/Redo tied to the puncta pack.
@@ -1554,7 +1554,7 @@ Use **Help → Shortcuts** in either the 2D or 3D window to open this section di
 - **Images** – Native readers cover common scientific and general image formats including TIFF/OME-TIFF, LSM, V3DRAW, MHD/RAW, PNG, JPG, EXR, BMP, CZI, Leica, HDF5-backed Atlas images, and NIfTI. Formats supported by Bio-Formats are available through the bundled Java sidecar when `bioformats_package.jar` and `atlas-bioformats-bridge.jar` are installed.
 - **Meshes** – OBJ, PLY, STL, OFF, VTK, GIfTI (verify on load via logs).
 - **SWC** – SWC/eSWC variations; duplicates avoided through canonical path checks.
-- **Puncta** – APO and CSV point sets.
+- **Puncta** – Atlas NIMP, Vaa3D APO/marker, and TXT/XYZ point sets.
 - **ROI/Annotations** – Native ROI/annotation formats plus conversions from mask/label images.
 - **Animations** – `.animation2d` and `.animation3d` timeline files.
 
