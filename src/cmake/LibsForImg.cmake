@@ -51,7 +51,7 @@ print_target_properties(TBB::tbb)
     set(MKL_PATH "${INTEL_PATH}\\mkl\\latest")
   else (WIN32)
     set(MKL_PATH ${INTEL_PATH}/mkl/latest)
-  endif (WIN32)
+  endif ()
   set(MKL_INCLUDE_DIRS ${MKL_INCLUDE_DIRS} ${MKL_PATH}/include)
   if (WIN32)
     set(MKL_LIBRARIES ${MKL_LIBRARIES}

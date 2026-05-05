@@ -161,7 +161,7 @@ Bio-Formats Image Bridge
 - Runtime requirements:
   - `bioformats_package.jar`
   - `atlas-bioformats-bridge.jar`
-  - Java 21 JRE for desktop Atlas, or Java 11+ when the image library is used without the bundled desktop runtime.
+  - Java 11 or newer runtime.
 - `ZImgInit` validates the jars directory before enabling Java image support. Desktop Atlas passes its bundled JRE explicitly; library users without a bundled JRE resolve Java lazily from `JAVA_HOME/bin/java`, then `java` on `PATH`.
 - Reader selection keeps native C++ readers first. `ZImgBioFormats` is registered as the fallback reader after native formats and can also probe extensionless or uncommon Bio-Formats files by content.
 - Subblocks created by the Bio-Formats reader use `FileFormat::BioFormats` explicitly. This avoids repeatedly rediscovering the reader during tiled 2D/3D paging and prevents native extension matches from stealing Bio-Formats-managed tile reads.
