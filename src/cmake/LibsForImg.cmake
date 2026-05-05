@@ -217,7 +217,15 @@ print_target_properties(hdf5-static)
 
 find_package(Eigen3 REQUIRED)
 print_target_properties(Eigen3::Eigen)
+
 find_package(absl REQUIRED PATHS ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build NO_DEFAULT_PATH)
+
+find_package(Protobuf CONFIG REQUIRED
+             PATHS ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build NO_DEFAULT_PATH)
+message(STATUS "Using Protobuf ${Protobuf_VERSION}")
+print_target_properties(protobuf::libprotobuf)
+print_target_properties(protobuf::protoc)
+
 find_package(Ceres REQUIRED
              PATHS ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build NO_DEFAULT_PATH)
 print_target_properties(Ceres::ceres)

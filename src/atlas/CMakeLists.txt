@@ -70,15 +70,6 @@ cmake_policy(SET CMP0074 NEW)
 #message(STATUS "_Atlas_SSL_INCLUDE_DIR: ${_Atlas_SSL_INCLUDE_DIR}")
 #message(STATUS "_Atlas_SSL_LIBRARIES: ${_Atlas_SSL_LIBRARIES}")
 
-# Find Protobuf installation
-# Looks for protobuf-config.cmake file installed by Protobuf's cmake installation.
-find_package(Protobuf CONFIG REQUIRED
-             PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build NO_DEFAULT_PATH)
-message(STATUS "Using Protobuf ${Protobuf_VERSION}")
-print_target_properties(protobuf::libprotobuf)
-print_target_properties(protobuf::protoc)
-set(protobuf_PROTOC_EXE protobuf::protoc) # for protobuf_generate
-
 # Find gRPC installation
 # Looks for gRPCConfig.cmake file installed by gRPC's cmake installation.
 find_package(gRPC CONFIG REQUIRED
@@ -213,6 +204,7 @@ set(PROTOS
     ${CMAKE_CURRENT_SOURCE_DIR}/../protos/scene.proto
 )
 set(PROTO_SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../protos)
+set(protobuf_PROTOC_EXE protobuf::protoc) # for protobuf_generate
 protobuf_generate(LANGUAGE cpp APPEND_PATH PROTOC_OUT_DIR ${CMAKE_CURRENT_BINARY_DIR} OUT_VAR PROTO_SRCS PROTOS ${PROTOS})
 grpc_generate_cpp(GRPC_SRCS GRPC_HDRS ${CMAKE_CURRENT_BINARY_DIR} ${PROTOS})
 set_property(SOURCE ${PROTO_SRCS} ${GRPC_SRCS} PROPERTY SKIP_AUTOGEN ON)

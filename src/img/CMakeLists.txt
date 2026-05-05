@@ -51,8 +51,6 @@ set(TIFF_SOURCES
 list(APPEND TIFF_SOURCES ${TIFFDIR}/tif_unix.c)
 source_group(libtiff FILES ${TIFF_SOURCES})
 
-find_package(Protobuf CONFIG REQUIRED
-             PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build NO_DEFAULT_PATH)
 set(protobuf_PROTOC_EXE protobuf::protoc)
 set(BIOFORMATS_PROTO ${CMAKE_CURRENT_SOURCE_DIR}/../protos/bioformats_bridge.proto)
 protobuf_generate(LANGUAGE cpp APPEND_PATH PROTOC_OUT_DIR ${CMAKE_CURRENT_BINARY_DIR} OUT_VAR BIOFORMATS_PROTO_SRCS
