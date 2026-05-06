@@ -172,7 +172,7 @@ Bio-Formats Image Bridge
 - Tunables:
   - `--atlas_bioformats_java_xmx=<size>` sets the sidecar JVM heap, default `2g`.
   - `--atlas_bioformats_bridge_io_timeout_ms=<ms>` bounds bridge stdin/stdout operations when non-zero; default `0` waits indefinitely.
-- Optional real-format breadth checks use an external corpus, not vendored image data. `util/download_bioformats_samples.py` can download a small public corpus from the OME sample image index, and `zbioformatstest` reads it when `ATLAS_BIOFORMATS_BREADTH_DIR` points at that corpus directory.
+- Optional real-format breadth checks use an external corpus, not vendored image data. `util/download_bioformats_samples.py` can download a small public corpus from the OME sample image index, or a bounded all-format corpus with an explicit cap such as `--mode all --per-format 1000`. The generated `manifest.json` is a saved download plan; reruns reuse it and skip planning until it is deleted. `zbioformatstest` reads the corpus when `ATLAS_BIOFORMATS_BREADTH_DIR` points at that directory.
 
 Neuroglancer Precomputed (HTTP)
 

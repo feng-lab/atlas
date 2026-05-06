@@ -17,6 +17,9 @@ logger = logging.getLogger(__name__)
 # Progress reporting policy for non-interactive environments (e.g., CI)
 PROGRESS_LOG_INTERVAL_SEC = 5  # minimum seconds between progress log lines
 PROGRESS_LOG_PERCENT_STEP = 10  # log on each additional N% completion
+DOWNLOAD_FILE_RETRIES = 5
+DOWNLOAD_FILE_BACKOFF_IN_SECONDS = 1
+DOWNLOAD_FILE_NON_RETRYABLE_HTTP_STATUS_CODES = {404, 410}
 BYTE_PRESERVED_ARCHIVE_SUFFIXES = (
     ".tar.gz",
     ".tgz",
@@ -32,6 +35,14 @@ BYTE_PRESERVED_ARCHIVE_SUFFIXES = (
     ".tzst",
     ".zst",
 )
+
+
+class DownloadFileRetryableError(RuntimeError):
+    """Raised when one download pass exhausts all configured sources."""
+
+
+class DownloadFileNonRetryableError(RuntimeError):
+    """Raised when retrying the same download cannot reasonably make progress."""
 
 
 def call_with_backoff(
@@ -178,8 +189,33 @@ def is_correct_platform(filename):
     return True
 
 
-@retry_with_backoff()
 def download_file_with_resume(
+    url,
+    fallback_url,
+    target_path,
+    expected_size=None,
+    expected_sha256=None,
+):
+    try:
+        return call_with_backoff(
+            lambda: _download_file_with_resume_once(
+                url,
+                fallback_url,
+                target_path,
+                expected_size=expected_size,
+                expected_sha256=expected_sha256,
+            ),
+            retries=DOWNLOAD_FILE_RETRIES,
+            backoff_in_seconds=DOWNLOAD_FILE_BACKOFF_IN_SECONDS,
+            should_retry=lambda e: not isinstance(e, DownloadFileNonRetryableError),
+            operation_name=f"download {target_path}",
+        )
+    except (DownloadFileRetryableError, DownloadFileNonRetryableError) as e:
+        logger.error("%s", e)
+        return False
+
+
+def _download_file_with_resume_once(
     url,
     fallback_url,
     target_path,
@@ -193,12 +229,20 @@ def download_file_with_resume(
     if os.path.exists(target_path):
         current_size = os.path.getsize(target_path)
         if has_expected_size and current_size == expected_size:
-            logger.info(
-                f"File {target_path} already exists with correct size. Skipping download."
-            )
             if has_expected_sha256:
-                return validate_checksum(target_path, expected_sha256)
-            return True
+                logger.info(f"File {target_path} already exists. Validating checksum.")
+                if validate_checksum(target_path, expected_sha256):
+                    logger.info(
+                        f"File {target_path} already exists with matching checksum. Skipping download."
+                    )
+                    return True
+                logger.warning(f"File {target_path} checksum mismatch. Re-downloading.")
+                current_size = 0
+            else:
+                logger.info(
+                    f"File {target_path} already exists with correct size. Skipping download."
+                )
+                return True
 
         if not has_expected_size:
             if current_size == 0:
@@ -220,8 +264,10 @@ def download_file_with_resume(
                 f"File {target_path} is larger than expected. Re-downloading."
             )
             current_size = 0
-        else:
+        elif current_size > 0:
             logger.info(f"Resuming download for {target_path}")
+        else:
+            logger.info(f"File {target_path} exists but is empty. Re-downloading.")
     else:
         current_size = 0
 
@@ -248,6 +294,13 @@ def download_file_with_resume(
         proxy_options = [(no_proxy, "")]
 
     urls = [u for u in (url, fallback_url, url, fallback_url) if u]
+    failure_reason = "no URL attempts were available"
+    if not urls:
+        raise DownloadFileNonRetryableError(
+            f"Failed to download {target_path} from all URLs: {failure_reason}"
+        )
+    saw_retryable_failure = False
+    saw_non_retryable_http_failure = False
     for current_url in urls:
         for current_proxies, proxy_label in proxy_options:
             try:
@@ -283,6 +336,12 @@ def download_file_with_resume(
                 response = requests.get(
                     current_url, stream=True, proxies=current_proxies, headers=headers
                 )
+
+                if (
+                    response.status_code
+                    in DOWNLOAD_FILE_NON_RETRYABLE_HTTP_STATUS_CODES
+                ):
+                    response.raise_for_status()
 
                 if "Range" in headers and response.status_code != 206:
                     logger.info(
@@ -409,14 +468,22 @@ def download_file_with_resume(
                     # Keep a blank line separation minimal in logs
                     logger.info("")
 
-                if has_expected_size and os.path.getsize(target_path) != expected_size:
+                actual_size = os.path.getsize(target_path)
+                if has_expected_size and actual_size != expected_size:
+                    failure_reason = (
+                        f"downloaded size {actual_size} did not match expected "
+                        f"size {expected_size}"
+                    )
+                    saw_retryable_failure = True
                     logger.warning(
                         "Downloaded file size does not match expected size. Trying next URL."
                     )
                     os.remove(target_path)
                     continue
 
-                if os.path.getsize(target_path) == 0:
+                if actual_size == 0:
+                    failure_reason = "downloaded file was empty"
+                    saw_retryable_failure = True
                     logger.warning("Downloaded empty file. Trying next URL.")
                     continue
 
@@ -429,12 +496,35 @@ def download_file_with_resume(
                     return True
 
                 logger.warning("Checksum validation failed. Trying next URL.")
+                failure_reason = "checksum validation failed"
+                saw_retryable_failure = True
                 os.remove(target_path)
+            except requests.HTTPError as e:
+                status_code = e.response.status_code if e.response is not None else None
+                failure_reason = (
+                    f"HTTP status {status_code} downloading from "
+                    f"{current_url}{proxy_suffix}: {e}"
+                )
+                if status_code in DOWNLOAD_FILE_NON_RETRYABLE_HTTP_STATUS_CODES:
+                    saw_non_retryable_http_failure = True
+                else:
+                    saw_retryable_failure = True
+                logger.error(failure_reason)
             except requests.RequestException as e:
+                saw_retryable_failure = True
+                failure_reason = (
+                    f"error downloading from {current_url}{proxy_suffix}: {e}"
+                )
                 logger.error(f"Error downloading from {current_url}{proxy_suffix}: {e}")
 
-    logger.error("Failed to download file from all URLs.")
-    return False
+    if saw_non_retryable_http_failure and not saw_retryable_failure:
+        raise DownloadFileNonRetryableError(
+            f"Failed to download {target_path} from all URLs: {failure_reason}"
+        )
+
+    raise DownloadFileRetryableError(
+        f"Failed to download {target_path} from all URLs: {failure_reason}"
+    )
 
 
 def sync_files(

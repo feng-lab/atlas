@@ -12,16 +12,20 @@ import logging
 import pathlib
 import posixpath
 import re
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
 
 import download_utils
+from logger import setup_logger
 
 
 DEFAULT_ROOT_URL = "https://downloads.openmicroscopy.org/images/"
 DEFAULT_OUTPUT_DIR = str(pathlib.Path.home() / "Documents" / "omeimages")
 USER_AGENT = "AtlasBioFormatsBreadthDownloader/1.0"
+BYTES_PER_MIB = 1024 * 1024
+BYTES_PER_GIB = 1024 * 1024 * 1024
 
 logger = logging.getLogger(__name__)
 
@@ -100,8 +104,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--per-format",
         type=int,
-        default=3,
-        help="Sample mode only: maximum files per top-level format.",
+        default=None,
+        help=(
+            "Maximum files per top-level format. In all mode, 0 means "
+            "unlimited; sample mode requires a positive value. Default: 3 in "
+            "sample mode, unlimited in all mode."
+        ),
     )
     parser.add_argument(
         "--max-file-mib",
@@ -143,8 +151,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
 
+    if args.per_format is None:
+        args.per_format = 3 if args.mode == "sample" else 0
     if args.mode == "sample" and args.per_format <= 0:
         raise SystemExit("--per-format must be positive in sample mode")
+    if args.mode == "all" and args.per_format < 0:
+        raise SystemExit("--per-format must be >= 0")
     if args.max_file_mib is None:
         args.max_file_mib = 512 if args.mode == "sample" else 0
     if args.max_total_gib is None:
@@ -259,6 +271,17 @@ def safe_relative_path(
     return pathlib.PurePosixPath(format_name, *parts)
 
 
+def normalize_relative_path(value: object) -> pathlib.PurePosixPath:
+    if not isinstance(value, str) or not value:
+        raise ValueError("relative_path must be a non-empty string")
+    path = pathlib.PurePosixPath(value)
+    if path.is_absolute() or any(part in {"", ".", ".."} for part in path.parts):
+        raise ValueError(
+            f"relative_path must stay inside the output directory: {value!r}"
+        )
+    return path
+
+
 def optional_mib_to_bytes(value: int) -> int | None:
     return None if value <= 0 else value * 1024 * 1024
 
@@ -279,6 +302,35 @@ def page_limit_reached(pages: int, max_pages: int) -> bool:
     return max_pages > 0 and pages >= max_pages
 
 
+def per_format_limit(args: argparse.Namespace) -> int | None:
+    return None if args.per_format <= 0 else args.per_format
+
+
+def format_byte_count(size_bytes: int) -> str:
+    if size_bytes >= BYTES_PER_GIB:
+        return f"{size_bytes / BYTES_PER_GIB:.2f} GiB"
+    if size_bytes >= BYTES_PER_MIB:
+        return f"{size_bytes / BYTES_PER_MIB:.1f} MiB"
+    return f"{size_bytes} B"
+
+
+def planning_stop_reason(
+    *,
+    queue: list[tuple[str, int]],
+    candidates: list[dict[str, object]],
+    format_limit: int | None,
+    pages: int,
+    max_pages: int,
+) -> str:
+    if format_limit is not None and len(candidates) >= format_limit:
+        return "per-format file limit reached"
+    if page_limit_reached(pages, max_pages):
+        return "page limit reached"
+    if not queue:
+        return "directory queue exhausted"
+    return "stopped"
+
+
 def collect_candidates(
     format_name: str,
     format_url: str,
@@ -288,38 +340,108 @@ def collect_candidates(
     queue: list[tuple[str, int]] = [(format_url, 0)]
     pages = 0
     candidates: list[dict[str, object]] = []
-    sample_limit = args.per_format if args.mode == "sample" else None
+    format_limit = per_format_limit(args)
     include_sidecars = args.mode == "all"
+    start_time = time.monotonic()
+    candidate_bytes = 0
+    directories_queued = 0
+    directories_skipped_by_depth = 0
+    skipped_non_candidates = 0
+    skipped_unknown_size = 0
+    skipped_too_large = 0
+
+    logger.info(
+        "planning %s: crawl start url=%s mode=%s max_depth=%s "
+        "max_pages_per_format=%s max_file=%s per_format=%s",
+        format_name,
+        format_url,
+        args.mode,
+        "unlimited" if args.max_depth == 0 else args.max_depth,
+        "unlimited" if args.max_pages_per_format == 0 else args.max_pages_per_format,
+        "unlimited" if max_file_bytes is None else format_byte_count(max_file_bytes),
+        "unlimited" if format_limit is None else format_limit,
+    )
 
     while (
         queue
-        and (sample_limit is None or len(candidates) < sample_limit)
+        and (format_limit is None or len(candidates) < format_limit)
         and not page_limit_reached(pages, args.max_pages_per_format)
     ):
         directory_url, depth = queue.pop(0)
         pages += 1
+        page_start_time = time.monotonic()
+        logger.info(
+            "planning %s: listing page=%d depth=%d queued=%d selected=%d "
+            "selected_bytes=%s url=%s",
+            format_name,
+            pages,
+            depth,
+            len(queue),
+            len(candidates),
+            format_byte_count(candidate_bytes),
+            directory_url,
+        )
         try:
             entries = list_entries(directory_url, args.timeout)
         except Exception as exc:
             logger.warning("failed to list %s: %s", directory_url, exc)
             continue
 
+        directory_entries = sum(1 for link, _ in entries if link.endswith("/"))
+        file_entries = len(entries) - directory_entries
+        logger.info(
+            "planning %s: listed page=%d in %.1fs entries=%d dirs=%d files=%d",
+            format_name,
+            pages,
+            time.monotonic() - page_start_time,
+            len(entries),
+            directory_entries,
+            file_entries,
+        )
+
+        page_directories_queued = 0
+        page_directories_skipped_by_depth = 0
+        page_skipped_non_candidates = 0
+        page_skipped_unknown_size = 0
+        page_skipped_too_large = 0
+        page_selected = 0
+        page_selected_bytes = 0
+
         for link, listed_size in entries:
             if link.endswith("/"):
                 if can_descend(depth, args.max_depth):
                     queue.append((link, depth + 1))
+                    directories_queued += 1
+                    page_directories_queued += 1
+                else:
+                    directories_skipped_by_depth += 1
+                    page_directories_skipped_by_depth += 1
                 continue
             if not is_candidate_file(link, include_sidecars=include_sidecars):
+                skipped_non_candidates += 1
+                page_skipped_non_candidates += 1
                 continue
-            size = (
-                listed_size
-                if listed_size is not None
-                else head_size(link, args.timeout)
-            )
+            if listed_size is not None:
+                size = listed_size
+            else:
+                head_start_time = time.monotonic()
+                logger.info("planning %s: probing size url=%s", format_name, link)
+                size = head_size(link, args.timeout)
+                logger.info(
+                    "planning %s: size probe finished in %.1fs size=%s url=%s",
+                    format_name,
+                    time.monotonic() - head_start_time,
+                    "unknown" if size is None else format_byte_count(size),
+                    link,
+                )
             if size is None:
+                skipped_unknown_size += 1
+                page_skipped_unknown_size += 1
                 logger.warning("skipping file with unknown size: %s", link)
                 continue
             if not within_optional_limit(size, max_file_bytes):
+                skipped_too_large += 1
+                page_skipped_too_large += 1
                 continue
             candidates.append(
                 {
@@ -331,8 +453,55 @@ def collect_candidates(
                     "size": size,
                 }
             )
-            if sample_limit is not None and len(candidates) >= sample_limit:
+            candidate_bytes += size
+            page_selected += 1
+            page_selected_bytes += size
+            if format_limit is not None and len(candidates) >= format_limit:
                 break
+
+        logger.info(
+            "planning %s: page=%d complete selected=%d selected_bytes=%s "
+            "queued_dirs=%d skipped_dirs_by_depth=%d skipped_non_candidates=%d "
+            "skipped_unknown_size=%d skipped_too_large=%d total_selected=%d "
+            "total_selected_bytes=%s remaining_queue=%d elapsed=%.1fs",
+            format_name,
+            pages,
+            page_selected,
+            format_byte_count(page_selected_bytes),
+            page_directories_queued,
+            page_directories_skipped_by_depth,
+            page_skipped_non_candidates,
+            page_skipped_unknown_size,
+            page_skipped_too_large,
+            len(candidates),
+            format_byte_count(candidate_bytes),
+            len(queue),
+            time.monotonic() - start_time,
+        )
+
+    logger.info(
+        "planning %s: finished reason=%s pages=%d queued_dirs=%d "
+        "skipped_dirs_by_depth=%d selected=%d selected_bytes=%s "
+        "skipped_non_candidates=%d skipped_unknown_size=%d skipped_too_large=%d "
+        "elapsed=%.1fs",
+        format_name,
+        planning_stop_reason(
+            queue=queue,
+            candidates=candidates,
+            format_limit=format_limit,
+            pages=pages,
+            max_pages=args.max_pages_per_format,
+        ),
+        pages,
+        directories_queued,
+        directories_skipped_by_depth,
+        len(candidates),
+        format_byte_count(candidate_bytes),
+        skipped_non_candidates,
+        skipped_unknown_size,
+        skipped_too_large,
+        time.monotonic() - start_time,
+    )
 
     return candidates
 
@@ -341,13 +510,77 @@ def should_hash(args: argparse.Namespace) -> bool:
     return args.hash == "complete" or (args.hash == "auto" and args.mode == "sample")
 
 
+def manifest_sample_record(sample: dict[str, object]) -> dict[str, object]:
+    relative_path = normalize_relative_path(sample.get("relative_path"))
+    url = sample.get("url")
+    if not isinstance(url, str) or not url:
+        raise ValueError(f"manifest record is missing url: {sample!r}")
+    try:
+        size = int(sample["size"])
+    except (KeyError, TypeError, ValueError) as exc:
+        raise ValueError(f"manifest record has invalid size: {sample!r}") from exc
+    if size < 0:
+        raise ValueError(f"manifest record has negative size: {sample!r}")
+
+    return {
+        "relative_path": str(relative_path),
+        "url": url,
+        "size": size,
+    }
+
+
+def load_planned_samples_from_manifest(
+    manifest_path: pathlib.Path,
+) -> list[dict[str, object]]:
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except OSError as exc:
+        raise RuntimeError(
+            f"failed to read existing manifest: {manifest_path}"
+        ) from exc
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(
+            f"failed to parse existing manifest: {manifest_path}"
+        ) from exc
+
+    if not isinstance(manifest, dict):
+        raise RuntimeError(f"manifest root must be an object: {manifest_path}")
+    samples = manifest.get("samples")
+    if not isinstance(samples, list):
+        raise RuntimeError(f"manifest samples must be a list: {manifest_path}")
+
+    planned_count = manifest.get("planned_count")
+    if isinstance(planned_count, int) and planned_count != len(samples):
+        logger.warning(
+            "Existing manifest has planned_count=%d but samples=%d. "
+            "Using the samples list as the saved plan; delete %s to replan.",
+            planned_count,
+            len(samples),
+            manifest_path,
+        )
+
+    records: list[dict[str, object]] = []
+    for index, sample in enumerate(samples, start=1):
+        if not isinstance(sample, dict):
+            raise RuntimeError(
+                f"manifest sample {index} must be an object: {manifest_path}"
+            )
+        try:
+            records.append(manifest_sample_record(sample))
+        except ValueError as exc:
+            raise RuntimeError(
+                f"invalid manifest sample {index} in {manifest_path}: {exc}"
+            ) from exc
+    return records
+
+
 def download_sample(
     sample: dict[str, object],
     output_dir: pathlib.Path,
     dry_run: bool,
     hash_file: bool,
 ) -> dict[str, object]:
-    relative_path = pathlib.PurePosixPath(str(sample["relative_path"]))
+    relative_path = normalize_relative_path(sample["relative_path"])
     dest = output_dir.joinpath(*relative_path.parts)
     size = int(sample["size"])
     sample = dict(sample)
@@ -365,7 +598,12 @@ def download_sample(
     if not ok:
         raise RuntimeError(f"failed to download {sample['url']}")
     if hash_file:
+        hash_start_time = time.monotonic()
+        logger.info("hashing %s", dest)
         sample["sha256"] = download_utils.calculate_checksum(dest)
+        logger.info(
+            "hash complete in %.1fs for %s", time.monotonic() - hash_start_time, dest
+        )
     if previous_size == size:
         sample["status"] = "exists"
     elif previous_size > 0:
@@ -388,7 +626,7 @@ def build_manifest(
         "root_url": root_url,
         "parameters": {
             "mode": args.mode,
-            "per_format": args.per_format if args.mode == "sample" else None,
+            "per_format": per_format_limit(args),
             "max_file_mib": args.max_file_mib,
             "max_total_gib": args.max_total_gib,
             "max_depth": args.max_depth,
@@ -400,7 +638,7 @@ def build_manifest(
         "file_count": len(records),
         "sample_count": len(records),
         "total_bytes": sum(int(sample["size"]) for sample in records),
-        "samples": records,
+        "samples": [manifest_sample_record(sample) for sample in records],
     }
 
 
@@ -414,39 +652,112 @@ def write_manifest(manifest_path: pathlib.Path, manifest: dict[str, object]) -> 
 
 
 def main() -> int:
-    logging.basicConfig(level=logging.INFO, format="%(message)s")
+    setup_logger()
     args = parse_args()
     max_file_bytes = optional_mib_to_bytes(args.max_file_mib)
     max_total_bytes = optional_gib_to_bytes(args.max_total_gib)
     output_dir = pathlib.Path(args.output_dir)
+    manifest_path = output_dir / args.manifest_name
 
     root_url = args.root_url if args.root_url.endswith("/") else args.root_url + "/"
-    top_links = [
-        link for link in list_links(root_url, args.timeout) if link.endswith("/")
-    ]
-    planned: list[dict[str, object]] = []
-    total_bytes = 0
+    logger.info("Bio-Formats sample downloader started")
+    logger.info(
+        "configuration: root_url=%s output_dir=%s mode=%s dry_run=%s hash=%s "
+        "timeout=%ds",
+        root_url,
+        output_dir,
+        args.mode,
+        args.dry_run,
+        args.hash,
+        args.timeout,
+    )
+    logger.info(
+        "planning limits: max_file=%s max_total=%s max_depth=%s "
+        "max_pages_per_format=%s per_format=%s",
+        "unlimited" if max_file_bytes is None else format_byte_count(max_file_bytes),
+        "unlimited" if max_total_bytes is None else format_byte_count(max_total_bytes),
+        "unlimited" if args.max_depth == 0 else args.max_depth,
+        "unlimited" if args.max_pages_per_format == 0 else args.max_pages_per_format,
+        "unlimited" if per_format_limit(args) is None else per_format_limit(args),
+    )
 
-    for format_url in top_links:
-        format_name = urllib.parse.unquote(
-            posixpath.basename(urllib.parse.urlparse(format_url.rstrip("/")).path)
+    if manifest_path.exists():
+        logger.info(
+            "using existing manifest plan: %s. Delete this file to replan.",
+            manifest_path,
         )
-        if not format_name:
-            continue
-        print(f"planning {format_name}...", flush=True)
-        candidates = collect_candidates(format_name, format_url, args, max_file_bytes)
-        print(f"  selected {len(candidates)} file(s)", flush=True)
-        for candidate in candidates:
-            size = int(candidate["size"])
-            if max_total_bytes is not None and total_bytes + size > max_total_bytes:
+        planned = load_planned_samples_from_manifest(manifest_path)
+        total_bytes = sum(int(sample["size"]) for sample in planned)
+        logger.info(
+            "loaded manifest plan: %d file(s), %s",
+            len(planned),
+            format_byte_count(total_bytes),
+        )
+    else:
+        logger.info("no manifest found at %s; planning from OME index", manifest_path)
+        logger.info("reading top-level OME image index: %s", root_url)
+        root_index_start_time = time.monotonic()
+        top_links = [
+            link for link in list_links(root_url, args.timeout) if link.endswith("/")
+        ]
+        logger.info(
+            "found %d top-level format directories in %.1fs",
+            len(top_links),
+            time.monotonic() - root_index_start_time,
+        )
+        planned: list[dict[str, object]] = []
+        total_bytes = 0
+        total_limit_reached = False
+
+        for format_index, format_url in enumerate(top_links, start=1):
+            format_name = urllib.parse.unquote(
+                posixpath.basename(urllib.parse.urlparse(format_url.rstrip("/")).path)
+            )
+            if not format_name:
+                continue
+            logger.info(
+                "planning format %d/%d: %s", format_index, len(top_links), format_name
+            )
+            candidates = collect_candidates(
+                format_name, format_url, args, max_file_bytes
+            )
+            format_added = 0
+            format_added_bytes = 0
+            for candidate in candidates:
+                size = int(candidate["size"])
+                if max_total_bytes is not None and total_bytes + size > max_total_bytes:
+                    logger.info(
+                        "global planning limit reached before %s: planned=%s "
+                        "next_file=%s limit=%s",
+                        candidate["relative_path"],
+                        format_byte_count(total_bytes),
+                        format_byte_count(size),
+                        format_byte_count(max_total_bytes),
+                    )
+                    total_limit_reached = True
+                    break
+                planned.append(manifest_sample_record(candidate))
+                total_bytes += size
+                format_added += 1
+                format_added_bytes += size
+            logger.info(
+                "planning format %d/%d complete: %s selected=%d added_to_plan=%d "
+                "added_bytes=%s total_planned=%d total_bytes=%s",
+                format_index,
+                len(top_links),
+                format_name,
+                len(candidates),
+                format_added,
+                format_byte_count(format_added_bytes),
+                len(planned),
+                format_byte_count(total_bytes),
+            )
+            if total_limit_reached or (
+                max_total_bytes is not None and total_bytes >= max_total_bytes
+            ):
                 break
-            planned.append(candidate)
-            total_bytes += size
-        if max_total_bytes is not None and total_bytes >= max_total_bytes:
-            break
 
     output_dir.mkdir(parents=True, exist_ok=True)
-    manifest_path = output_dir / args.manifest_name
     hash_file = should_hash(args)
 
     if args.dry_run:
@@ -461,41 +772,64 @@ def main() -> int:
             planned_total_bytes=total_bytes,
         )
         print(json.dumps(manifest, indent=2, sort_keys=True))
-        print(
-            f"planned {len(planned)} file(s), {total_bytes / (1024 * 1024 * 1024):.2f} GiB"
+        logger.info(
+            "dry run complete: planned %d file(s), %s",
+            len(planned),
+            format_byte_count(total_bytes),
         )
         return 0
 
     completed: list[dict[str, object]] = []
-    write_manifest(
+    logger.info(
+        "download plan complete: %d file(s), %s manifest=%s",
+        len(planned),
+        format_byte_count(total_bytes),
         manifest_path,
-        build_manifest(
-            args=args,
-            root_url=root_url,
-            records=completed,
-            planned_count=len(planned),
-            planned_total_bytes=total_bytes,
-        ),
     )
-
-    for index, sample in enumerate(planned, start=1):
-        print(
-            f"[{index}/{len(planned)}] {sample['relative_path']} ({int(sample['size']) / (1024 * 1024):.1f} MiB)",
-            flush=True,
-        )
-        completed.append(download_sample(sample, output_dir, False, hash_file))
+    if not manifest_path.exists():
         write_manifest(
             manifest_path,
             build_manifest(
                 args=args,
                 root_url=root_url,
-                records=completed,
+                records=planned,
                 planned_count=len(planned),
                 planned_total_bytes=total_bytes,
             ),
         )
+        logger.info("wrote manifest plan to %s", manifest_path)
 
-    print(f"wrote {len(completed)} file entries to {manifest_path}")
+    completed_bytes = 0
+    for index, sample in enumerate(planned, start=1):
+        size = int(sample["size"])
+        file_start_time = time.monotonic()
+        logger.info(
+            "downloading file %d/%d: %s size=%s completed=%s/%s",
+            index,
+            len(planned),
+            sample["relative_path"],
+            format_byte_count(size),
+            format_byte_count(completed_bytes),
+            format_byte_count(total_bytes),
+        )
+        completed.append(download_sample(sample, output_dir, False, hash_file))
+        completed_bytes += size
+        overall_progress = (
+            completed_bytes / total_bytes * 100.0 if total_bytes else 100.0
+        )
+        logger.info(
+            "finished file %d/%d: %s status=%s elapsed=%.1fs completed=%s/%s (%.1f%%)",
+            index,
+            len(planned),
+            sample["relative_path"],
+            completed[-1]["status"],
+            time.monotonic() - file_start_time,
+            format_byte_count(completed_bytes),
+            format_byte_count(total_bytes),
+            overall_progress,
+        )
+
+    logger.info("download run complete: %d file(s) processed", len(completed))
     return 0
 
 

@@ -65,7 +65,9 @@ For a full external-drive mirror of the public OME image tree, use `all` mode.
 This mode mirrors every non-hidden file under the OME image root, including
 format sidecars. Downloads are resumable: existing complete files are skipped,
 partial files are continued with HTTP range requests when the server supports
-them, and `manifest.json` is rewritten after each completed file.
+them, and `manifest.json` is used as a saved download plan. If `manifest.json`
+already exists, the downloader skips planning and downloads/resumes the files
+listed there; delete the manifest to force a new plan.
 
 ```sh
 python util/download_bioformats_samples.py --mode all --output-dir "/Volumes/External/omeimages"
@@ -74,4 +76,5 @@ python util/download_bioformats_samples.py --mode all --output-dir "/Volumes/Ext
 Use `--dry-run` first to estimate planned file count and total bytes. In `all`
 mode, size, depth, page, and total-byte caps are unlimited by default; pass
 `--max-total-gib`, `--max-file-mib`, `--max-depth`, or
-`--max-pages-per-format` to stage the mirror.
+`--max-pages-per-format` to stage the mirror. Use `--per-format` in `all` mode
+to cap the number of files selected from each top-level format.
