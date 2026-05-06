@@ -44,7 +44,9 @@ constexpr uint32_t kMaxFrameBytes = 512_u32 * 1024_u32 * 1024_u32;
 constexpr uint32_t kBridgeProtocolVersion = 1;
 constexpr const char* kBioFormatsJar = "bioformats_package.jar";
 constexpr const char* kAtlasBioFormatsBridgeJar = "atlas-bioformats-bridge.jar";
-constexpr int kJavaVersionProbeTimeoutMs = 5000;
+// This is used only for system Java discovery. A cold JVM can take several
+// seconds to answer under CI load, especially while many tests start at once.
+constexpr int kJavaVersionProbeTimeoutMs = 30000;
 
 struct JavaCandidate
 {
@@ -213,17 +215,12 @@ QString resolveJavaExecutable()
 {
   const QString bundledJreDir = ZImgGlobal::instance().jreDIR;
   if (!bundledJreDir.isEmpty()) {
-    const JavaCandidate bundled{
-      QString("bundled jreDIR=%1").arg(bundledJreDir),
-      javaExecutableInHome(bundledJreDir),
-      true,
-    };
-    const JavaCheckResult check = checkJavaCandidate(bundled);
-    if (!check.ok) {
-      const QString detail = QString("Bundled Bio-Formats Java runtime is not usable. ") + check.detail;
-      throw ZException(detail);
+    const QString bundledJava = javaExecutableInHome(bundledJreDir);
+    if (!QFileInfo(bundledJava).isExecutable()) {
+      throw ZException(
+        fmt::format("Bundled Bio-Formats Java runtime is incomplete. java executable not found: {}", bundledJava));
     }
-    return bundled.program;
+    return bundledJava;
   }
 
   QStringList diagnostics;
