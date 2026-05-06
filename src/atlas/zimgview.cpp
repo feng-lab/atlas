@@ -3503,10 +3503,10 @@ QString ZImgView::infoOfPos(double x, double y)
                        'g',
                        QLocale::FloatingPointShortest);
         for (size_t c = 1; c < imgPack.imgInfo().numChannels; ++c) {
-          info += QString(",%1").arg(imgPack.displayValue(lx, ly, lz, c, lt, m_view.isMaxZProjView()),
-                                     0,
-                                     'g',
-                                     QLocale::FloatingPointShortest);
+          info += QString(", %1").arg(imgPack.displayValue(lx, ly, lz, c, lt, m_view.isMaxZProjView()),
+                                      0,
+                                      'g',
+                                      QLocale::FloatingPointShortest);
         }
         info += ")";
 

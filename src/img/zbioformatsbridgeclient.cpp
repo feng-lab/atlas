@@ -369,10 +369,13 @@ public:
   [[nodiscard]] std::vector<ZBioFormatsReaderFormat> listFormats()
   {
     std::lock_guard<std::mutex> lock(m_mutex);
+    const bool cached = !m_cachedFormats.empty();
     QElapsedTimer timer;
     timer.start();
     auto result = listFormatsLocked();
-    VLOG(1) << "Bio-Formats bridge listFormats took " << timer.elapsed() << " ms";
+    if (!cached) {
+      VLOG(1) << "Bio-Formats bridge listFormats took " << timer.elapsed() << " ms for " << result.size() << " formats";
+    }
     return result;
   }
 
@@ -409,10 +412,14 @@ public:
   [[nodiscard]] ZBioFormatsDatasetInfo openDataset(const QString& filename)
   {
     std::lock_guard<std::mutex> lock(m_mutex);
+    const QString path = canonicalPath(filename);
+    const bool cached = m_datasetsByPath.contains(path);
     QElapsedTimer timer;
     timer.start();
-    const ZBioFormatsDatasetInfo result = openDatasetLocked(filename);
-    VLOG(1) << "Bio-Formats bridge openDataset took " << timer.elapsed() << " ms for " << filename;
+    const ZBioFormatsDatasetInfo result = openDatasetByPathLocked(path);
+    if (!cached) {
+      VLOG(1) << "Bio-Formats bridge openDataset took " << timer.elapsed() << " ms for " << filename;
+    }
     return result;
   }
 
@@ -625,6 +632,11 @@ private:
   [[nodiscard]] const ZBioFormatsDatasetInfo& openDatasetLocked(const QString& filename)
   {
     const QString path = canonicalPath(filename);
+    return openDatasetByPathLocked(path);
+  }
+
+  [[nodiscard]] const ZBioFormatsDatasetInfo& openDatasetByPathLocked(const QString& path)
+  {
     auto it = m_datasetsByPath.find(path);
     if (it != m_datasetsByPath.end()) {
       return it.value();

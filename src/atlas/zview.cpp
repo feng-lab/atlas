@@ -24,9 +24,16 @@
 #include <QEventLoop>
 #include <QProgressDialog>
 #include <QMenu>
+#include <QSizePolicy>
 #include <QSignalBlocker>
 
 namespace nim {
+
+namespace {
+
+constexpr int kInfoLabelReservedLines = 3;
+
+} // namespace
 
 ZView::ZView(ZDoc& doc, QWidget* parent, Qt::WindowFlags f)
   : QWidget(parent, f)
@@ -51,6 +58,10 @@ ZView::ZView(ZDoc& doc, QWidget* parent, Qt::WindowFlags f)
   m_label = new QLabel(this);
   m_label->setTextInteractionFlags(Qt::TextSelectableByMouse);
   m_label->setWordWrap(true);
+  m_label->setMinimumWidth(0);
+  m_label->setAlignment(Qt::AlignLeft | Qt::AlignTop);
+  m_label->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed);
+  m_label->setFixedHeight(m_label->fontMetrics().lineSpacing() * kInfoLabelReservedLines);
 
   m_layout = new QVBoxLayout;
   m_layout->addWidget(m_label);
@@ -270,6 +281,7 @@ void ZView::setInfo(double x, double y)
     info += view->infoOfPos(x, y);
   }
   m_label->setText(info);
+  m_label->setToolTip(info);
 }
 
 void ZView::registerObjView(std::unique_ptr<ZObjView>&& v)

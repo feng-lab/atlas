@@ -5,8 +5,8 @@
 #include "zmainwindow.h"
 #include "zdoc.h"
 #include "zlog.h"
+#include <QMetaObject>
 #include <QThread>
-#include <QThreadPool>
 
 namespace nim {
 
@@ -31,9 +31,6 @@ void ZServiceManager::init()
   CHECK(!m_init);
   m_init = true;
 
-  const int threadCount = QThreadPool::globalInstance()->maxThreadCount();
-  QThreadPool::globalInstance()->setMaxThreadCount(qMax(4, 2 * threadCount));
-
   m_uiThread = QThread::currentThread();
 
   // Create the UI dispatcher before starting worker threads so it is available
@@ -41,71 +38,16 @@ void ZServiceManager::init()
   // event loop being active yet.
   m_rpcUiDispatcher = new ZRpcUiDispatcher(this);
 
-  m_ioThread = new QThread;
-  m_dbThread = new QThread;
-  m_pushThread = new QThread;
   m_rpcThread = new QThread;
-  m_logicThread = new QThread;
-
-  m_ioThread->setObjectName("IOThread");
-  m_dbThread->setObjectName("DBThread");
-  m_pushThread->setObjectName("PushThread");
   m_rpcThread->setObjectName("RPCThread");
-  m_logicThread->setObjectName("LogicThread");
 
   m_rpcService = new ZRPCService(m_appVersion);
   m_rpcService->setUiDispatcher(m_rpcUiDispatcher);
   m_rpcService->moveToThread(m_rpcThread);
 
-  QObject::connect(m_ioThread, &QThread::started, this, &ZServiceManager::ioThreadStarted, Qt::DirectConnection);
-  QObject::connect(m_dbThread, &QThread::started, this, &ZServiceManager::dbThreadStarted, Qt::DirectConnection);
-  QObject::connect(m_pushThread, &QThread::started, this, &ZServiceManager::pushThreadStarted, Qt::DirectConnection);
   QObject::connect(m_rpcThread, &QThread::started, this, &ZServiceManager::rpcThreadStarted, Qt::DirectConnection);
-  QObject::connect(m_logicThread, &QThread::started, this, &ZServiceManager::logicThreadStarted, Qt::DirectConnection);
-  QObject::connect(m_ioThread, &QThread::finished, this, &ZServiceManager::ioThreadFinished, Qt::DirectConnection);
-  QObject::connect(m_dbThread, &QThread::finished, this, &ZServiceManager::dbThreadFinished, Qt::DirectConnection);
-  QObject::connect(m_pushThread, &QThread::finished, this, &ZServiceManager::pushThreadFinished, Qt::DirectConnection);
   QObject::connect(m_rpcThread, &QThread::finished, this, &ZServiceManager::rpcThreadFinished, Qt::DirectConnection);
-  QObject::connect(m_logicThread,
-                   &QThread::finished,
-                   this,
-                   &ZServiceManager::logicThreadFinished,
-                   Qt::DirectConnection);
-  m_ioThread->start();
-  m_dbThread->start();
-  m_pushThread->start();
   m_rpcThread->start();
-  m_logicThread->start();
-}
-
-void ZServiceManager::ioThreadStarted()
-{
-  checkCurrentOn(IO);
-}
-
-void ZServiceManager::ioThreadFinished()
-{
-  checkCurrentOn(IO);
-}
-
-void ZServiceManager::dbThreadStarted()
-{
-  checkCurrentOn(DB);
-}
-
-void ZServiceManager::dbThreadFinished()
-{
-  checkCurrentOn(DB);
-}
-
-void ZServiceManager::pushThreadStarted()
-{
-  checkCurrentOn(PUSH);
-}
-
-void ZServiceManager::pushThreadFinished()
-{
-  checkCurrentOn(PUSH);
 }
 
 void ZServiceManager::rpcThreadStarted()
@@ -119,16 +61,6 @@ void ZServiceManager::rpcThreadFinished()
   checkCurrentOn(RPC);
   m_rpcService->shutdown();
   m_rpcService->moveToThread(m_uiThread);
-}
-
-void ZServiceManager::logicThreadStarted()
-{
-  checkCurrentOn(LOGIC);
-}
-
-void ZServiceManager::logicThreadFinished()
-{
-  checkCurrentOn(LOGIC);
 }
 
 ZRPCService* ZServiceManager::rpcService()
@@ -156,13 +88,6 @@ void ZServiceManager::shutdown()
 {
   CHECK(!m_shutdown);
 
-  QThreadPool::globalInstance()->waitForDone();
-
-  m_logicThread->quit();
-  m_logicThread->wait();
-  delete m_logicThread;
-  m_logicThread = nullptr;
-
   // Stop gRPC server running on the RPC thread, then stop the thread itself.
   if (m_rpcService) {
     QMetaObject::invokeMethod(
@@ -177,21 +102,6 @@ void ZServiceManager::shutdown()
   delete m_rpcThread;
   m_rpcThread = nullptr;
 
-  m_pushThread->quit();
-  m_pushThread->wait();
-  delete m_pushThread;
-  m_pushThread = nullptr;
-
-  m_dbThread->quit();
-  m_dbThread->wait();
-  delete m_dbThread;
-  m_dbThread = nullptr;
-
-  m_ioThread->quit();
-  m_ioThread->wait();
-  delete m_ioThread;
-  m_ioThread = nullptr;
-
   delete m_rpcService;
   m_rpcService = nullptr;
 
@@ -205,33 +115,6 @@ void ZServiceManager::check()
   CHECK(!m_shutdown && m_init);
 }
 
-QThread* ZServiceManager::getThread(ThreadType p)
-{
-  check();
-
-  if (p == ZServiceManager::UI) {
-    return this->m_uiThread;
-  }
-  if (p == ZServiceManager::IO) {
-    return this->m_ioThread;
-  }
-  if (p == ZServiceManager::DB) {
-    return this->m_dbThread;
-  }
-  if (p == ZServiceManager::PUSH) {
-    return this->m_pushThread;
-  }
-  if (p == ZServiceManager::RPC) {
-    return this->m_rpcThread;
-  }
-  if (p == ZServiceManager::LOGIC) {
-    return this->m_logicThread;
-  }
-
-  CHECK(false);
-  return nullptr;
-}
-
 bool ZServiceManager::isCurrentOn(ZServiceManager::ThreadType p)
 {
   check();
@@ -241,31 +124,8 @@ bool ZServiceManager::isCurrentOn(ZServiceManager::ThreadType p)
     return true;
   }
 
-  if (p == ZServiceManager::DB && cur == m_dbThread) {
-    return true;
-  }
-
-  if (p == ZServiceManager::IO && cur == m_ioThread) {
-    return true;
-  }
-
-  if (p == ZServiceManager::PUSH && cur == m_pushThread) {
-    return true;
-  }
-
   if (p == ZServiceManager::RPC && cur == m_rpcThread) {
     return true;
-  }
-
-  if (p == ZServiceManager::LOGIC && cur == m_logicThread) {
-    return true;
-  }
-
-  if (p == ZServiceManager::EXTERNAL) {
-    if (cur != m_uiThread && cur != m_dbThread && cur != m_ioThread && cur != m_pushThread && cur != m_rpcThread &&
-        cur != m_logicThread) {
-      return true;
-    }
   }
 
   return false;
