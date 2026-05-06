@@ -30,6 +30,7 @@ message Request
 
   oneof command
   {
+    RuntimeInfoRequest runtime_info = 9;
     ListFormatsRequest list_formats = 10;
     ProbeRequest probe = 11;
     OpenDatasetRequest open_dataset = 12;
@@ -48,6 +49,7 @@ message Response
 
   oneof result
   {
+    RuntimeInfoResponse runtime_info = 9;
     ListFormatsResponse list_formats = 10;
     ProbeResponse probe = 11;
     OpenDatasetResponse open_dataset = 12;
@@ -56,6 +58,18 @@ message Response
     ShutdownResponse shutdown = 15;
     ThumbnailChunk thumbnail_chunk = 16;
   }
+}
+
+message RuntimeInfoRequest {}
+
+message RuntimeInfoResponse
+{
+  uint32 protocol_version = 1;
+  string bridge_version = 2;
+  string bioformats_version = 3;
+  string java_version = 4;
+  string java_vm_name = 5;
+  uint64 process_id = 6;
 }
 
 message ListFormatsRequest {}

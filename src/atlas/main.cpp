@@ -1,5 +1,6 @@
 #include "../version/version.h"
 #include "zapplication.h"
+#include "zbioformatsbridgeclient.h"
 #include "zcpuinfo.h"
 #include "zexception.h"
 #include "zimginit.h"
@@ -21,6 +22,8 @@
 #include <QDir>
 #include <QFileInfo>
 #include <QMessageBox>
+#include <QRunnable>
+#include <QThreadPool>
 #include <QTimer>
 #include <QUrl>
 #include <folly/ScopeGuard.h>
@@ -235,6 +238,17 @@ int main(int argc, char* argv[])
       sm.setMainWindow(mainWin);
       QObject::connect(&app, &ZApplication::fileOpenRequest, mainWin, &ZMainWindow::loadUrls);
       mainWin->show();
+
+      QTimer::singleShot(0, mainWin, []() {
+        QThreadPool::globalInstance()->start(QRunnable::create([]() {
+          try {
+            ZBioFormatsBridgeClient::instance().warmUp();
+          }
+          catch (const std::exception& e) {
+            LOG(WARNING) << "Bio-Formats bridge warmup failed: " << e.what();
+          }
+        }));
+      });
 
       // Support launching Atlas with a scene file (or directory of files) as a positional argument.
       // Example:

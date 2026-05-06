@@ -14,10 +14,17 @@
 #include <QRegularExpression>
 #include <QStringList>
 #include <algorithm>
+#include <condition_variable>
+#include <deque>
+#include <exception>
+#include <future>
 #include <gflags/gflags.h>
 #include <limits>
 #include <mutex>
 #include <optional>
+#include <thread>
+#include <type_traits>
+#include <utility>
 #include <vector>
 
 DEFINE_string(atlas_bioformats_java_xmx,
@@ -34,6 +41,7 @@ namespace {
 namespace proto = atlas::bioformats::bridge;
 
 constexpr uint32_t kMaxFrameBytes = 512_u32 * 1024_u32 * 1024_u32;
+constexpr uint32_t kBridgeProtocolVersion = 1;
 constexpr const char* kBioFormatsJar = "bioformats_package.jar";
 constexpr const char* kAtlasBioFormatsBridgeJar = "atlas-bioformats-bridge.jar";
 constexpr int kJavaVersionProbeTimeoutMs = 5000;
@@ -77,6 +85,8 @@ QStringList repeatedStringsToQStringList(const google::protobuf::RepeatedPtrFiel
 std::string responseCaseName(const proto::Response& response)
 {
   switch (response.result_case()) {
+    case proto::Response::kRuntimeInfo:
+      return "runtime_info";
     case proto::Response::kListFormats:
       return "list_formats";
     case proto::Response::kProbe:
@@ -353,34 +363,34 @@ ZBioFormatsDatasetInfo convertDatasetInfo(const proto::OpenDatasetResponse& data
 
 } // namespace
 
-class ZBioFormatsBridgeClient::Impl
+class ZBioFormatsBridgeProcess
 {
 public:
   [[nodiscard]] std::vector<ZBioFormatsReaderFormat> listFormats()
   {
     std::lock_guard<std::mutex> lock(m_mutex);
-    if (!m_cachedFormats.empty()) {
-      return m_cachedFormats;
-    }
+    QElapsedTimer timer;
+    timer.start();
+    auto result = listFormatsLocked();
+    VLOG(1) << "Bio-Formats bridge listFormats took " << timer.elapsed() << " ms";
+    return result;
+  }
 
-    proto::Request request;
-    request.mutable_list_formats();
-    proto::Response response = transact(request);
-    requireOk(response, "list Bio-Formats readers");
-    if (!response.has_list_formats()) {
-      throw ZException(fmt::format("Bio-Formats bridge returned '{}' for list_formats", responseCaseName(response)));
-    }
-
-    m_cachedFormats.reserve(response.list_formats().formats_size());
-    for (const auto& format : response.list_formats().formats()) {
-      m_cachedFormats.push_back(convertReaderFormat(format));
-    }
-    return m_cachedFormats;
+  void warmUp()
+  {
+    std::lock_guard<std::mutex> lock(m_mutex);
+    QElapsedTimer timer;
+    timer.start();
+    ensureProcess();
+    (void)listFormatsLocked();
+    LOG(INFO) << "Bio-Formats bridge warmup completed in " << timer.elapsed() << " ms";
   }
 
   [[nodiscard]] bool canRead(const QString& filename)
   {
     std::lock_guard<std::mutex> lock(m_mutex);
+    QElapsedTimer timer;
+    timer.start();
     proto::Request request;
     auto* probe = request.mutable_probe();
     probe->set_path(canonicalPath(filename).toStdString());
@@ -392,13 +402,18 @@ public:
     if (!response.has_probe()) {
       throw ZException(fmt::format("Bio-Formats bridge returned '{}' for probe", responseCaseName(response)));
     }
+    VLOG(1) << "Bio-Formats bridge probe took " << timer.elapsed() << " ms for " << filename;
     return response.probe().can_read();
   }
 
-  [[nodiscard]] const ZBioFormatsDatasetInfo& openDataset(const QString& filename)
+  [[nodiscard]] ZBioFormatsDatasetInfo openDataset(const QString& filename)
   {
     std::lock_guard<std::mutex> lock(m_mutex);
-    return openDatasetLocked(filename);
+    QElapsedTimer timer;
+    timer.start();
+    const ZBioFormatsDatasetInfo result = openDatasetLocked(filename);
+    VLOG(1) << "Bio-Formats bridge openDataset took " << timer.elapsed() << " ms for " << filename;
+    return result;
   }
 
   [[nodiscard]] std::vector<uint8_t> readRegion(const QString& filename, size_t scene, const ZImgRegion& region)
@@ -410,6 +425,8 @@ public:
   readRegion(const QString& filename, size_t scene, uint32_t resolution, const ZImgRegion& region)
   {
     std::lock_guard<std::mutex> lock(m_mutex);
+    QElapsedTimer timer;
+    timer.start();
     const auto& dataset = openDatasetLocked(filename);
     if (scene >= dataset.series.size()) {
       throw ZException(fmt::format("Bio-Formats scene {} is out of range for {}", scene, filename));
@@ -466,6 +483,8 @@ public:
                                      result.size()));
       }
       if (chunk.final_chunk()) {
+        VLOG(1) << "Bio-Formats bridge readRegion took " << timer.elapsed() << " ms for " << filename
+                << " bytes=" << result.size();
         return result;
       }
     }
@@ -474,6 +493,8 @@ public:
   [[nodiscard]] ZBioFormatsThumbnail readThumbnail(const QString& filename, size_t scene, size_t z, size_t t)
   {
     std::lock_guard<std::mutex> lock(m_mutex);
+    QElapsedTimer timer;
+    timer.start();
     const auto& dataset = openDatasetLocked(filename);
     if (scene >= dataset.series.size()) {
       throw ZException(fmt::format("Bio-Formats scene {} is out of range for {}", scene, filename));
@@ -534,6 +555,8 @@ public:
                       result.pixels.size()));
       }
       if (chunk.final_chunk()) {
+        VLOG(1) << "Bio-Formats bridge readThumbnail took " << timer.elapsed() << " ms for " << filename
+                << " bytes=" << result.pixels.size();
         return result;
       }
     }
@@ -542,6 +565,8 @@ public:
   void closeDataset(const QString& filename)
   {
     std::lock_guard<std::mutex> lock(m_mutex);
+    QElapsedTimer timer;
+    timer.start();
     const QString path = canonicalPath(filename);
     auto it = m_datasetsByPath.find(path);
     if (it == m_datasetsByPath.end()) {
@@ -553,9 +578,10 @@ public:
     proto::Response response = transact(request);
     requireOk(response, "close Bio-Formats dataset");
     m_datasetsByPath.erase(it);
+    VLOG(1) << "Bio-Formats bridge closeDataset took " << timer.elapsed() << " ms for " << filename;
   }
 
-  ~Impl()
+  ~ZBioFormatsBridgeProcess()
   {
     try {
       if (m_process.state() == QProcess::Running) {
@@ -576,6 +602,26 @@ public:
   }
 
 private:
+  [[nodiscard]] std::vector<ZBioFormatsReaderFormat> listFormatsLocked()
+  {
+    if (!m_cachedFormats.empty()) {
+      return m_cachedFormats;
+    }
+
+    proto::Request request;
+    request.mutable_list_formats();
+    proto::Response response = transact(request);
+    requireOk(response, "list Bio-Formats readers");
+    if (!response.has_list_formats()) {
+      throw ZException(fmt::format("Bio-Formats bridge returned '{}' for list_formats", responseCaseName(response)));
+    }
+
+    m_cachedFormats.reserve(response.list_formats().formats_size());
+    for (const auto& format : response.list_formats().formats()) {
+      m_cachedFormats.push_back(convertReaderFormat(format));
+    }
+    return m_cachedFormats;
+  }
   [[nodiscard]] const ZBioFormatsDatasetInfo& openDatasetLocked(const QString& filename)
   {
     const QString path = canonicalPath(filename);
@@ -641,6 +687,9 @@ private:
     m_datasetsByPath.clear();
     m_stdoutBuffer.clear();
 
+    QElapsedTimer startupTimer;
+    startupTimer.start();
+
     QStringList args;
     if (!FLAGS_atlas_bioformats_java_xmx.empty()) {
       args.push_back(QString("-Xmx%1").arg(QString::fromStdString(FLAGS_atlas_bioformats_java_xmx)));
@@ -656,6 +705,45 @@ private:
     if (!m_process.waitForStarted(30000)) {
       throw ZException(fmt::format("failed to start Bio-Formats bridge '{}': {}", java, m_process.errorString()));
     }
+    const qint64 startMs = startupTimer.elapsed();
+
+    QElapsedTimer handshakeTimer;
+    handshakeTimer.start();
+    try {
+      const proto::RuntimeInfoResponse info = runtimeInfo();
+      if (info.protocol_version() != kBridgeProtocolVersion) {
+        throw ZException(fmt::format("Bio-Formats bridge protocol mismatch: Atlas expects {}, bridge reports {}",
+                                     kBridgeProtocolVersion,
+                                     info.protocol_version()));
+      }
+      LOG(INFO) << "Bio-Formats bridge ready: pid=" << m_process.processId() << ", java=" << java
+                << ", jarsDIR=" << ZImgGlobal::instance().jarsDIR << ", startMs=" << startMs
+                << ", handshakeMs=" << handshakeTimer.elapsed() << ", protocol=" << info.protocol_version()
+                << ", bridge=" << info.bridge_version() << ", bioformats=" << info.bioformats_version()
+                << ", javaVersion=" << info.java_version() << ", vm=" << info.java_vm_name()
+                << ", javaPid=" << info.process_id();
+    }
+    catch (...) {
+      if (m_process.state() != QProcess::NotRunning) {
+        m_process.kill();
+        m_process.waitForFinished(1000);
+      }
+      m_datasetsByPath.clear();
+      m_stdoutBuffer.clear();
+      throw;
+    }
+  }
+
+  [[nodiscard]] proto::RuntimeInfoResponse runtimeInfo()
+  {
+    proto::Request request;
+    request.mutable_runtime_info();
+    proto::Response response = transact(request);
+    requireOk(response, "handshake with Bio-Formats bridge");
+    if (!response.has_runtime_info()) {
+      throw ZException(fmt::format("Bio-Formats bridge returned '{}' for runtime_info", responseCaseName(response)));
+    }
+    return response.runtime_info();
   }
 
   void writeRequest(const proto::Request& request)
@@ -802,9 +890,171 @@ private:
   QMap<QString, ZBioFormatsDatasetInfo> m_datasetsByPath;
 };
 
+class ZBioFormatsBridgeClient::Impl
+{
+public:
+  Impl()
+    : m_thread([this]() {
+      run();
+    })
+  {}
+
+  ~Impl()
+  {
+    {
+      std::lock_guard<std::mutex> lock(m_mutex);
+      m_stopping = true;
+    }
+    m_cv.notify_one();
+    if (m_thread.joinable()) {
+      m_thread.join();
+    }
+  }
+
+  [[nodiscard]] std::vector<ZBioFormatsReaderFormat> listFormats()
+  {
+    return call([](ZBioFormatsBridgeProcess& core) {
+      return core.listFormats();
+    });
+  }
+
+  void warmUp()
+  {
+    call([](ZBioFormatsBridgeProcess& core) {
+      core.warmUp();
+    });
+  }
+
+  [[nodiscard]] bool canRead(const QString& filename)
+  {
+    return call([&filename](ZBioFormatsBridgeProcess& core) {
+      return core.canRead(filename);
+    });
+  }
+
+  [[nodiscard]] ZBioFormatsDatasetInfo openDataset(const QString& filename)
+  {
+    return call([&filename](ZBioFormatsBridgeProcess& core) {
+      return core.openDataset(filename);
+    });
+  }
+
+  [[nodiscard]] std::vector<uint8_t> readRegion(const QString& filename, size_t scene, const ZImgRegion& region)
+  {
+    return call([&filename, scene, &region](ZBioFormatsBridgeProcess& core) {
+      return core.readRegion(filename, scene, region);
+    });
+  }
+
+  [[nodiscard]] std::vector<uint8_t>
+  readRegion(const QString& filename, size_t scene, uint32_t resolution, const ZImgRegion& region)
+  {
+    return call([&filename, scene, resolution, &region](ZBioFormatsBridgeProcess& core) {
+      return core.readRegion(filename, scene, resolution, region);
+    });
+  }
+
+  [[nodiscard]] ZBioFormatsThumbnail readThumbnail(const QString& filename, size_t scene, size_t z, size_t t)
+  {
+    return call([&filename, scene, z, t](ZBioFormatsBridgeProcess& core) {
+      return core.readThumbnail(filename, scene, z, t);
+    });
+  }
+
+  void closeDataset(const QString& filename)
+  {
+    call([&filename](ZBioFormatsBridgeProcess& core) {
+      core.closeDataset(filename);
+    });
+  }
+
+private:
+  template<typename Fn>
+  void enqueue(Fn&& fn)
+  {
+    {
+      std::lock_guard<std::mutex> lock(m_mutex);
+      if (m_stopping) {
+        throw ZException("Bio-Formats bridge worker is shutting down");
+      }
+      m_tasks.emplace_back(std::forward<Fn>(fn));
+    }
+    m_cv.notify_one();
+  }
+
+  ZBioFormatsBridgeProcess& core()
+  {
+    if (!m_core) {
+      m_core = std::make_unique<ZBioFormatsBridgeProcess>();
+    }
+    return *m_core;
+  }
+
+  template<typename Fn>
+  auto call(Fn&& fn) -> std::invoke_result_t<Fn, ZBioFormatsBridgeProcess&>
+  {
+    using Result = std::invoke_result_t<Fn, ZBioFormatsBridgeProcess&>;
+
+    if constexpr (std::is_void_v<Result>) {
+      std::promise<void> promise;
+      std::future<void> future = promise.get_future();
+      enqueue(std::packaged_task<void()>([this, fn = std::forward<Fn>(fn), promise = std::move(promise)]() mutable {
+        try {
+          fn(core());
+          promise.set_value();
+        }
+        catch (...) {
+          promise.set_exception(std::current_exception());
+        }
+      }));
+      future.get();
+    } else {
+      std::promise<Result> promise;
+      std::future<Result> future = promise.get_future();
+      enqueue(std::packaged_task<void()>([this, fn = std::forward<Fn>(fn), promise = std::move(promise)]() mutable {
+        try {
+          promise.set_value(fn(core()));
+        }
+        catch (...) {
+          promise.set_exception(std::current_exception());
+        }
+      }));
+      return future.get();
+    }
+  }
+
+  void run()
+  {
+    while (true) {
+      std::packaged_task<void()> task;
+      {
+        std::unique_lock<std::mutex> lock(m_mutex);
+        m_cv.wait(lock, [this]() {
+          return m_stopping || !m_tasks.empty();
+        });
+        if (m_tasks.empty()) {
+          CHECK(m_stopping);
+          break;
+        }
+        task = std::move(m_tasks.front());
+        m_tasks.pop_front();
+      }
+      task();
+    }
+    m_core.reset();
+  }
+
+  std::mutex m_mutex;
+  std::condition_variable m_cv;
+  std::deque<std::packaged_task<void()>> m_tasks;
+  bool m_stopping = false;
+  std::unique_ptr<ZBioFormatsBridgeProcess> m_core;
+  std::thread m_thread;
+};
+
 ZBioFormatsBridgeClient& ZBioFormatsBridgeClient::instance()
 {
-  thread_local ZBioFormatsBridgeClient client;
+  static ZBioFormatsBridgeClient client;
   return client;
 }
 
@@ -850,7 +1100,7 @@ bool ZBioFormatsBridgeClient::canRead(const QString& filename)
   return m_impl->canRead(filename);
 }
 
-const ZBioFormatsDatasetInfo& ZBioFormatsBridgeClient::openDataset(const QString& filename)
+ZBioFormatsDatasetInfo ZBioFormatsBridgeClient::openDataset(const QString& filename)
 {
   return m_impl->openDataset(filename);
 }
@@ -877,6 +1127,11 @@ ZBioFormatsThumbnail ZBioFormatsBridgeClient::readThumbnail(const QString& filen
 void ZBioFormatsBridgeClient::closeDataset(const QString& filename)
 {
   m_impl->closeDataset(filename);
+}
+
+void ZBioFormatsBridgeClient::warmUp()
+{
+  m_impl->warmUp();
 }
 
 } // namespace nim

@@ -109,7 +109,7 @@ public:
 
   [[nodiscard]] bool canRead(const QString& filename);
 
-  [[nodiscard]] const ZBioFormatsDatasetInfo& openDataset(const QString& filename);
+  [[nodiscard]] ZBioFormatsDatasetInfo openDataset(const QString& filename);
 
   [[nodiscard]] std::vector<uint8_t> readRegion(const QString& filename, size_t scene, const ZImgRegion& region);
 
@@ -119,6 +119,8 @@ public:
   [[nodiscard]] ZBioFormatsThumbnail readThumbnail(const QString& filename, size_t scene, size_t z, size_t t);
 
   void closeDataset(const QString& filename);
+
+  void warmUp();
 
 private:
   class Impl;

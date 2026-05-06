@@ -84,6 +84,7 @@ _MACOS_JAR_ENTRY_REMOVE_LIST: frozenset[str] = frozenset(
 
 _MACOS_CODESIGN_TIMESTAMP_RETRY_ATTEMPTS = 5
 _MACOS_CODESIGN_TIMESTAMP_RETRY_BASE_DELAY_SECONDS = 2.0
+_MACOS_JRE_ENTITLEMENTS_FILENAME = "macos_jre.entitlements"
 
 
 def _patch_qtifw_installerbase() -> None:
@@ -479,6 +480,17 @@ def _macos_entitlements_path() -> Optional[str]:
     if not os.path.exists(entitlements):
         raise RuntimeError(
             f"{_ENTITLEMENTS_ENV_VAR} is set but the entitlements file does not exist: {entitlements}"
+        )
+    return entitlements
+
+
+def _macos_jre_entitlements_path() -> str:
+    entitlements = os.path.join(
+        common_dirs.atlas_util_dir(), _MACOS_JRE_ENTITLEMENTS_FILENAME
+    )
+    if not os.path.exists(entitlements):
+        raise RuntimeError(
+            f"Bundled JRE entitlements file does not exist: {entitlements}"
         )
     return entitlements
 
@@ -977,6 +989,40 @@ def _macos_should_apply_entitlements(
     return "executable" in desc.lower()
 
 
+def _macos_should_apply_jre_entitlements(
+    target_path: str, *, file_descriptions: dict[str, str]
+) -> bool:
+    desc = file_descriptions.get(target_path)
+    if not desc or "executable" not in desc.lower():
+        return False
+
+    # HotSpot needs executable memory for the VM code cache even for `java -version`.
+    # Hardened-runtime signing without these entitlements makes the bundled JRE fail
+    # during VM initialization in deployed Atlas.app bundles.
+    normalized = os.path.normpath(target_path)
+    return any(
+        marker in normalized
+        for marker in (
+            f"{os.sep}Contents{os.sep}Resources{os.sep}jre{os.sep}",
+            f"{os.sep}Contents{os.sep}Resources{os.sep}jre-arm{os.sep}",
+        )
+    )
+
+
+def _macos_entitlements_for_target(
+    target_path: str, *, entitlements: Optional[str], file_descriptions: dict[str, str]
+) -> Optional[str]:
+    if _macos_should_apply_jre_entitlements(
+        target_path, file_descriptions=file_descriptions
+    ):
+        return _macos_jre_entitlements_path()
+    if _macos_should_apply_entitlements(
+        target_path, entitlements=entitlements, file_descriptions=file_descriptions
+    ):
+        return entitlements
+    return None
+
+
 def _macos_codesign_target(
     target_path: str,
     *,
@@ -1004,10 +1050,11 @@ def _macos_codesign_target(
             "--sign",
             identity,
         ]
-        if _macos_should_apply_entitlements(
+        target_entitlements = _macos_entitlements_for_target(
             target_path, entitlements=entitlements, file_descriptions=file_descriptions
-        ):
-            cmd.extend(["--entitlements", entitlements])
+        )
+        if target_entitlements:
+            cmd.extend(["--entitlements", target_entitlements])
 
     cmd.append(target_path)
     _macos_run_codesign_checked(cmd)

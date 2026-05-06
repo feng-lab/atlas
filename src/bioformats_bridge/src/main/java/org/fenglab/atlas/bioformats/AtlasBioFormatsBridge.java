@@ -12,6 +12,7 @@ import org.fenglab.atlas.bioformats.proto.BioFormatsBridgeProto.ReaderFormat;
 import org.fenglab.atlas.bioformats.proto.BioFormatsBridgeProto.Request;
 import org.fenglab.atlas.bioformats.proto.BioFormatsBridgeProto.Response;
 import org.fenglab.atlas.bioformats.proto.BioFormatsBridgeProto.ResolutionInfo;
+import org.fenglab.atlas.bioformats.proto.BioFormatsBridgeProto.RuntimeInfoResponse;
 import org.fenglab.atlas.bioformats.proto.BioFormatsBridgeProto.SeriesInfo;
 import org.fenglab.atlas.bioformats.proto.BioFormatsBridgeProto.ShutdownResponse;
 import org.fenglab.atlas.bioformats.proto.BioFormatsBridgeProto.StatusCode;
@@ -47,6 +48,7 @@ public final class AtlasBioFormatsBridge
 {
   private static final int MAX_FRAME_BYTES = 512 * 1024 * 1024;
   private static final int PIXEL_CHUNK_BYTES = 8 * 1024 * 1024;
+  private static final int PROTOCOL_VERSION = 1;
 
   private final InputStream in;
   private final OutputStream out;
@@ -82,6 +84,9 @@ public final class AtlasBioFormatsBridge
 
       try {
         switch (request.getCommandCase()) {
+          case RUNTIME_INFO:
+            sendOk(request.getRequestId(), Response.newBuilder().setRuntimeInfo(runtimeInfo()));
+            break;
           case LIST_FORMATS:
             sendOk(request.getRequestId(), Response.newBuilder().setListFormats(listFormats()));
             break;
@@ -114,6 +119,20 @@ public final class AtlasBioFormatsBridge
       }
     }
     closeAllSessions();
+  }
+
+  private RuntimeInfoResponse runtimeInfo()
+  {
+    final Package bridgePackage = AtlasBioFormatsBridge.class.getPackage();
+    final String bridgeVersion = bridgePackage == null ? "" : bridgePackage.getImplementationVersion();
+    return RuntimeInfoResponse.newBuilder()
+      .setProtocolVersion(PROTOCOL_VERSION)
+      .setBridgeVersion(nullToEmpty(bridgeVersion))
+      .setBioformatsVersion(nullToEmpty(FormatTools.VERSION))
+      .setJavaVersion(nullToEmpty(System.getProperty("java.version")))
+      .setJavaVmName(nullToEmpty(System.getProperty("java.vm.name")))
+      .setProcessId(ProcessHandle.current().pid())
+      .build();
   }
 
   private Request readRequest() throws IOException
