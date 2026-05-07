@@ -393,6 +393,7 @@ def _download_file_with_resume_once(
                 # Append to file if resuming, otherwise write new file
                 mode = "ab" if current_size > 0 else "wb"
                 with open(target_path, mode) as file:
+                    initial_size = current_size
                     downloaded_size = current_size
                     chunks = (
                         response.raw.stream(8192, decode_content=False)
@@ -403,11 +404,12 @@ def _download_file_with_resume_once(
                         if chunk:
                             file.write(chunk)
                             downloaded_size += len(chunk)
+                            transferred_size = downloaded_size - initial_size
                             elapsed_time = time.time() - start_time
                             # Avoid division by zero if the first chunk arrives too quickly or
                             # if the clock resolution reports a zero/negative elapsed time.
                             if elapsed_time > 0:
-                                speed = downloaded_size / (
+                                speed = transferred_size / (
                                     1024 * 1024 * elapsed_time
                                 )  # MB/s
                             else:
