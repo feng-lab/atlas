@@ -19,6 +19,16 @@
 #include <string>
 
 namespace nim {
+
+namespace bioformats_detail {
+
+void createSubBlocksForTesting(const QString& filename,
+                               const ZBioFormatsDatasetInfo& dataset,
+                               const std::vector<ZImgInfo>& infos,
+                               std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks);
+
+} // namespace bioformats_detail
+
 namespace {
 
 QString platformJavaExecutableName()
@@ -432,6 +442,85 @@ TEST(ZBioFormatsTest, FakeReaderResolutionMetadataCreatesPyramidSubBlocks)
   ASSERT_EQ(1u, subBlocks.size());
   EXPECT_TRUE(std::ranges::any_of(subBlocks.front(), [](const std::shared_ptr<ZImgSubBlock>& block) {
     return block && block->xRatio > 1 && block->yRatio > 1;
+  }));
+}
+
+TEST(ZBioFormatsTest, ZDownsampledResolutionCreatesPyramidSubBlocks)
+{
+  QTemporaryDir dir;
+  ASSERT_TRUE(dir.isValid());
+  const QString path = createFakeReaderFile(dir, QStringLiteral("synthetic-z-downsample"));
+
+  ZImgInfo info;
+  info.width = 5;
+  info.height = 5;
+  info.depth = 5;
+  info.numChannels = 1;
+  info.numTimes = 1;
+  info.setVoxelFormat<uint8_t>();
+  info.createDefaultDescriptions();
+
+  ZBioFormatsSeriesInfo series;
+  series.sizeX = info.width;
+  series.sizeY = info.height;
+  series.sizeZ = info.depth;
+  series.effectiveSizeC = info.numChannels;
+  series.sizeT = info.numTimes;
+  series.rgbChannelCount = 1;
+  series.bytesPerPixel = 1;
+  series.pixelType = QStringLiteral("uint8");
+  series.resolutionCount = 2;
+  series.optimalTileWidth = 512;
+  series.optimalTileHeight = 512;
+
+  ZBioFormatsResolutionInfo baseResolution;
+  baseResolution.resolution = 0;
+  baseResolution.sizeX = info.width;
+  baseResolution.sizeY = info.height;
+  baseResolution.sizeZ = info.depth;
+  baseResolution.effectiveSizeC = info.numChannels;
+  baseResolution.sizeT = info.numTimes;
+  baseResolution.imageCount = info.depth;
+  series.resolutions.push_back(baseResolution);
+
+  ZBioFormatsResolutionInfo downsampledResolution;
+  downsampledResolution.resolution = 1;
+  downsampledResolution.sizeX = 2;
+  downsampledResolution.sizeY = 2;
+  downsampledResolution.sizeZ = 2;
+  downsampledResolution.effectiveSizeC = info.numChannels;
+  downsampledResolution.sizeT = info.numTimes;
+  downsampledResolution.imageCount = 2;
+  downsampledResolution.optimalTileWidth = 1;
+  downsampledResolution.optimalTileHeight = 1;
+  series.resolutions.push_back(downsampledResolution);
+
+  ZBioFormatsDatasetInfo dataset;
+  dataset.series.push_back(series);
+
+  std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>> subBlocks;
+  bioformats_detail::createSubBlocksForTesting(path, dataset, {info}, &subBlocks);
+
+  ASSERT_EQ(1u, subBlocks.size());
+
+  std::vector<const ZImgSubBlock*> zDownsampledBlocks;
+  for (const auto& block : subBlocks.front()) {
+    if (block && block->xRatio == 2 && block->yRatio == 2 && block->zRatio == 2) {
+      zDownsampledBlocks.push_back(block.get());
+    }
+  }
+
+  ASSERT_EQ(8u, zDownsampledBlocks.size());
+  EXPECT_TRUE(std::ranges::any_of(zDownsampledBlocks, [](const ZImgSubBlock* block) {
+    return block->x == 0 && block->y == 0 && block->z == 0 && block->width == 2 && block->height == 2 &&
+           block->depth == 2;
+  }));
+  EXPECT_TRUE(std::ranges::any_of(zDownsampledBlocks, [](const ZImgSubBlock* block) {
+    return block->x == 2 && block->y == 2 && block->z == 2 && block->width == 2 && block->height == 2 &&
+           block->depth == 2;
+  }));
+  EXPECT_FALSE(std::ranges::any_of(zDownsampledBlocks, [](const ZImgSubBlock* block) {
+    return block->z >= 4;
   }));
 }
 

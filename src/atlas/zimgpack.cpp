@@ -510,7 +510,7 @@ ZImgPack::ZImgPack(ZImgSource imgSource, ZImgInfo* pInfo, std::vector<std::share
 
   bool hasPyramidal = false;
   for (const auto& b : sceneSubBlock) {
-    if (b->xRatio > 1) {
+    if (b->xRatio > 1 || b->yRatio > 1 || b->zRatio > 1) {
       hasPyramidal = true;
       break;
     }

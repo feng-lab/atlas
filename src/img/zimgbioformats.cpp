@@ -243,7 +243,8 @@ public:
                                 ZImgRegion resolutionRegion,
                                 ZImgInfo resolutionInfo,
                                 size_t xRatio,
-                                size_t yRatio)
+                                size_t yRatio,
+                                size_t zRatio)
     : ZImgSubBlock(baseRegion.start.t,
                    baseRegion.start.x,
                    baseRegion.start.y,
@@ -253,7 +254,7 @@ public:
                    checkedSize("pyramid tile depth", baseRegion.end.z - baseRegion.start.z),
                    xRatio,
                    yRatio,
-                   1)
+                   zRatio)
     , m_filename(std::move(filename))
     , m_scene(scene)
     , m_resolution(resolution)
@@ -264,6 +265,7 @@ public:
     CHECK(m_resolutionRegion.isValid(m_resolutionInfo));
     CHECK(xRatio > 0);
     CHECK(yRatio > 0);
+    CHECK(zRatio > 0);
   }
 
   [[nodiscard]] std::shared_ptr<ZImg> read() const override
@@ -307,6 +309,7 @@ void addBioFormatsTiledSubBlocks(const QString& filename,
                                  const ZImgInfo& resolutionInfo,
                                  size_t xRatio,
                                  size_t yRatio,
+                                 size_t zRatio,
                                  size_t tileWidth,
                                  size_t tileHeight,
                                  std::vector<std::shared_ptr<ZImgSubBlock>>& subBlocks)
@@ -323,14 +326,16 @@ void addBioFormatsTiledSubBlocks(const QString& filename,
           const size_t baseY = scaledResolutionCoordToBase(y, resolutionInfo.height, info.height, yRatio);
           const size_t baseXEnd = scaledResolutionCoordToBase(xEnd, resolutionInfo.width, info.width, xRatio);
           const size_t baseYEnd = scaledResolutionCoordToBase(yEnd, resolutionInfo.height, info.height, yRatio);
+          const size_t baseZ = scaledResolutionCoordToBase(z, resolutionInfo.depth, info.depth, zRatio);
+          const size_t baseZEnd = scaledResolutionCoordToBase(z + 1, resolutionInfo.depth, info.depth, zRatio);
           ZImgRegion baseRegion(ZVoxelCoordinate(checkedIndex("pyramid base x", baseX),
                                                  checkedIndex("pyramid base y", baseY),
-                                                 checkedIndex("pyramid base z", z),
+                                                 checkedIndex("pyramid base z", baseZ),
                                                  0,
                                                  checkedIndex("pyramid base t", t)),
                                 ZVoxelCoordinate(checkedIndex("pyramid base x end", baseXEnd),
                                                  checkedIndex("pyramid base y end", baseYEnd),
-                                                 checkedIndex("pyramid base z end", z + 1),
+                                                 checkedIndex("pyramid base z end", baseZEnd),
                                                  checkedIndex("pyramid base channel end", info.numChannels),
                                                  checkedIndex("pyramid base t end", t + 1)));
           ZImgRegion resolutionRegion(
@@ -355,7 +360,8 @@ void addBioFormatsTiledSubBlocks(const QString& filename,
                                                                                    std::move(resolutionRegion),
                                                                                    resolutionInfo,
                                                                                    xRatio,
-                                                                                   yRatio));
+                                                                                   yRatio,
+                                                                                   zRatio));
           }
         }
       }
@@ -383,6 +389,7 @@ void createBioFormatsSubBlocks(const QString& filename,
                                 info,
                                 1,
                                 1,
+                                1,
                                 tileSizeOrDefault(series.optimalTileWidth),
                                 tileSizeOrDefault(series.optimalTileHeight),
                                 (*subBlocks)[s]);
@@ -393,23 +400,25 @@ void createBioFormatsSubBlocks(const QString& filename,
       }
       const auto xRatio = integerRatioForResolution(info.width, checkedSize("resolution size_x", resolution.sizeX));
       const auto yRatio = integerRatioForResolution(info.height, checkedSize("resolution size_y", resolution.sizeY));
-      if (!xRatio || !yRatio || *xRatio == 1 || *yRatio == 1) {
+      const auto zRatio = integerRatioForResolution(info.depth, checkedSize("resolution size_z", resolution.sizeZ));
+      if (!xRatio || !yRatio || !zRatio || (*xRatio == 1 && *yRatio == 1 && *zRatio == 1)) {
         VLOG(1) << fmt::format("Skipping Bio-Formats resolution {} for series {} because Atlas requires integer "
-                               "downsample ratios (full {}x{}, resolution {}x{})",
+                               "downsample ratios (full {}x{}x{}, resolution {}x{}x{})",
                                resolution.resolution,
                                s,
                                info.width,
                                info.height,
+                               info.depth,
                                resolution.sizeX,
-                               resolution.sizeY);
+                               resolution.sizeY,
+                               resolution.sizeZ);
         continue;
       }
 
       const ZImgInfo resolutionInfo = toResolutionImgInfo(series, resolution);
-      if (resolutionInfo.depth != info.depth || resolutionInfo.numChannels != info.numChannels ||
-          resolutionInfo.numTimes != info.numTimes) {
+      if (resolutionInfo.numChannels != info.numChannels || resolutionInfo.numTimes != info.numTimes) {
         VLOG(1) << fmt::format("Skipping Bio-Formats resolution {} for series {} because Atlas pyramid subblocks "
-                               "require matching Z/C/T dimensions (full {}x{}x{}, C={}, T={}; resolution "
+                               "require matching C/T dimensions (full {}x{}x{}, C={}, T={}; resolution "
                                "{}x{}x{}, C={}, T={})",
                                resolution.resolution,
                                s,
@@ -432,6 +441,7 @@ void createBioFormatsSubBlocks(const QString& filename,
                                   resolutionInfo,
                                   *xRatio,
                                   *yRatio,
+                                  *zRatio,
                                   tileSizeOrDefault(resolution.optimalTileWidth),
                                   tileSizeOrDefault(resolution.optimalTileHeight),
                                   (*subBlocks)[s]);
@@ -440,6 +450,18 @@ void createBioFormatsSubBlocks(const QString& filename,
 }
 
 } // namespace
+
+namespace bioformats_detail {
+
+void createSubBlocksForTesting(const QString& filename,
+                               const ZBioFormatsDatasetInfo& dataset,
+                               const std::vector<ZImgInfo>& infos,
+                               std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks)
+{
+  createBioFormatsSubBlocks(filename, dataset, infos, subBlocks);
+}
+
+} // namespace bioformats_detail
 
 bool ZImgBioFormats::supportRead() const
 {

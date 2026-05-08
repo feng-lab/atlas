@@ -316,18 +316,40 @@ public final class AtlasBioFormatsBridge
     final Length sx = metadata.getPixelsPhysicalSizeX(series);
     final Length sy = metadata.getPixelsPhysicalSizeY(series);
     final Length sz = metadata.getPixelsPhysicalSizeZ(series);
-    if (sx != null) {
+    final Double sxUm = physicalSizeMicrometers(sx);
+    final Double syUm = physicalSizeMicrometers(sy);
+    final Double szUm = physicalSizeMicrometers(sz);
+    if (sxUm != null) {
       info.setHasPhysicalSizeX(true);
-      info.setPhysicalSizeXUm(sx.value(UNITS.MICROMETER).doubleValue());
+      info.setPhysicalSizeXUm(sxUm);
     }
-    if (sy != null) {
+    if (syUm != null) {
       info.setHasPhysicalSizeY(true);
-      info.setPhysicalSizeYUm(sy.value(UNITS.MICROMETER).doubleValue());
+      info.setPhysicalSizeYUm(syUm);
     }
-    if (sz != null) {
+    if (szUm != null) {
       info.setHasPhysicalSizeZ(true);
-      info.setPhysicalSizeZUm(sz.value(UNITS.MICROMETER).doubleValue());
+      info.setPhysicalSizeZUm(szUm);
     }
+  }
+
+  private static Double physicalSizeMicrometers(final Length length)
+  {
+    if (length == null) {
+      return null;
+    }
+    final Number value;
+    try {
+      value = length.value(UNITS.MICROMETER);
+    }
+    catch (final RuntimeException e) {
+      return null;
+    }
+    if (value == null) {
+      return null;
+    }
+    final double micrometers = value.doubleValue();
+    return Double.isFinite(micrometers) && micrometers > 0.0 ? micrometers : null;
   }
 
   private void addChannelMetadata(final IFormatReader reader, final int series, final SeriesInfo.Builder info)

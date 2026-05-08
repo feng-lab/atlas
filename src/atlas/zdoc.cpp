@@ -553,6 +553,7 @@ void ZDoc::loadFile(const QString& fileName)
 {
   QString error;
   if (!loadFile(fileName, error)) {
+    LOG(ERROR) << "Can not load file " << fileName << ": " << error;
     showCriticalWithDetails(QApplication::activeWindow(), tr("Can not load file %1").arg(fileName), error);
   }
 }
@@ -570,6 +571,7 @@ void ZDoc::loadFileList(const QStringList& fileList)
     }
   }
   if (!error.isEmpty()) {
+    LOG(ERROR) << "Can not load one or more files: " << error;
     showCriticalWithDetails(QApplication::activeWindow(), tr("Can not load one or more files"), error);
   }
 }
