@@ -591,7 +591,8 @@ def download_sample(
         return sample
 
     dest.parent.mkdir(parents=True, exist_ok=True)
-    previous_size = dest.stat().st_size if dest.exists() else 0
+    existed_before = dest.exists()
+    previous_size = dest.stat().st_size if existed_before else 0
     ok = download_utils.download_file_with_resume(
         str(sample["url"]), "", str(dest), expected_size=size
     )
@@ -604,8 +605,10 @@ def download_sample(
         logger.info(
             "hash complete in %.1fs for %s", time.monotonic() - hash_start_time, dest
         )
-    if previous_size == size:
+    if existed_before and previous_size == size:
         sample["status"] = "exists"
+    elif size == 0:
+        sample["status"] = "downloaded"
     elif previous_size > 0:
         sample["status"] = "resumed"
     else:

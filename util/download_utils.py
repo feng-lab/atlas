@@ -222,8 +222,36 @@ def _download_file_with_resume_once(
     expected_size=None,
     expected_sha256=None,
 ):
-    has_expected_size = expected_size is not None and expected_size > 0
+    has_expected_size = expected_size is not None and expected_size >= 0
+    has_positive_expected_size = expected_size is not None and expected_size > 0
     has_expected_sha256 = bool(expected_sha256)
+
+    if has_expected_size and expected_size == 0:
+        if os.path.exists(target_path) and os.path.getsize(target_path) == 0:
+            if has_expected_sha256:
+                logger.info(f"File {target_path} already exists. Validating checksum.")
+                if validate_checksum(target_path, expected_sha256):
+                    logger.info(
+                        f"File {target_path} already exists with matching checksum. Skipping download."
+                    )
+                    return True
+                raise DownloadFileNonRetryableError(
+                    f"Expected empty file {target_path} failed checksum validation."
+                )
+            logger.info(
+                f"File {target_path} already exists with correct size. Skipping download."
+            )
+            return True
+
+        logger.info(f"Creating expected empty file: {target_path}")
+        with open(target_path, "wb"):
+            pass
+        if has_expected_sha256 and not validate_checksum(target_path, expected_sha256):
+            raise DownloadFileNonRetryableError(
+                f"Created empty file {target_path} failed checksum validation."
+            )
+        logger.info(f"File created successfully: {target_path}")
+        return True
 
     # Check if file exists and has correct size
     if os.path.exists(target_path):
@@ -330,7 +358,7 @@ def _download_file_with_resume_once(
                 }
 
                 # Try to use range if file exists and we know the expected size.
-                if current_size > 0 and has_expected_size:
+                if current_size > 0 and has_positive_expected_size:
                     headers["Range"] = f"bytes={current_size}-"
 
                 response = requests.get(
@@ -416,7 +444,7 @@ def _download_file_with_resume_once(
                                 speed = 0.0
                             progress = (
                                 (downloaded_size / expected_size) * 100
-                                if has_expected_size
+                                if has_positive_expected_size
                                 else None
                             )
 
@@ -483,7 +511,7 @@ def _download_file_with_resume_once(
                     os.remove(target_path)
                     continue
 
-                if actual_size == 0:
+                if actual_size == 0 and not (has_expected_size and expected_size == 0):
                     failure_reason = "downloaded file was empty"
                     saw_retryable_failure = True
                     logger.warning("Downloaded empty file. Trying next URL.")
