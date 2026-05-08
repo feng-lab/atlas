@@ -31,7 +31,7 @@ namespace nim {
 
 namespace {
 
-constexpr int kInfoLabelReservedLines = 3;
+constexpr int kInfoLabelReservedLines = 2;
 
 } // namespace
 
