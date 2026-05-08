@@ -847,7 +847,7 @@ If you have multiple images loaded:
 In **Trace Settings → SWC Target**:
 
 - **Create new SWC**: the first trace creates a new SWC object; after it is created, Atlas automatically reuses that SWC for subsequent traces for the same `(image, channel)` so repeated traces extend the same tree instead of creating a new file each time.
-- **Attach to existing**: choose an existing SWC from the dropdown. New branches are appended to that SWC (the result is merged, not overwritten).
+- **Attach to existing**: choose an existing SWC from the dropdown. New branches are appended to that SWC.
 
 The mapping from `(image, channel)` to SWC target is stored **in memory for the current session** (it is not currently a durable scene setting).
 
@@ -870,7 +870,7 @@ In the **3D view** specifically:
 
 Selection behavior:
 
-- Clicking on selectable objects (for example SWC nodes) prioritizes selection/editing. Tracing is intended for clicks on the image/background, not on already-selectable overlays.
+- Clicking on selectable objects (for example SWC nodes) prioritizes selection/editing. Tracing is intended for clicks on the image/background.
 
 #### Step 5: adjust tracing parameters (optional)
 
@@ -1053,7 +1053,7 @@ Atlas uses a classical **trackball/orbit** camera controller centered on the cam
 
 1. Select an object in Objects Manager.
 2. In the Object View Setting dock at right, adjust parameters such as visibility, transform (translation, rotation, scale), bounding box style, transfer functions, slice toggles, and per-object clipping.
-3. For EM-style grayscale volumes, use **Apply EM Preset** to rewrite the current transfer functions and slice colormaps so intensity `0` is transparent while non-zero values remain opaque, and switch volume rendering to **Direct Volume Rendering**. This is a one-shot adjustment to the live settings, not a persistent mode.
+3. For EM-style grayscale volumes, use **Apply EM Preset** to rewrite the current transfer functions and slice colormaps so intensity `0` is transparent while non-zero values remain opaque, and switch volume rendering to **Direct Volume Rendering**.
 4. Use the Global/Per-object tabs to manage render passes.
 5. Changes immediately affect the 3D canvas; for heavy operations (full-resolution volume streaming) watch the progress toolbar.
 

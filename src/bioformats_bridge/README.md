@@ -65,16 +65,20 @@ For a full external-drive mirror of the public OME image tree, use `all` mode.
 This mode mirrors every non-hidden file under the OME image root, including
 format sidecars. Downloads are resumable: existing complete files are skipped,
 partial files are continued with HTTP range requests when the server supports
-them, and `manifest.json` is used as a saved download plan. If `manifest.json`
-already exists, the downloader skips planning and downloads/resumes the files
-listed there; delete the manifest to force a new plan.
+them, and `manifest.json` is used as a saved download plan. The downloader
+keeps a separate `full_manifest.json` inventory of the OME tree; every run
+ensures that full inventory exists first. If `manifest.json` is missing, the
+downloader loads the full inventory, derives a new plan from the current
+selection flags, and writes `manifest.json` before downloading. Delete
+`manifest.json` to derive a new plan from the cached full inventory, or delete
+`full_manifest.json` to refresh the inventory from OME.
 
 ```sh
 python util/download_bioformats_samples.py --mode all --output-dir "/Volumes/External/omeimages"
 ```
 
 Use `--dry-run` first to estimate planned file count and total bytes. In `all`
-mode, size, depth, page, and total-byte caps are unlimited by default; pass
-`--max-total-gib`, `--max-file-mib`, `--max-depth`, or
-`--max-pages-per-format` to stage the mirror. Use `--per-format` in `all` mode
-to cap the number of files selected from each top-level format.
+mode, size, depth, and total-byte caps are unlimited by default; pass
+`--max-total-gib`, `--max-file-mib`, or `--max-depth` to derive a smaller plan.
+Use `--per-format` in `all` mode to cap the number of files selected from each
+top-level format.
