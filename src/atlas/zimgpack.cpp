@@ -518,7 +518,19 @@ ZImgPack::ZImgPack(ZImgSource imgSource, ZImgInfo* pInfo, std::vector<std::share
 
   // bool needScale = Z3DGpuInfo::instance().needScaleDataForTexture(m_imgInfo.width, m_imgInfo.height,
   // m_imgInfo.depth);
-  if (m_imgSource.totalFileSize <= m_fastReadSizeThreshold) {
+  const size_t decodedImageBytes = m_imgInfo.byteNumber();
+  // Descriptor files such as BDV XML can be tiny while referencing much larger pixel payloads.
+  const bool shouldReadWholeImage =
+    m_imgSource.totalFileSize <= m_fastReadSizeThreshold && decodedImageBytes <= m_fastReadSizeThreshold;
+  if (!shouldReadWholeImage && m_imgSource.totalFileSize <= m_fastReadSizeThreshold) {
+    VLOG(1) << fmt::format("skip read all because decoded image is too large: source file bytes={}, decoded image "
+                           "bytes={}, threshold={}",
+                           m_imgSource.totalFileSize,
+                           decodedImageBytes,
+                           m_fastReadSizeThreshold);
+  }
+
+  if (shouldReadWholeImage) {
     VLOG(1) << "read all";
     m_diskCached = false;
     m_img = ZImg(m_imgSource);

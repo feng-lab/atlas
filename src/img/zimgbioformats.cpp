@@ -47,6 +47,26 @@ size_t ceilDiv(size_t numerator, size_t denominator)
   return (numerator + denominator - 1) / denominator;
 }
 
+size_t floorDiv(size_t numerator, size_t denominator)
+{
+  CHECK(denominator > 0);
+  return numerator / denominator;
+}
+
+bool resolutionDimensionMatchesRatio(size_t fullSize, size_t resolutionSize, size_t ratio)
+{
+  CHECK(ratio > 0);
+  // BDV and some Bio-Formats readers report pyramid dimensions rounded down for odd full sizes.
+  return ceilDiv(fullSize, ratio) == resolutionSize || floorDiv(fullSize, ratio) == resolutionSize;
+}
+
+size_t scaledResolutionCoordToBase(size_t coord, size_t resolutionSize, size_t fullSize, size_t ratio)
+{
+  CHECK(ratio > 0);
+  CHECK(coord <= resolutionSize);
+  return std::min(fullSize, checkedMul("scaled pyramid coordinate", coord, ratio));
+}
+
 void setVoxelFormatFromBioFormats(const ZBioFormatsSeriesInfo& series, ZImgInfo& info)
 {
   const QString pixelType = series.pixelType.toLower();
@@ -195,7 +215,7 @@ std::optional<size_t> integerRatioForResolution(size_t fullSize, size_t resoluti
   }
 
   for (size_t ratio : candidates) {
-    if (ratio > 0 && ceilDiv(fullSize, ratio) == resolutionSize) {
+    if (ratio > 0 && resolutionDimensionMatchesRatio(fullSize, resolutionSize, ratio)) {
       return ratio;
     }
   }
@@ -299,10 +319,10 @@ void addBioFormatsTiledSubBlocks(const QString& filename,
         const size_t yEnd = std::min(resolutionInfo.height, y + th);
         for (size_t x = 0; x < resolutionInfo.width; x += tw) {
           const size_t xEnd = std::min(resolutionInfo.width, x + tw);
-          const size_t baseX = x * xRatio;
-          const size_t baseY = y * yRatio;
-          const size_t baseXEnd = std::min(info.width, xEnd * xRatio);
-          const size_t baseYEnd = std::min(info.height, yEnd * yRatio);
+          const size_t baseX = scaledResolutionCoordToBase(x, resolutionInfo.width, info.width, xRatio);
+          const size_t baseY = scaledResolutionCoordToBase(y, resolutionInfo.height, info.height, yRatio);
+          const size_t baseXEnd = scaledResolutionCoordToBase(xEnd, resolutionInfo.width, info.width, xRatio);
+          const size_t baseYEnd = scaledResolutionCoordToBase(yEnd, resolutionInfo.height, info.height, yRatio);
           ZImgRegion baseRegion(ZVoxelCoordinate(checkedIndex("pyramid base x", baseX),
                                                  checkedIndex("pyramid base y", baseY),
                                                  checkedIndex("pyramid base z", z),
