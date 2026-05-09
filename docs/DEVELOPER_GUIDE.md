@@ -152,7 +152,7 @@ Testing
 
 Bio-Formats Image Bridge
 
-- Atlas reads Bio-Formats-backed image files through `ZImgBioFormats` and a persistent Java sidecar.
+- Atlas reads Bio-Formats-backed image files through `ZImgBioFormats` and a pool of persistent Java sidecars.
   - Protocol definition: `src/protos/bioformats_bridge.proto`.
   - C++ client: `src/img/zbioformatsbridgeclient.*`.
   - Atlas reader: `src/img/zimgbioformats.*`.
@@ -167,10 +167,12 @@ Bio-Formats Image Bridge
 - Subblocks created by the Bio-Formats reader use `FileFormat::BioFormats` explicitly. This avoids repeatedly rediscovering the reader during tiled 2D/3D paging and prevents native extension matches from stealing Bio-Formats-managed tile reads.
 - Bio-Formats sub-resolutions are exposed in the bridge metadata. Atlas keeps resolution 0 as the canonical image geometry and adds compatible integer-ratio Bio-Formats pyramid levels directly to the `ZImgPack` tile index, so large pyramidal files can serve overview tiles from Bio-Formats instead of forcing Atlas to synthesize every pyramid level from full-resolution reads.
 - Bio-Formats thumbnails are read through a dedicated streamed bridge command. Thumbnail support is best-effort because not every Bio-Formats reader provides useful thumbnail planes.
-- `ZBioFormatsBridgeClient` is a process-wide singleton that owns one persistent Java sidecar on a dedicated serial worker. The sidecar keeps one Bio-Formats reader session per opened file path for the lifetime of the client, so GUI and image worker requests reuse Java startup and reader initialization while preserving ordered stdin/stdout protocol access.
-- Desktop Atlas schedules a background Bio-Formats warmup after the main window is shown. Warmup starts the Java sidecar, performs the runtime handshake, and caches the supported reader list without blocking first paint.
+- `ZBioFormatsBridgeClient` is a process-wide singleton that owns a configurable pool of independent Java sidecars, each on its own serial worker thread. Each sidecar keeps its own Bio-Formats reader session per opened file path for the lifetime of the client. Metadata, probe, thumbnail, and format-list operations use the primary worker to keep the control path simple; pixel-region reads dispatch round-robin across the worker pool so Atlas' existing tiled image reads can make progress in parallel while each stdin/stdout protocol stream stays ordered.
+- Opening a Bio-Formats dataset synchronously opens it on every bridge worker before returning. Secondary Java sidecars do not start during application warmup; they start during the first dataset open for a file so later pixel-region reads do not pay JVM startup or reader-open latency. This preserves Atlas' existing local-file behavior, where display callers receive a complete result instead of progressive/async placeholders, while keeping tiled reads parallel once the dataset is displayed. A worker can still lazily reopen a dataset if its sidecar restarts.
+- Desktop Atlas schedules a background Bio-Formats warmup after the main window is shown. Warmup uses only the primary bridge worker to start one Java sidecar, perform the runtime handshake, and cache the supported reader list without blocking first paint.
 - Tunables:
   - `--atlas_bioformats_java_xmx=<size>` sets the sidecar JVM heap, default `2g`.
+  - `--atlas_bioformats_bridge_worker_count=<count>` sets the number of persistent Java sidecars used for pixel reads. Default `0` chooses `min(std::thread::hardware_concurrency(), physical RAM / 2 GiB)` with a one-worker floor. `1` preserves the previous single-sidecar behavior. Higher explicit values can improve tiled-read throughput for formats such as Leica, but each worker has its own JVM heap cap, JVM overhead, and reader sessions.
   - `--atlas_bioformats_bridge_io_timeout_ms=<ms>` bounds bridge stdin/stdout operations when non-zero; default `0` waits indefinitely.
 - Optional real-format breadth checks use an external corpus. `zbioformatstest` reads the corpus when `ATLAS_BIOFORMATS_BREADTH_DIR` points at that directory.
 

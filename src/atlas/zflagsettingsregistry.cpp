@@ -134,6 +134,12 @@ const std::vector<ZFlagSettingSpec>& atlasFlagSettingSpecs()
                                 ZFlagSettingEditorKind::Auto,
                                 {},
                                 true));
+    allSpecs.push_back(makeSpec("atlas_bioformats_bridge_worker_count",
+                                "I/O & Processing",
+                                "Bio-Formats bridge worker count",
+                                ZFlagSettingEditorKind::Auto,
+                                {},
+                                true));
     allSpecs.push_back(makeSpec("atlas_number_of_blocks_to_use_PBO_threashold",
                                 "I/O & Processing",
                                 "PBO upload block threshold",
