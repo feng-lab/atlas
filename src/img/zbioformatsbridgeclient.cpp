@@ -1,5 +1,6 @@
 #include "zbioformatsbridgeclient.h"
 
+#include "bioformats_bridge.grpc.pb.h"
 #include "bioformats_bridge.pb.h"
 #include "zexception.h"
 #include "zcpuinfo.h"
@@ -14,8 +15,10 @@
 #include <QProcess>
 #include <QRegularExpression>
 #include <QStringList>
+#include <grpcpp/grpcpp.h>
 #include <algorithm>
 #include <atomic>
+#include <chrono>
 #include <condition_variable>
 #include <deque>
 #include <exception>
@@ -36,13 +39,17 @@ DEFINE_string(atlas_bioformats_java_xmx,
               "Maximum Java heap for the persistent Bio-Formats bridge process. Empty means no -Xmx argument.");
 DEFINE_int32(atlas_bioformats_bridge_io_timeout_ms,
              0,
-             "Timeout for Bio-Formats bridge stdin/stdout operations in milliseconds. 0 means wait indefinitely.");
+             "Timeout for Bio-Formats bridge operations in milliseconds. 0 means wait indefinitely.");
 DEFINE_int32(
   atlas_bioformats_bridge_worker_count,
   0,
-  "Number of persistent Bio-Formats Java bridge workers used for pixel reads. 0 chooses from hardware concurrency and "
-  "a 2 GiB per-worker memory budget; 1 preserves the single-sidecar behavior; values greater than 1 start independent "
-  "Java sidecars, each with its own JVM heap and Bio-Formats reader sessions.");
+  "Number of Bio-Formats bridge workers used for pixel reads. 0 means auto: the gRPC backend uses hardware "
+  "concurrency, while the stdio backend chooses from hardware concurrency and a 2 GiB per-JVM memory budget. On "
+  "gRPC, workers are independent Bio-Formats reader instances inside one Java process; on stdio, workers are "
+  "independent Java sidecars.");
+DEFINE_bool(atlas_bioformats_bridge_use_grpc,
+            true,
+            "Use the single-JVM gRPC Bio-Formats bridge. Set false to use the stdio multi-process bridge.");
 
 namespace nim {
 
@@ -287,6 +294,10 @@ size_t resolveBioFormatsBridgeWorkerCount()
   }
 
   const size_t cpuWorkers = std::max<size_t>(1, std::thread::hardware_concurrency());
+  if (FLAGS_atlas_bioformats_bridge_use_grpc) {
+    return cpuWorkers;
+  }
+
   const size_t memoryWorkers =
     std::max<size_t>(1, ZCpuInfo::instance().nPhysicalRAM / kAutoBridgeWorkerHeapBudgetBytes);
   return std::min(cpuWorkers, memoryWorkers);
@@ -1058,10 +1069,10 @@ private:
   std::thread m_thread;
 };
 
-class ZBioFormatsBridgeClient::Impl
+class ZBioFormatsStdioBridgePool
 {
 public:
-  Impl()
+  ZBioFormatsStdioBridgePool()
   {
     const size_t workerCount = resolveBioFormatsBridgeWorkerCount();
     CHECK(workerCount > 0);
@@ -1202,6 +1213,622 @@ private:
 
   std::vector<std::unique_ptr<ZBioFormatsBridgeWorker>> m_workers;
   std::atomic<size_t> m_nextReadWorker = 0;
+};
+
+class ZBioFormatsGrpcBridgeProcess
+{
+public:
+  explicit ZBioFormatsGrpcBridgeProcess(size_t workerCount)
+    : m_workerCount(workerCount)
+  {
+    CHECK(m_workerCount > 0);
+    LOG(INFO) << "Bio-Formats bridge gRPC backend enabled with one JVM and " << m_workerCount << " reader worker(s)"
+              << " (--atlas_bioformats_bridge_worker_count=" << FLAGS_atlas_bioformats_bridge_worker_count
+              << ", --atlas_bioformats_java_xmx=" << FLAGS_atlas_bioformats_java_xmx << ")";
+  }
+
+  ~ZBioFormatsGrpcBridgeProcess()
+  {
+    try {
+      if (m_stub) {
+        proto::Request request;
+        request.set_request_id(nextRequestId());
+        request.mutable_shutdown();
+        (void)transact(request, "shutdown Bio-Formats gRPC bridge");
+      }
+      if (m_process.state() == QProcess::Running) {
+        m_process.waitForFinished(5000);
+      }
+    }
+    catch (...) {
+    }
+    if (m_process.state() != QProcess::NotRunning) {
+      m_process.kill();
+      m_process.waitForFinished(1000);
+    }
+  }
+
+  [[nodiscard]] std::vector<ZBioFormatsReaderFormat> listFormats()
+  {
+    std::lock_guard<std::mutex> lock(m_cacheMutex);
+    if (!m_cachedFormats.empty()) {
+      return m_cachedFormats;
+    }
+
+    QElapsedTimer timer;
+    timer.start();
+    proto::Request request;
+    request.mutable_list_formats();
+    proto::Response response = transact(request, "list Bio-Formats readers");
+    requireOk(response, "list Bio-Formats readers");
+    if (!response.has_list_formats()) {
+      throw ZException(
+        fmt::format("Bio-Formats gRPC bridge returned '{}' for list_formats", responseCaseName(response)));
+    }
+    m_cachedFormats.reserve(response.list_formats().formats_size());
+    for (const auto& format : response.list_formats().formats()) {
+      m_cachedFormats.push_back(convertReaderFormat(format));
+    }
+    VLOG(1) << "Bio-Formats gRPC bridge listFormats took " << timer.elapsed() << " ms for " << m_cachedFormats.size()
+            << " formats";
+    return m_cachedFormats;
+  }
+
+  void warmUp()
+  {
+    QElapsedTimer timer;
+    timer.start();
+    ensureProcess();
+    (void)listFormats();
+    LOG(INFO) << "Bio-Formats gRPC bridge warmup completed in " << timer.elapsed() << " ms";
+  }
+
+  [[nodiscard]] bool canRead(const QString& filename)
+  {
+    QElapsedTimer timer;
+    timer.start();
+    proto::Request request;
+    auto* probe = request.mutable_probe();
+    probe->set_path(canonicalPath(filename).toStdString());
+    probe->set_grouping_policy(proto::FILE_GROUPING_POLICY_DEFAULT);
+    probe->set_metadata_filtered(true);
+
+    proto::Response response = transact(request, "probe Bio-Formats reader");
+    requireOk(response, "probe Bio-Formats reader");
+    if (!response.has_probe()) {
+      throw ZException(fmt::format("Bio-Formats gRPC bridge returned '{}' for probe", responseCaseName(response)));
+    }
+    VLOG(1) << "Bio-Formats gRPC bridge probe took " << timer.elapsed() << " ms for " << filename;
+    return response.probe().can_read();
+  }
+
+  [[nodiscard]] ZBioFormatsDatasetInfo openDataset(const QString& filename)
+  {
+    const QString path = canonicalPath(filename);
+    std::lock_guard<std::mutex> lock(m_datasetMutex);
+    auto it = m_datasetsByPath.find(path);
+    if (it != m_datasetsByPath.end()) {
+      return it.value();
+    }
+
+    QElapsedTimer timer;
+    timer.start();
+    proto::Request request;
+    auto* open = request.mutable_open_dataset();
+    open->set_path(path.toStdString());
+    open->set_grouping_policy(proto::FILE_GROUPING_POLICY_DEFAULT);
+    open->set_metadata_filtered(false);
+
+    proto::Response response = transact(request, "open Bio-Formats dataset");
+    requireOk(response, "open Bio-Formats dataset");
+    if (!response.has_open_dataset()) {
+      throw ZException(
+        fmt::format("Bio-Formats gRPC bridge returned '{}' for open_dataset", responseCaseName(response)));
+    }
+    auto inserted = m_datasetsByPath.insert(path, convertDatasetInfo(response.open_dataset()));
+    VLOG(1) << "Bio-Formats gRPC bridge openDataset took " << timer.elapsed() << " ms for " << filename;
+    return inserted.value();
+  }
+
+  [[nodiscard]] std::vector<uint8_t> readRegion(const QString& filename, size_t scene, const ZImgRegion& region)
+  {
+    return readRegion(filename, scene, 0, region);
+  }
+
+  [[nodiscard]] std::vector<uint8_t>
+  readRegion(const QString& filename, size_t scene, uint32_t resolution, const ZImgRegion& region)
+  {
+    QElapsedTimer timer;
+    timer.start();
+    const ZBioFormatsDatasetInfo dataset = openDataset(filename);
+    if (scene >= dataset.series.size()) {
+      throw ZException(fmt::format("Bio-Formats scene {} is out of range for {}", scene, filename));
+    }
+
+    proto::Request request;
+    const uint64_t requestId = nextRequestId();
+    request.set_request_id(requestId);
+    auto* readRegion = request.mutable_read_region();
+    readRegion->set_session_id(dataset.sessionId);
+    readRegion->set_series(static_cast<uint32_t>(scene));
+    readRegion->set_resolution(resolution);
+    readRegion->set_x(static_cast<uint64_t>(region.start.x));
+    readRegion->set_y(static_cast<uint64_t>(region.start.y));
+    readRegion->set_z(static_cast<uint64_t>(region.start.z));
+    readRegion->set_c(static_cast<uint64_t>(region.start.c));
+    readRegion->set_t(static_cast<uint64_t>(region.start.t));
+    readRegion->set_width(static_cast<uint64_t>(region.end.x - region.start.x));
+    readRegion->set_height(static_cast<uint64_t>(region.end.y - region.start.y));
+    readRegion->set_depth(static_cast<uint64_t>(region.end.z - region.start.z));
+    readRegion->set_channel_count(static_cast<uint64_t>(region.end.c - region.start.c));
+    readRegion->set_time_count(static_cast<uint64_t>(region.end.t - region.start.t));
+
+    std::vector<uint8_t> result;
+    uint32_t expectedSequenceIndex = 0;
+    for (const proto::Response& response : execute(request, "read Bio-Formats image region")) {
+      if (response.request_id() != requestId) {
+        throw ZException(fmt::format("Bio-Formats gRPC bridge returned response id {} while waiting for {}",
+                                     response.request_id(),
+                                     requestId));
+      }
+      requireOk(response, "read Bio-Formats image region");
+      if (!response.has_pixel_chunk()) {
+        throw ZException(
+          fmt::format("Bio-Formats gRPC bridge returned '{}' while streaming pixels", responseCaseName(response)));
+      }
+
+      const auto& chunk = response.pixel_chunk();
+      if (chunk.sequence_index() != expectedSequenceIndex) {
+        throw ZException(fmt::format("Bio-Formats gRPC bridge pixel chunk sequence mismatch: expected {}, got {}",
+                                     expectedSequenceIndex,
+                                     chunk.sequence_index()));
+      }
+      ++expectedSequenceIndex;
+
+      const std::string& data = chunk.data();
+      result.insert(result.end(), data.begin(), data.end());
+      if (chunk.total_bytes() != result.size()) {
+        throw ZException(
+          fmt::format("Bio-Formats gRPC bridge pixel byte count mismatch: bridge reported {}, received {}",
+                      chunk.total_bytes(),
+                      result.size()));
+      }
+      if (chunk.final_chunk()) {
+        VLOG(1) << "Bio-Formats gRPC bridge readRegion took " << timer.elapsed() << " ms for " << filename
+                << " bytes=" << result.size();
+        return result;
+      }
+    }
+    throw ZException("Bio-Formats gRPC bridge ended readRegion stream without a final chunk");
+  }
+
+  [[nodiscard]] ZBioFormatsThumbnail readThumbnail(const QString& filename, size_t scene, size_t z, size_t t)
+  {
+    QElapsedTimer timer;
+    timer.start();
+    const ZBioFormatsDatasetInfo dataset = openDataset(filename);
+    if (scene >= dataset.series.size()) {
+      throw ZException(fmt::format("Bio-Formats scene {} is out of range for {}", scene, filename));
+    }
+
+    proto::Request request;
+    const uint64_t requestId = nextRequestId();
+    request.set_request_id(requestId);
+    auto* readThumbnail = request.mutable_read_thumbnail();
+    readThumbnail->set_session_id(dataset.sessionId);
+    readThumbnail->set_series(static_cast<uint32_t>(scene));
+    readThumbnail->set_z(static_cast<uint64_t>(z));
+    readThumbnail->set_t(static_cast<uint64_t>(t));
+
+    ZBioFormatsThumbnail result;
+    uint32_t expectedSequenceIndex = 0;
+    for (const proto::Response& response : execute(request, "read Bio-Formats thumbnail")) {
+      if (response.request_id() != requestId) {
+        throw ZException(fmt::format("Bio-Formats gRPC bridge returned response id {} while waiting for {}",
+                                     response.request_id(),
+                                     requestId));
+      }
+      requireOk(response, "read Bio-Formats thumbnail");
+      if (!response.has_thumbnail_chunk()) {
+        throw ZException(
+          fmt::format("Bio-Formats gRPC bridge returned '{}' while streaming thumbnail", responseCaseName(response)));
+      }
+
+      const auto& chunk = response.thumbnail_chunk();
+      if (chunk.sequence_index() != expectedSequenceIndex) {
+        throw ZException(fmt::format("Bio-Formats gRPC bridge thumbnail chunk sequence mismatch: expected {}, got {}",
+                                     expectedSequenceIndex,
+                                     chunk.sequence_index()));
+      }
+      ++expectedSequenceIndex;
+
+      if (expectedSequenceIndex == 1) {
+        result.width = chunk.width();
+        result.height = chunk.height();
+        result.channelCount = chunk.channel_count();
+        result.bytesPerPixel = chunk.bytes_per_pixel();
+        result.pixelType = QString::fromStdString(chunk.pixel_type());
+      } else if (result.width != chunk.width() || result.height != chunk.height() ||
+                 result.channelCount != chunk.channel_count() || result.bytesPerPixel != chunk.bytes_per_pixel() ||
+                 result.pixelType != QString::fromStdString(chunk.pixel_type())) {
+        throw ZException("Bio-Formats gRPC bridge changed thumbnail metadata while streaming");
+      }
+
+      const std::string& data = chunk.data();
+      result.pixels.insert(result.pixels.end(), data.begin(), data.end());
+      if (chunk.total_bytes() != result.pixels.size()) {
+        throw ZException(
+          fmt::format("Bio-Formats gRPC bridge thumbnail byte count mismatch: bridge reported {}, received {}",
+                      chunk.total_bytes(),
+                      result.pixels.size()));
+      }
+      if (chunk.final_chunk()) {
+        VLOG(1) << "Bio-Formats gRPC bridge readThumbnail took " << timer.elapsed() << " ms for " << filename
+                << " bytes=" << result.pixels.size();
+        return result;
+      }
+    }
+    throw ZException("Bio-Formats gRPC bridge ended thumbnail stream without a final chunk");
+  }
+
+  void closeDataset(const QString& filename)
+  {
+    const QString path = canonicalPath(filename);
+    ZBioFormatsDatasetInfo dataset;
+    {
+      std::lock_guard<std::mutex> lock(m_datasetMutex);
+      auto it = m_datasetsByPath.find(path);
+      if (it == m_datasetsByPath.end()) {
+        return;
+      }
+      dataset = it.value();
+      m_datasetsByPath.erase(it);
+    }
+
+    proto::Request request;
+    request.mutable_close_dataset()->set_session_id(dataset.sessionId);
+    proto::Response response = transact(request, "close Bio-Formats dataset");
+    requireOk(response, "close Bio-Formats dataset");
+  }
+
+private:
+  uint64_t nextRequestId()
+  {
+    const uint64_t result = m_nextRequestId.fetch_add(1, std::memory_order_relaxed);
+    CHECK(result != 0);
+    return result;
+  }
+
+  [[nodiscard]] QString javaExecutable()
+  {
+    if (m_javaExecutable.isEmpty()) {
+      m_javaExecutable = resolveJavaExecutable();
+    }
+    return m_javaExecutable;
+  }
+
+  void ensureProcess()
+  {
+    std::lock_guard<std::mutex> lock(m_startMutex);
+    if (m_stub) {
+      return;
+    }
+
+    if (!ZBioFormatsBridgeClient::hasRuntimeSupport()) {
+      throw ZException(fmt::format("Bio-Formats bridge runtime is incomplete. Missing: {}",
+                                   ZBioFormatsBridgeClient::missingRuntimeFiles().join(", ")));
+    }
+
+    m_datasetsByPath.clear();
+    m_stdoutBuffer.clear();
+
+    QElapsedTimer startupTimer;
+    startupTimer.start();
+
+    QStringList args;
+    if (!FLAGS_atlas_bioformats_java_xmx.empty()) {
+      args.push_back(QString("-Xmx%1").arg(QString::fromStdString(FLAGS_atlas_bioformats_java_xmx)));
+    }
+    args << "-Djava.awt.headless=true"
+         << "-cp" << bridgeClasspath() << "org.fenglab.atlas.bioformats.AtlasBioFormatsBridge"
+         << "--grpc-port=0" << QString("--worker-count=%1").arg(m_workerCount);
+
+    const QString java = javaExecutable();
+    m_process.setProgram(java);
+    m_process.setArguments(args);
+    m_process.setProcessChannelMode(QProcess::SeparateChannels);
+    m_process.setStandardErrorFile(QProcess::nullDevice());
+    m_process.start();
+    if (!m_process.waitForStarted(30000)) {
+      const QString error = m_process.errorString();
+      if (m_process.state() != QProcess::NotRunning) {
+        m_process.kill();
+        m_process.waitForFinished(1000);
+      }
+      m_stdoutBuffer.clear();
+      throw ZException(fmt::format("failed to start Bio-Formats gRPC bridge '{}': {}", java, error));
+    }
+    const qint64 startMs = startupTimer.elapsed();
+    const uint16_t port = readStartupPort();
+    const QString target = QStringLiteral("127.0.0.1:%1").arg(port);
+
+    grpc::ChannelArguments channelArgs;
+    channelArgs.SetMaxReceiveMessageSize(static_cast<int>(kMaxFrameBytes));
+    channelArgs.SetMaxSendMessageSize(static_cast<int>(kMaxFrameBytes));
+    m_channel = grpc::CreateCustomChannel(target.toStdString(), grpc::InsecureChannelCredentials(), channelArgs);
+    m_stub = proto::BioFormatsBridge::NewStub(m_channel);
+
+    QElapsedTimer handshakeTimer;
+    handshakeTimer.start();
+    try {
+      proto::Request request;
+      request.mutable_runtime_info();
+      const proto::Response response = transactLocked(request, "handshake with Bio-Formats gRPC bridge");
+      requireOk(response, "handshake with Bio-Formats gRPC bridge");
+      if (!response.has_runtime_info()) {
+        throw ZException(
+          fmt::format("Bio-Formats gRPC bridge returned '{}' for runtime_info", responseCaseName(response)));
+      }
+      const proto::RuntimeInfoResponse& info = response.runtime_info();
+      if (info.protocol_version() != kBridgeProtocolVersion) {
+        throw ZException(fmt::format("Bio-Formats bridge protocol mismatch: Atlas expects {}, bridge reports {}",
+                                     kBridgeProtocolVersion,
+                                     info.protocol_version()));
+      }
+      LOG(INFO) << "Bio-Formats gRPC bridge ready: pid=" << m_process.processId() << ", java=" << java
+                << ", jarsDIR=" << ZImgGlobal::instance().jarsDIR << ", target=" << target
+                << ", readerWorkers=" << m_workerCount << ", startMs=" << startMs
+                << ", handshakeMs=" << handshakeTimer.elapsed() << ", protocol=" << info.protocol_version()
+                << ", bridge=" << info.bridge_version() << ", bioformats=" << info.bioformats_version()
+                << ", javaVersion=" << info.java_version() << ", vm=" << info.java_vm_name()
+                << ", javaPid=" << info.process_id();
+    }
+    catch (...) {
+      m_stub.reset();
+      m_channel.reset();
+      if (m_process.state() != QProcess::NotRunning) {
+        m_process.kill();
+        m_process.waitForFinished(1000);
+      }
+      m_stdoutBuffer.clear();
+      throw;
+    }
+  }
+
+  [[nodiscard]] uint16_t readStartupPort()
+  {
+    QElapsedTimer timer;
+    timer.start();
+    while (timer.elapsed() < kJavaVersionProbeTimeoutMs) {
+      m_stdoutBuffer.append(m_process.readAllStandardOutput());
+      const qsizetype newline = m_stdoutBuffer.indexOf('\n');
+      if (newline >= 0) {
+        const QByteArray line = m_stdoutBuffer.left(newline).trimmed();
+        m_stdoutBuffer.remove(0, newline + 1);
+        constexpr std::string_view prefix = "ATLAS_BIOFORMATS_GRPC_PORT=";
+        if (!line.startsWith(QByteArray(prefix.data(), static_cast<qsizetype>(prefix.size())))) {
+          throw ZException(fmt::format("Bio-Formats gRPC bridge printed unexpected startup line: {}",
+                                       QString::fromUtf8(line).toStdString()));
+        }
+        bool ok = false;
+        const int port = line.mid(static_cast<qsizetype>(prefix.size())).toInt(&ok);
+        if (!ok || port <= 0 || port > std::numeric_limits<uint16_t>::max()) {
+          throw ZException(fmt::format("Bio-Formats gRPC bridge printed invalid startup port: {}",
+                                       QString::fromUtf8(line).toStdString()));
+        }
+        return static_cast<uint16_t>(port);
+      }
+      if (m_process.state() != QProcess::Running) {
+        throwGrpcProcessError("Bio-Formats gRPC bridge exited before reporting its port");
+      }
+      const qint64 remaining = kJavaVersionProbeTimeoutMs - timer.elapsed();
+      m_process.waitForReadyRead(static_cast<int>(std::max<qint64>(1, std::min<qint64>(1000, remaining))));
+    }
+    throwGrpcProcessError("timed out waiting for Bio-Formats gRPC bridge startup");
+  }
+
+  [[nodiscard]] proto::Response transact(proto::Request& request, std::string_view operation)
+  {
+    request.set_request_id(nextRequestId());
+    proto::Response response = transactWithId(request, operation);
+    if (response.request_id() != request.request_id()) {
+      throw ZException(fmt::format("Bio-Formats gRPC bridge returned response id {} while waiting for {}",
+                                   response.request_id(),
+                                   request.request_id()));
+    }
+    return response;
+  }
+
+  [[nodiscard]] proto::Response transactLocked(proto::Request& request, std::string_view operation)
+  {
+    request.set_request_id(nextRequestId());
+    proto::Response response = executeLocked(request, operation);
+    if (response.request_id() != request.request_id()) {
+      throw ZException(fmt::format("Bio-Formats gRPC bridge returned response id {} while waiting for {}",
+                                   response.request_id(),
+                                   request.request_id()));
+    }
+    return response;
+  }
+
+  [[nodiscard]] proto::Response transactWithId(const proto::Request& request, std::string_view operation)
+  {
+    std::vector<proto::Response> responses = execute(request, operation);
+    if (responses.empty()) {
+      throw ZException(fmt::format("Bio-Formats gRPC bridge returned no response for {}", operation));
+    }
+    if (responses.size() != 1) {
+      throw ZException(fmt::format("Bio-Formats gRPC bridge returned {} responses for unary operation {}",
+                                   responses.size(),
+                                   operation));
+    }
+    return std::move(responses.front());
+  }
+
+  [[nodiscard]] proto::Response executeLocked(const proto::Request& request, std::string_view operation)
+  {
+    std::vector<proto::Response> responses = executeLockedStream(request, operation);
+    if (responses.empty()) {
+      throw ZException(fmt::format("Bio-Formats gRPC bridge returned no response for {}", operation));
+    }
+    if (responses.size() != 1) {
+      throw ZException(fmt::format("Bio-Formats gRPC bridge returned {} responses for unary operation {}",
+                                   responses.size(),
+                                   operation));
+    }
+    return std::move(responses.front());
+  }
+
+  [[nodiscard]] std::vector<proto::Response> execute(const proto::Request& request, std::string_view operation)
+  {
+    ensureProcess();
+    return executeLockedStream(request, operation);
+  }
+
+  [[nodiscard]] std::vector<proto::Response> executeLockedStream(const proto::Request& request,
+                                                                 std::string_view operation)
+  {
+    CHECK(m_stub != nullptr);
+    grpc::ClientContext context;
+    applyDeadline(context);
+    std::vector<proto::Response> responses;
+    std::unique_ptr<grpc::ClientReader<proto::Response>> reader = m_stub->Execute(&context, request);
+    proto::Response response;
+    while (reader->Read(&response)) {
+      responses.push_back(std::move(response));
+      response.Clear();
+    }
+    const grpc::Status status = reader->Finish();
+    if (!status.ok()) {
+      throw ZException(fmt::format("Bio-Formats gRPC bridge failed to {}: {} ({})",
+                                   operation,
+                                   status.error_message(),
+                                   static_cast<int>(status.error_code())));
+    }
+    return responses;
+  }
+
+  void applyDeadline(grpc::ClientContext& context) const
+  {
+    if (FLAGS_atlas_bioformats_bridge_io_timeout_ms <= 0) {
+      return;
+    }
+    context.set_deadline(std::chrono::system_clock::now() +
+                         std::chrono::milliseconds(FLAGS_atlas_bioformats_bridge_io_timeout_ms));
+  }
+
+  void requireOk(const proto::Response& response, std::string_view operation) const
+  {
+    if (response.status() == proto::STATUS_CODE_OK) {
+      return;
+    }
+    throw ZException(fmt::format("Bio-Formats gRPC bridge failed to {}: {} ({})",
+                                 operation,
+                                 response.error_message(),
+                                 proto::StatusCode_Name(response.status())));
+  }
+
+  [[noreturn]] void throwGrpcProcessError(const char* message)
+  {
+    const QString stderrText = QString::fromUtf8(m_process.readAllStandardError());
+    QString detail = QString::fromUtf8(message);
+    if (!stderrText.isEmpty()) {
+      detail += QString(": ") + stderrText;
+    } else if (!m_process.errorString().isEmpty()) {
+      detail += QString(": ") + m_process.errorString();
+    }
+
+    if (m_process.state() != QProcess::NotRunning) {
+      m_process.kill();
+      m_process.waitForFinished(1000);
+    }
+    m_stdoutBuffer.clear();
+    throw ZException(detail);
+  }
+
+  size_t m_workerCount = 1;
+  std::mutex m_startMutex;
+  std::mutex m_cacheMutex;
+  std::mutex m_datasetMutex;
+  QProcess m_process;
+  QByteArray m_stdoutBuffer;
+  QString m_javaExecutable;
+  std::shared_ptr<grpc::Channel> m_channel;
+  std::unique_ptr<proto::BioFormatsBridge::Stub> m_stub;
+  std::atomic<uint64_t> m_nextRequestId = 1;
+  std::vector<ZBioFormatsReaderFormat> m_cachedFormats;
+  QMap<QString, ZBioFormatsDatasetInfo> m_datasetsByPath;
+};
+
+class ZBioFormatsBridgeClient::Impl
+{
+public:
+  Impl()
+    : m_useGrpc(FLAGS_atlas_bioformats_bridge_use_grpc)
+  {
+    const size_t workerCount = resolveBioFormatsBridgeWorkerCount();
+    CHECK(workerCount > 0);
+    if (m_useGrpc) {
+      m_grpc = std::make_unique<ZBioFormatsGrpcBridgeProcess>(workerCount);
+    } else {
+      m_stdio = std::make_unique<ZBioFormatsStdioBridgePool>();
+    }
+  }
+
+  [[nodiscard]] std::vector<ZBioFormatsReaderFormat> listFormats()
+  {
+    return m_useGrpc ? m_grpc->listFormats() : m_stdio->listFormats();
+  }
+
+  void warmUp()
+  {
+    if (m_useGrpc) {
+      m_grpc->warmUp();
+    } else {
+      m_stdio->warmUp();
+    }
+  }
+
+  [[nodiscard]] bool canRead(const QString& filename)
+  {
+    return m_useGrpc ? m_grpc->canRead(filename) : m_stdio->canRead(filename);
+  }
+
+  [[nodiscard]] ZBioFormatsDatasetInfo openDataset(const QString& filename)
+  {
+    return m_useGrpc ? m_grpc->openDataset(filename) : m_stdio->openDataset(filename);
+  }
+
+  [[nodiscard]] std::vector<uint8_t> readRegion(const QString& filename, size_t scene, const ZImgRegion& region)
+  {
+    return m_useGrpc ? m_grpc->readRegion(filename, scene, region) : m_stdio->readRegion(filename, scene, region);
+  }
+
+  [[nodiscard]] std::vector<uint8_t>
+  readRegion(const QString& filename, size_t scene, uint32_t resolution, const ZImgRegion& region)
+  {
+    return m_useGrpc ? m_grpc->readRegion(filename, scene, resolution, region)
+                     : m_stdio->readRegion(filename, scene, resolution, region);
+  }
+
+  [[nodiscard]] ZBioFormatsThumbnail readThumbnail(const QString& filename, size_t scene, size_t z, size_t t)
+  {
+    return m_useGrpc ? m_grpc->readThumbnail(filename, scene, z, t) : m_stdio->readThumbnail(filename, scene, z, t);
+  }
+
+  void closeDataset(const QString& filename)
+  {
+    if (m_useGrpc) {
+      m_grpc->closeDataset(filename);
+    } else {
+      m_stdio->closeDataset(filename);
+    }
+  }
+
+private:
+  bool m_useGrpc = false;
+  std::unique_ptr<ZBioFormatsStdioBridgePool> m_stdio;
+  std::unique_ptr<ZBioFormatsGrpcBridgeProcess> m_grpc;
 };
 
 ZBioFormatsBridgeClient& ZBioFormatsBridgeClient::instance()

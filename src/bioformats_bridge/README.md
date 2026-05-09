@@ -1,8 +1,9 @@
 # Atlas Bio-Formats Bridge
 
-This directory owns the Java sidecar used by Atlas' native `ZImgBioFormats`
-reader. The sidecar speaks the protobuf protocol in `src/protos` over
-length-prefixed stdin/stdout frames and compiles/runs against Atlas' packaged
+This directory owns the Java bridge used by Atlas' native `ZImgBioFormats`
+reader. The default desktop transport is a single-JVM gRPC service. The same
+protobuf schema also supports the legacy sidecar protocol over length-prefixed
+stdin/stdout frames. Both transports compile/run against Atlas' packaged
 `bioformats_package.jar`.
 
 Atlas does not pin a separate Bio-Formats Maven version here. The Maven build
@@ -19,9 +20,10 @@ mvn -DskipTests package
 cp target/atlas-bioformats-bridge.jar ../3rdparty/build/jars/
 ```
 
-The generated jar intentionally shades only `protobuf-java`; Bio-Formats stays
-outside this jar so Atlas can keep using the packaged `bioformats_package.jar`
-as the single Bio-Formats runtime payload.
+The generated jar intentionally shades the bridge transport dependencies
+(`protobuf-java` and gRPC) but not Bio-Formats itself. Bio-Formats stays outside
+this jar so Atlas can keep using the packaged `bioformats_package.jar` as the
+single Bio-Formats runtime payload.
 
 The Java bridge intentionally stays on the Protobuf Java 3.25.x maintenance
 line. Keep the Maven `protobuf.version` property pinned to the same patch
@@ -33,7 +35,9 @@ The protocol exposes Bio-Formats resolution metadata and streams both region
 pixels and thumbnails as chunked protobuf responses. Atlas uses full-resolution
 metadata for the canonical `ZImgInfo`, then adds integer-ratio Bio-Formats
 pyramid levels to the `ZImgPack` tile index when the reader reports compatible
-sub-resolutions.
+sub-resolutions. The gRPC backend starts the bridge with `--grpc-port=<port>`;
+`--worker-count=<count>` controls how many independent `IFormatReader`
+instances are opened per dataset inside that single Java process.
 
 ## Validation Data
 

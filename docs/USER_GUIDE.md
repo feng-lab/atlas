@@ -1534,7 +1534,8 @@ Use **Help → Shortcuts** in either the 2D or 3D window to open this section di
 | `--atlas_http_backend` | Select remote-dataset HTTP transport: `proxygen` or `curl`. |
 | `--atlas_http_ca_bundle` | Override the PEM CA bundle used for HTTPS remote-dataset requests. |
 | `--atlas_http_windows_trust_source` | On Windows, choose the default HTTPS trust source shared by both HTTP backends: `auto`, `windows_store`, or `bundled_pem`. |
-| `--atlas_bioformats_bridge_worker_count` | Number of persistent Bio-Formats Java sidecars used for pixel reads. The default `0` chooses from CPU threads and a 2 GiB per-worker memory budget; use `1` to preserve the previous single-sidecar behavior, or higher values to trade memory for faster tiled reads. |
+| `--atlas_bioformats_bridge_worker_count` | Bio-Formats bridge worker count for pixel reads. Default `0` auto-selects workers: the default gRPC backend uses CPU thread count for Java-side reader workers inside one JVM, while the stdio backend caps Java sidecar processes by CPU threads and a 2 GiB per-JVM memory budget. |
+| `--atlas_bioformats_bridge_use_grpc` | Bio-Formats bridge transport. Default `true` starts one Java process and uses gRPC, with `--atlas_bioformats_bridge_worker_count` controlling Java-side reader workers inside that process. Set `false` to use the stdio multi-process backend. |
 | `--filename` | Input path for headless export (`.animation3d` for animation export, `.scene` for scene export). |
 | `--output_filename` | Output path (`.mp4`/video for animation export, image path for scene export). |
 | `--output_fps`, `--output_start_frame`, `--output_end_frame` | Output frame timing. |

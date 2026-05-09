@@ -226,6 +226,12 @@ message(STATUS "Using Protobuf ${Protobuf_VERSION}")
 print_target_properties(protobuf::libprotobuf)
 print_target_properties(protobuf::protoc)
 
+find_package(gRPC CONFIG REQUIRED
+             PATHS ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build NO_DEFAULT_PATH)
+message(STATUS "Using gRPC ${gRPC_VERSION}")
+print_target_properties(gRPC::grpc++)
+print_target_properties(gRPC::grpc_cpp_plugin)
+
 find_package(Ceres REQUIRED
              PATHS ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build NO_DEFAULT_PATH)
 print_target_properties(Ceres::ceres)

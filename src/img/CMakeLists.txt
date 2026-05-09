@@ -55,7 +55,9 @@ set(protobuf_PROTOC_EXE protobuf::protoc)
 set(BIOFORMATS_PROTO ${CMAKE_CURRENT_SOURCE_DIR}/../protos/bioformats_bridge.proto)
 protobuf_generate(LANGUAGE cpp APPEND_PATH PROTOC_OUT_DIR ${CMAKE_CURRENT_BINARY_DIR} OUT_VAR BIOFORMATS_PROTO_SRCS
                   PROTOS ${BIOFORMATS_PROTO})
-set_property(SOURCE ${BIOFORMATS_PROTO_SRCS} PROPERTY SKIP_AUTOGEN ON)
+include(gRPCGenerateCPP)
+grpc_generate_cpp(BIOFORMATS_GRPC_SRCS BIOFORMATS_GRPC_HDRS ${CMAKE_CURRENT_BINARY_DIR} ${BIOFORMATS_PROTO})
+set_property(SOURCE ${BIOFORMATS_PROTO_SRCS} ${BIOFORMATS_GRPC_SRCS} PROPERTY SKIP_AUTOGEN ON)
 
 # main srcs
 set(IMG_SOURCES
@@ -290,7 +292,7 @@ message(STATUS "CMAKE_LINKER: ${CMAKE_LINKER}")
 
 # our target
 set(LIBRARY_NAME img)
-add_library(${LIBRARY_NAME} STATIC ${TIFF_SOURCES} ${IMG_SOURCES} ${BIOFORMATS_PROTO_SRCS})
+add_library(${LIBRARY_NAME} STATIC ${TIFF_SOURCES} ${IMG_SOURCES} ${BIOFORMATS_PROTO_SRCS} ${BIOFORMATS_GRPC_SRCS})
 set_property(TARGET ${LIBRARY_NAME} PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELEASE ${ATLAS_ENABLE_RELEASE_IPO})
 
 if (NOT ZIMG_DISABLE_FREEIMAGE)
@@ -333,7 +335,7 @@ endif ()
 set_source_files_properties(zimgjpegxr.cpp PROPERTIES INCLUDE_DIRECTORIES "${JPEGXR_INCLUDE_DIRS}")
 set_source_files_properties(zimginterpolate.cpp PROPERTIES
         INCLUDE_DIRECTORIES "${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/ITKMorphologicalContourInterpolation")
-set_source_files_properties(zbioformatsbridgeclient.cpp ${BIOFORMATS_PROTO_SRCS}
+set_source_files_properties(zbioformatsbridgeclient.cpp ${BIOFORMATS_PROTO_SRCS} ${BIOFORMATS_GRPC_SRCS}
         PROPERTIES
         INCLUDE_DIRECTORIES "${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/include;${CMAKE_CURRENT_BINARY_DIR}"
         COMPILE_OPTIONS "-iquote${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/include")
@@ -469,7 +471,7 @@ target_link_libraries(${LIBRARY_NAME} PUBLIC ${ITK_LIBRARIES} ${JPEGTURBO_LIBRAR
         GeometricTools glm::glm-header-only
         WebP::webp zstd::libzstd_static liblzma::liblzma ZLIB::ZLIB
         ${VTK_LIBRARIES} assimp::assimp TBB::tbb
-        glog::glog protobuf::libprotobuf ${_QT_LIBS_})
+        glog::glog gRPC::grpc++ protobuf::libprotobuf ${_QT_LIBS_})
 
 if (llfio_FOUND)
     target_link_libraries(${LIBRARY_NAME} PUBLIC llfio::sl)

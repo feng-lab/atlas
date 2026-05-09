@@ -5,6 +5,11 @@ package atlas.bioformats.bridge;
 option java_package = "org.fenglab.atlas.bioformats.proto";
 option java_outer_classname = "BioFormatsBridgeProto";
 
+service BioFormatsBridge
+{
+  rpc Execute(Request) returns (stream Response);
+}
+
 enum StatusCode
 {
   STATUS_CODE_UNSPECIFIED = 0;

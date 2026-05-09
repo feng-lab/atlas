@@ -1,6 +1,10 @@
 package org.fenglab.atlas.bioformats;
 
 import com.google.protobuf.ByteString;
+import io.grpc.Server;
+import io.grpc.netty.shaded.io.grpc.netty.NettyServerBuilder;
+import io.grpc.stub.StreamObserver;
+import org.fenglab.atlas.bioformats.proto.BioFormatsBridgeGrpc;
 import org.fenglab.atlas.bioformats.proto.BioFormatsBridgeProto.CloseDatasetResponse;
 import org.fenglab.atlas.bioformats.proto.BioFormatsBridgeProto.FileGroupingPolicy;
 import org.fenglab.atlas.bioformats.proto.BioFormatsBridgeProto.ListFormatsResponse;
@@ -28,11 +32,17 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Hashtable;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 import loci.formats.FormatException;
 import loci.formats.FormatTools;
 import loci.formats.IFormatReader;
@@ -48,30 +58,118 @@ public final class AtlasBioFormatsBridge
 {
   private static final int MAX_FRAME_BYTES = 512 * 1024 * 1024;
   private static final int PIXEL_CHUNK_BYTES = 8 * 1024 * 1024;
+  private static final int GRPC_PIXEL_CHUNK_BYTES = 1024 * 1024;
   private static final int PROTOCOL_VERSION = 1;
 
   private final InputStream in;
   private final OutputStream out;
+  private final int workerCount;
+  private final Object sessionsLock = new Object();
   private final Map<Long, ReaderSession> sessions = new LinkedHashMap<>();
   private final AtomicLong nextSessionId = new AtomicLong(1);
 
-  private AtlasBioFormatsBridge(final InputStream in, final OutputStream out)
+  private AtlasBioFormatsBridge(final InputStream in, final OutputStream out, final int workerCount)
   {
-    this.in = new BufferedInputStream(in);
-    this.out = new BufferedOutputStream(out);
+    if (workerCount <= 0) {
+      throw new IllegalArgumentException("worker count must be positive");
+    }
+    this.in = in == null ? null : new BufferedInputStream(in);
+    this.out = out == null ? null : new BufferedOutputStream(out);
+    this.workerCount = workerCount;
+  }
+
+  private AtlasBioFormatsBridge(final int workerCount)
+  {
+    this(null, null, workerCount);
   }
 
   public static void main(final String[] args) throws Exception
   {
     final OutputStream protocolOut = new FileOutputStream(FileDescriptor.out);
     System.setProperty("org.slf4j.simpleLogger.logFile", "System.err");
+    System.setProperty("org.slf4j.simpleLogger.defaultLogLevel", "warn");
     System.setOut(System.err);
-    final AtlasBioFormatsBridge bridge = new AtlasBioFormatsBridge(System.in, protocolOut);
+
+    int grpcPort = -1;
+    int workerCount = 1;
+    for (final String arg : args) {
+      if (arg.startsWith("--grpc-port=")) {
+        grpcPort = parseNonNegativeIntArgument(arg, "--grpc-port=");
+      } else if (arg.startsWith("--worker-count=")) {
+        workerCount = parsePositiveIntArgument(arg, "--worker-count=");
+      } else if (!arg.isEmpty()) {
+        throw new IllegalArgumentException("unknown argument: " + arg);
+      }
+    }
+
+    if (grpcPort >= 0) {
+      runGrpcServer(grpcPort, workerCount, protocolOut);
+      return;
+    }
+
+    final AtlasBioFormatsBridge bridge = new AtlasBioFormatsBridge(System.in, protocolOut, workerCount);
     bridge.run();
   }
 
-  private void run() throws IOException
+  private static int parseNonNegativeIntArgument(final String arg, final String prefix)
   {
+    final int value = Integer.parseInt(arg.substring(prefix.length()));
+    if (value < 0) {
+      throw new IllegalArgumentException(prefix + " must be >= 0");
+    }
+    return value;
+  }
+
+  private static int parsePositiveIntArgument(final String arg, final String prefix)
+  {
+    final int value = Integer.parseInt(arg.substring(prefix.length()));
+    if (value <= 0) {
+      throw new IllegalArgumentException(prefix + " must be > 0");
+    }
+    return value;
+  }
+
+  private static void runGrpcServer(final int grpcPort, final int workerCount, final OutputStream startupOut)
+    throws Exception
+  {
+    final AtlasBioFormatsBridge bridge = new AtlasBioFormatsBridge(workerCount);
+    final AtomicReference<Server> serverRef = new AtomicReference<>();
+    final Runnable shutdown = () ->
+    {
+      final Server server = serverRef.get();
+      if (server != null) {
+        server.shutdown();
+      }
+    };
+    final InetSocketAddress listenAddress = new InetSocketAddress(InetAddress.getByName("127.0.0.1"), grpcPort);
+    final Server server = NettyServerBuilder.forAddress(listenAddress)
+                            .maxInboundMessageSize(MAX_FRAME_BYTES)
+                            .addService(new BioFormatsGrpcService(bridge, shutdown))
+                            .build()
+                            .start();
+    serverRef.set(server);
+    startupOut.write(("ATLAS_BIOFORMATS_GRPC_PORT=" + server.getPort() + "\n").getBytes(StandardCharsets.US_ASCII));
+    startupOut.flush();
+    server.awaitTermination();
+    bridge.closeAllSessions();
+  }
+
+  private interface ResponseSink
+  {
+    void send(Response response) throws Exception;
+
+    default int pixelChunkBytes()
+    {
+      return PIXEL_CHUNK_BYTES;
+    }
+  }
+
+  private void run() throws Exception
+  {
+    if (in == null || out == null) {
+      throw new IllegalStateException("stdio bridge was not initialized with streams");
+    }
+    final ResponseSink sink = this::writeResponse;
     boolean running = true;
     while (running) {
       final Request request;
@@ -83,42 +181,47 @@ public final class AtlasBioFormatsBridge
       }
 
       try {
-        switch (request.getCommandCase()) {
-          case RUNTIME_INFO:
-            sendOk(request.getRequestId(), Response.newBuilder().setRuntimeInfo(runtimeInfo()));
-            break;
-          case LIST_FORMATS:
-            sendOk(request.getRequestId(), Response.newBuilder().setListFormats(listFormats()));
-            break;
-          case PROBE:
-            sendOk(request.getRequestId(), Response.newBuilder().setProbe(probe(request)));
-            break;
-          case OPEN_DATASET:
-            sendOk(request.getRequestId(), Response.newBuilder().setOpenDataset(openDataset(request)));
-            break;
-          case READ_REGION:
-            readRegion(request);
-            break;
-          case READ_THUMBNAIL:
-            readThumbnail(request);
-            break;
-          case CLOSE_DATASET:
-            closeDataset(request.getCloseDataset().getSessionId());
-            sendOk(request.getRequestId(), Response.newBuilder().setCloseDataset(CloseDatasetResponse.newBuilder()));
-            break;
-          case SHUTDOWN:
-            sendOk(request.getRequestId(), Response.newBuilder().setShutdown(ShutdownResponse.newBuilder()));
-            running = false;
-            break;
-          default:
-            sendError(request.getRequestId(), StatusCode.STATUS_CODE_INVALID_ARGUMENT, "missing request command");
-        }
+        running = handleRequest(request, sink);
       }
       catch (final Throwable t) {
-        sendError(request.getRequestId(), statusFor(t), t.getMessage());
+        sendError(sink, request.getRequestId(), statusFor(t), t.getMessage());
       }
     }
     closeAllSessions();
+  }
+
+  private boolean handleRequest(final Request request, final ResponseSink sink) throws Exception
+  {
+    switch (request.getCommandCase()) {
+      case RUNTIME_INFO:
+        sendOk(sink, request.getRequestId(), Response.newBuilder().setRuntimeInfo(runtimeInfo()));
+        return true;
+      case LIST_FORMATS:
+        sendOk(sink, request.getRequestId(), Response.newBuilder().setListFormats(listFormats()));
+        return true;
+      case PROBE:
+        sendOk(sink, request.getRequestId(), Response.newBuilder().setProbe(probe(request)));
+        return true;
+      case OPEN_DATASET:
+        sendOk(sink, request.getRequestId(), Response.newBuilder().setOpenDataset(openDataset(request)));
+        return true;
+      case READ_REGION:
+        readRegion(request, sink);
+        return true;
+      case READ_THUMBNAIL:
+        readThumbnail(request, sink);
+        return true;
+      case CLOSE_DATASET:
+        closeDataset(request.getCloseDataset().getSessionId());
+        sendOk(sink, request.getRequestId(), Response.newBuilder().setCloseDataset(CloseDatasetResponse.newBuilder()));
+        return true;
+      case SHUTDOWN:
+        sendOk(sink, request.getRequestId(), Response.newBuilder().setShutdown(ShutdownResponse.newBuilder()));
+        return false;
+      default:
+        sendError(sink, request.getRequestId(), StatusCode.STATUS_CODE_INVALID_ARGUMENT, "missing request command");
+        return true;
+    }
   }
 
   private RuntimeInfoResponse runtimeInfo()
@@ -161,21 +264,22 @@ public final class AtlasBioFormatsBridge
     return (b0 & 0xff) | ((b1 & 0xff) << 8) | ((b2 & 0xff) << 16) | ((b3 & 0xff) << 24);
   }
 
-  private void sendOk(final long requestId, final Response.Builder response) throws IOException
+  private void sendOk(final ResponseSink sink, final long requestId, final Response.Builder response) throws Exception
   {
     response.setRequestId(requestId);
     response.setStatus(StatusCode.STATUS_CODE_OK);
-    writeResponse(response.build());
+    sink.send(response.build());
   }
 
-  private void sendError(final long requestId, final StatusCode status, final String message) throws IOException
+  private void sendError(final ResponseSink sink, final long requestId, final StatusCode status, final String message)
+    throws Exception
   {
     final Response response = Response.newBuilder()
                                 .setRequestId(requestId)
                                 .setStatus(status)
                                 .setErrorMessage(message == null ? status.name() : message)
                                 .build();
-    writeResponse(response);
+    sink.send(response);
   }
 
   private void writeResponse(final Response response) throws IOException
@@ -237,28 +341,37 @@ public final class AtlasBioFormatsBridge
   {
     final String path = request.getOpenDataset().getPath();
     requireExistingFile(path);
-    final IFormatReader reader =
-      createReader(request.getOpenDataset().getGroupingPolicy(), request.getOpenDataset().getMetadataFiltered());
+    final ArrayList<IFormatReader> readers = new ArrayList<>(workerCount);
     boolean success = false;
     try {
-      reader.setId(path);
+      for (int i = 0; i < workerCount; ++i) {
+        final IFormatReader reader =
+          createReader(request.getOpenDataset().getGroupingPolicy(), request.getOpenDataset().getMetadataFiltered());
+        readers.add(reader);
+        reader.setId(path);
+      }
+      final IFormatReader metadataReader = readers.get(0);
       final long sessionId = nextSessionId.getAndIncrement();
       final OpenDatasetResponse.Builder response = OpenDatasetResponse.newBuilder()
                                                      .setSessionId(sessionId)
                                                      .setPath(path)
-                                                     .setFormatName(nullToEmpty(reader.getFormat()))
-                                                     .setReaderClass(reader.getClass().getName())
-                                                     .addAllUsedFiles(nonNullArray(reader.getUsedFiles()));
-      for (int s = 0; s < reader.getSeriesCount(); ++s) {
-        response.addSeries(seriesInfo(reader, s));
+                                                     .setFormatName(nullToEmpty(metadataReader.getFormat()))
+                                                     .setReaderClass(metadataReader.getClass().getName())
+                                                     .addAllUsedFiles(nonNullArray(metadataReader.getUsedFiles()));
+      for (int s = 0; s < metadataReader.getSeriesCount(); ++s) {
+        response.addSeries(seriesInfo(metadataReader, s));
       }
-      sessions.put(sessionId, new ReaderSession(sessionId, path, reader));
+      synchronized (sessionsLock) {
+        sessions.put(sessionId, new ReaderSession(sessionId, path, readers));
+      }
       success = true;
       return response.build();
     }
     finally {
       if (!success) {
-        reader.close();
+        for (final IFormatReader reader : readers) {
+          reader.close();
+        }
       }
     }
   }
@@ -421,14 +534,11 @@ public final class AtlasBioFormatsBridge
     }
   }
 
-  private void readRegion(final Request request) throws FormatException, IOException
+  private void readRegion(final Request request, final ResponseSink sink) throws Exception
   {
-    final ReaderSession session = sessions.get(request.getReadRegion().getSessionId());
-    if (session == null) {
-      throw new IllegalArgumentException("unknown Bio-Formats session id: " + request.getReadRegion().getSessionId());
-    }
-    synchronized (session) {
-      final IFormatReader reader = session.reader;
+    final ReaderSession session = sessionFor(request.getReadRegion().getSessionId());
+    final IFormatReader reader = session.readReader();
+    synchronized (reader) {
       final int series = toInt("series", request.getReadRegion().getSeries());
       final int resolution = toInt("resolution", request.getReadRegion().getResolution());
       final int x = toInt("x", request.getReadRegion().getX());
@@ -446,7 +556,7 @@ public final class AtlasBioFormatsBridge
       reader.setResolution(resolution);
       validateRegion(reader, x, y, z0, c0, t0, width, height, depth, channelCount, timeCount);
 
-      final ChunkWriter chunks = new ChunkWriter(request.getRequestId());
+      final ChunkWriter chunks = new ChunkWriter(sink, request.getRequestId(), sink.pixelChunkBytes());
       final int rgbChannelCount = Math.max(1, reader.getRGBChannelCount());
       final int bytesPerPixel = FormatTools.getBytesPerPixel(reader.getPixelType());
       final boolean littleEndian = reader.isLittleEndian();
@@ -471,15 +581,11 @@ public final class AtlasBioFormatsBridge
     }
   }
 
-  private void readThumbnail(final Request request) throws FormatException, IOException
+  private void readThumbnail(final Request request, final ResponseSink sink) throws Exception
   {
-    final ReaderSession session = sessions.get(request.getReadThumbnail().getSessionId());
-    if (session == null) {
-      throw new IllegalArgumentException("unknown Bio-Formats session id: " +
-                                         request.getReadThumbnail().getSessionId());
-    }
-    synchronized (session) {
-      final IFormatReader reader = session.reader;
+    final ReaderSession session = sessionFor(request.getReadThumbnail().getSessionId());
+    final IFormatReader reader = session.primaryReader();
+    synchronized (reader) {
       final int series = toInt("series", request.getReadThumbnail().getSeries());
       final int z = toInt("z", request.getReadThumbnail().getZ());
       final int t = toInt("t", request.getReadThumbnail().getT());
@@ -502,12 +608,14 @@ public final class AtlasBioFormatsBridge
       final boolean littleEndian = reader.isLittleEndian();
       final boolean interleaved = reader.isInterleaved();
       final ThumbnailChunkWriter chunks =
-        new ThumbnailChunkWriter(request.getRequestId(),
+        new ThumbnailChunkWriter(sink,
+                                 request.getRequestId(),
                                  width,
                                  height,
                                  atlasChannelCount,
                                  bytesPerPixel,
-                                 FormatTools.getPixelTypeString(reader.getPixelType()));
+                                 FormatTools.getPixelTypeString(reader.getPixelType()),
+                                 sink.pixelChunkBytes());
 
       for (int atlasC = 0; atlasC < atlasChannelCount; ++atlasC) {
         final int bioC = atlasC / rgbChannelCount;
@@ -546,23 +654,41 @@ public final class AtlasBioFormatsBridge
 
   private void closeDataset(final long sessionId) throws IOException
   {
-    final ReaderSession session = sessions.remove(sessionId);
+    final ReaderSession session;
+    synchronized (sessionsLock) {
+      session = sessions.remove(sessionId);
+    }
     if (session != null) {
-      session.reader.close();
+      session.close();
     }
   }
 
   private void closeAllSessions()
   {
-    for (final ReaderSession session : sessions.values()) {
+    final ArrayList<ReaderSession> toClose;
+    synchronized (sessionsLock) {
+      toClose = new ArrayList<>(sessions.values());
+      sessions.clear();
+    }
+    for (final ReaderSession session : toClose) {
       try {
-        session.reader.close();
+        session.close();
       }
       catch (final IOException ignored) {
         // best-effort process shutdown
       }
     }
-    sessions.clear();
+  }
+
+  private ReaderSession sessionFor(final long sessionId)
+  {
+    synchronized (sessionsLock) {
+      final ReaderSession session = sessions.get(sessionId);
+      if (session != null) {
+        return session;
+      }
+    }
+    throw new IllegalArgumentException("unknown Bio-Formats session id: " + sessionId);
   }
 
   private static IFormatReader createReader(final FileGroupingPolicy groupingPolicy, final boolean metadataFiltered)
@@ -649,17 +775,22 @@ public final class AtlasBioFormatsBridge
 
   private final class ChunkWriter
   {
+    private final ResponseSink sink;
     private final long requestId;
-    private final ByteArrayOutputStream buffer = new ByteArrayOutputStream(PIXEL_CHUNK_BYTES);
+    private final int chunkBytes;
+    private final ByteArrayOutputStream buffer;
     private int sequenceIndex = 0;
     private long totalBytes = 0;
 
-    ChunkWriter(final long requestId)
+    ChunkWriter(final ResponseSink sink, final long requestId, final int chunkBytes)
     {
+      this.sink = sink;
       this.requestId = requestId;
+      this.chunkBytes = chunkBytes;
+      this.buffer = new ByteArrayOutputStream(chunkBytes);
     }
 
-    void writePlane(final byte[] image, final int bytesPerPixel, final boolean littleEndian) throws IOException
+    void writePlane(final byte[] image, final int bytesPerPixel, final boolean littleEndian) throws Exception
     {
       if (littleEndian || bytesPerPixel == 1) {
         writeBytes(image, 0, image.length);
@@ -677,7 +808,7 @@ public final class AtlasBioFormatsBridge
                          final int rgbC,
                          final int bytesPerPixel,
                          final boolean littleEndian,
-                         final boolean interleaved) throws IOException
+                         final boolean interleaved) throws Exception
     {
       for (int yy = 0; yy < height; ++yy) {
         for (int xx = 0; xx < width; ++xx) {
@@ -693,7 +824,7 @@ public final class AtlasBioFormatsBridge
     }
 
     private void writeSample(final byte[] image, final int index, final int bytesPerPixel, final boolean littleEndian)
-      throws IOException
+      throws Exception
     {
       if (littleEndian || bytesPerPixel == 1) {
         writeBytes(image, index, bytesPerPixel);
@@ -704,35 +835,35 @@ public final class AtlasBioFormatsBridge
       }
     }
 
-    private void writeBytes(final byte[] data, int offset, int count) throws IOException
+    private void writeBytes(final byte[] data, int offset, int count) throws Exception
     {
       while (count > 0) {
-        final int writable = Math.min(count, PIXEL_CHUNK_BYTES - buffer.size());
+        final int writable = Math.min(count, chunkBytes - buffer.size());
         buffer.write(data, offset, writable);
         offset += writable;
         count -= writable;
         totalBytes += writable;
-        if (buffer.size() == PIXEL_CHUNK_BYTES) {
+        if (buffer.size() == chunkBytes) {
           flush(false);
         }
       }
     }
 
-    private void writeByte(final byte value) throws IOException
+    private void writeByte(final byte value) throws Exception
     {
       buffer.write(value);
       ++totalBytes;
-      if (buffer.size() == PIXEL_CHUNK_BYTES) {
+      if (buffer.size() == chunkBytes) {
         flush(false);
       }
     }
 
-    void finish() throws IOException
+    void finish() throws Exception
     {
       flush(true);
     }
 
-    private void flush(final boolean finalChunk) throws IOException
+    private void flush(final boolean finalChunk) throws Exception
     {
       if (buffer.size() == 0 && !finalChunk) {
         return;
@@ -744,38 +875,45 @@ public final class AtlasBioFormatsBridge
                                  .setData(ByteString.copyFrom(buffer.toByteArray()))
                                  .build();
       buffer.reset();
-      sendOk(requestId, Response.newBuilder().setPixelChunk(chunk));
+      sendOk(sink, requestId, Response.newBuilder().setPixelChunk(chunk));
     }
   }
 
   private final class ThumbnailChunkWriter
   {
+    private final ResponseSink sink;
     private final long requestId;
     private final int width;
     private final int height;
     private final int channelCount;
     private final int bytesPerPixel;
     private final String pixelType;
-    private final ByteArrayOutputStream buffer = new ByteArrayOutputStream(PIXEL_CHUNK_BYTES);
+    private final int chunkBytes;
+    private final ByteArrayOutputStream buffer;
     private int sequenceIndex = 0;
     private long totalBytes = 0;
 
-    ThumbnailChunkWriter(final long requestId,
+    ThumbnailChunkWriter(final ResponseSink sink,
+                         final long requestId,
                          final int width,
                          final int height,
                          final int channelCount,
                          final int bytesPerPixel,
-                         final String pixelType)
+                         final String pixelType,
+                         final int chunkBytes)
     {
+      this.sink = sink;
       this.requestId = requestId;
       this.width = width;
       this.height = height;
       this.channelCount = channelCount;
       this.bytesPerPixel = bytesPerPixel;
       this.pixelType = pixelType;
+      this.chunkBytes = chunkBytes;
+      this.buffer = new ByteArrayOutputStream(chunkBytes);
     }
 
-    void writePlane(final byte[] image, final int bytesPerPixel, final boolean littleEndian) throws IOException
+    void writePlane(final byte[] image, final int bytesPerPixel, final boolean littleEndian) throws Exception
     {
       if (littleEndian || bytesPerPixel == 1) {
         writeBytes(image, 0, image.length);
@@ -793,7 +931,7 @@ public final class AtlasBioFormatsBridge
                          final int rgbC,
                          final int bytesPerPixel,
                          final boolean littleEndian,
-                         final boolean interleaved) throws IOException
+                         final boolean interleaved) throws Exception
     {
       for (int yy = 0; yy < height; ++yy) {
         for (int xx = 0; xx < width; ++xx) {
@@ -809,7 +947,7 @@ public final class AtlasBioFormatsBridge
     }
 
     private void writeSample(final byte[] image, final int index, final int bytesPerPixel, final boolean littleEndian)
-      throws IOException
+      throws Exception
     {
       if (littleEndian || bytesPerPixel == 1) {
         writeBytes(image, index, bytesPerPixel);
@@ -820,35 +958,35 @@ public final class AtlasBioFormatsBridge
       }
     }
 
-    private void writeBytes(final byte[] data, int offset, int count) throws IOException
+    private void writeBytes(final byte[] data, int offset, int count) throws Exception
     {
       while (count > 0) {
-        final int writable = Math.min(count, PIXEL_CHUNK_BYTES - buffer.size());
+        final int writable = Math.min(count, chunkBytes - buffer.size());
         buffer.write(data, offset, writable);
         offset += writable;
         count -= writable;
         totalBytes += writable;
-        if (buffer.size() == PIXEL_CHUNK_BYTES) {
+        if (buffer.size() == chunkBytes) {
           flush(false);
         }
       }
     }
 
-    private void writeByte(final byte value) throws IOException
+    private void writeByte(final byte value) throws Exception
     {
       buffer.write(value);
       ++totalBytes;
-      if (buffer.size() == PIXEL_CHUNK_BYTES) {
+      if (buffer.size() == chunkBytes) {
         flush(false);
       }
     }
 
-    void finish() throws IOException
+    void finish() throws Exception
     {
       flush(true);
     }
 
-    private void flush(final boolean finalChunk) throws IOException
+    private void flush(final boolean finalChunk) throws Exception
     {
       if (buffer.size() == 0 && !finalChunk) {
         return;
@@ -865,7 +1003,51 @@ public final class AtlasBioFormatsBridge
                                      .setData(ByteString.copyFrom(buffer.toByteArray()))
                                      .build();
       buffer.reset();
-      sendOk(requestId, Response.newBuilder().setThumbnailChunk(chunk));
+      sendOk(sink, requestId, Response.newBuilder().setThumbnailChunk(chunk));
+    }
+  }
+
+  private static final class BioFormatsGrpcService extends BioFormatsBridgeGrpc.BioFormatsBridgeImplBase
+  {
+    private final AtlasBioFormatsBridge bridge;
+    private final Runnable shutdown;
+
+    BioFormatsGrpcService(final AtlasBioFormatsBridge bridge, final Runnable shutdown)
+    {
+      this.bridge = bridge;
+      this.shutdown = shutdown;
+    }
+
+    @Override public void execute(final Request request, final StreamObserver<Response> responseObserver)
+    {
+      boolean keepRunning = true;
+      final ResponseSink sink = new ResponseSink() {
+        @Override public void send(final Response response)
+        {
+          responseObserver.onNext(response);
+        }
+
+        @Override public int pixelChunkBytes()
+        {
+          return GRPC_PIXEL_CHUNK_BYTES;
+        }
+      };
+      try {
+        keepRunning = bridge.handleRequest(request, sink);
+        responseObserver.onCompleted();
+      }
+      catch (final Throwable t) {
+        try {
+          bridge.sendError(sink, request.getRequestId(), statusFor(t), t.getMessage());
+          responseObserver.onCompleted();
+        }
+        catch (final Throwable sendFailure) {
+          responseObserver.onError(sendFailure);
+        }
+      }
+      if (!keepRunning) {
+        new Thread(shutdown, "atlas-bioformats-grpc-shutdown").start();
+      }
     }
   }
 
@@ -873,13 +1055,38 @@ public final class AtlasBioFormatsBridge
   {
     final long id;
     final String path;
-    final IFormatReader reader;
+    final List<IFormatReader> readers;
+    final AtomicLong nextReadReader = new AtomicLong(0);
 
-    ReaderSession(final long id, final String path, final IFormatReader reader)
+    ReaderSession(final long id, final String path, final List<IFormatReader> readers)
     {
+      if (readers.isEmpty()) {
+        throw new IllegalArgumentException("reader session requires at least one reader");
+      }
       this.id = id;
       this.path = path;
-      this.reader = reader;
+      this.readers = readers;
+    }
+
+    IFormatReader primaryReader()
+    {
+      return readers.get(0);
+    }
+
+    IFormatReader readReader()
+    {
+      final long rawIndex = nextReadReader.getAndIncrement();
+      final int index = Math.floorMod(rawIndex, readers.size());
+      return readers.get(index);
+    }
+
+    void close() throws IOException
+    {
+      for (final IFormatReader reader : readers) {
+        synchronized (reader) {
+          reader.close();
+        }
+      }
     }
   }
 }

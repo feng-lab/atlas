@@ -29,6 +29,7 @@
 #include <nanobind/eigen/dense.h>
 #include <nanobind/operators.h>
 #include <nanobind/trampoline.h>
+#include <gflags/gflags.h>
 #include <cstring>
 
 namespace nb = nanobind;
@@ -36,6 +37,9 @@ namespace nb = nanobind;
 using namespace nim;
 
 using namespace nb::literals;
+
+DECLARE_int32(atlas_bioformats_bridge_worker_count);
+DECLARE_bool(atlas_bioformats_bridge_use_grpc);
 
 namespace {
 
@@ -402,6 +406,8 @@ std::array<T, 3> vectorToArray3(const std::vector<T>& values, const char* name)
 NB_MODULE(_imgpy, m)
 {
   ZLogInit::instance("zimg"s);
+  ::FLAGS_atlas_bioformats_bridge_use_grpc = false;
+  ::FLAGS_atlas_bioformats_bridge_worker_count = 1;
   ZImgInit::instance(qgetenv("Resources_DIR"), "", qgetenv("ZIMG_JARS_DIR"), false);
 
   m.doc() = R"pbdoc(

@@ -15,12 +15,17 @@
 #include <QStringList>
 #include <QTemporaryDir>
 #include <algorithm>
+#include <gflags/gflags.h>
 #include <map>
 #include <mutex>
 #include <optional>
 #include <set>
 #include <stdexcept>
 #include <string>
+
+DECLARE_int32(atlas_bioformats_bridge_io_timeout_ms);
+DECLARE_int32(atlas_bioformats_bridge_worker_count);
+DECLARE_bool(atlas_bioformats_bridge_use_grpc);
 
 namespace nim {
 
@@ -34,6 +39,35 @@ void createSubBlocksForTesting(const QString& filename,
 } // namespace bioformats_detail
 
 namespace {
+
+constexpr int kBioFormatsBridgeTestIoTimeoutMs = 5 * 60 * 1000;
+
+void configureBioFormatsTestBridge()
+{
+  // Bio-Formats tests are functional coverage, not bridge-throughput benchmarks.
+  // Default to stdio for CI coverage, but preserve an explicit command-line
+  // override so developers can run the same tests against the gRPC backend.
+  const gflags::CommandLineFlagInfo useGrpcInfo =
+    gflags::GetCommandLineFlagInfoOrDie("atlas_bioformats_bridge_use_grpc");
+  if (useGrpcInfo.is_default) {
+    ::FLAGS_atlas_bioformats_bridge_use_grpc = false;
+  }
+
+  // Keep CI deterministic by avoiding the stdio auto worker pool, which can
+  // otherwise multiply into many JVMs when CTest runs discovered GoogleTest cases
+  // in parallel. When gRPC is explicitly requested, auto still means Java-side
+  // reader instances inside one JVM.
+  if (!::FLAGS_atlas_bioformats_bridge_use_grpc && ::FLAGS_atlas_bioformats_bridge_worker_count == 0) {
+    ::FLAGS_atlas_bioformats_bridge_worker_count = 1;
+  }
+
+  // Production defaults wait indefinitely for bridge I/O because local file
+  // reads may legitimately be long-running. Tests should fail before CTest's
+  // broad per-case timeout so the error path includes bridge diagnostics.
+  if (::FLAGS_atlas_bioformats_bridge_io_timeout_ms <= 0) {
+    ::FLAGS_atlas_bioformats_bridge_io_timeout_ms = kBioFormatsBridgeTestIoTimeoutMs;
+  }
+}
 
 QString platformJavaExecutableName()
 {
@@ -83,6 +117,7 @@ std::optional<std::string> bioFormatsRuntimeSkipReason()
 
   if (!checked) {
     checked = true;
+    configureBioFormatsTestBridge();
 
     const QDir thirdPartyBuild(QStringLiteral(ATLAS_THIRDPARTY_BUILD_DIR));
     const QDir jarsDir(thirdPartyBuild.filePath(QStringLiteral("jars")));
