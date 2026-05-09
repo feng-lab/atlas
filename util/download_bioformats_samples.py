@@ -553,6 +553,29 @@ def relative_path_format_name(relative_path: pathlib.PurePosixPath) -> str:
     return relative_path.parts[0]
 
 
+def order_records_for_download(
+    records: list[dict[str, object]],
+) -> list[dict[str, object]]:
+    format_counts: dict[str, int] = {}
+    format_first_index: dict[str, int] = {}
+    indexed_records: list[tuple[int, dict[str, object], str]] = []
+    for index, record in enumerate(records):
+        relative_path = normalize_relative_path(record["relative_path"])
+        format_name = relative_path_format_name(relative_path)
+        indexed_records.append((index, record, format_name))
+        format_counts[format_name] = format_counts.get(format_name, 0) + 1
+        format_first_index.setdefault(format_name, index)
+
+    # Finish smaller formats first so partial runs maximize format coverage.
+    def sort_key(
+        indexed_record: tuple[int, dict[str, object], str],
+    ) -> tuple[int, int, int]:
+        index, _, format_name = indexed_record
+        return (format_counts[format_name], format_first_index[format_name], index)
+
+    return [record for _, record, _ in sorted(indexed_records, key=sort_key)]
+
+
 def relative_path_parent_depth(relative_path: pathlib.PurePosixPath) -> int:
     return max(len(relative_path.parts) - 2, 0)
 
@@ -1159,6 +1182,13 @@ def main() -> int:
             max_total_bytes=max_total_bytes,
         )
         logger.info("derived plan from full manifest: %s", full_manifest_path)
+
+    ordered_planned = order_records_for_download(planned)
+    if ordered_planned != planned:
+        logger.info(
+            "download order updated: formats scheduled by ascending planned file count",
+        )
+    planned = ordered_planned
 
     hash_file = should_hash(args)
 
