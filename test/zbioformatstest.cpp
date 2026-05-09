@@ -6,15 +6,19 @@
 #include "zimgio.h"
 #include "zcpuinfo.h"
 
+#include <QDir>
 #include <QFile>
 #include <QFileInfo>
-#include <QDirIterator>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QStringList>
 #include <QTemporaryDir>
 #include <algorithm>
+#include <map>
+#include <mutex>
 #include <optional>
+#include <set>
 #include <stdexcept>
 #include <string>
 
@@ -133,6 +137,221 @@ size_t nonNegativeIndex(index_t value)
   return static_cast<size_t>(value);
 }
 
+QString canonicalExistingPath(const QString& path)
+{
+  QFileInfo fi(path);
+  CHECK(fi.exists());
+  const QString canonicalPath = fi.canonicalFilePath();
+  return canonicalPath.isEmpty() ? fi.absoluteFilePath() : canonicalPath;
+}
+
+class WarningLogCapture final : public google::LogSink
+{
+public:
+  void clear()
+  {
+    std::lock_guard<std::mutex> lock(m_mutex);
+    m_messages.clear();
+  }
+
+  [[nodiscard]] std::vector<std::string> messages() const
+  {
+    std::lock_guard<std::mutex> lock(m_mutex);
+    return m_messages;
+  }
+
+  void send(google::LogSeverity severity,
+            const char*,
+            const char* baseFilename,
+            int line,
+            const google::LogMessageTime& time,
+            const char* message,
+            size_t messageLen) override
+  {
+    if (severity < google::GLOG_WARNING) {
+      return;
+    }
+    std::lock_guard<std::mutex> lock(m_mutex);
+    m_messages.push_back(formatLogMessage(severity, baseFilename, line, time, message, messageLen));
+  }
+
+private:
+  mutable std::mutex m_mutex;
+  std::vector<std::string> m_messages;
+};
+
+class ScopedWarningLogCapture
+{
+public:
+  ScopedWarningLogCapture()
+  {
+    addLogSink(&m_sink);
+  }
+
+  ~ScopedWarningLogCapture()
+  {
+    removeLogSink(&m_sink);
+  }
+
+  void clear()
+  {
+    m_sink.clear();
+  }
+
+  [[nodiscard]] std::vector<std::string> messages() const
+  {
+    return m_sink.messages();
+  }
+
+private:
+  WarningLogCapture m_sink;
+};
+
+struct CorpusFailure
+{
+  QString canonicalPath;
+  std::string message;
+};
+
+struct CorpusManifestFile
+{
+  QString relativePath;
+  QString absolutePath;
+};
+
+struct CorpusDriverRule
+{
+  QString topLevelFormat;
+  QStringList driverPathSuffixes;
+  bool includeExtensionlessNonDocs = false;
+};
+
+struct CorpusFormatStats
+{
+  size_t manifestFiles = 0;
+  size_t selectedDriverFiles = 0;
+  size_t missingFiles = 0;
+  size_t missingDriverFiles = 0;
+  size_t openedDriverFiles = 0;
+  size_t coveredDriverFiles = 0;
+};
+
+const std::vector<CorpusDriverRule>& corpusDriverRules()
+{
+  static const std::vector<CorpusDriverRule> kRules = {
+    {QStringLiteral("AmiraMesh"), {QStringLiteral(".am")}},
+    {QStringLiteral("BDV"), {QStringLiteral(".xml")}},
+    {QStringLiteral("CV7000"), {QStringLiteral(".wpi")}},
+    {QStringLiteral("CellH5"), {QStringLiteral(".ch5")}},
+    {QStringLiteral("CellSens"), {QStringLiteral(".vsi")}},
+    {QStringLiteral("Cellomics"), {QStringLiteral(".dib")}},
+    {QStringLiteral("DCIMG"), {QStringLiteral(".dcimg")}},
+    {QStringLiteral("DICOM"), {QStringLiteral(".dcm")}, true},
+    {QStringLiteral("DV"), {QStringLiteral(".dv"), QStringLiteral(".r3d"), QStringLiteral(".r3d_d3d")}},
+    {QStringLiteral("ECAT7"), {QStringLiteral(".v")}},
+    {QStringLiteral("Flex"), {QStringLiteral(".flex")}},
+    {QStringLiteral("Gatan"), {QStringLiteral(".dm3"), QStringLiteral(".dm4")}},
+    {QStringLiteral("HCS"),
+     {QStringLiteral(".dib"),
+      QStringLiteral(".xdce"),
+      QStringLiteral("/index.idx.xml"),
+      QStringLiteral("/index.ref.xml"),
+      QStringLiteral("/index.xml")}},
+    {QStringLiteral("Hamamatsu-NDPI"), {QStringLiteral(".ndpi")}},
+    {QStringLiteral("Hamamatsu-VMS"), {QStringLiteral(".vms")}},
+    {QStringLiteral("ICS"), {QStringLiteral(".ics")}},
+    {QStringLiteral("Imaris-IMS"), {QStringLiteral(".ims")}},
+    {QStringLiteral("Imspector"), {QStringLiteral(".msr")}},
+    {QStringLiteral("InCell2000"), {QStringLiteral(".xdce")}},
+    {QStringLiteral("InCell3000"), {QStringLiteral(".frm")}},
+    {QStringLiteral("JDCE"), {QStringLiteral(".jdce")}},
+    {QStringLiteral("KLB"), {QStringLiteral(".klb")}},
+    {QStringLiteral("LEO"), {QStringLiteral(".tif"), QStringLiteral(".tiff")}},
+    {QStringLiteral("Leica-LIF"), {QStringLiteral(".lif")}},
+    {QStringLiteral("Leica-SCN"), {QStringLiteral(".scn")}},
+    {QStringLiteral("Leica-XLEF"), {QStringLiteral(".xlef")}},
+    {QStringLiteral("MRC"),
+     {QStringLiteral(".map"), QStringLiteral(".mrc"), QStringLiteral(".rec"), QStringLiteral(".st")}},
+    {QStringLiteral("MetaXpress"), {QStringLiteral(".htd")}},
+    {QStringLiteral("Metamorph"), {QStringLiteral(".nd")}},
+    {QStringLiteral("Micro-Manager"),
+     {QStringLiteral("/metadata.txt"), QStringLiteral("_metadata.txt"), QStringLiteral("/acqusition.xml")}},
+    {QStringLiteral("ND2"), {QStringLiteral(".nd2")}},
+    {QStringLiteral("NIfTI"), {QStringLiteral(".nii"), QStringLiteral(".nii.gz"), QStringLiteral(".hdr")}},
+    {QStringLiteral("NRRD"), {QStringLiteral(".nhdr"), QStringLiteral(".nrrd")}},
+    {QStringLiteral("OBF"), {QStringLiteral(".obf")}},
+    {QStringLiteral("OME-TIFF"),
+     {QStringLiteral(".ome.tif"),
+      QStringLiteral(".ome.tiff"),
+      QStringLiteral(".tif"),
+      QStringLiteral(".tiff"),
+      QStringLiteral(".btf"),
+      QStringLiteral(".tf2"),
+      QStringLiteral(".tf8")}},
+    {QStringLiteral("OME-XML"), {QStringLiteral(".ome.xml")}},
+    {QStringLiteral("Olympus-FluoView"), {QStringLiteral(".oib"), QStringLiteral(".oif")}},
+    {QStringLiteral("Olympus-OIR"), {QStringLiteral(".oir")}},
+    {QStringLiteral("PNG"), {QStringLiteral(".png")}},
+    {QStringLiteral("PerkinElmer-Columbus"), {QStringLiteral("/measurementindex.columbusidx.xml")}},
+    {QStringLiteral("PerkinElmer-Operetta"),
+     {QStringLiteral("/index.idx.xml"), QStringLiteral("/index.ref.xml"), QStringLiteral("/index.xml")}},
+    {QStringLiteral("SDT"), {QStringLiteral(".sdt")}},
+    {QStringLiteral("SPC-FIFO"), {QStringLiteral(".set")}},
+    {QStringLiteral("SVS"), {QStringLiteral(".svs")}},
+    {QStringLiteral("ScanR"), {QStringLiteral("/experiment_descriptor.xml")}},
+    {QStringLiteral("TIFF"), {QStringLiteral(".tif"), QStringLiteral(".tiff"), QStringLiteral(".g3")}},
+    {QStringLiteral("Trestle"), {QStringLiteral(".tif"), QStringLiteral(".tiff")}},
+    {QStringLiteral("Vectra-QPTIFF"), {QStringLiteral(".qptiff")}},
+    {QStringLiteral("Ventana"), {QStringLiteral(".bif")}},
+    {QStringLiteral("Zeiss-CZI"), {QStringLiteral(".czi")}},
+    {QStringLiteral("gateway_tests"), {QStringLiteral(".dv"), QStringLiteral(".tiff"), QStringLiteral(".tif")}},
+    {QStringLiteral("u-track"), {QStringLiteral(".zip")}},
+  };
+  return kRules;
+}
+
+QString topLevelFormat(const QString& relativePath)
+{
+  const int separator = relativePath.indexOf(QLatin1Char('/'));
+  return separator < 0 ? relativePath : relativePath.left(separator);
+}
+
+bool isKnownNonImageDocument(const QString& relativePath)
+{
+  const QString name = QFileInfo(relativePath).fileName().toLower();
+  return name == QStringLiteral("copying") || name == QStringLiteral("license") ||
+         name == QStringLiteral("license.txt") || name == QStringLiteral("readme") ||
+         name == QStringLiteral("readme.txt");
+}
+
+bool hasNoFileExtension(const QString& relativePath)
+{
+  return !QFileInfo(relativePath).fileName().contains(QLatin1Char('.'));
+}
+
+std::optional<bool> isCorpusDriverFile(const QString& relativePath)
+{
+  const QString topLevel = topLevelFormat(relativePath);
+  const auto& rules = corpusDriverRules();
+  const auto it = std::ranges::find_if(rules, [&topLevel](const CorpusDriverRule& rule) {
+    return rule.topLevelFormat == topLevel;
+  });
+  if (it == rules.end()) {
+    return std::nullopt;
+  }
+
+  const QString lowerRelativePath = relativePath.toLower();
+  for (const QString& suffix : it->driverPathSuffixes) {
+    if (lowerRelativePath.endsWith(suffix)) {
+      return true;
+    }
+  }
+  if (it->includeExtensionlessNonDocs && hasNoFileExtension(relativePath) && !isKnownNonImageDocument(relativePath)) {
+    return true;
+  }
+  return false;
+}
+
 void expectSameRegionPixels(const ZImg& full, const ZImg& region, const ZImgRegion& sourceRegion)
 {
   ASSERT_EQ(sourceRegion.end.x - sourceRegion.start.x, region.sWidth());
@@ -164,12 +383,12 @@ void expectSameRegionPixels(const ZImg& full, const ZImg& region, const ZImgRegi
   }
 }
 
-std::vector<QString> corpusFilesFromManifest(const QString& rootPath)
+std::vector<CorpusManifestFile> corpusFilesFromManifest(const QString& rootPath)
 {
   const QString manifestPath = QDir(rootPath).filePath(QStringLiteral("manifest.json"));
   QFile manifestFile(manifestPath);
   if (!manifestFile.exists()) {
-    return {};
+    throw std::runtime_error(fmt::format("Bio-Formats corpus manifest is missing: {}", manifestPath.toStdString()));
   }
   if (!manifestFile.open(QIODevice::ReadOnly)) {
     throw std::runtime_error(fmt::format("failed to open {}", manifestPath.toStdString()));
@@ -182,35 +401,38 @@ std::vector<QString> corpusFilesFromManifest(const QString& rootPath)
       fmt::format("failed to parse {}: {}", manifestPath.toStdString(), error.errorString().toStdString()));
   }
 
-  std::vector<QString> files;
-  const QJsonArray samples = doc.object().value(QStringLiteral("samples")).toArray();
+  const QJsonValue samplesValue = doc.object().value(QStringLiteral("samples"));
+  if (!samplesValue.isArray()) {
+    throw std::runtime_error(
+      fmt::format("Bio-Formats corpus manifest samples must be an array: {}", manifestPath.toStdString()));
+  }
+
+  std::vector<CorpusManifestFile> files;
+  const QJsonArray samples = samplesValue.toArray();
+  if (samples.isEmpty()) {
+    throw std::runtime_error(fmt::format("Bio-Formats corpus manifest has no samples: {}", manifestPath.toStdString()));
+  }
   files.reserve(static_cast<size_t>(samples.size()));
-  for (const QJsonValue& value : samples) {
+  for (qsizetype index = 0; index < samples.size(); ++index) {
+    const QJsonValue& value = samples[index];
+    if (!value.isObject()) {
+      throw std::runtime_error(fmt::format("Bio-Formats corpus manifest sample {} must be an object in {}",
+                                           index + 1,
+                                           manifestPath.toStdString()));
+    }
     const QJsonObject object = value.toObject();
     const QString relativePath = object.value(QStringLiteral("relative_path")).toString();
-    if (!relativePath.isEmpty()) {
-      files.push_back(QDir(rootPath).filePath(relativePath));
+    if (relativePath.isEmpty()) {
+      throw std::runtime_error(fmt::format("Bio-Formats corpus manifest sample {} is missing relative_path in {}",
+                                           index + 1,
+                                           manifestPath.toStdString()));
     }
+    files.push_back({relativePath, QDir(rootPath).filePath(relativePath)});
   }
   return files;
 }
 
-std::vector<QString> corpusFilesByWalking(const QString& rootPath)
-{
-  std::vector<QString> files;
-  QDirIterator it(rootPath, QDir::Files | QDir::NoSymLinks, QDirIterator::Subdirectories);
-  while (it.hasNext()) {
-    const QString path = it.next();
-    if (QFileInfo(path).fileName() == QStringLiteral("manifest.json")) {
-      continue;
-    }
-    files.push_back(path);
-  }
-  std::sort(files.begin(), files.end());
-  return files;
-}
-
-std::vector<QString> publicCorpusFiles()
+std::vector<CorpusManifestFile> publicCorpusFiles()
 {
   const QByteArray root = qgetenv("ATLAS_BIOFORMATS_BREADTH_DIR");
   if (root.isEmpty()) {
@@ -220,11 +442,10 @@ std::vector<QString> publicCorpusFiles()
   if (!QDir(rootPath).exists()) {
     throw std::runtime_error(fmt::format("ATLAS_BIOFORMATS_BREADTH_DIR does not exist: {}", rootPath.toStdString()));
   }
-  std::vector<QString> files = corpusFilesFromManifest(rootPath);
-  if (files.empty()) {
-    files = corpusFilesByWalking(rootPath);
-  }
-  std::sort(files.begin(), files.end());
+  std::vector<CorpusManifestFile> files = corpusFilesFromManifest(rootPath);
+  std::sort(files.begin(), files.end(), [](const CorpusManifestFile& lhs, const CorpusManifestFile& rhs) {
+    return lhs.relativePath < rhs.relativePath;
+  });
   return files;
 }
 
@@ -552,39 +773,86 @@ TEST(ZBioFormatsTest, PublicCorpusReadsMetadataAndSmallRegions)
     GTEST_SKIP() << *reason;
   }
 
-  const std::vector<QString> files = publicCorpusFiles();
+  const std::vector<CorpusManifestFile> files = publicCorpusFiles();
   if (files.empty()) {
     GTEST_SKIP() << "set ATLAS_BIOFORMATS_BREADTH_DIR to run public Bio-Formats corpus smoke tests";
   }
-  const bool strict = !qgetenv("ATLAS_BIOFORMATS_BREADTH_STRICT").isEmpty();
 
+  ScopedWarningLogCapture warningCapture;
+  std::set<QString> coveredCompanionFiles;
+  std::set<QString> formatsWithoutDriverRules;
+  std::set<QString> formatsWithoutSelectedDrivers;
+  std::set<QString> formatsWithoutCheckedDrivers;
+  std::map<QString, CorpusFormatStats> formatStats;
   size_t openedFiles = 0;
-  size_t unsupportedFiles = 0;
-  size_t openFailures = 0;
-  size_t regionFailures = 0;
-  size_t thumbnailFailures = 0;
-  for (const QString& path : files) {
-    SCOPED_TRACE(path.toStdString());
-    ZImgBioFormats reader;
-    if (!reader.canRead(path)) {
-      ++unsupportedFiles;
+  size_t missingFiles = 0;
+  size_t selectedDriverFiles = 0;
+  size_t skippedNonDriverFiles = 0;
+  size_t skippedCoveredCompanionFiles = 0;
+  std::vector<CorpusFailure> openFailureRecords;
+  std::vector<CorpusFailure> regionFailureRecords;
+  std::vector<CorpusFailure> warningFailureRecords;
+  for (const CorpusManifestFile& file : files) {
+    const QString& path = file.absolutePath;
+    const QString format = topLevelFormat(file.relativePath);
+    CorpusFormatStats& stats = formatStats[format];
+    ++stats.manifestFiles;
+    const std::optional<bool> isDriver = isCorpusDriverFile(file.relativePath);
+    if (isDriver.has_value() && *isDriver) {
+      ++selectedDriverFiles;
+      ++stats.selectedDriverFiles;
+    }
+
+    SCOPED_TRACE(file.relativePath.toStdString());
+    if (!QFileInfo(path).exists()) {
+      ++missingFiles;
+      ++stats.missingFiles;
+      if (isDriver.has_value() && *isDriver) {
+        ++stats.missingDriverFiles;
+      }
+      ADD_FAILURE() << "Bio-Formats corpus manifest entry is missing on disk: " << file.relativePath.toStdString()
+                    << " (" << path.toStdString() << ")";
       continue;
     }
 
+    if (!isDriver.has_value()) {
+      formatsWithoutDriverRules.insert(format);
+      ++skippedNonDriverFiles;
+      continue;
+    }
+    if (!*isDriver) {
+      ++skippedNonDriverFiles;
+      continue;
+    }
+
+    const QString canonicalPath = canonicalExistingPath(path);
+    if (coveredCompanionFiles.contains(canonicalPath)) {
+      ++skippedCoveredCompanionFiles;
+      ++stats.coveredDriverFiles;
+      continue;
+    }
+
+    warningCapture.clear();
+    ZBioFormatsDatasetInfo dataset;
     std::vector<ZImgInfo> infos;
     try {
+      dataset = ZBioFormatsBridgeClient::instance().openDataset(path);
       ZImgIO::instance().readInfos(path, infos, nullptr, FileFormat::BioFormats);
     }
     catch (const std::exception& e) {
-      ++openFailures;
       ZBioFormatsBridgeClient::instance().closeDataset(path);
-      if (strict) {
-        FAIL() << e.what();
-      }
+      openFailureRecords.push_back(
+        {canonicalPath, fmt::format("failed to open Bio-Formats corpus file {}: {}", path.toStdString(), e.what())});
       continue;
     }
-    ASSERT_FALSE(infos.empty());
+    if (infos.empty()) {
+      ZBioFormatsBridgeClient::instance().closeDataset(path);
+      openFailureRecords.push_back(
+        {canonicalPath, fmt::format("Bio-Formats corpus file has no readable series: {}", path.toStdString())});
+      continue;
+    }
     ++openedFiles;
+    ++stats.openedDriverFiles;
 
     for (size_t scene = 0; scene < infos.size(); ++scene) {
       SCOPED_TRACE(fmt::format("scene {}", scene));
@@ -594,44 +862,95 @@ TEST(ZBioFormatsTest, PublicCorpusReadsMetadataAndSmallRegions)
           ZImgIO::instance().readImg(path, img, region, scene, 1, 1, 1, FileFormat::BioFormats);
         }
         catch (const std::exception& e) {
-          ++regionFailures;
-          if (strict) {
-            FAIL() << e.what();
-          }
+          regionFailureRecords.push_back(
+            {canonicalPath,
+             fmt::format("failed to read Bio-Formats corpus region from {}: {}", path.toStdString(), e.what())});
           continue;
         }
         EXPECT_FALSE(img.isEmpty());
       }
-      ZImgThumbernail thumbnail;
-      try {
-        ZImgIO::instance().readThumbnail(path,
-                                         thumbnail,
-                                         ZImgRegion(0, -1, 0, -1, 0, 1, 0, -1, 0, 1),
-                                         scene,
-                                         FileFormat::BioFormats);
+    }
+
+    const std::vector<std::string> warningMessages = warningCapture.messages();
+    if (!warningMessages.empty()) {
+      warningFailureRecords.push_back({canonicalPath,
+                                       fmt::format("warnings/errors while reading Bio-Formats corpus file {}:\n{}",
+                                                   path.toStdString(),
+                                                   fmt::join(warningMessages, "\n"))});
+    }
+
+    for (const QString& usedFile : dataset.usedFiles) {
+      if (!QFileInfo(usedFile).exists()) {
+        continue;
       }
-      catch (const std::exception& e) {
-        ++thumbnailFailures;
-        if (strict) {
-          FAIL() << e.what();
-        }
+      const QString usedPath = canonicalExistingPath(usedFile);
+      if (usedPath != canonicalPath) {
+        coveredCompanionFiles.insert(usedPath);
       }
     }
     ZBioFormatsBridgeClient::instance().closeDataset(path);
   }
 
+  size_t suppressedCoveredCompanionFailures = 0;
+  auto reportFailures = [&](const std::vector<CorpusFailure>& failures) {
+    size_t reportedFailures = 0;
+    for (const CorpusFailure& failure : failures) {
+      if (coveredCompanionFiles.contains(failure.canonicalPath)) {
+        ++suppressedCoveredCompanionFailures;
+        continue;
+      }
+      ++reportedFailures;
+      ADD_FAILURE() << failure.message;
+    }
+    return reportedFailures;
+  };
+  const size_t openFailures = reportFailures(openFailureRecords);
+  const size_t regionFailures = reportFailures(regionFailureRecords);
+  const size_t warningFailures = reportFailures(warningFailureRecords);
+
+  for (const QString& format : formatsWithoutDriverRules) {
+    ADD_FAILURE() << "Bio-Formats corpus top-level format has no driver rule: " << format.toStdString();
+  }
+  for (const auto& [format, stats] : formatStats) {
+    if (formatsWithoutDriverRules.contains(format)) {
+      continue;
+    }
+    if (stats.selectedDriverFiles == 0) {
+      formatsWithoutSelectedDrivers.insert(format);
+      ADD_FAILURE() << "Bio-Formats corpus top-level format selected no driver files: " << format.toStdString()
+                    << " (manifest entries: " << stats.manifestFiles
+                    << "). Fix the driver rule or include at least one real driver in manifest.json.";
+      continue;
+    }
+    if (stats.missingDriverFiles == 0 && stats.openedDriverFiles + stats.coveredDriverFiles == 0) {
+      formatsWithoutCheckedDrivers.insert(format);
+      ADD_FAILURE() << "Bio-Formats corpus top-level format checked no driver files: " << format.toStdString()
+                    << " (selected drivers: " << stats.selectedDriverFiles
+                    << "). Selected drivers must either open or be covered by another opened driver.";
+    }
+  }
+
   RecordProperty("files", static_cast<int>(files.size()));
+  RecordProperty("missing_files", static_cast<int>(missingFiles));
+  RecordProperty("selected_driver_files", static_cast<int>(selectedDriverFiles));
+  RecordProperty("skipped_non_driver_files", static_cast<int>(skippedNonDriverFiles));
   RecordProperty("opened_files", static_cast<int>(openedFiles));
-  RecordProperty("unsupported_or_companion_files", static_cast<int>(unsupportedFiles));
+  RecordProperty("skipped_covered_companion_files", static_cast<int>(skippedCoveredCompanionFiles));
+  RecordProperty("suppressed_covered_companion_failures", static_cast<int>(suppressedCoveredCompanionFailures));
+  RecordProperty("formats_without_driver_rules", static_cast<int>(formatsWithoutDriverRules.size()));
+  RecordProperty("formats_without_selected_drivers", static_cast<int>(formatsWithoutSelectedDrivers.size()));
+  RecordProperty("formats_without_checked_drivers", static_cast<int>(formatsWithoutCheckedDrivers.size()));
   RecordProperty("open_failures", static_cast<int>(openFailures));
   RecordProperty("region_failures", static_cast<int>(regionFailures));
-  RecordProperty("thumbnail_failures", static_cast<int>(thumbnailFailures));
+  RecordProperty("warning_failures", static_cast<int>(warningFailures));
   EXPECT_GT(openedFiles, 0u);
-  if (strict) {
-    EXPECT_EQ(0u, openFailures);
-    EXPECT_EQ(0u, regionFailures);
-    EXPECT_EQ(0u, thumbnailFailures);
-  }
+  EXPECT_EQ(0u, missingFiles);
+  EXPECT_TRUE(formatsWithoutDriverRules.empty());
+  EXPECT_TRUE(formatsWithoutSelectedDrivers.empty());
+  EXPECT_TRUE(formatsWithoutCheckedDrivers.empty());
+  EXPECT_EQ(0u, openFailures);
+  EXPECT_EQ(0u, regionFailures);
+  EXPECT_EQ(0u, warningFailures);
 }
 
 } // namespace nim

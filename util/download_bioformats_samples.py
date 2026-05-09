@@ -64,6 +64,62 @@ EXCLUDED_FILENAMES = {
     "readme.txt",
 }
 
+# Driver files for formats where selecting only the first N files can produce an
+# unusable partial dataset. When one of these drivers is selected, the planner
+# downloads the containing dataset directory atomically, even if that makes the
+# per-format file count exceed --per-format.
+DATASET_DRIVER_SUFFIXES = {
+    "BDV": (".xml",),
+    "CV7000": (".wpi",),
+    "CellSens": (".vsi",),
+    "HCS": (
+        ".xdce",
+        "/index.idx.xml",
+        "/index.ref.xml",
+        "/index.xml",
+    ),
+    "Hamamatsu-VMS": (".vms",),
+    "ICS": (".ics",),
+    "InCell2000": (".xdce",),
+    "JDCE": (".jdce",),
+    "Leica-XLEF": (".xlef",),
+    "MetaXpress": (".htd",),
+    "Metamorph": (".nd",),
+    "Micro-Manager": ("/metadata.txt", "_metadata.txt", "/acqusition.xml"),
+    "NRRD": (".nhdr",),
+    "OME-XML": (".ome.xml",),
+    "Olympus-FluoView": (".oif",),
+    "PerkinElmer-Columbus": ("/measurementindex.columbusidx.xml",),
+    "PerkinElmer-Operetta": (
+        "/index.idx.xml",
+        "/index.ref.xml",
+        "/index.xml",
+    ),
+    "SPC-FIFO": (".set",),
+    "ScanR": ("/experiment_descriptor.xml",),
+}
+
+DRIVER_ONLY_FORMATS = {
+    "BDV",
+    "CV7000",
+    "CellSens",
+    "Hamamatsu-VMS",
+    "ICS",
+    "InCell2000",
+    "JDCE",
+    "Leica-XLEF",
+    "MetaXpress",
+    "Metamorph",
+    "Micro-Manager",
+    "NRRD",
+    "OME-XML",
+    "Olympus-FluoView",
+    "PerkinElmer-Columbus",
+    "PerkinElmer-Operetta",
+    "SPC-FIFO",
+    "ScanR",
+}
+
 
 class LinkParser(html.parser.HTMLParser):
     def __init__(self) -> None:
@@ -501,6 +557,38 @@ def relative_path_parent_depth(relative_path: pathlib.PurePosixPath) -> int:
     return max(len(relative_path.parts) - 2, 0)
 
 
+def relative_path_is_under(
+    relative_path: pathlib.PurePosixPath, prefix: pathlib.PurePosixPath
+) -> bool:
+    return relative_path.parts[: len(prefix.parts)] == prefix.parts
+
+
+def has_path_suffix(
+    relative_path: pathlib.PurePosixPath, suffixes: tuple[str, ...]
+) -> bool:
+    lower_path = relative_path.as_posix().lower()
+    return any(lower_path.endswith(suffix) for suffix in suffixes)
+
+
+def dataset_driver_group_prefix(
+    relative_path: pathlib.PurePosixPath,
+) -> pathlib.PurePosixPath | None:
+    format_name = relative_path_format_name(relative_path)
+    suffixes = DATASET_DRIVER_SUFFIXES.get(format_name)
+    if suffixes is None or not has_path_suffix(relative_path, suffixes):
+        return None
+    if len(relative_path.parts) < 2:
+        return None
+
+    if (
+        format_name in {"HCS", "PerkinElmer-Operetta"}
+        and len(relative_path.parts) >= 3
+        and relative_path.parts[-2].lower() == "images"
+    ):
+        return pathlib.PurePosixPath(*relative_path.parts[:-2])
+    return pathlib.PurePosixPath(*relative_path.parts[:-1])
+
+
 def derive_plan_from_full_manifest(
     *,
     args: argparse.Namespace,
@@ -510,19 +598,47 @@ def derive_plan_from_full_manifest(
 ) -> tuple[list[dict[str, object]], int]:
     format_limit = per_format_limit(args)
     include_sidecars = args.mode == "all"
+    normalized_records: list[
+        tuple[dict[str, object], pathlib.PurePosixPath, str, int]
+    ] = []
+    records_by_format: dict[
+        str,
+        list[tuple[dict[str, object], pathlib.PurePosixPath, str, int]],
+    ] = {}
+    for sample in full_records:
+        record = manifest_sample_record(sample)
+        relative_path = normalize_relative_path(record["relative_path"])
+        record_info = (
+            record,
+            relative_path,
+            relative_path_format_name(relative_path),
+            int(record["size"]),
+        )
+        normalized_records.append(record_info)
+        records_by_format.setdefault(record_info[2], []).append(record_info)
+
     selected: list[dict[str, object]] = []
+    selected_paths: set[str] = set()
     selected_bytes = 0
     per_format_counts: dict[str, int] = {}
     skipped_by_mode = 0
     skipped_by_depth = 0
     skipped_by_size = 0
     skipped_by_per_format = 0
+    skipped_by_total_size = 0
     total_limit_reached = False
+    dataset_groups_selected = 0
+    dataset_group_files_selected = 0
+    per_format_overrun_files = 0
+    group_records_by_prefix: dict[
+        pathlib.PurePosixPath,
+        list[tuple[dict[str, object], pathlib.PurePosixPath, str, int]],
+    ] = {}
 
     logger.info(
         "deriving download plan from full manifest: records=%d mode=%s "
         "max_file=%s max_total=%s max_depth=%s per_format=%s",
-        len(full_records),
+        len(normalized_records),
         args.mode,
         "unlimited" if max_file_bytes is None else format_byte_count(max_file_bytes),
         "unlimited" if max_total_bytes is None else format_byte_count(max_total_bytes),
@@ -530,51 +646,167 @@ def derive_plan_from_full_manifest(
         "unlimited" if format_limit is None else format_limit,
     )
 
-    for sample in full_records:
-        record = manifest_sample_record(sample)
-        relative_path = normalize_relative_path(record["relative_path"])
-        format_name = relative_path_format_name(relative_path)
-        size = int(record["size"])
+    def records_for_prefix(
+        prefix: pathlib.PurePosixPath,
+    ) -> list[tuple[dict[str, object], pathlib.PurePosixPath, str, int]]:
+        cached = group_records_by_prefix.get(prefix)
+        if cached is not None:
+            return cached
+        format_records = records_by_format.get(relative_path_format_name(prefix), [])
+        records = [
+            record_info
+            for record_info in format_records
+            if relative_path_is_under(record_info[1], prefix)
+        ]
+        group_records_by_prefix[prefix] = records
+        return records
 
-        if not include_sidecars and not is_candidate_file(
-            str(record["url"]), include_sidecars=False
+    def add_record_group(
+        records: list[tuple[dict[str, object], pathlib.PurePosixPath, str, int]],
+        *,
+        label: str,
+        complete_dataset_group: bool,
+    ) -> int:
+        nonlocal selected_bytes
+        nonlocal skipped_by_size
+        nonlocal skipped_by_per_format
+        nonlocal skipped_by_total_size
+        nonlocal total_limit_reached
+        nonlocal per_format_overrun_files
+
+        new_records = [
+            record_info
+            for record_info in records
+            if str(record_info[1]) not in selected_paths
+        ]
+        if not new_records:
+            return 0
+
+        format_name = new_records[0][2]
+        if any(record_info[2] != format_name for record_info in new_records):
+            raise RuntimeError(f"dataset group spans multiple formats: {label}")
+
+        if max_file_bytes is not None and any(
+            not within_optional_limit(record_info[3], max_file_bytes)
+            for record_info in new_records
         ):
-            skipped_by_mode += 1
+            skipped_by_size += len(new_records)
+            logger.info(
+                "skipping complete dataset group with oversized file(s): %s files=%d",
+                label,
+                len(new_records),
+            )
+            return 0
+
+        before_count = per_format_counts.get(format_name, 0)
+        if format_limit is not None and before_count >= format_limit:
+            skipped_by_per_format += len(new_records)
+            return 0
+
+        group_size = sum(record_info[3] for record_info in new_records)
+        if (
+            max_total_bytes is not None
+            and selected_bytes + group_size > max_total_bytes
+        ):
+            if complete_dataset_group:
+                skipped_by_total_size += len(new_records)
+                logger.info(
+                    "skipping complete dataset group beyond total-byte limit: "
+                    "%s planned=%s group=%s limit=%s",
+                    label,
+                    format_byte_count(selected_bytes),
+                    format_byte_count(group_size),
+                    format_byte_count(max_total_bytes),
+                )
+                return 0
+            logger.info(
+                "global plan limit reached before %s: planned=%s next_group=%s limit=%s",
+                label,
+                format_byte_count(selected_bytes),
+                format_byte_count(group_size),
+                format_byte_count(max_total_bytes),
+            )
+            total_limit_reached = True
+            return 0
+
+        selected.extend(record_info[0] for record_info in new_records)
+        selected_paths.update(str(record_info[1]) for record_info in new_records)
+        selected_bytes += group_size
+        after_count = before_count + len(new_records)
+        per_format_counts[format_name] = after_count
+        if (
+            complete_dataset_group
+            and format_limit is not None
+            and after_count > format_limit
+        ):
+            per_format_overrun_files += after_count - max(format_limit, before_count)
+        return len(new_records)
+
+    processed_group_prefixes: set[pathlib.PurePosixPath] = set()
+    for record_info in normalized_records:
+        _, relative_path, _, _ = record_info
+        group_prefix = dataset_driver_group_prefix(relative_path)
+        if group_prefix is None or group_prefix in processed_group_prefixes:
             continue
+        processed_group_prefixes.add(group_prefix)
         if (
             args.max_depth > 0
             and relative_path_parent_depth(relative_path) > args.max_depth
         ):
             skipped_by_depth += 1
             continue
-        if not within_optional_limit(size, max_file_bytes):
-            skipped_by_size += 1
-            continue
-        if (
-            format_limit is not None
-            and per_format_counts.get(format_name, 0) >= format_limit
-        ):
-            skipped_by_per_format += 1
-            continue
-        if max_total_bytes is not None and selected_bytes + size > max_total_bytes:
-            logger.info(
-                "global plan limit reached before %s: planned=%s next_file=%s limit=%s",
-                record["relative_path"],
-                format_byte_count(selected_bytes),
-                format_byte_count(size),
-                format_byte_count(max_total_bytes),
-            )
-            total_limit_reached = True
+
+        group_records = records_for_prefix(group_prefix)
+        added = add_record_group(
+            group_records,
+            label=group_prefix.as_posix(),
+            complete_dataset_group=True,
+        )
+        if added:
+            dataset_groups_selected += 1
+            dataset_group_files_selected += added
+        if total_limit_reached:
             break
 
-        selected.append(record)
-        selected_bytes += size
-        per_format_counts[format_name] = per_format_counts.get(format_name, 0) + 1
+    if not total_limit_reached:
+        for record, relative_path, format_name, size in normalized_records:
+            if str(relative_path) in selected_paths:
+                continue
+            if dataset_driver_group_prefix(relative_path) is not None:
+                continue
+            if format_name in DRIVER_ONLY_FORMATS and (
+                format_limit is not None or not include_sidecars
+            ):
+                skipped_by_mode += 1
+                continue
+            if not include_sidecars and not is_candidate_file(
+                str(record["url"]), include_sidecars=False
+            ):
+                skipped_by_mode += 1
+                continue
+            if (
+                args.max_depth > 0
+                and relative_path_parent_depth(relative_path) > args.max_depth
+            ):
+                skipped_by_depth += 1
+                continue
+            if not within_optional_limit(size, max_file_bytes):
+                skipped_by_size += 1
+                continue
+
+            add_record_group(
+                [(record, relative_path, format_name, size)],
+                label=str(record["relative_path"]),
+                complete_dataset_group=False,
+            )
+            if total_limit_reached:
+                break
 
     logger.info(
         "derived download plan: selected=%d selected_bytes=%s "
         "formats=%d skipped_by_mode=%d skipped_by_depth=%d skipped_by_size=%d "
-        "skipped_by_per_format=%d total_limit_reached=%s",
+        "skipped_by_per_format=%d skipped_by_total_size=%d dataset_groups=%d "
+        "dataset_group_files=%d per_format_overrun_files=%d total_limit_reached=%s",
         len(selected),
         format_byte_count(selected_bytes),
         len(per_format_counts),
@@ -582,6 +814,10 @@ def derive_plan_from_full_manifest(
         skipped_by_depth,
         skipped_by_size,
         skipped_by_per_format,
+        skipped_by_total_size,
+        dataset_groups_selected,
+        dataset_group_files_selected,
+        per_format_overrun_files,
         total_limit_reached,
     )
     return selected, selected_bytes
