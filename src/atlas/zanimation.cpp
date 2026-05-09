@@ -20,6 +20,7 @@
 #include <QDir>
 #include <QProgressDialog>
 #include <QThread>
+#include <memory>
 #include <utility>
 #include "zlog.h"
 
@@ -767,13 +768,19 @@ void ZAnimation::exportFixedSize3DAnimation(const QString& fn,
 
   auto progress = new QProgressDialog(title, "Cancel", 0, 100, QApplication::activeWindow());
   progress->setAutoReset(false);
+  progress->setAutoClose(false);
   progress->setWindowModality(Qt::WindowModal);
   progress->setAttribute(Qt::WA_DeleteOnClose);
   QObject::disconnect(progress, &QProgressDialog::canceled, progress, &QProgressDialog::cancel);
+  auto exportFinished = std::make_shared<bool>(false);
   connect(engine, &Z3DRenderingEngine::progressChanged, progress, &QProgressDialog::setValue);
-  connect(engine, &Z3DRenderingEngine::renderingError, progress, &QProgressDialog::reset);
-  connect(engine, &Z3DRenderingEngine::videoEncoderFinished, progress, &QProgressDialog::reset);
-  connect(engine, &Z3DRenderingEngine::videoEncoderFinished, this, &ZAnimation::videoEncoderFinished);
+  connect(engine, &Z3DRenderingEngine::renderingError, progress, [progress](const QString&) {
+    progress->reject();
+  });
+  connect(engine, &Z3DRenderingEngine::videoEncoderFinished, progress, [progress, exportFinished]() {
+    *exportFinished = true;
+    progress->accept();
+  });
   connect(progress, &QProgressDialog::canceled, this, &ZAnimation::cancelButtonPressed);
 
   QObject::disconnect(this,
@@ -799,8 +806,10 @@ void ZAnimation::exportFixedSize3DAnimation(const QString& fn,
                                             false,
                                             tileSize,
                                             tileBorder);
-
   progress->exec();
+  if (*exportFinished) {
+    videoEncoderFinished();
+  }
 }
 
 void ZAnimation::export3DAnimation(const QString& fn,
@@ -923,9 +932,11 @@ void ZAnimation::exportFixedSize2DAnimation(const QString& fn,
 
   if (!progress->wasCanceled()) {
     progress->setLabelText("Compressing Video...");
-    connect(m_videoEncoder, &ZVideoEncoder::error, progress, &QProgressDialog::reset);
-    connect(m_videoEncoder, &ZVideoEncoder::finished, progress, &QProgressDialog::reset);
-    connect(m_videoEncoder, &ZVideoEncoder::canceled, progress, &QProgressDialog::reset);
+    connect(m_videoEncoder, &ZVideoEncoder::error, progress, [progress](const QString&) {
+      progress->reject();
+    });
+    connect(m_videoEncoder, &ZVideoEncoder::finished, progress, &QProgressDialog::accept);
+    connect(m_videoEncoder, &ZVideoEncoder::canceled, progress, &QProgressDialog::reject);
     connect(progress, &QProgressDialog::canceled, m_videoEncoder, &ZVideoEncoder::cancel);
     m_tempDir = tempdir;
     m_videoEncoder->encode(tmpdir, namePrefix, fieldWidth, framePerSecond, dir.filePath(fn));

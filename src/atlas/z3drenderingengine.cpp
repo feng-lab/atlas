@@ -50,6 +50,7 @@ DECLARE_bool(atlas_enable_benchmark_screen_space_sufficiency_audit);
 #include <QTimer>
 #include <QThread>
 #include <chrono>
+#include <cstdint>
 #include <memory>
 
 DEFINE_bool(atlas_debug_opengl,
@@ -948,6 +949,11 @@ void Z3DRenderingEngine::exportFixedSize3DAnimation(const ZAnimation* animation,
     } else {
       int numCols = (width + tileSize - 1) / tileSize;
       int numRows = (height + tileSize - 1) / tileSize;
+      constexpr int kTileRenderProgressMax = 98;
+      constexpr int kTileComposeProgress = 99;
+      const int64_t totalTileFrames = int64_t(numFrame) * int64_t(numCols) * int64_t(numRows);
+      CHECK(totalTileFrames > 0);
+      int64_t completedTileFrames = 0;
       bool forwardFrame = false;
       bool forwardCol = false;
       for (int r = 0; r < numRows; ++r) {
@@ -961,10 +967,6 @@ void Z3DRenderingEngine::exportFixedSize3DAnimation(const ZAnimation* animation,
           for (int i = forwardFrame ? startFrame : (endFrame - 1); forwardFrame ? (i < endFrame) : (i >= startFrame);
                forwardFrame ? ++i : --i) {
             maybeCancel(token);
-            Q_EMIT progressChanged(std::clamp<int>(
-              std::floor(((c * r + r) * numFrame + i - startFrame) * 1. / (numFrame * numCols * numRows) * 100.),
-              0,
-              98));
 
             animation->setCurrentTime(static_cast<double>(i) / framePerSecond);
             QString filename = QString("_%1%2_%3_%4.png")
@@ -1001,6 +1003,11 @@ void Z3DRenderingEngine::exportFixedSize3DAnimation(const ZAnimation* animation,
                                                                        tileStartX,
                                                                        tileStartY,
                                                                        token);
+            ++completedTileFrames;
+            Q_EMIT progressChanged(std::clamp<int>(
+              std::floor(static_cast<double>(completedTileFrames) * kTileRenderProgressMax / totalTileFrames),
+              0,
+              kTileRenderProgressMax));
           }
         }
       }
@@ -1038,7 +1045,7 @@ void Z3DRenderingEngine::exportFixedSize3DAnimation(const ZAnimation* animation,
                                                                                        sst,
                                                                                        token)));
       }
-      Q_EMIT progressChanged(99);
+      Q_EMIT progressChanged(kTileComposeProgress);
       folly::coro::blockingWait(folly::coro::collectAllWindowed(std::move(composeTasks), composeWindow));
       maybeCancel(token);
     }
