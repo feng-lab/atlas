@@ -1,10 +1,6 @@
 package org.fenglab.atlas.bioformats;
 
 import com.google.protobuf.ByteString;
-import io.grpc.Server;
-import io.grpc.netty.shaded.io.grpc.netty.NettyServerBuilder;
-import io.grpc.stub.StreamObserver;
-import org.fenglab.atlas.bioformats.proto.BioFormatsBridgeGrpc;
 import org.fenglab.atlas.bioformats.proto.BioFormatsBridgeProto.CloseDatasetResponse;
 import org.fenglab.atlas.bioformats.proto.BioFormatsBridgeProto.FileGroupingPolicy;
 import org.fenglab.atlas.bioformats.proto.BioFormatsBridgeProto.ListFormatsResponse;
@@ -21,20 +17,10 @@ import org.fenglab.atlas.bioformats.proto.BioFormatsBridgeProto.SeriesInfo;
 import org.fenglab.atlas.bioformats.proto.BioFormatsBridgeProto.ShutdownResponse;
 import org.fenglab.atlas.bioformats.proto.BioFormatsBridgeProto.StatusCode;
 import org.fenglab.atlas.bioformats.proto.BioFormatsBridgeProto.ThumbnailChunk;
-import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
 import java.io.ByteArrayOutputStream;
-import java.io.EOFException;
 import java.io.File;
-import java.io.FileDescriptor;
-import java.io.FileOutputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.net.InetAddress;
-import java.net.InetSocketAddress;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Hashtable;
 import java.util.LinkedHashMap;
@@ -42,7 +28,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.atomic.AtomicReference;
 import loci.formats.FormatException;
 import loci.formats.FormatTools;
 import loci.formats.IFormatReader;
@@ -54,107 +39,27 @@ import ome.units.UNITS;
 import ome.units.quantity.Length;
 import ome.xml.model.primitives.Color;
 
-public final class AtlasBioFormatsBridge
+public final class AtlasBioFormatsBridgeCore
 {
-  private static final int MAX_FRAME_BYTES = 512 * 1024 * 1024;
-  private static final int PIXEL_CHUNK_BYTES = 8 * 1024 * 1024;
-  private static final int GRPC_PIXEL_CHUNK_BYTES = 1024 * 1024;
+  public static final int MAX_FRAME_BYTES = 512 * 1024 * 1024;
+  public static final int PIXEL_CHUNK_BYTES = 8 * 1024 * 1024;
+  public static final int GRPC_PIXEL_CHUNK_BYTES = 1024 * 1024;
   private static final int PROTOCOL_VERSION = 1;
 
-  private final InputStream in;
-  private final OutputStream out;
   private final int workerCount;
   private final Object sessionsLock = new Object();
   private final Map<Long, ReaderSession> sessions = new LinkedHashMap<>();
   private final AtomicLong nextSessionId = new AtomicLong(1);
 
-  private AtlasBioFormatsBridge(final InputStream in, final OutputStream out, final int workerCount)
+  public AtlasBioFormatsBridgeCore(final int workerCount)
   {
     if (workerCount <= 0) {
       throw new IllegalArgumentException("worker count must be positive");
     }
-    this.in = in == null ? null : new BufferedInputStream(in);
-    this.out = out == null ? null : new BufferedOutputStream(out);
     this.workerCount = workerCount;
   }
 
-  private AtlasBioFormatsBridge(final int workerCount)
-  {
-    this(null, null, workerCount);
-  }
-
-  public static void main(final String[] args) throws Exception
-  {
-    final OutputStream protocolOut = new FileOutputStream(FileDescriptor.out);
-    System.setProperty("org.slf4j.simpleLogger.logFile", "System.err");
-    System.setProperty("org.slf4j.simpleLogger.defaultLogLevel", "warn");
-    System.setOut(System.err);
-
-    int grpcPort = -1;
-    int workerCount = 1;
-    for (final String arg : args) {
-      if (arg.startsWith("--grpc-port=")) {
-        grpcPort = parseNonNegativeIntArgument(arg, "--grpc-port=");
-      } else if (arg.startsWith("--worker-count=")) {
-        workerCount = parsePositiveIntArgument(arg, "--worker-count=");
-      } else if (!arg.isEmpty()) {
-        throw new IllegalArgumentException("unknown argument: " + arg);
-      }
-    }
-
-    if (grpcPort >= 0) {
-      runGrpcServer(grpcPort, workerCount, protocolOut);
-      return;
-    }
-
-    final AtlasBioFormatsBridge bridge = new AtlasBioFormatsBridge(System.in, protocolOut, workerCount);
-    bridge.run();
-  }
-
-  private static int parseNonNegativeIntArgument(final String arg, final String prefix)
-  {
-    final int value = Integer.parseInt(arg.substring(prefix.length()));
-    if (value < 0) {
-      throw new IllegalArgumentException(prefix + " must be >= 0");
-    }
-    return value;
-  }
-
-  private static int parsePositiveIntArgument(final String arg, final String prefix)
-  {
-    final int value = Integer.parseInt(arg.substring(prefix.length()));
-    if (value <= 0) {
-      throw new IllegalArgumentException(prefix + " must be > 0");
-    }
-    return value;
-  }
-
-  private static void runGrpcServer(final int grpcPort, final int workerCount, final OutputStream startupOut)
-    throws Exception
-  {
-    final AtlasBioFormatsBridge bridge = new AtlasBioFormatsBridge(workerCount);
-    final AtomicReference<Server> serverRef = new AtomicReference<>();
-    final Runnable shutdown = () ->
-    {
-      final Server server = serverRef.get();
-      if (server != null) {
-        server.shutdown();
-      }
-    };
-    final InetSocketAddress listenAddress = new InetSocketAddress(InetAddress.getByName("127.0.0.1"), grpcPort);
-    final Server server = NettyServerBuilder.forAddress(listenAddress)
-                            .maxInboundMessageSize(MAX_FRAME_BYTES)
-                            .addService(new BioFormatsGrpcService(bridge, shutdown))
-                            .build()
-                            .start();
-    serverRef.set(server);
-    startupOut.write(("ATLAS_BIOFORMATS_GRPC_PORT=" + server.getPort() + "\n").getBytes(StandardCharsets.US_ASCII));
-    startupOut.flush();
-    server.awaitTermination();
-    bridge.closeAllSessions();
-  }
-
-  private interface ResponseSink
+  public interface ResponseSink
   {
     void send(Response response) throws Exception;
 
@@ -164,33 +69,7 @@ public final class AtlasBioFormatsBridge
     }
   }
 
-  private void run() throws Exception
-  {
-    if (in == null || out == null) {
-      throw new IllegalStateException("stdio bridge was not initialized with streams");
-    }
-    final ResponseSink sink = this::writeResponse;
-    boolean running = true;
-    while (running) {
-      final Request request;
-      try {
-        request = readRequest();
-      }
-      catch (final EOFException eof) {
-        break;
-      }
-
-      try {
-        running = handleRequest(request, sink);
-      }
-      catch (final Throwable t) {
-        sendError(sink, request.getRequestId(), statusFor(t), t.getMessage());
-      }
-    }
-    closeAllSessions();
-  }
-
-  private boolean handleRequest(final Request request, final ResponseSink sink) throws Exception
+  public boolean handleRequest(final Request request, final ResponseSink sink) throws Exception
   {
     switch (request.getCommandCase()) {
       case RUNTIME_INFO:
@@ -226,7 +105,7 @@ public final class AtlasBioFormatsBridge
 
   private RuntimeInfoResponse runtimeInfo()
   {
-    final Package bridgePackage = AtlasBioFormatsBridge.class.getPackage();
+    final Package bridgePackage = AtlasBioFormatsBridgeCore.class.getPackage();
     final String bridgeVersion = bridgePackage == null ? "" : bridgePackage.getImplementationVersion();
     return RuntimeInfoResponse.newBuilder()
       .setProtocolVersion(PROTOCOL_VERSION)
@@ -238,32 +117,6 @@ public final class AtlasBioFormatsBridge
       .build();
   }
 
-  private Request readRequest() throws IOException
-  {
-    final int size = readLittleEndianInt(in);
-    if (size < 0 || size > MAX_FRAME_BYTES) {
-      throw new IOException("invalid request frame size: " + size);
-    }
-    final byte[] data = in.readNBytes(size);
-    if (data.length != size) {
-      throw new EOFException("truncated request frame");
-    }
-    return Request.parseFrom(data);
-  }
-
-  private static int readLittleEndianInt(final InputStream input) throws IOException
-  {
-    final int b0 = input.read();
-    if (b0 < 0)
-      throw new EOFException();
-    final int b1 = input.read();
-    final int b2 = input.read();
-    final int b3 = input.read();
-    if ((b1 | b2 | b3) < 0)
-      throw new EOFException();
-    return (b0 & 0xff) | ((b1 & 0xff) << 8) | ((b2 & 0xff) << 16) | ((b3 & 0xff) << 24);
-  }
-
   private void sendOk(final ResponseSink sink, final long requestId, final Response.Builder response) throws Exception
   {
     response.setRequestId(requestId);
@@ -271,7 +124,7 @@ public final class AtlasBioFormatsBridge
     sink.send(response.build());
   }
 
-  private void sendError(final ResponseSink sink, final long requestId, final StatusCode status, final String message)
+  public void sendError(final ResponseSink sink, final long requestId, final StatusCode status, final String message)
     throws Exception
   {
     final Response response = Response.newBuilder()
@@ -280,22 +133,6 @@ public final class AtlasBioFormatsBridge
                                 .setErrorMessage(message == null ? status.name() : message)
                                 .build();
     sink.send(response);
-  }
-
-  private void writeResponse(final Response response) throws IOException
-  {
-    final byte[] data = response.toByteArray();
-    writeLittleEndianInt(out, data.length);
-    out.write(data);
-    out.flush();
-  }
-
-  private static void writeLittleEndianInt(final OutputStream output, final int value) throws IOException
-  {
-    output.write(value & 0xff);
-    output.write((value >>> 8) & 0xff);
-    output.write((value >>> 16) & 0xff);
-    output.write((value >>> 24) & 0xff);
   }
 
   private ListFormatsResponse listFormats()
@@ -663,7 +500,7 @@ public final class AtlasBioFormatsBridge
     }
   }
 
-  private void closeAllSessions()
+  public void closeAllSessions()
   {
     final ArrayList<ReaderSession> toClose;
     synchronized (sessionsLock) {
@@ -720,7 +557,7 @@ public final class AtlasBioFormatsBridge
     }
   }
 
-  private static StatusCode statusFor(final Throwable t)
+  public static StatusCode statusFor(final Throwable t)
   {
     if (t instanceof FileNotFoundException) {
       return StatusCode.STATUS_CODE_NOT_FOUND;
@@ -1004,50 +841,6 @@ public final class AtlasBioFormatsBridge
                                      .build();
       buffer.reset();
       sendOk(sink, requestId, Response.newBuilder().setThumbnailChunk(chunk));
-    }
-  }
-
-  private static final class BioFormatsGrpcService extends BioFormatsBridgeGrpc.BioFormatsBridgeImplBase
-  {
-    private final AtlasBioFormatsBridge bridge;
-    private final Runnable shutdown;
-
-    BioFormatsGrpcService(final AtlasBioFormatsBridge bridge, final Runnable shutdown)
-    {
-      this.bridge = bridge;
-      this.shutdown = shutdown;
-    }
-
-    @Override public void execute(final Request request, final StreamObserver<Response> responseObserver)
-    {
-      boolean keepRunning = true;
-      final ResponseSink sink = new ResponseSink() {
-        @Override public void send(final Response response)
-        {
-          responseObserver.onNext(response);
-        }
-
-        @Override public int pixelChunkBytes()
-        {
-          return GRPC_PIXEL_CHUNK_BYTES;
-        }
-      };
-      try {
-        keepRunning = bridge.handleRequest(request, sink);
-        responseObserver.onCompleted();
-      }
-      catch (final Throwable t) {
-        try {
-          bridge.sendError(sink, request.getRequestId(), statusFor(t), t.getMessage());
-          responseObserver.onCompleted();
-        }
-        catch (final Throwable sendFailure) {
-          responseObserver.onError(sendFailure);
-        }
-      }
-      if (!keepRunning) {
-        new Thread(shutdown, "atlas-bioformats-grpc-shutdown").start();
-      }
     }
   }
 

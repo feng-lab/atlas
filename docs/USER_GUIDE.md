@@ -1535,8 +1535,8 @@ Use **Help → Shortcuts** in either the 2D or 3D window to open this section di
 | `--atlas_http_backend` | Select remote-dataset HTTP transport: `proxygen` or `curl`. |
 | `--atlas_http_ca_bundle` | Override the PEM CA bundle used for HTTPS remote-dataset requests. |
 | `--atlas_http_windows_trust_source` | On Windows, choose the default HTTPS trust source shared by both HTTP backends: `auto`, `windows_store`, or `bundled_pem`. |
-| `--atlas_bioformats_bridge_worker_count` | Bio-Formats bridge worker count for pixel reads. Default `0` auto-selects workers: the default gRPC backend uses CPU thread count for Java-side reader workers inside one JVM, while the stdio backend caps Java sidecar processes by CPU threads and a 2 GiB per-JVM memory budget. |
-| `--atlas_bioformats_bridge_use_grpc` | Bio-Formats bridge transport. Default `true` starts one Java process and uses gRPC, with `--atlas_bioformats_bridge_worker_count` controlling Java-side reader workers inside that process. Set `false` to use the stdio multi-process backend. |
+| `--atlas_bioformats_bridge_worker_count` | Bio-Formats gRPC reader count for pixel reads. Default `0` auto-selects the CPU thread count for Java-side reader workers inside one JVM. The stdio backend always uses one Java process and ignores this flag. |
+| `--atlas_bioformats_bridge_use_grpc` | Bio-Formats bridge transport. Default `true` starts the desktop gRPC bridge jar in one Java process. Set `false` to use the small single-process stdio bridge jar. |
 | `--filename` | Input path for headless export (`.animation3d` for animation export, `.scene` for scene export). |
 | `--output_filename` | Output path (`.mp4`/video for animation export, image path for scene export). |
 | `--output_fps`, `--output_start_frame`, `--output_end_frame` | Output frame timing. |
@@ -1554,7 +1554,7 @@ Use **Help → Shortcuts** in either the 2D or 3D window to open this section di
 
 ### 12.3 File Format Support at a Glance
 
-- **Images** – Native readers cover common scientific and general image formats including TIFF/OME-TIFF, LSM, V3DRAW, MHD/RAW, PNG, JPG, EXR, BMP, CZI, Leica, HDF5-backed Atlas images, and NIfTI. Formats supported by Bio-Formats are available through the bundled Java sidecar when `bioformats_package.jar` and `atlas-bioformats-bridge.jar` are installed.
+- **Images** – Native readers cover common scientific and general image formats including TIFF/OME-TIFF, LSM, V3DRAW, MHD/RAW, PNG, JPG, EXR, BMP, CZI, Leica, HDF5-backed Atlas images, and NIfTI. Formats supported by Bio-Formats are available through `bioformats_package.jar`.
 - **Meshes** – OBJ, PLY, STL, OFF, VTK, GIfTI (verify on load via logs).
 - **SWC** – SWC/eSWC variations; duplicates avoided through canonical path checks.
 - **Puncta** – Atlas NIMP, Vaa3D APO/marker, and TXT/XYZ point sets.

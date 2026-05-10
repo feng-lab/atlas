@@ -446,9 +446,8 @@ if (UNIX AND NOT APPLE)
   endif ()
 endif ()
 
-install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/jars" # source directory
-        DESTINATION zimg # target directory (relative so --prefix/DESTDIR work)
-        FILES_MATCHING PATTERN "*.jar"
-        PATTERN "*idea*" EXCLUDE
-        PATTERN "*cmake*" EXCLUDE
+install(FILES
+        "${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/jars/bioformats_package.jar"
+        "${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/jars/atlas-bioformats-bridge-stdio.jar"
+        DESTINATION zimg/jars
 )

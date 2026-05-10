@@ -3,7 +3,6 @@
 #include "bioformats_bridge.grpc.pb.h"
 #include "bioformats_bridge.pb.h"
 #include "zexception.h"
-#include "zcpuinfo.h"
 #include "zimginterface.h"
 #include "zlog.h"
 
@@ -43,13 +42,11 @@ DEFINE_int32(atlas_bioformats_bridge_io_timeout_ms,
 DEFINE_int32(
   atlas_bioformats_bridge_worker_count,
   0,
-  "Number of Bio-Formats bridge workers used for pixel reads. 0 means auto: the gRPC backend uses hardware "
-  "concurrency, while the stdio backend chooses from hardware concurrency and a 2 GiB per-JVM memory budget. On "
-  "gRPC, workers are independent Bio-Formats reader instances inside one Java process; on stdio, workers are "
-  "independent Java sidecars.");
+  "Number of Bio-Formats reader workers used for gRPC pixel reads. 0 means auto. The stdio backend always uses one "
+  "Java process and ignores this flag.");
 DEFINE_bool(atlas_bioformats_bridge_use_grpc,
             true,
-            "Use the single-JVM gRPC Bio-Formats bridge. Set false to use the stdio multi-process bridge.");
+            "Use the single-JVM gRPC Bio-Formats bridge. Set false to use the single-process stdio bridge.");
 
 namespace nim {
 
@@ -60,11 +57,13 @@ namespace proto = atlas::bioformats::bridge;
 constexpr uint32_t kMaxFrameBytes = 512_u32 * 1024_u32 * 1024_u32;
 constexpr uint32_t kBridgeProtocolVersion = 1;
 constexpr const char* kBioFormatsJar = "bioformats_package.jar";
-constexpr const char* kAtlasBioFormatsBridgeJar = "atlas-bioformats-bridge.jar";
+constexpr const char* kAtlasBioFormatsGrpcBridgeJar = "atlas-bioformats-bridge-grpc.jar";
+constexpr const char* kAtlasBioFormatsStdioBridgeJar = "atlas-bioformats-bridge-stdio.jar";
+constexpr const char* kAtlasBioFormatsGrpcBridgeMainClass = "org.fenglab.atlas.bioformats.AtlasBioFormatsGrpcBridge";
+constexpr const char* kAtlasBioFormatsStdioBridgeMainClass = "org.fenglab.atlas.bioformats.AtlasBioFormatsStdioBridge";
 // This is used only for system Java discovery. A cold JVM can take several
 // seconds to answer under CI load, especially while many tests start at once.
 constexpr int kJavaVersionProbeTimeoutMs = 30000;
-constexpr uint64_t kAutoBridgeWorkerHeapBudgetBytes = 2_u64 * 1024_u64 * 1024_u64 * 1024_u64;
 
 struct JavaCandidate
 {
@@ -281,11 +280,27 @@ QString bridgeClasspath()
 #else
   constexpr QChar separator(':');
 #endif
-  return jarsDir.absoluteFilePath(kBioFormatsJar) + separator + jarsDir.absoluteFilePath(kAtlasBioFormatsBridgeJar);
+  const char* bridgeJar =
+    FLAGS_atlas_bioformats_bridge_use_grpc ? kAtlasBioFormatsGrpcBridgeJar : kAtlasBioFormatsStdioBridgeJar;
+  return jarsDir.absoluteFilePath(kBioFormatsJar) + separator + jarsDir.absoluteFilePath(bridgeJar);
+}
+
+const char* bridgeMainClass()
+{
+  return FLAGS_atlas_bioformats_bridge_use_grpc ? kAtlasBioFormatsGrpcBridgeMainClass
+                                                : kAtlasBioFormatsStdioBridgeMainClass;
+}
+
+const char* bridgeJarName()
+{
+  return FLAGS_atlas_bioformats_bridge_use_grpc ? kAtlasBioFormatsGrpcBridgeJar : kAtlasBioFormatsStdioBridgeJar;
 }
 
 size_t resolveBioFormatsBridgeWorkerCount()
 {
+  if (!FLAGS_atlas_bioformats_bridge_use_grpc) {
+    return 1;
+  }
   if (FLAGS_atlas_bioformats_bridge_worker_count < 0) {
     throw ZException("--atlas_bioformats_bridge_worker_count must be >= 0");
   }
@@ -293,14 +308,7 @@ size_t resolveBioFormatsBridgeWorkerCount()
     return static_cast<size_t>(FLAGS_atlas_bioformats_bridge_worker_count);
   }
 
-  const size_t cpuWorkers = std::max<size_t>(1, std::thread::hardware_concurrency());
-  if (FLAGS_atlas_bioformats_bridge_use_grpc) {
-    return cpuWorkers;
-  }
-
-  const size_t memoryWorkers =
-    std::max<size_t>(1, ZCpuInfo::instance().nPhysicalRAM / kAutoBridgeWorkerHeapBudgetBytes);
-  return std::min(cpuWorkers, memoryWorkers);
+  return std::max<size_t>(1, std::thread::hardware_concurrency());
 }
 
 ZBioFormatsReaderFormat convertReaderFormat(const proto::ReaderFormat& format)
@@ -749,7 +757,7 @@ private:
       args.push_back(QString("-Xmx%1").arg(QString::fromStdString(FLAGS_atlas_bioformats_java_xmx)));
     }
     args << "-Djava.awt.headless=true"
-         << "-cp" << bridgeClasspath() << "org.fenglab.atlas.bioformats.AtlasBioFormatsBridge";
+         << "-cp" << bridgeClasspath() << bridgeMainClass();
 
     const QString java = javaExecutable();
     m_process.setProgram(java);
@@ -1069,78 +1077,48 @@ private:
   std::thread m_thread;
 };
 
-class ZBioFormatsStdioBridgePool
+class ZBioFormatsStdioBridgeClient
 {
 public:
-  ZBioFormatsStdioBridgePool()
+  ZBioFormatsStdioBridgeClient()
+    : m_worker(std::make_unique<ZBioFormatsBridgeWorker>(0))
   {
-    const size_t workerCount = resolveBioFormatsBridgeWorkerCount();
-    CHECK(workerCount > 0);
-    m_workers.reserve(workerCount);
-    for (size_t i = 0; i < workerCount; ++i) {
-      m_workers.push_back(std::make_unique<ZBioFormatsBridgeWorker>(i));
-    }
-    LOG(INFO) << "Bio-Formats bridge worker pool size: " << workerCount
+    LOG(INFO) << "Bio-Formats stdio bridge enabled with one Java process"
               << " (--atlas_bioformats_bridge_worker_count=" << FLAGS_atlas_bioformats_bridge_worker_count
               << ", --atlas_bioformats_java_xmx=" << FLAGS_atlas_bioformats_java_xmx << ")";
   }
 
   [[nodiscard]] std::vector<ZBioFormatsReaderFormat> listFormats()
   {
-    return primaryWorker().call([](ZBioFormatsBridgeProcess& core) {
+    return worker().call([](ZBioFormatsBridgeProcess& core) {
       return core.listFormats();
     });
   }
 
   void warmUp()
   {
-    primaryWorker().call([](ZBioFormatsBridgeProcess& core) {
+    worker().call([](ZBioFormatsBridgeProcess& core) {
       core.warmUp();
     });
   }
 
   [[nodiscard]] bool canRead(const QString& filename)
   {
-    return primaryWorker().call([&filename](ZBioFormatsBridgeProcess& core) {
+    return worker().call([&filename](ZBioFormatsBridgeProcess& core) {
       return core.canRead(filename);
     });
   }
 
   [[nodiscard]] ZBioFormatsDatasetInfo openDataset(const QString& filename)
   {
-    std::vector<std::future<ZBioFormatsDatasetInfo>> futures;
-    futures.reserve(m_workers.size());
-    for (const auto& worker : m_workers) {
-      futures.push_back(worker->callAsync([filename](ZBioFormatsBridgeProcess& core) {
-        return core.openDataset(filename);
-      }));
-    }
-
-    std::optional<ZBioFormatsDatasetInfo> primaryResult;
-    std::exception_ptr firstException;
-    for (size_t i = 0; i < futures.size(); ++i) {
-      try {
-        ZBioFormatsDatasetInfo dataset = futures[i].get();
-        if (i == 0) {
-          primaryResult = std::move(dataset);
-        }
-      }
-      catch (...) {
-        if (!firstException) {
-          firstException = std::current_exception();
-        }
-      }
-    }
-    if (firstException) {
-      std::rethrow_exception(firstException);
-    }
-    CHECK(primaryResult.has_value());
-    return std::move(*primaryResult);
+    return worker().call([&filename](ZBioFormatsBridgeProcess& core) {
+      return core.openDataset(filename);
+    });
   }
 
   [[nodiscard]] std::vector<uint8_t> readRegion(const QString& filename, size_t scene, const ZImgRegion& region)
   {
-    return readWorker().call([&filename, scene, &region](ZBioFormatsBridgeProcess& core) {
+    return worker().call([&filename, scene, &region](ZBioFormatsBridgeProcess& core) {
       return core.readRegion(filename, scene, region);
     });
   }
@@ -1148,71 +1126,33 @@ public:
   [[nodiscard]] std::vector<uint8_t>
   readRegion(const QString& filename, size_t scene, uint32_t resolution, const ZImgRegion& region)
   {
-    return readWorker().call([&filename, scene, resolution, &region](ZBioFormatsBridgeProcess& core) {
+    return worker().call([&filename, scene, resolution, &region](ZBioFormatsBridgeProcess& core) {
       return core.readRegion(filename, scene, resolution, region);
     });
   }
 
   [[nodiscard]] ZBioFormatsThumbnail readThumbnail(const QString& filename, size_t scene, size_t z, size_t t)
   {
-    return primaryWorker().call([&filename, scene, z, t](ZBioFormatsBridgeProcess& core) {
+    return worker().call([&filename, scene, z, t](ZBioFormatsBridgeProcess& core) {
       return core.readThumbnail(filename, scene, z, t);
     });
   }
 
   void closeDataset(const QString& filename)
   {
-    std::vector<std::future<void>> futures;
-    futures.reserve(m_workers.size());
-    for (const auto& worker : m_workers) {
-      futures.push_back(worker->callAsync([filename](ZBioFormatsBridgeProcess& core) {
-        core.closeDataset(filename);
-      }));
-    }
-    waitAll(std::move(futures));
+    worker().call([&filename](ZBioFormatsBridgeProcess& core) {
+      core.closeDataset(filename);
+    });
   }
 
 private:
-  ZBioFormatsBridgeWorker& primaryWorker()
+  ZBioFormatsBridgeWorker& worker()
   {
-    CHECK(!m_workers.empty());
-    CHECK(m_workers.front() != nullptr);
-    return *m_workers.front();
+    CHECK(m_worker != nullptr);
+    return *m_worker;
   }
 
-  ZBioFormatsBridgeWorker& readWorker()
-  {
-    CHECK(!m_workers.empty());
-    const size_t index = m_nextReadWorker.fetch_add(1, std::memory_order_relaxed) % m_workers.size();
-    CHECK(m_workers[index] != nullptr);
-    return *m_workers[index];
-  }
-
-  template<typename T>
-  void waitAll(std::vector<std::future<T>> futures)
-  {
-    std::exception_ptr firstException;
-    for (auto& future : futures) {
-      try {
-        if constexpr (std::is_void_v<T>) {
-          future.get();
-        } else {
-          (void)future.get();
-        }
-      }
-      catch (...) {
-        if (!firstException) {
-          firstException = std::current_exception();
-        }
-      }
-    }
-    if (firstException) {
-      std::rethrow_exception(firstException);
-    }
-  }
-
-  std::vector<std::unique_ptr<ZBioFormatsBridgeWorker>> m_workers;
-  std::atomic<size_t> m_nextReadWorker = 0;
+  std::unique_ptr<ZBioFormatsBridgeWorker> m_worker;
 };
 
 class ZBioFormatsGrpcBridgeProcess
@@ -1530,8 +1470,8 @@ private:
       args.push_back(QString("-Xmx%1").arg(QString::fromStdString(FLAGS_atlas_bioformats_java_xmx)));
     }
     args << "-Djava.awt.headless=true"
-         << "-cp" << bridgeClasspath() << "org.fenglab.atlas.bioformats.AtlasBioFormatsBridge"
-         << "--grpc-port=0" << QString("--worker-count=%1").arg(m_workerCount);
+         << "-cp" << bridgeClasspath() << bridgeMainClass() << "--grpc-port=0"
+         << QString("--worker-count=%1").arg(m_workerCount);
 
     const QString java = javaExecutable();
     m_process.setProgram(java);
@@ -1771,7 +1711,7 @@ public:
     if (m_useGrpc) {
       m_grpc = std::make_unique<ZBioFormatsGrpcBridgeProcess>(workerCount);
     } else {
-      m_stdio = std::make_unique<ZBioFormatsStdioBridgePool>();
+      m_stdio = std::make_unique<ZBioFormatsStdioBridgeClient>();
     }
   }
 
@@ -1827,14 +1767,40 @@ public:
 
 private:
   bool m_useGrpc = false;
-  std::unique_ptr<ZBioFormatsStdioBridgePool> m_stdio;
+  std::unique_ptr<ZBioFormatsStdioBridgeClient> m_stdio;
   std::unique_ptr<ZBioFormatsGrpcBridgeProcess> m_grpc;
 };
 
+namespace {
+
+std::mutex& bioFormatsBridgeClientSingletonMutex()
+{
+  static std::mutex mutex;
+  return mutex;
+}
+
+std::unique_ptr<ZBioFormatsBridgeClient>& bioFormatsBridgeClientSingleton()
+{
+  static std::unique_ptr<ZBioFormatsBridgeClient> client;
+  return client;
+}
+
+} // namespace
+
 ZBioFormatsBridgeClient& ZBioFormatsBridgeClient::instance()
 {
-  static ZBioFormatsBridgeClient client;
-  return client;
+  std::lock_guard<std::mutex> lock(bioFormatsBridgeClientSingletonMutex());
+  std::unique_ptr<ZBioFormatsBridgeClient>& client = bioFormatsBridgeClientSingleton();
+  if (!client) {
+    client = std::make_unique<ZBioFormatsBridgeClient>();
+  }
+  return *client;
+}
+
+void ZBioFormatsBridgeClient::resetInstanceForTesting()
+{
+  std::lock_guard<std::mutex> lock(bioFormatsBridgeClientSingletonMutex());
+  bioFormatsBridgeClientSingleton().reset();
 }
 
 bool ZBioFormatsBridgeClient::hasRuntimeSupport()
@@ -1857,8 +1823,8 @@ QStringList ZBioFormatsBridgeClient::missingRuntimeFiles()
   if (!jarsDir.exists(kBioFormatsJar)) {
     missing.push_back(kBioFormatsJar);
   }
-  if (!jarsDir.exists(kAtlasBioFormatsBridgeJar)) {
-    missing.push_back(kAtlasBioFormatsBridgeJar);
+  if (!jarsDir.exists(bridgeJarName())) {
+    missing.push_back(bridgeJarName());
   }
   return missing;
 }

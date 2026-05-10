@@ -97,6 +97,10 @@ public:
 
   static QStringList missingRuntimeFiles();
 
+  // Tests change bridge transport flags in-process; reset before the next
+  // instance() call so the singleton captures the new flag values.
+  static void resetInstanceForTesting();
+
   ZBioFormatsBridgeClient();
 
   ~ZBioFormatsBridgeClient();

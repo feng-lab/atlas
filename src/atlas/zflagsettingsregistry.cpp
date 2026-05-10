@@ -136,7 +136,7 @@ const std::vector<ZFlagSettingSpec>& atlasFlagSettingSpecs()
                                 true));
     allSpecs.push_back(makeSpec("atlas_bioformats_bridge_worker_count",
                                 "I/O & Processing",
-                                "Bio-Formats bridge worker count",
+                                "Bio-Formats gRPC reader count",
                                 ZFlagSettingEditorKind::Auto,
                                 {},
                                 true));

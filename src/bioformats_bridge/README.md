@@ -1,29 +1,35 @@
 # Atlas Bio-Formats Bridge
 
 This directory owns the Java bridge used by Atlas' native `ZImgBioFormats`
-reader. The default desktop transport is a single-JVM gRPC service. The same
-protobuf schema also supports the legacy sidecar protocol over length-prefixed
-stdin/stdout frames. Both transports compile/run against Atlas' packaged
+reader. The bridge builds two transport jars from one shared core:
+
+- `atlas-bioformats-bridge-grpc.jar` is the default desktop jar. It runs one JVM
+  with a loopback gRPC service and can open multiple Java-side `IFormatReader`
+  workers inside that process.
+- `atlas-bioformats-bridge-stdio.jar` uses the length-prefixed stdin/stdout protobuf 
+  protocol and always runs one Java process.
+
+Both transports compile and run against Atlas' packaged
 `bioformats_package.jar`.
 
 Atlas does not pin a separate Bio-Formats Maven version here. The Maven build
 uses `../3rdparty/build/jars/bioformats_package.jar` as a system-scoped compile
-dependency, and Atlas runtime loading uses that same jar beside
-`atlas-bioformats-bridge.jar`.
+dependency, and Atlas runtime loading uses that same jar beside the selected
+transport jar.
 
-Rebuild the bridge jar only when changing the bridge Java code or protobuf
+Rebuild the bridge jars only when changing the bridge Java code or protobuf
 protocol:
 
 ```sh
 cd src/bioformats_bridge
 mvn -DskipTests package
-cp target/atlas-bioformats-bridge.jar ../3rdparty/build/jars/
+cp grpc/target/atlas-bioformats-bridge-grpc.jar ../3rdparty/build/jars/
+cp stdio/target/atlas-bioformats-bridge-stdio.jar ../3rdparty/build/jars/
 ```
 
-The generated jar intentionally shades the bridge transport dependencies
-(`protobuf-java` and gRPC) but not Bio-Formats itself. Bio-Formats stays outside
-this jar so Atlas can keep using the packaged `bioformats_package.jar` as the
-single Bio-Formats runtime payload.
+The generated transport jars intentionally shade their Java-side protocol
+dependencies but not Bio-Formats itself. The stdio jar shades only the shared
+bridge core plus protobuf runtime, while the gRPC jar also shades gRPC.
 
 The Java bridge intentionally stays on the Protobuf Java 3.25.x maintenance
 line. Keep the Maven `protobuf.version` property pinned to the same patch
@@ -31,58 +37,11 @@ version for both `protobuf-java` and `protoc`; Atlas' C++ side uses its own
 vendored Protobuf runtime in a separate process and only shares protobuf wire
 frames with this sidecar.
 
+Keep all Java gRPC runtime artifacts and `protoc-gen-grpc-java` on the same
+Maven `grpc.version` property so generated stubs and runtime APIs stay aligned.
+
 The protocol exposes Bio-Formats resolution metadata and streams both region
 pixels and thumbnails as chunked protobuf responses. Atlas uses full-resolution
 metadata for the canonical `ZImgInfo`, then adds integer-ratio Bio-Formats
 pyramid levels to the `ZImgPack` tile index when the reader reports compatible
-sub-resolutions. The gRPC backend starts the bridge with `--grpc-port=<port>`;
-`--worker-count=<count>` controls how many independent `IFormatReader`
-instances are opened per dataset inside that single Java process.
-
-## Validation Data
-
-Prefer deterministic Bio-Formats `FakeReader` inputs for bridge protocol,
-metadata, chunking, and voxel-layout tests:
-
-- https://bio-formats.readthedocs.io/en/stable/metadata/FakeReader.html
-- https://bio-formats.readthedocs.io/en/v8.1.0/developers/generating-test-images.html
-
-Format-breadth checks should run against an external corpus instead of vendoring
-large microscopy datasets into Atlas. Useful sources are the public OME sample
-image downloads and local lab files such as ND2/CZI fixtures:
-
-- https://downloads.openmicroscopy.org/images/
-
-To build a small local public corpus:
-
-```sh
-python util/download_bioformats_samples.py --mode sample --output-dir "$HOME/Documents/omeimages"
-```
-
-Then run the optional breadth smoke test with:
-
-```sh
-ATLAS_BIOFORMATS_BREADTH_DIR="$HOME/Documents/omeimages" ./zbioformatstest
-```
-
-For a full external-drive mirror of the public OME image tree, use `all` mode.
-This mode mirrors every non-hidden file under the OME image root, including
-format sidecars. Downloads are resumable: existing complete files are skipped,
-partial files are continued with HTTP range requests when the server supports
-them, and `manifest.json` is used as a saved download plan. The downloader
-keeps a separate `full_manifest.json` inventory of the OME tree; every run
-ensures that full inventory exists first. If `manifest.json` is missing, the
-downloader loads the full inventory, derives a new plan from the current
-selection flags, and writes `manifest.json` before downloading. Delete
-`manifest.json` to derive a new plan from the cached full inventory, or delete
-`full_manifest.json` to refresh the inventory from OME.
-
-```sh
-python util/download_bioformats_samples.py --mode all --output-dir "/Volumes/External/omeimages"
-```
-
-Use `--dry-run` first to estimate planned file count and total bytes. In `all`
-mode, size, depth, and total-byte caps are unlimited by default; pass
-`--max-total-gib`, `--max-file-mib`, or `--max-depth` to derive a smaller plan.
-Use `--per-format` in `all` mode to cap the number of files selected from each
-top-level format.
+sub-resolutions.

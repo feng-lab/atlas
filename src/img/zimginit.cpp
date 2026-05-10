@@ -37,7 +37,8 @@ ZImgInit::ZImgInit(const QString& resourcesDIR, const QString& jreDIR, const QSt
     LOG(INFO) << "no java support";
   } else {
     QDir jarsD(jarsDIR);
-    if (!jarsD.exists() || !jarsD.exists("bioformats_package.jar") || !jarsD.exists("atlas-bioformats-bridge.jar")) {
+    if (!jarsD.exists() || !jarsD.exists("bioformats_package.jar") ||
+        (!jarsD.exists("atlas-bioformats-bridge-grpc.jar") && !jarsD.exists("atlas-bioformats-bridge-stdio.jar"))) {
       throw ZException(fmt::format("invalid jarsDIR: {}", jarsDIR));
     }
     ZImgGlobal::instance().jarsDIR = jarsD.absolutePath();

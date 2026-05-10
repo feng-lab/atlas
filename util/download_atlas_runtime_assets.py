@@ -22,7 +22,7 @@ def _normalize_relpath(value: str) -> str:
 
 
 def _target_dir() -> Path:
-    return Path(common_dirs.ext_build_dir()) / "jars"
+    return Path(common_dirs.ext_build_dir())
 
 
 def _validate_file(path: Path, *, expected_size: int, expected_sha256: str) -> bool:

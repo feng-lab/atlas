@@ -15,6 +15,7 @@
 #include <QStringList>
 #include <QTemporaryDir>
 #include <algorithm>
+#include <array>
 #include <gflags/gflags.h>
 #include <map>
 #include <mutex>
@@ -40,30 +41,14 @@ void createSubBlocksForTesting(const QString& filename,
 
 namespace {
 
-constexpr int kBioFormatsBridgeTestIoTimeoutMs = 5 * 60 * 1000;
+constexpr int kBioFormatsBridgeTestIoTimeoutMs = 10 * 60 * 1000;
 
 void configureBioFormatsTestBridge()
 {
-  // Bio-Formats tests are functional coverage, not bridge-throughput benchmarks.
-  // Default to stdio for CI coverage, but preserve an explicit command-line
-  // override so developers can run the same tests against the gRPC backend.
-  const gflags::CommandLineFlagInfo useGrpcInfo =
-    gflags::GetCommandLineFlagInfoOrDie("atlas_bioformats_bridge_use_grpc");
-  if (useGrpcInfo.is_default) {
-    ::FLAGS_atlas_bioformats_bridge_use_grpc = false;
-  }
-
-  // Keep CI deterministic by avoiding the stdio auto worker pool, which can
-  // otherwise multiply into many JVMs when CTest runs discovered GoogleTest cases
-  // in parallel. When gRPC is explicitly requested, auto still means Java-side
-  // reader instances inside one JVM.
-  if (!::FLAGS_atlas_bioformats_bridge_use_grpc && ::FLAGS_atlas_bioformats_bridge_worker_count == 0) {
-    ::FLAGS_atlas_bioformats_bridge_worker_count = 1;
-  }
-
   // Production defaults wait indefinitely for bridge I/O because local file
   // reads may legitimately be long-running. Tests should fail before CTest's
-  // broad per-case timeout so the error path includes bridge diagnostics.
+  // broad per-case timeout so the error path includes bridge diagnostics. Keep
+  // enough headroom for slower CI runners that may start the JVM cold.
   if (::FLAGS_atlas_bioformats_bridge_io_timeout_ms <= 0) {
     ::FLAGS_atlas_bioformats_bridge_io_timeout_ms = kBioFormatsBridgeTestIoTimeoutMs;
   }
@@ -112,46 +97,102 @@ std::optional<QString> bundledJreDir()
 
 std::optional<std::string> bioFormatsRuntimeSkipReason()
 {
-  static bool checked = false;
-  static std::optional<std::string> skipReason;
+  configureBioFormatsTestBridge();
 
-  if (!checked) {
-    checked = true;
-    configureBioFormatsTestBridge();
-
-    const QDir thirdPartyBuild(QStringLiteral(ATLAS_THIRDPARTY_BUILD_DIR));
-    const QDir jarsDir(thirdPartyBuild.filePath(QStringLiteral("jars")));
-    if (!jarsDir.exists("bioformats_package.jar")) {
-      skipReason = fmt::format("missing {}", jarsDir.filePath("bioformats_package.jar"));
-      return skipReason;
-    }
-    if (!jarsDir.exists("atlas-bioformats-bridge.jar")) {
-      skipReason = fmt::format("missing {}", jarsDir.filePath("atlas-bioformats-bridge.jar"));
-      return skipReason;
-    }
-    const std::optional<QString> jreDir = bundledJreDir();
-    if (!jreDir) {
-      skipReason =
-        fmt::format("missing bundled JRE under {}", QStringLiteral(ATLAS_THIRDPARTY_BUILD_DIR).toStdString());
-      return skipReason;
-    }
-
-    ZLogInit::instance("zbioformatstest");
-    LOG(INFO) << "Bio-Formats test runtime: jreDIR=" << *jreDir << ", java=" << javaExecutableInJreDir(*jreDir)
-              << ", jarsDIR=" << jarsDir.absolutePath();
-
-    try {
-      ZImgInit::instance("", *jreDir, jarsDir.absolutePath(), false);
-      if (!ZImgBioFormats().supportRead()) {
-        skipReason = "Bio-Formats runtime support is not available";
-      }
-    }
-    catch (const std::exception& e) {
-      skipReason = fmt::format("Bio-Formats runtime initialization failed: {}", e.what());
-    }
+  const QDir thirdPartyBuild(QStringLiteral(ATLAS_THIRDPARTY_BUILD_DIR));
+  const QDir jarsDir(thirdPartyBuild.filePath(QStringLiteral("jars")));
+  if (!jarsDir.exists("bioformats_package.jar")) {
+    return fmt::format("missing {}", jarsDir.filePath("bioformats_package.jar"));
+  }
+  const QString bridgeJar = ::FLAGS_atlas_bioformats_bridge_use_grpc
+                              ? QStringLiteral("atlas-bioformats-bridge-grpc.jar")
+                              : QStringLiteral("atlas-bioformats-bridge-stdio.jar");
+  if (!jarsDir.exists(bridgeJar)) {
+    return fmt::format("missing {}", jarsDir.filePath(bridgeJar));
+  }
+  const std::optional<QString> jreDir = bundledJreDir();
+  if (!jreDir) {
+    return fmt::format("missing bundled JRE under {}", QStringLiteral(ATLAS_THIRDPARTY_BUILD_DIR).toStdString());
   }
 
-  return skipReason;
+  ZLogInit::instance("zbioformatstest");
+  LOG(INFO) << "Bio-Formats test runtime: jreDIR=" << *jreDir << ", java=" << javaExecutableInJreDir(*jreDir)
+            << ", jarsDIR=" << jarsDir.absolutePath() << ", useGrpc=" << ::FLAGS_atlas_bioformats_bridge_use_grpc
+            << ", workerCount=" << ::FLAGS_atlas_bioformats_bridge_worker_count;
+
+  try {
+    ZImgInit::instance("", *jreDir, jarsDir.absolutePath(), false);
+    if (!ZImgBioFormats().supportRead()) {
+      return "Bio-Formats runtime support is not available";
+    }
+  }
+  catch (const std::exception& e) {
+    return fmt::format("Bio-Formats runtime initialization failed: {}", e.what());
+  }
+
+  return std::nullopt;
+}
+
+struct BioFormatsBridgeTestTransport
+{
+  const char* name;
+  bool useGrpc;
+  int workerCount;
+};
+
+constexpr std::array<BioFormatsBridgeTestTransport, 3> kBioFormatsBridgeTestTransports = {
+  // Stdio intentionally uses an invalid gRPC worker count to verify that the gRPC-only flag is ignored.
+  BioFormatsBridgeTestTransport{"stdio",          false, -7},
+  BioFormatsBridgeTestTransport{"grpc-1-worker",  true,  1 },
+  BioFormatsBridgeTestTransport{"grpc-2-workers", true,  2 },
+};
+
+class ScopedBioFormatsBridgeTestTransport
+{
+public:
+  explicit ScopedBioFormatsBridgeTestTransport(const BioFormatsBridgeTestTransport& transport)
+  {
+    ::FLAGS_atlas_bioformats_bridge_use_grpc = transport.useGrpc;
+    ::FLAGS_atlas_bioformats_bridge_worker_count = transport.workerCount;
+    ZBioFormatsBridgeClient::resetInstanceForTesting();
+  }
+
+  ~ScopedBioFormatsBridgeTestTransport()
+  {
+    ZBioFormatsBridgeClient::resetInstanceForTesting();
+  }
+};
+
+class ScopedBioFormatsBridgeDefaultTransport
+{
+public:
+  ScopedBioFormatsBridgeDefaultTransport()
+  {
+    ::FLAGS_atlas_bioformats_bridge_use_grpc = true;
+    ::FLAGS_atlas_bioformats_bridge_worker_count = 0;
+    ZBioFormatsBridgeClient::resetInstanceForTesting();
+  }
+
+  ~ScopedBioFormatsBridgeDefaultTransport()
+  {
+    ZBioFormatsBridgeClient::resetInstanceForTesting();
+  }
+};
+
+template<typename Fn>
+void runForEachBioFormatsBridgeTransport(Fn&& fn)
+{
+  for (const BioFormatsBridgeTestTransport& transport : kBioFormatsBridgeTestTransports) {
+    SCOPED_TRACE(transport.name);
+    const ScopedBioFormatsBridgeTestTransport scopedTransport(transport);
+    if (const auto reason = bioFormatsRuntimeSkipReason(); reason.has_value()) {
+      GTEST_SKIP() << *reason;
+    }
+    fn();
+    if (::testing::Test::HasFatalFailure()) {
+      return;
+    }
+  }
 }
 
 QString createFakeReaderFile(QTemporaryDir& dir, const QString& basename)
@@ -521,184 +562,170 @@ std::vector<ZImgRegion> smokeRegions(const ZImgInfo& info)
 
 TEST(ZBioFormatsTest, FormatExtensionListDoesNotRequireAnOpenFile)
 {
-  if (const auto reason = bioFormatsRuntimeSkipReason(); reason.has_value()) {
-    GTEST_SKIP() << *reason;
-  }
-
-  const QStringList extensions = ZImgBioFormats().extensions();
-  ASSERT_FALSE(extensions.empty());
-  EXPECT_TRUE(extensions.contains(QStringLiteral("fake"), Qt::CaseInsensitive));
+  runForEachBioFormatsBridgeTransport([]() {
+    const QStringList extensions = ZImgBioFormats().extensions();
+    ASSERT_FALSE(extensions.empty());
+    EXPECT_TRUE(extensions.contains(QStringLiteral("fake"), Qt::CaseInsensitive));
+  });
 }
 
 TEST(ZBioFormatsTest, FakeReaderMetadataCreatesDeterministicInfoAndSubBlocks)
 {
-  if (const auto reason = bioFormatsRuntimeSkipReason(); reason.has_value()) {
-    GTEST_SKIP() << *reason;
-  }
+  runForEachBioFormatsBridgeTransport([]() {
+    QTemporaryDir dir;
+    ASSERT_TRUE(dir.isValid());
+    const QString path =
+      createFakeReaderFile(dir, QStringLiteral("metadata&sizeX=7&sizeY=5&sizeZ=3&sizeC=2&sizeT=4&pixelType=uint8"));
 
-  QTemporaryDir dir;
-  ASSERT_TRUE(dir.isValid());
-  const QString path =
-    createFakeReaderFile(dir, QStringLiteral("metadata&sizeX=7&sizeY=5&sizeZ=3&sizeC=2&sizeT=4&pixelType=uint8"));
+    std::vector<ZImgInfo> infos;
+    std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>> subBlocks;
+    ZImgIO::instance().readInfos(path, infos, &subBlocks, FileFormat::BioFormats);
 
-  std::vector<ZImgInfo> infos;
-  std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>> subBlocks;
-  ZImgIO::instance().readInfos(path, infos, &subBlocks, FileFormat::BioFormats);
+    ASSERT_EQ(1u, infos.size());
+    const ZImgInfo& info = infos.front();
+    EXPECT_EQ(7u, info.width);
+    EXPECT_EQ(5u, info.height);
+    EXPECT_EQ(3u, info.depth);
+    EXPECT_EQ(2u, info.numChannels);
+    EXPECT_EQ(4u, info.numTimes);
+    EXPECT_TRUE(info.isType<uint8_t>());
 
-  ASSERT_EQ(1u, infos.size());
-  const ZImgInfo& info = infos.front();
-  EXPECT_EQ(7u, info.width);
-  EXPECT_EQ(5u, info.height);
-  EXPECT_EQ(3u, info.depth);
-  EXPECT_EQ(2u, info.numChannels);
-  EXPECT_EQ(4u, info.numTimes);
-  EXPECT_TRUE(info.isType<uint8_t>());
-
-  ASSERT_EQ(infos.size(), subBlocks.size());
-  ASSERT_FALSE(subBlocks.front().empty());
-  const std::shared_ptr<ZImgSubBlock>& firstBlock = subBlocks.front().front();
-  ASSERT_NE(nullptr, firstBlock);
-  EXPECT_EQ(0, firstBlock->x);
-  EXPECT_EQ(0, firstBlock->y);
-  EXPECT_EQ(0, firstBlock->z);
-  EXPECT_EQ(0, firstBlock->t);
-  EXPECT_EQ(7, firstBlock->width);
-  EXPECT_EQ(5, firstBlock->height);
-  EXPECT_EQ(1, firstBlock->depth);
+    ASSERT_EQ(infos.size(), subBlocks.size());
+    ASSERT_FALSE(subBlocks.front().empty());
+    const std::shared_ptr<ZImgSubBlock>& firstBlock = subBlocks.front().front();
+    ASSERT_NE(nullptr, firstBlock);
+    EXPECT_EQ(0, firstBlock->x);
+    EXPECT_EQ(0, firstBlock->y);
+    EXPECT_EQ(0, firstBlock->z);
+    EXPECT_EQ(0, firstBlock->t);
+    EXPECT_EQ(7, firstBlock->width);
+    EXPECT_EQ(5, firstBlock->height);
+    EXPECT_EQ(1, firstBlock->depth);
+  });
 }
 
 TEST(ZBioFormatsTest, IndexedFalseColorDataStaysSingleChannel)
 {
-  if (const auto reason = bioFormatsRuntimeSkipReason(); reason.has_value()) {
-    GTEST_SKIP() << *reason;
-  }
+  runForEachBioFormatsBridgeTransport([]() {
+    QTemporaryDir dir;
+    ASSERT_TRUE(dir.isValid());
+    const QString path = createFakeReaderFile(
+      dir,
+      QStringLiteral(
+        "indexed&sizeX=9&sizeY=7&sizeZ=1&sizeC=1&sizeT=1&pixelType=uint8&indexed=true&falseColor=true&lutLength=256"));
 
-  QTemporaryDir dir;
-  ASSERT_TRUE(dir.isValid());
-  const QString path = createFakeReaderFile(
-    dir,
-    QStringLiteral(
-      "indexed&sizeX=9&sizeY=7&sizeZ=1&sizeC=1&sizeT=1&pixelType=uint8&indexed=true&falseColor=true&lutLength=256"));
+    std::vector<ZImgInfo> infos;
+    ZImgIO::instance().readInfos(path, infos, nullptr, FileFormat::BioFormats);
 
-  std::vector<ZImgInfo> infos;
-  ZImgIO::instance().readInfos(path, infos, nullptr, FileFormat::BioFormats);
+    ASSERT_EQ(1u, infos.size());
+    EXPECT_EQ(1u, infos.front().numChannels);
+    EXPECT_TRUE(infos.front().isType<uint8_t>());
 
-  ASSERT_EQ(1u, infos.size());
-  EXPECT_EQ(1u, infos.front().numChannels);
-  EXPECT_TRUE(infos.front().isType<uint8_t>());
-
-  const ZImg img(path, ZImgRegion(), 0, 1, 1, 1, FileFormat::BioFormats);
-  EXPECT_EQ(1u, img.numChannels());
-  EXPECT_TRUE(img.info().isType<uint8_t>());
+    const ZImg img(path, ZImgRegion(), 0, 1, 1, 1, FileFormat::BioFormats);
+    EXPECT_EQ(1u, img.numChannels());
+    EXPECT_TRUE(img.info().isType<uint8_t>());
+  });
 }
 
 TEST(ZBioFormatsTest, ChannelColorMetadataIsPreserved)
 {
-  if (const auto reason = bioFormatsRuntimeSkipReason(); reason.has_value()) {
-    GTEST_SKIP() << *reason;
-  }
+  runForEachBioFormatsBridgeTransport([]() {
+    QTemporaryDir dir;
+    ASSERT_TRUE(dir.isValid());
+    const QString path = createFakeReaderFile(
+      dir,
+      QStringLiteral("color&sizeX=9&sizeY=7&sizeZ=1&sizeC=1&sizeT=1&pixelType=uint8&color=0x00ff00ff"));
 
-  QTemporaryDir dir;
-  ASSERT_TRUE(dir.isValid());
-  const QString path = createFakeReaderFile(
-    dir,
-    QStringLiteral("color&sizeX=9&sizeY=7&sizeZ=1&sizeC=1&sizeT=1&pixelType=uint8&color=0x00ff00ff"));
+    std::vector<ZImgInfo> infos;
+    ZImgIO::instance().readInfos(path, infos, nullptr, FileFormat::BioFormats);
 
-  std::vector<ZImgInfo> infos;
-  ZImgIO::instance().readInfos(path, infos, nullptr, FileFormat::BioFormats);
-
-  ASSERT_EQ(1u, infos.size());
-  ASSERT_EQ(1u, infos.front().channelColors.size());
-  EXPECT_EQ(0, infos.front().channelColors[0].r);
-  EXPECT_EQ(255, infos.front().channelColors[0].g);
-  EXPECT_EQ(0, infos.front().channelColors[0].b);
-  EXPECT_EQ(255, infos.front().channelColors[0].a);
+    ASSERT_EQ(1u, infos.size());
+    ASSERT_EQ(1u, infos.front().channelColors.size());
+    EXPECT_EQ(0, infos.front().channelColors[0].r);
+    EXPECT_EQ(255, infos.front().channelColors[0].g);
+    EXPECT_EQ(0, infos.front().channelColors[0].b);
+    EXPECT_EQ(255, infos.front().channelColors[0].a);
+  });
 }
 
 TEST(ZBioFormatsTest, FakeReaderRegionMatchesTheSameCoordinatesFromFullRead)
 {
-  if (const auto reason = bioFormatsRuntimeSkipReason(); reason.has_value()) {
-    GTEST_SKIP() << *reason;
-  }
+  runForEachBioFormatsBridgeTransport([]() {
+    QTemporaryDir dir;
+    ASSERT_TRUE(dir.isValid());
+    const QString path =
+      createFakeReaderFile(dir, QStringLiteral("region&sizeX=13&sizeY=11&sizeZ=3&sizeC=2&sizeT=2&pixelType=uint16"));
 
-  QTemporaryDir dir;
-  ASSERT_TRUE(dir.isValid());
-  const QString path =
-    createFakeReaderFile(dir, QStringLiteral("region&sizeX=13&sizeY=11&sizeZ=3&sizeC=2&sizeT=2&pixelType=uint16"));
+    ZImg full(path, ZImgRegion(), 0, 1, 1, 1, FileFormat::BioFormats);
+    ASSERT_TRUE(full.info().isType<uint16_t>());
+    ASSERT_EQ(13u, full.width());
+    ASSERT_EQ(11u, full.height());
+    ASSERT_EQ(3u, full.depth());
+    ASSERT_EQ(2u, full.numChannels());
+    ASSERT_EQ(2u, full.numTimes());
 
-  ZImg full(path, ZImgRegion(), 0, 1, 1, 1, FileFormat::BioFormats);
-  ASSERT_TRUE(full.info().isType<uint16_t>());
-  ASSERT_EQ(13u, full.width());
-  ASSERT_EQ(11u, full.height());
-  ASSERT_EQ(3u, full.depth());
-  ASSERT_EQ(2u, full.numChannels());
-  ASSERT_EQ(2u, full.numTimes());
+    const ZImgRegion sourceRegion(2, 9, 3, 8, 1, 3, 0, 2, 1, 2);
+    ZImg region;
+    ZImgIO::instance().readImg(path, region, sourceRegion, 0, 1, 1, 1, FileFormat::BioFormats);
 
-  const ZImgRegion sourceRegion(2, 9, 3, 8, 1, 3, 0, 2, 1, 2);
-  ZImg region;
-  ZImgIO::instance().readImg(path, region, sourceRegion, 0, 1, 1, 1, FileFormat::BioFormats);
-
-  ASSERT_TRUE(region.info().isType<uint16_t>());
-  expectSameRegionPixels(full, region, sourceRegion);
+    ASSERT_TRUE(region.info().isType<uint16_t>());
+    expectSameRegionPixels(full, region, sourceRegion);
+  });
 }
 
 TEST(ZBioFormatsTest, FakeReaderReadReassemblesMultiplePixelChunks)
 {
-  if (const auto reason = bioFormatsRuntimeSkipReason(); reason.has_value()) {
-    GTEST_SKIP() << *reason;
-  }
+  runForEachBioFormatsBridgeTransport([]() {
+    QTemporaryDir dir;
+    ASSERT_TRUE(dir.isValid());
+    const QString path =
+      createFakeReaderFile(dir, QStringLiteral("chunks&sizeX=4097&sizeY=2048&sizeZ=1&sizeC=1&sizeT=1&pixelType=uint8"));
 
-  QTemporaryDir dir;
-  ASSERT_TRUE(dir.isValid());
-  const QString path =
-    createFakeReaderFile(dir, QStringLiteral("chunks&sizeX=4097&sizeY=2048&sizeZ=1&sizeC=1&sizeT=1&pixelType=uint8"));
+    ZImg img(path, ZImgRegion(), 0, 1, 1, 1, FileFormat::BioFormats);
 
-  ZImg img(path, ZImgRegion(), 0, 1, 1, 1, FileFormat::BioFormats);
+    ASSERT_TRUE(img.info().isType<uint8_t>());
+    EXPECT_EQ(4097u, img.width());
+    EXPECT_EQ(2048u, img.height());
+    EXPECT_EQ(4097u * 2048u, img.byteNumber());
+    EXPECT_GT(img.byteNumber(), 8u * 1024u * 1024u);
 
-  ASSERT_TRUE(img.info().isType<uint8_t>());
-  EXPECT_EQ(4097u, img.width());
-  EXPECT_EQ(2048u, img.height());
-  EXPECT_EQ(4097u * 2048u, img.byteNumber());
-  EXPECT_GT(img.byteNumber(), 8u * 1024u * 1024u);
-
-  const auto boundary = *img.data<uint8_t>(4096, 2047);
-  const auto reread = ZImg(path, ZImgRegion(4096, 4097, 2047, 2048), 0, 1, 1, 1, FileFormat::BioFormats);
-  ASSERT_TRUE(reread.info().isType<uint8_t>());
-  ASSERT_EQ(1u, reread.width());
-  ASSERT_EQ(1u, reread.height());
-  EXPECT_EQ(boundary, *reread.data<uint8_t>(0, 0));
+    const auto boundary = *img.data<uint8_t>(4096, 2047);
+    const auto reread = ZImg(path, ZImgRegion(4096, 4097, 2047, 2048), 0, 1, 1, 1, FileFormat::BioFormats);
+    ASSERT_TRUE(reread.info().isType<uint8_t>());
+    ASSERT_EQ(1u, reread.width());
+    ASSERT_EQ(1u, reread.height());
+    EXPECT_EQ(boundary, *reread.data<uint8_t>(0, 0));
+  });
 }
 
 TEST(ZBioFormatsTest, FakeReaderResolutionMetadataCreatesPyramidSubBlocks)
 {
-  if (const auto reason = bioFormatsRuntimeSkipReason(); reason.has_value()) {
-    GTEST_SKIP() << *reason;
-  }
+  runForEachBioFormatsBridgeTransport([]() {
+    QTemporaryDir dir;
+    ASSERT_TRUE(dir.isValid());
+    const QString path = createFakeReaderFile(
+      dir,
+      QStringLiteral(
+        "pyramid&sizeX=64&sizeY=48&sizeZ=1&sizeC=1&sizeT=1&pixelType=uint8&resolutions=3&resolutionScale=2"));
 
-  QTemporaryDir dir;
-  ASSERT_TRUE(dir.isValid());
-  const QString path = createFakeReaderFile(
-    dir,
-    QStringLiteral(
-      "pyramid&sizeX=64&sizeY=48&sizeZ=1&sizeC=1&sizeT=1&pixelType=uint8&resolutions=3&resolutionScale=2"));
+    const ZBioFormatsDatasetInfo& dataset = ZBioFormatsBridgeClient::instance().openDataset(path);
+    ASSERT_EQ(1u, dataset.series.size());
+    ASSERT_GE(dataset.series.front().resolutions.size(), 3u);
+    EXPECT_EQ(64u, dataset.series.front().resolutions[0].sizeX);
+    EXPECT_EQ(48u, dataset.series.front().resolutions[0].sizeY);
+    EXPECT_EQ(32u, dataset.series.front().resolutions[1].sizeX);
+    EXPECT_EQ(24u, dataset.series.front().resolutions[1].sizeY);
+    EXPECT_EQ(16u, dataset.series.front().resolutions[2].sizeX);
+    EXPECT_EQ(12u, dataset.series.front().resolutions[2].sizeY);
 
-  const ZBioFormatsDatasetInfo& dataset = ZBioFormatsBridgeClient::instance().openDataset(path);
-  ASSERT_EQ(1u, dataset.series.size());
-  ASSERT_GE(dataset.series.front().resolutions.size(), 3u);
-  EXPECT_EQ(64u, dataset.series.front().resolutions[0].sizeX);
-  EXPECT_EQ(48u, dataset.series.front().resolutions[0].sizeY);
-  EXPECT_EQ(32u, dataset.series.front().resolutions[1].sizeX);
-  EXPECT_EQ(24u, dataset.series.front().resolutions[1].sizeY);
-  EXPECT_EQ(16u, dataset.series.front().resolutions[2].sizeX);
-  EXPECT_EQ(12u, dataset.series.front().resolutions[2].sizeY);
-
-  std::vector<ZImgInfo> infos;
-  std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>> subBlocks;
-  ZImgIO::instance().readInfos(path, infos, &subBlocks, FileFormat::BioFormats);
-  ASSERT_EQ(1u, subBlocks.size());
-  EXPECT_TRUE(std::ranges::any_of(subBlocks.front(), [](const std::shared_ptr<ZImgSubBlock>& block) {
-    return block && block->xRatio > 1 && block->yRatio > 1;
-  }));
+    std::vector<ZImgInfo> infos;
+    std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>> subBlocks;
+    ZImgIO::instance().readInfos(path, infos, &subBlocks, FileFormat::BioFormats);
+    ASSERT_EQ(1u, subBlocks.size());
+    EXPECT_TRUE(std::ranges::any_of(subBlocks.front(), [](const std::shared_ptr<ZImgSubBlock>& block) {
+      return block && block->xRatio > 1 && block->yRatio > 1;
+    }));
+  });
 }
 
 TEST(ZBioFormatsTest, ZDownsampledResolutionCreatesPyramidSubBlocks)
@@ -782,35 +809,34 @@ TEST(ZBioFormatsTest, ZDownsampledResolutionCreatesPyramidSubBlocks)
 
 TEST(ZBioFormatsTest, FakeReaderThumbnailIsReadWhenAvailable)
 {
-  if (const auto reason = bioFormatsRuntimeSkipReason(); reason.has_value()) {
-    GTEST_SKIP() << *reason;
-  }
+  runForEachBioFormatsBridgeTransport([]() {
+    QTemporaryDir dir;
+    ASSERT_TRUE(dir.isValid());
+    const QString path = createFakeReaderFile(
+      dir,
+      QStringLiteral("thumbnail&sizeX=64&sizeY=48&sizeZ=1&sizeC=1&sizeT=1&pixelType=uint8&thumbSizeX=8&thumbSizeY=6"));
 
-  QTemporaryDir dir;
-  ASSERT_TRUE(dir.isValid());
-  const QString path = createFakeReaderFile(
-    dir,
-    QStringLiteral("thumbnail&sizeX=64&sizeY=48&sizeZ=1&sizeC=1&sizeT=1&pixelType=uint8&thumbSizeX=8&thumbSizeY=6"));
-
-  ZImgThumbernail thumbnail = ZImg::readImgThumbnail(path, ZImgRegion(), 0, FileFormat::BioFormats);
-  ASSERT_TRUE(thumbnail.hasPlaneAttachment(0, 0));
-  const std::vector<ZImg>& thumbnails = thumbnail.planeAttachments(0, 0);
-  ASSERT_FALSE(thumbnails.empty());
-  EXPECT_EQ(8u, thumbnails.front().width());
-  EXPECT_EQ(6u, thumbnails.front().height());
-  EXPECT_EQ(1u, thumbnails.front().numChannels());
-  EXPECT_TRUE(thumbnails.front().info().isType<uint8_t>());
+    ZImgThumbernail thumbnail = ZImg::readImgThumbnail(path, ZImgRegion(), 0, FileFormat::BioFormats);
+    ASSERT_TRUE(thumbnail.hasPlaneAttachment(0, 0));
+    const std::vector<ZImg>& thumbnails = thumbnail.planeAttachments(0, 0);
+    ASSERT_FALSE(thumbnails.empty());
+    EXPECT_EQ(8u, thumbnails.front().width());
+    EXPECT_EQ(6u, thumbnails.front().height());
+    EXPECT_EQ(1u, thumbnails.front().numChannels());
+    EXPECT_TRUE(thumbnails.front().info().isType<uint8_t>());
+  });
 }
 
 TEST(ZBioFormatsTest, PublicCorpusReadsMetadataAndSmallRegions)
 {
-  if (const auto reason = bioFormatsRuntimeSkipReason(); reason.has_value()) {
-    GTEST_SKIP() << *reason;
-  }
-
   const std::vector<CorpusManifestFile> files = publicCorpusFiles();
   if (files.empty()) {
     GTEST_SKIP() << "set ATLAS_BIOFORMATS_BREADTH_DIR to run public Bio-Formats corpus smoke tests";
+  }
+
+  const ScopedBioFormatsBridgeDefaultTransport scopedTransport;
+  if (const auto reason = bioFormatsRuntimeSkipReason(); reason.has_value()) {
+    GTEST_SKIP() << *reason;
   }
 
   ScopedWarningLogCapture warningCapture;
