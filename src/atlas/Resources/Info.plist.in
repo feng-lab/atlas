@@ -102,5 +102,17 @@
 	<string>public.app-category.productivity</string>
 	<key>NSHumanReadableCopyright</key>
 	<string>${MACOSX_BUNDLE_COPYRIGHT}</string>
+	<key>NSDesktopFolderUsageDescription</key>
+	<string>Atlas needs access to datasets and related files you choose from the Desktop.</string>
+	<key>NSDocumentsFolderUsageDescription</key>
+	<string>Atlas needs access to datasets and related files you choose from Documents.</string>
+	<key>NSDownloadsFolderUsageDescription</key>
+	<string>Atlas needs access to datasets and related files you choose from Downloads.</string>
+	<key>NSNetworkVolumesUsageDescription</key>
+	<string>Atlas needs access to datasets and related files you choose from network volumes.</string>
+	<key>NSRemovableVolumesUsageDescription</key>
+	<string>Atlas needs access to datasets and related files you choose from removable volumes.</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Atlas normally listens only on this Mac. If you enable remote control, Atlas uses the local network so companion tools such as atlas-agent can connect to the running app.</string>
 </dict>
 </plist>

@@ -10,18 +10,22 @@
 #include "zrpcuidispatcher.h"
 #include "zrpcsceneids.h"
 #include "zrpctaskmanager.h"
+#include <gflags/gflags.h>
 #include <QThread>
 #include <algorithm>
 #include <chrono>
 #include <sstream>
 #include <string>
-#include <string_view>
 #include <utility>
 #include <grpc/support/time.h>
 #include <grpcpp/grpcpp.h>
 #include <google/protobuf/empty.pb.h>
 #include <google/protobuf/struct.pb.h>
 #include <google/protobuf/wrappers.pb.h>
+
+DEFINE_bool(atlas_scene_rpc_bind_all_interfaces,
+            false,
+            "Bind the Atlas scene gRPC server to all network interfaces. Disabled by default.");
 
 namespace nim {
 
@@ -3748,7 +3752,13 @@ void ZRPCService::onRPCThreadStarted()
   // Ensure we are on the RPC thread
   CHECK(g_sm->isCurrentOn(ZServiceManager::RPC));
 
-  std::string server_address("0.0.0.0:50051");
+  constexpr const char* kSceneRpcLoopbackAddress = "127.0.0.1:50051";
+  constexpr const char* kSceneRpcAllInterfacesAddress = "0.0.0.0:50051";
+  const std::string serverAddress =
+    FLAGS_atlas_scene_rpc_bind_all_interfaces ? kSceneRpcAllInterfacesAddress : kSceneRpcLoopbackAddress;
+  if (FLAGS_atlas_scene_rpc_bind_all_interfaces) {
+    LOG(INFO) << "Atlas scene RPC server is binding to all network interfaces at " << serverAddress;
+  }
   // Allocate services on the heap and keep them alive for the server lifetime.
   m_sceneService = std::unique_ptr<grpc::Service>(new SceneServiceImpl(m_uiDispatcher, m_appVersion));
 
@@ -3756,20 +3766,20 @@ void ZRPCService::onRPCThreadStarted()
   // Set the default compression algorithm for the server.
   builder.SetDefaultCompressionAlgorithm(GRPC_COMPRESS_GZIP);
   // Listen on the given address without any authentication mechanism.
-  builder.AddListeningPort(server_address, grpc::InsecureServerCredentials());
+  builder.AddListeningPort(serverAddress, grpc::InsecureServerCredentials());
   // Register "service" as the instance through which we'll communicate with
   // clients. In this case it corresponds to an *synchronous* service.
   builder.RegisterService(m_sceneService.get());
   // Finally assemble the server.
   m_serverOwned = builder.BuildAndStart();
   if (!m_serverOwned) {
-    LOG(ERROR) << "Failed to start Atlas scene RPC server on " << server_address
+    LOG(ERROR) << "Failed to start Atlas scene RPC server on " << serverAddress
                << "; Scene RPC will be unavailable for this process. "
                << "This usually means the port is already in use.";
     m_grpcServer = nullptr;
     return;
   }
-  LOG(INFO) << "Server listening on " << server_address;
+  LOG(INFO) << "Atlas scene RPC server listening on " << serverAddress;
   m_grpcServer = m_serverOwned.get();
   // Block in a background thread so the RPC QThread event loop remains free
   // to accept a BlockingQueuedConnection for shutdown.
