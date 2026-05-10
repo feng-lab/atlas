@@ -1,5 +1,6 @@
 #include "zimginit.h"
 #include "zlog.h"
+#include "zbioformatsbridgeclient.h"
 #include "zcpuinfo.h"
 #include "zimginterface.h"
 #include "zh5zjpegxr.h"
@@ -9,6 +10,7 @@
 #endif
 #include <itkMultiThreaderBase.h>
 #include <QDir>
+#include <QFileInfo>
 #include <cpuinfo.h>
 
 #include <folly/Singleton.h>
@@ -16,6 +18,18 @@
 #include <folly/synchronization/HazptrThreadPoolExecutor.h>
 
 namespace nim {
+
+namespace {
+
+constexpr const char* kBioFormatsJar = "bioformats_package.jar";
+constexpr const char* kAtlasBioFormatsBridgeJar = "atlas-bioformats-bridge.jar";
+#ifdef _WIN32
+constexpr const char* kJavaExecutable = "bin/java.exe";
+#else
+constexpr const char* kJavaExecutable = "bin/java";
+#endif
+
+} // namespace
 
 const ZImgInit&
 ZImgInit::instance(const QString& resourcesDIR, const QString& jreDIR, const QString& jarsDIR, bool verbose)
@@ -37,32 +51,40 @@ ZImgInit::ZImgInit(const QString& resourcesDIR, const QString& jreDIR, const QSt
     LOG(INFO) << "no java support";
   } else {
     QDir jarsD(jarsDIR);
-    if (!jarsD.exists() || !jarsD.exists("bioformats_package.jar") ||
-        (!jarsD.exists("atlas-bioformats-bridge-grpc.jar") && !jarsD.exists("atlas-bioformats-bridge-stdio.jar"))) {
+    if (!jarsD.exists() || !jarsD.exists(kAtlasBioFormatsBridgeJar)) {
       throw ZException(fmt::format("invalid jarsDIR: {}", jarsDIR));
     }
     ZImgGlobal::instance().jarsDIR = jarsD.absolutePath();
+    const QString bridgeJarPath = jarsD.absoluteFilePath(kAtlasBioFormatsBridgeJar);
+    const QString bioFormatsJarPath = jarsD.exists(kBioFormatsJar) ? jarsD.absoluteFilePath(kBioFormatsJar) : QString();
     if (verbose) {
       LOG(INFO) << "jarsDIR: " << ZImgGlobal::instance().jarsDIR;
+      LOG(INFO) << "Bio-Formats bridge jar: " << bridgeJarPath;
+      if (bioFormatsJarPath.isEmpty()) {
+        LOG(INFO) << "bioformats jar: not configured";
+      } else {
+        LOG(INFO) << "bioformats jar: " << bioFormatsJarPath;
+      }
+    }
+
+    ZBioFormatsBridgeClient::configureBridgeJarPath(bridgeJarPath);
+    if (!bioFormatsJarPath.isEmpty()) {
+      ZBioFormatsBridgeClient::configureBioFormatsJarPath(bioFormatsJarPath);
     }
 
     if (jreDIR.isEmpty()) {
-      LOG(INFO) << "no bundled jreDIR; Bio-Formats bridge will try JAVA_HOME, then java in system PATH when first used";
+      LOG(INFO) << "no bundled jreDIR; Bio-Formats Java executable is not configured";
     } else {
       QDir jreD(jreDIR);
       if (!jreD.exists() || !jreD.exists("bin")) {
         throw ZException(fmt::format("invalid jreDIR: {}", jreD.absolutePath()));
       }
-#ifdef _WIN32
-      if (!jreD.exists("bin/java.exe"))
-#else
-      if (!jreD.exists("bin/java"))
-#endif
-      {
+      if (!jreD.exists(kJavaExecutable)) {
         throw ZException(fmt::format("no java in jreDIR: {}", jreD.absolutePath()));
       }
 
       ZImgGlobal::instance().jreDIR = jreD.absolutePath();
+      ZBioFormatsBridgeClient::configureJavaExecutablePath(jreD.absoluteFilePath(kJavaExecutable));
       if (verbose) {
         LOG(INFO) << "jreDIR: " << ZImgGlobal::instance().jreDIR;
       }

@@ -403,7 +403,9 @@ def _repair_linux_wheel_with_auditwheel(*, wheel_path: Path, out_dir: Path) -> P
     return final_path
 
 
-def _stage_conda_zimg_from_wheel(*, wheel_path: Path, conda_source_dir: Path) -> Path:
+def _stage_conda_zimg_from_wheel(
+    *, wheel_path: Path, conda_source_dir: Path, bioformats_jar_path: Path
+) -> Path:
     with tempfile.TemporaryDirectory(prefix="zimg_wheel_extract_") as tmp:
         wheel_root = Path(tmp)
         with zipfile.ZipFile(wheel_path, "r") as zf:
@@ -421,6 +423,21 @@ def _stage_conda_zimg_from_wheel(*, wheel_path: Path, conda_source_dir: Path) ->
 
         conda_source_dir.mkdir(parents=True, exist_ok=True)
         shutil.copytree(src_pkg_dir, dst_pkg_dir, symlinks=False)
+
+        if not bioformats_jar_path.is_file():
+            raise RuntimeError(
+                "Cannot stage conda zimg package with bundled Bio-Formats support; "
+                f"missing jar: {bioformats_jar_path}"
+            )
+        bridge_jar_path = dst_pkg_dir / "jars" / "atlas-bioformats-bridge.jar"
+        if not bridge_jar_path.is_file():
+            raise RuntimeError(
+                "Cannot stage conda zimg package with bundled Bio-Formats support; "
+                f"missing bridge jar: {bridge_jar_path}"
+            )
+        shutil.copy2(
+            bioformats_jar_path, bridge_jar_path.parent / "bioformats_package.jar"
+        )
 
         # auditwheel uses a sibling `<project>.libs/` directory for vendored
         # shared libraries; include it so the conda package matches the wheel.
@@ -688,9 +705,19 @@ def main() -> int:
             assert conda_cmd is not None
             assert conda_source_dir is not None
             wheel_path = wheels[0]
+            bioformats_jar_path = (
+                repo_root
+                / "src"
+                / "3rdparty"
+                / "build"
+                / "jars"
+                / "bioformats_package.jar"
+            )
             logger.info("Staging conda zimg package from wheel: %s", wheel_path.name)
             staged_dir = _stage_conda_zimg_from_wheel(
-                wheel_path=wheel_path, conda_source_dir=conda_source_dir
+                wheel_path=wheel_path,
+                conda_source_dir=conda_source_dir,
+                bioformats_jar_path=bioformats_jar_path,
             )
             logger.info("Staged conda package dir: %s", staged_dir)
             _run_checked(conda_cmd, cwd=repo_root, display_cmd=conda_cmd_display)

@@ -104,11 +104,8 @@ std::optional<std::string> bioFormatsRuntimeSkipReason()
   if (!jarsDir.exists("bioformats_package.jar")) {
     return fmt::format("missing {}", jarsDir.filePath("bioformats_package.jar"));
   }
-  const QString bridgeJar = ::FLAGS_atlas_bioformats_bridge_use_grpc
-                              ? QStringLiteral("atlas-bioformats-bridge-grpc.jar")
-                              : QStringLiteral("atlas-bioformats-bridge-stdio.jar");
-  if (!jarsDir.exists(bridgeJar)) {
-    return fmt::format("missing {}", jarsDir.filePath(bridgeJar));
+  if (!jarsDir.exists("atlas-bioformats-bridge.jar")) {
+    return fmt::format("missing {}", jarsDir.filePath("atlas-bioformats-bridge.jar"));
   }
   const std::optional<QString> jreDir = bundledJreDir();
   if (!jreDir) {

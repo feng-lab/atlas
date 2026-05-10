@@ -3,11 +3,9 @@
 #include "bioformats_bridge.grpc.pb.h"
 #include "bioformats_bridge.pb.h"
 #include "zexception.h"
-#include "zimginterface.h"
 #include "zlog.h"
 
 #include <QByteArray>
-#include <QDir>
 #include <QElapsedTimer>
 #include <QFileInfo>
 #include <QMap>
@@ -57,13 +55,18 @@ namespace proto = atlas::bioformats::bridge;
 constexpr uint32_t kMaxFrameBytes = 512_u32 * 1024_u32 * 1024_u32;
 constexpr uint32_t kBridgeProtocolVersion = 1;
 constexpr const char* kBioFormatsJar = "bioformats_package.jar";
-constexpr const char* kAtlasBioFormatsGrpcBridgeJar = "atlas-bioformats-bridge-grpc.jar";
-constexpr const char* kAtlasBioFormatsStdioBridgeJar = "atlas-bioformats-bridge-stdio.jar";
-constexpr const char* kAtlasBioFormatsGrpcBridgeMainClass = "org.fenglab.atlas.bioformats.AtlasBioFormatsGrpcBridge";
-constexpr const char* kAtlasBioFormatsStdioBridgeMainClass = "org.fenglab.atlas.bioformats.AtlasBioFormatsStdioBridge";
-// This is used only for system Java discovery. A cold JVM can take several
-// seconds to answer under CI load, especially while many tests start at once.
+constexpr const char* kAtlasBioFormatsBridgeJar = "atlas-bioformats-bridge.jar";
+constexpr const char* kAtlasBioFormatsBridgeMainClass = "org.fenglab.atlas.bioformats.AtlasBioFormatsBridge";
+// A cold JVM can take several seconds to answer under CI load, especially
+// while many tests start at once.
 constexpr int kJavaVersionProbeTimeoutMs = 30000;
+
+struct BioFormatsRuntimeConfig
+{
+  QString javaExecutablePath;
+  QString bridgeJarPath;
+  QString bioFormatsJarPath;
+};
 
 struct JavaCandidate
 {
@@ -77,6 +80,24 @@ struct JavaCheckResult
   bool ok = false;
   QString detail;
 };
+
+std::mutex& bioFormatsRuntimeConfigMutex()
+{
+  static std::mutex mutex;
+  return mutex;
+}
+
+BioFormatsRuntimeConfig& bioFormatsRuntimeConfig()
+{
+  static BioFormatsRuntimeConfig config;
+  return config;
+}
+
+BioFormatsRuntimeConfig bioFormatsRuntimeConfigSnapshot()
+{
+  std::lock_guard<std::mutex> lock(bioFormatsRuntimeConfigMutex());
+  return bioFormatsRuntimeConfig();
+}
 
 QString canonicalPath(const QString& filename)
 {
@@ -125,20 +146,6 @@ std::string responseCaseName(const proto::Response& response)
   }
   CHECK(false);
   return "unknown";
-}
-
-QString platformJavaExecutableName()
-{
-#ifdef _WIN32
-  return "java.exe";
-#else
-  return "java";
-#endif
-}
-
-QString javaExecutableInHome(const QString& javaHome)
-{
-  return QDir(javaHome).absoluteFilePath(QString("bin/") + platformJavaExecutableName());
 }
 
 std::optional<int> parseJavaMajorVersion(const QString& versionOutput)
@@ -230,70 +237,60 @@ JavaCheckResult checkJavaCandidate(const JavaCandidate& candidate)
 
 QString resolveJavaExecutable()
 {
-  const QString bundledJreDir = ZImgGlobal::instance().jreDIR;
-  if (!bundledJreDir.isEmpty()) {
-    const QString bundledJava = javaExecutableInHome(bundledJreDir);
-    if (!QFileInfo(bundledJava).isExecutable()) {
-      throw ZException(
-        fmt::format("Bundled Bio-Formats Java runtime is incomplete. java executable not found: {}", bundledJava));
-    }
-    return bundledJava;
+  const QString javaExecutablePath = bioFormatsRuntimeConfigSnapshot().javaExecutablePath;
+  if (javaExecutablePath.isEmpty()) {
+    throw ZException("Bio-Formats requires Java 11 or newer, but no Java executable is configured");
   }
 
-  QStringList diagnostics;
-  const QString javaHome = qEnvironmentVariable("JAVA_HOME");
-  if (javaHome.isEmpty()) {
-    diagnostics.push_back("JAVA_HOME: not set");
-  } else {
-    const JavaCandidate candidate{
-      QString("JAVA_HOME=%1").arg(javaHome),
-      javaExecutableInHome(javaHome),
-      true,
-    };
-    const JavaCheckResult check = checkJavaCandidate(candidate);
-    if (check.ok) {
-      return candidate.program;
-    }
-    diagnostics.push_back(check.detail);
-  }
-
-  const JavaCandidate pathCandidate{
-    "PATH java",
-    platformJavaExecutableName(),
-    false,
+  const JavaCandidate candidate{
+    "configured Java",
+    javaExecutablePath,
+    true,
   };
-  const JavaCheckResult pathCheck = checkJavaCandidate(pathCandidate);
-  if (pathCheck.ok) {
-    return pathCandidate.program;
+  const JavaCheckResult check = checkJavaCandidate(candidate);
+  if (check.ok) {
+    return candidate.program;
   }
-  diagnostics.push_back(pathCheck.detail);
-
-  const QString detail = QString("Bio-Formats requires Java 11 or newer. Tried:\n- ") + diagnostics.join("\n- ");
+  const QString detail = QString("Bio-Formats requires Java 11 or newer. ") + check.detail;
   throw ZException(detail);
+}
+
+QString checkedJavaExecutablePath(const QString& javaExecutablePath)
+{
+  if (javaExecutablePath.isEmpty()) {
+    throw ZException("Java executable path must not be empty");
+  }
+  const QFileInfo javaFile(javaExecutablePath);
+  if (!javaFile.isExecutable()) {
+    throw ZException(fmt::format("invalid Java executable path: {}", javaExecutablePath));
+  }
+  return javaFile.absoluteFilePath();
+}
+
+QString checkedJarPath(const QString& jarPath, const char* description)
+{
+  if (jarPath.isEmpty()) {
+    throw ZException(fmt::format("{} path must not be empty", description));
+  }
+
+  const QFileInfo jarFile(jarPath);
+  if (!jarFile.exists() || !jarFile.isFile()) {
+    throw ZException(fmt::format("invalid {} path: {}", description, jarPath));
+  }
+  return jarFile.absoluteFilePath();
 }
 
 QString bridgeClasspath()
 {
-  QDir jarsDir(ZImgGlobal::instance().jarsDIR);
+  const BioFormatsRuntimeConfig config = bioFormatsRuntimeConfigSnapshot();
 #ifdef _WIN32
   constexpr QChar separator(';');
 #else
   constexpr QChar separator(':');
 #endif
-  const char* bridgeJar =
-    FLAGS_atlas_bioformats_bridge_use_grpc ? kAtlasBioFormatsGrpcBridgeJar : kAtlasBioFormatsStdioBridgeJar;
-  return jarsDir.absoluteFilePath(kBioFormatsJar) + separator + jarsDir.absoluteFilePath(bridgeJar);
-}
-
-const char* bridgeMainClass()
-{
-  return FLAGS_atlas_bioformats_bridge_use_grpc ? kAtlasBioFormatsGrpcBridgeMainClass
-                                                : kAtlasBioFormatsStdioBridgeMainClass;
-}
-
-const char* bridgeJarName()
-{
-  return FLAGS_atlas_bioformats_bridge_use_grpc ? kAtlasBioFormatsGrpcBridgeJar : kAtlasBioFormatsStdioBridgeJar;
+  CHECK(!config.bioFormatsJarPath.isEmpty());
+  CHECK(!config.bridgeJarPath.isEmpty());
+  return config.bioFormatsJarPath + separator + config.bridgeJarPath;
 }
 
 size_t resolveBioFormatsBridgeWorkerCount()
@@ -757,7 +754,7 @@ private:
       args.push_back(QString("-Xmx%1").arg(QString::fromStdString(FLAGS_atlas_bioformats_java_xmx)));
     }
     args << "-Djava.awt.headless=true"
-         << "-cp" << bridgeClasspath() << bridgeMainClass();
+         << "-cp" << bridgeClasspath() << kAtlasBioFormatsBridgeMainClass;
 
     const QString java = javaExecutable();
     m_process.setProgram(java);
@@ -785,8 +782,10 @@ private:
                                      kBridgeProtocolVersion,
                                      info.protocol_version()));
       }
+      const BioFormatsRuntimeConfig runtimeConfig = bioFormatsRuntimeConfigSnapshot();
       LOG(INFO) << "Bio-Formats bridge worker " << m_workerIndex << " ready: pid=" << m_process.processId()
-                << ", java=" << java << ", jarsDIR=" << ZImgGlobal::instance().jarsDIR << ", startMs=" << startMs
+                << ", java=" << java << ", bridgeJar=" << runtimeConfig.bridgeJarPath
+                << ", bioformatsJar=" << runtimeConfig.bioFormatsJarPath << ", startMs=" << startMs
                 << ", handshakeMs=" << handshakeTimer.elapsed() << ", protocol=" << info.protocol_version()
                 << ", bridge=" << info.bridge_version() << ", bioformats=" << info.bioformats_version()
                 << ", javaVersion=" << info.java_version() << ", vm=" << info.java_vm_name()
@@ -1470,7 +1469,7 @@ private:
       args.push_back(QString("-Xmx%1").arg(QString::fromStdString(FLAGS_atlas_bioformats_java_xmx)));
     }
     args << "-Djava.awt.headless=true"
-         << "-cp" << bridgeClasspath() << bridgeMainClass() << "--grpc-port=0"
+         << "-cp" << bridgeClasspath() << kAtlasBioFormatsBridgeMainClass << "--grpc-port=0"
          << QString("--worker-count=%1").arg(m_workerCount);
 
     const QString java = javaExecutable();
@@ -1515,8 +1514,10 @@ private:
                                      kBridgeProtocolVersion,
                                      info.protocol_version()));
       }
+      const BioFormatsRuntimeConfig runtimeConfig = bioFormatsRuntimeConfigSnapshot();
       LOG(INFO) << "Bio-Formats gRPC bridge ready: pid=" << m_process.processId() << ", java=" << java
-                << ", jarsDIR=" << ZImgGlobal::instance().jarsDIR << ", target=" << target
+                << ", bridgeJar=" << runtimeConfig.bridgeJarPath
+                << ", bioformatsJar=" << runtimeConfig.bioFormatsJarPath << ", target=" << target
                 << ", readerWorkers=" << m_workerCount << ", startMs=" << startMs
                 << ", handshakeMs=" << handshakeTimer.elapsed() << ", protocol=" << info.protocol_version()
                 << ", bridge=" << info.bridge_version() << ", bioformats=" << info.bioformats_version()
@@ -1785,6 +1786,22 @@ std::unique_ptr<ZBioFormatsBridgeClient>& bioFormatsBridgeClientSingleton()
   return client;
 }
 
+void configureRuntimePath(QString BioFormatsRuntimeConfig::* field, const QString& resolvedPath)
+{
+  std::lock_guard<std::mutex> singletonLock(bioFormatsBridgeClientSingletonMutex());
+  if (bioFormatsBridgeClientSingleton() != nullptr) {
+    const BioFormatsRuntimeConfig config = bioFormatsRuntimeConfigSnapshot();
+    if (config.*field == resolvedPath) {
+      return;
+    }
+    throw ZException("Bio-Formats runtime cannot be reconfigured after the bridge has been started");
+  }
+
+  std::lock_guard<std::mutex> configLock(bioFormatsRuntimeConfigMutex());
+  BioFormatsRuntimeConfig& config = bioFormatsRuntimeConfig();
+  config.*field = resolvedPath;
+}
+
 } // namespace
 
 ZBioFormatsBridgeClient& ZBioFormatsBridgeClient::instance()
@@ -1792,6 +1809,10 @@ ZBioFormatsBridgeClient& ZBioFormatsBridgeClient::instance()
   std::lock_guard<std::mutex> lock(bioFormatsBridgeClientSingletonMutex());
   std::unique_ptr<ZBioFormatsBridgeClient>& client = bioFormatsBridgeClientSingleton();
   if (!client) {
+    if (!hasRuntimeSupport()) {
+      throw ZException(
+        fmt::format("Bio-Formats bridge runtime is incomplete. Missing: {}", missingRuntimeFiles().join(", ")));
+    }
     client = std::make_unique<ZBioFormatsBridgeClient>();
   }
   return *client;
@@ -1811,22 +1832,41 @@ bool ZBioFormatsBridgeClient::hasRuntimeSupport()
 QStringList ZBioFormatsBridgeClient::missingRuntimeFiles()
 {
   QStringList missing;
-  if (ZImgGlobal::instance().jarsDIR.isEmpty()) {
-    missing.push_back("jars directory");
-    return missing;
+  const BioFormatsRuntimeConfig config = bioFormatsRuntimeConfigSnapshot();
+  if (config.javaExecutablePath.isEmpty()) {
+    missing.push_back("Java executable");
+  } else if (!QFileInfo(config.javaExecutablePath).isExecutable()) {
+    missing.push_back(config.javaExecutablePath);
   }
-  QDir jarsDir(ZImgGlobal::instance().jarsDIR);
-  if (!jarsDir.exists()) {
-    missing.push_back(jarsDir.absolutePath());
-    return missing;
+  if (config.bridgeJarPath.isEmpty()) {
+    missing.push_back(kAtlasBioFormatsBridgeJar);
+  } else if (!QFileInfo(config.bridgeJarPath).isFile()) {
+    missing.push_back(config.bridgeJarPath);
   }
-  if (!jarsDir.exists(kBioFormatsJar)) {
+  if (config.bioFormatsJarPath.isEmpty()) {
     missing.push_back(kBioFormatsJar);
-  }
-  if (!jarsDir.exists(bridgeJarName())) {
-    missing.push_back(bridgeJarName());
+  } else if (!QFileInfo(config.bioFormatsJarPath).isFile()) {
+    missing.push_back(config.bioFormatsJarPath);
   }
   return missing;
+}
+
+void ZBioFormatsBridgeClient::configureJavaExecutablePath(const QString& javaExecutablePath)
+{
+  const QString resolvedJavaExecutablePath = checkedJavaExecutablePath(javaExecutablePath);
+  configureRuntimePath(&BioFormatsRuntimeConfig::javaExecutablePath, resolvedJavaExecutablePath);
+}
+
+void ZBioFormatsBridgeClient::configureBridgeJarPath(const QString& bridgeJarPath)
+{
+  const QString resolvedBridgeJarPath = checkedJarPath(bridgeJarPath, "Atlas Bio-Formats bridge jar");
+  configureRuntimePath(&BioFormatsRuntimeConfig::bridgeJarPath, resolvedBridgeJarPath);
+}
+
+void ZBioFormatsBridgeClient::configureBioFormatsJarPath(const QString& bioFormatsJarPath)
+{
+  const QString resolvedBioFormatsJarPath = checkedJarPath(bioFormatsJarPath, "Bio-Formats jar");
+  configureRuntimePath(&BioFormatsRuntimeConfig::bioFormatsJarPath, resolvedBioFormatsJarPath);
 }
 
 ZBioFormatsBridgeClient::ZBioFormatsBridgeClient()

@@ -1,12 +1,7 @@
 files_to_download = [
     {
-        "expected_size": 2197829,
-        "expected_sha256": "cfaac39b582fbb18f698c946aa07027288f7af0519cdbc2537a728df66d91e73",
-        "filename": "jars/atlas-bioformats-bridge-stdio.jar",
-    },
-    {
-        "expected_size": 20390326,
-        "expected_sha256": "844b4cf383bf19ff859bff90e8411b6320316aa3c3f59f74cf6410faffb6a1bf",
-        "filename": "jars/atlas-bioformats-bridge-grpc.jar",
-    },
+        "expected_size": 20389516,
+        "expected_sha256": "aec4c5f558f12b17857e4b510c3c740cdc1030f9655a1c29e40ec98790e8e2f6",
+        "filename": "jars/atlas-bioformats-bridge.jar",
+    }
 ]

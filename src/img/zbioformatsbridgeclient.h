@@ -97,6 +97,10 @@ public:
 
   static QStringList missingRuntimeFiles();
 
+  static void configureJavaExecutablePath(const QString& javaExecutablePath);
+  static void configureBridgeJarPath(const QString& bridgeJarPath);
+  static void configureBioFormatsJarPath(const QString& bioFormatsJarPath);
+
   // Tests change bridge transport flags in-process; reset before the next
   // instance() call so the singleton captures the new flag values.
   static void resetInstanceForTesting();

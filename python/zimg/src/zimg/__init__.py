@@ -5,20 +5,29 @@ repository’s C++ sources in ``src/python/imgpy.cpp``.
 """
 
 import os
+import shutil
 import sys
+from pathlib import Path
 
 # Enforce supported Python versions early and fail with an import error.
 if sys.version_info < (3, 12):
     raise ImportError("zimg requires Python >= 3.12")
 
-# Configure resource locations for the native library so both the native install
-# layout and the PyPI wheel layout behave consistently.
-current_dir = os.path.dirname(os.path.abspath(__file__))
-os.environ.setdefault("Resources_DIR", current_dir)
-os.environ.setdefault("ZIMG_JARS_DIR", os.path.join(current_dir, "jars"))
+current_dir = Path(__file__).resolve().parent
+
+
+def _java_executable_path() -> str:
+    java_name = "java.exe" if os.name == "nt" else "java"
+    java_home = os.environ.get("JAVA_HOME")
+    if java_home:
+        candidate = Path(java_home).expanduser() / "bin" / java_name
+        if candidate.is_file():
+            return str(candidate.resolve())
+    return shutil.which(java_name) or ""
+
 
 try:
-    from ._imgpy import *  # type: ignore[import-not-found]  # noqa: F401,F403
+    from . import _imgpy as _native  # type: ignore[import-not-found]
 except ModuleNotFoundError as exc:
     # Only rewrite the error if the compiled extension itself is missing.
     # If a dependency import fails (e.g., `numpy`), surface that original error.
@@ -30,4 +39,12 @@ except ModuleNotFoundError as exc:
         "for Atlas zimg are available."
     ) from exc
 
+_native._initialize_runtime(
+    str(current_dir),
+    str(current_dir / "jars" / "atlas-bioformats-bridge.jar"),
+    _java_executable_path(),
+)
+
+from ._imgpy import *  # type: ignore[import-not-found]  # noqa: F401,F403,E402
+from . import bioformats  # noqa: F401,E402
 from . import neutube_json

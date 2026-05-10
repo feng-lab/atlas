@@ -449,7 +449,6 @@ if (UNIX AND NOT APPLE)
 endif ()
 
 install(FILES
-        "${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/jars/bioformats_package.jar"
-        "${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/jars/atlas-bioformats-bridge-stdio.jar"
+        "${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/jars/atlas-bioformats-bridge.jar"
         DESTINATION zimg/jars
 )

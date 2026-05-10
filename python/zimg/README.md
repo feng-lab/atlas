@@ -245,12 +245,19 @@ Supported file formats depend on how the wheel/source was built. The
 - `Vaa3DRaw`, `HDF5Img`, `MetaImage`, `ITKImage`
 - `FreeImage` (optional; omitted when built with `-DZIMG_DISABLE_FREEIMAGE=ON`)
 
-`BioFormats` uses the packaged Atlas Bio-Formats jars, but the wheel does not
-ship Java. At runtime, zimg checks `JAVA_HOME/bin/java` first, then falls back
-to `java` from `PATH` if `JAVA_HOME` is unset or unsuitable. The bridge jar is
-compiled for Java 11, so Bio-Formats reads require Java 11 or newer. Missing or
-older Java runtimes surface as Python exceptions from the Bio-Formats
-read/probe call; native formats do not start Java.
+`BioFormats` requires OME's `bioformats_package.jar`, which is not installed by
+default. Configure an existing jar with
+`zimg.bioformats.configure("/path/to/bioformats_package.jar")`, or call
+`zimg.bioformats.download()` to fetch the pinned runtime jar and enable it for
+the current Python process. If no Bio-Formats jar is configured, native formats
+continue to work and Bio-Formats-backed readers report unavailable.
+
+The wheel does not ship Java. At import time, the Python package checks
+`JAVA_HOME/bin/java` first, then falls back to `java` from `PATH` if `JAVA_HOME`
+is unset or unsuitable, and passes the resolved executable to the native bridge
+runtime. The bridge jar is compiled for Java 11, so Bio-Formats reads require
+Java 11 or newer. Missing or older Java runtimes surface as Python exceptions
+from the Bio-Formats read/probe call; native formats do not start Java.
 
 ## Notes / limitations
 
