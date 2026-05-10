@@ -503,6 +503,14 @@ def main() -> int:
     if common_dirs.is_mac():
         allowed_env_keys.add("MACOS_CODESIGN_IDENTITY")
     atlas_env.load_repo_dotenv(allowed_keys=allowed_env_keys)
+    if common_dirs.is_mac() and os.environ.get("PYPI_API_TOKEN", "").strip():
+        identity = os.environ.get("MACOS_CODESIGN_IDENTITY", "").strip()
+        if not identity or identity == "-":
+            raise RuntimeError(
+                "Refusing to publish macOS zimg wheel to PyPI without a Developer ID "
+                "codesigning identity. Set MACOS_CODESIGN_IDENTITY to a Developer ID "
+                "Application identity before publishing."
+            )
 
     out_dir = repo_root / "python" / "zimg" / "dist"
     cmd = [sys.executable, "-m", "build", "--wheel", "--outdir", str(out_dir)]
@@ -633,6 +641,8 @@ def main() -> int:
 
     if not wheels:
         raise RuntimeError("Wheel build did not produce any artifacts.")
+
+    atlas_pypi.report_dist_artifact_sizes(out_dir)
 
     atlas_pypi.maybe_upload_to_pypi(
         out_dir,

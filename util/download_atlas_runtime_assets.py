@@ -1,5 +1,4 @@
 import logging
-import shutil
 from pathlib import Path
 
 import atlas_file_hosts
@@ -46,42 +45,6 @@ def _all_targets_valid() -> bool:
     return True
 
 
-def _copy_from_local_static_dir(source_dir: Path) -> bool:
-    copied = False
-    target_dir = _target_dir()
-    for item in raw_files_to_download:
-        rel = _normalize_relpath(item["filename"])
-        source_path = source_dir / rel
-        target_path = target_dir / rel
-        expected_size = int(item["expected_size"])
-        expected_sha256 = str(item["expected_sha256"])
-
-        if not _validate_file(
-            source_path,
-            expected_size=expected_size,
-            expected_sha256=expected_sha256,
-        ):
-            logger.warning(
-                "Local runtime asset does not match manifest: %s", source_path
-            )
-            return False
-
-        if _validate_file(
-            target_path,
-            expected_size=expected_size,
-            expected_sha256=expected_sha256,
-        ):
-            logger.info("Runtime asset already present: %s", target_path)
-            continue
-
-        logger.info("Copying runtime asset %s -> %s", source_path, target_path)
-        target_path.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(source_path, target_path)
-        copied = True
-
-    return copied or _all_targets_valid()
-
-
 def _download_from_static_hosts() -> None:
     files_to_download = atlas_file_hosts.with_static_urls(
         raw_files_to_download,
@@ -106,10 +69,6 @@ def _download_from_static_hosts() -> None:
 def download_atlas_runtime_assets() -> None:
     if _all_targets_valid():
         logger.info("Atlas runtime assets are already present.")
-        return
-
-    local_static_dir = Path(common_dirs.static_deploy_folder()) / "atlas_runtime_assets"
-    if local_static_dir.is_dir() and _copy_from_local_static_dir(local_static_dir):
         return
 
     _download_from_static_hosts()

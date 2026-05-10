@@ -71,6 +71,20 @@ def ensure_empty_dir(path: Path) -> None:
             entry.unlink()
 
 
+def report_dist_artifact_sizes(dist_dir: Path) -> None:
+    pypi_upload_file_size_limit_bytes = 100 * 1024 * 1024
+    for artifact in sorted(p for p in dist_dir.iterdir() if p.is_file()):
+        size_bytes = artifact.stat().st_size
+        logger.info("Package size: %s is %s bytes", artifact.name, f"{size_bytes:,}")
+        if size_bytes > pypi_upload_file_size_limit_bytes:
+            logger.warning(
+                "Package exceeds PyPI's default per-file upload limit of %s bytes: %s is %s bytes",
+                f"{pypi_upload_file_size_limit_bytes:,}",
+                artifact.name,
+                f"{size_bytes:,}",
+            )
+
+
 def maybe_upload_to_pypi(
     dist_dir: Path,
     *,

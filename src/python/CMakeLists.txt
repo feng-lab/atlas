@@ -379,6 +379,7 @@ if (APPLE)
           continue()
         endif()
 
+        message(STATUS "codesign: signing installed zimg Mach-O: ${_path}")
         execute_process(
           COMMAND codesign --force --sign "${_codesign_identity}" --timestamp=none "${_path}"
           RESULT_VARIABLE _cs_rc
@@ -389,6 +390,7 @@ if (APPLE)
           message(FATAL_ERROR "codesign failed for ${_path} (exit ${_cs_rc})\n${_cs_out}\n${_cs_err}")
         endif()
 
+        message(STATUS "codesign: verifying installed zimg Mach-O: ${_path}")
         execute_process(
           COMMAND codesign --verify --strict --verbose=2 "${_path}"
           RESULT_VARIABLE _verify_rc
