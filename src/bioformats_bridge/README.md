@@ -18,6 +18,19 @@ mvn -DskipTests clean package
 cp target/atlas-bioformats-bridge.jar ../3rdparty/build/jars/
 ```
 
+For the private developer workflow that publishes a new bridge jar as an Atlas
+runtime asset for future builds/CI, use:
+
+```sh
+uv run util/build_and_publish_bioformats_bridge.py
+```
+
+That helper builds the shaded jar, updates
+`src/3rdparty/build/jars/atlas-bioformats-bridge.jar`, copies the same jar into
+the private static `atlas_runtime_assets/jars/` deploy mirror, regenerates
+`util/atlas_runtime_assets_filelist.py`, and syncs `atlas_runtime_assets` to R2.
+Use `--skip-publish` to stop before the R2 sync.
+
 The Java bridge intentionally stays on the Protobuf Java 3.25.x maintenance
 line. Keep the Maven `protobuf.version` property pinned to the same patch
 version for both `protobuf-java` and `protoc`; Atlas' C++ side uses its own
