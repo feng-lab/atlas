@@ -41,7 +41,7 @@ except ModuleNotFoundError as exc:
 
 _native._initialize_runtime(
     str(current_dir),
-    str(current_dir / "jars" / "atlas-bioformats-bridge.jar"),
+    str(current_dir / "jars"),
     _java_executable_path(),
 )
 

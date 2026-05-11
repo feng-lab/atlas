@@ -31,9 +31,10 @@
 #include <utility>
 #include <vector>
 
-DEFINE_string(atlas_bioformats_java_xmx,
-              "2g",
-              "Maximum Java heap for the persistent Bio-Formats bridge process. Empty means no -Xmx argument.");
+DEFINE_string(
+  atlas_bioformats_java_xmx,
+  "",
+  "Optional maximum Java heap for the persistent Bio-Formats bridge process. Empty means no -Xmx argument.");
 DEFINE_int32(atlas_bioformats_bridge_io_timeout_ms,
              0,
              "Timeout for Bio-Formats bridge operations in milliseconds. 0 means wait indefinitely.");
@@ -1867,6 +1868,21 @@ void ZBioFormatsBridgeClient::configureBioFormatsJarPath(const QString& bioForma
 {
   const QString resolvedBioFormatsJarPath = checkedJarPath(bioFormatsJarPath, "Bio-Formats jar");
   configureRuntimePath(&BioFormatsRuntimeConfig::bioFormatsJarPath, resolvedBioFormatsJarPath);
+}
+
+QString ZBioFormatsBridgeClient::javaExecutablePath()
+{
+  return bioFormatsRuntimeConfigSnapshot().javaExecutablePath;
+}
+
+QString ZBioFormatsBridgeClient::bridgeJarPath()
+{
+  return bioFormatsRuntimeConfigSnapshot().bridgeJarPath;
+}
+
+QString ZBioFormatsBridgeClient::bioFormatsJarPath()
+{
+  return bioFormatsRuntimeConfigSnapshot().bioFormatsJarPath;
 }
 
 ZBioFormatsBridgeClient::ZBioFormatsBridgeClient()

@@ -88,6 +88,15 @@ struct NeuroglancerAnnotationsLoadResult
   std::shared_ptr<ZSkeleton> skeleton;
 };
 
+void showNonBlockingCriticalMessage(QWidget* parent, const QString& title, const QString& text)
+{
+  auto* messageBox = new QMessageBox(QMessageBox::Critical, title, text, QMessageBox::Ok, parent);
+  messageBox->setAttribute(Qt::WA_DeleteOnClose);
+  messageBox->setWindowModality(Qt::NonModal);
+  messageBox->setModal(false);
+  messageBox->show();
+}
+
 struct ClipboardNeuroglancerMeshStateResult
 {
   enum class Status
@@ -3536,7 +3545,8 @@ QString ZImgView::infoOfPos(double x, double y)
     }
   }
   catch (const ZException& e) {
-    QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(), e.what());
+    LOG(ERROR) << "Failed to read image value for hover info: " << e.what();
+    showNonBlockingCriticalMessage(QApplication::activeWindow(), QApplication::applicationName(), e.what());
   }
   return info;
 }

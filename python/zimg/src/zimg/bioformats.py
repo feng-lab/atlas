@@ -34,6 +34,18 @@ def configure(path: str | os.PathLike[str]) -> Path:
     return jar_path
 
 
+def configure_java(path: str | os.PathLike[str]) -> Path:
+    """Use a specific Java executable for this Python process."""
+
+    java_path = Path(path).expanduser().resolve()
+    if not java_path.is_file():
+        raise FileNotFoundError(f"Java executable does not exist: {java_path}")
+    if not os.access(java_path, os.X_OK):
+        raise PermissionError(f"Java path is not executable: {java_path}")
+    _imgpy._set_bioformats_java_executable_path(str(java_path))
+    return java_path
+
+
 def download() -> Path:
     """Download the pinned Bio-Formats runtime jar, verify it, and configure zimg."""
 
@@ -70,6 +82,42 @@ def is_available() -> bool:
     """Return whether zimg currently has a complete Bio-Formats runtime."""
 
     return bool(_imgpy._has_bioformats_runtime_support())
+
+
+def runtime_paths() -> dict[str, Path | None]:
+    """Return the Java executable, bridge jar, and Bio-Formats jar paths in use."""
+
+    raw = _imgpy._bioformats_runtime_paths()
+    return {key: Path(value) if value else None for key, value in raw.items()}
+
+
+def ensure_available() -> None:
+    """Print runtime paths and raise unless Bio-Formats is ready to use."""
+
+    paths = runtime_paths()
+    labels = {
+        "java_executable": "Java executable",
+        "bridge_jar": "Atlas Bio-Formats bridge jar",
+        "bioformats_jar": "Bio-Formats jar",
+    }
+    for key, label in labels.items():
+        print(f"{label}: {paths[key] or 'not configured'}")
+
+    if is_available():
+        print("Bio-Formats runtime available: True")
+        return
+
+    missing = [str(item) for item in _imgpy._missing_bioformats_runtime_files()]
+    missing_suffix = "" if not missing else f" (missing: {', '.join(missing)})"
+    print(f"Bio-Formats runtime available: False{missing_suffix}")
+    details = ", ".join(
+        f"{key}={value if value is not None else 'not configured'}"
+        for key, value in paths.items()
+    )
+    raise RuntimeError(
+        "zimg Bio-Formats runtime is not available. "
+        f"Missing: {', '.join(missing)}. Runtime paths: {details}"
+    )
 
 
 def path() -> Path | None:

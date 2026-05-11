@@ -171,7 +171,6 @@ Bio-Formats Image Bridge
 - Opening a Bio-Formats dataset synchronously opens it on every active Java-side reader before returning. This preserves Atlas' existing local-file behavior, where display callers receive a complete result instead of progressive/async placeholders, while keeping tiled reads parallel in the desktop gRPC backend once the dataset is displayed.
 - Desktop Atlas schedules a background Bio-Formats warmup after the main window is shown. Warmup starts the selected Java bridge, performs the runtime handshake, and caches the supported reader list without blocking first paint.
 - Tunables:
-  - `--atlas_bioformats_java_xmx=<size>` sets the sidecar JVM heap, default `2g`.
   - `--atlas_bioformats_bridge_worker_count=<count>` sets the gRPC reader count for pixel reads. On the default gRPC backend, workers are Java-side `IFormatReader` instances inside one JVM and default `0` uses `std::thread::hardware_concurrency()`. On the stdio backend, this flag is ignored and the single stdio sidecar is used.
   - `--atlas_bioformats_bridge_use_grpc=<bool>` selects the bridge transport inside the merged bridge jar. Default `true` uses the gRPC backend; `false` uses the stdio backend.
   - `--atlas_bioformats_bridge_io_timeout_ms=<ms>` bounds bridge operations when non-zero; default `0` waits indefinitely.

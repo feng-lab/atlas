@@ -10,8 +10,6 @@ class ZImgGlobal
 public:
   static ZImgGlobal& instance();
 
-  QString jreDIR;
-  QString jarsDIR;
   QString resourcesDIR;
 
 private:

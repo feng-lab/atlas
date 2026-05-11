@@ -30,19 +30,13 @@
 #include <nanobind/eigen/dense.h>
 #include <nanobind/operators.h>
 #include <nanobind/trampoline.h>
-#include <QFileInfo>
-#include <gflags/gflags.h>
 #include <cstring>
-#include <mutex>
 
 namespace nb = nanobind;
 
 using namespace nim;
 
 using namespace nb::literals;
-
-DECLARE_int32(atlas_bioformats_bridge_worker_count);
-DECLARE_bool(atlas_bioformats_bridge_use_grpc);
 
 namespace {
 
@@ -404,88 +398,21 @@ std::array<T, 3> vectorToArray3(const std::vector<T>& values, const char* name)
   return {values[0], values[1], values[2]};
 }
 
-std::mutex& runtimeInitMutex()
+void initializeRuntime(const QString& resourcesDir, const QString& jarsDir, const QString& javaExecutablePath)
 {
-  static std::mutex mutex;
-  return mutex;
-}
-
-bool& runtimeInitialized()
-{
-  static bool initialized = false;
-  return initialized;
-}
-
-std::string& runtimeResourcesDir()
-{
-  static std::string path;
-  return path;
-}
-
-std::string& runtimeBridgeJarPath()
-{
-  static std::string path;
-  return path;
-}
-
-std::string& runtimeJavaExecutablePath()
-{
-  static std::string path;
-  return path;
-}
-
-void initializeRuntime(const std::string& resourcesDir,
-                       const std::string& bridgeJarPath,
-                       const std::string& javaExecutablePath)
-{
-  std::lock_guard<std::mutex> lock(runtimeInitMutex());
-  const QFileInfo bridgeJar(QString::fromStdString(bridgeJarPath));
-  if (!bridgeJar.exists() || !bridgeJar.isFile()) {
-    throw ZException(fmt::format("invalid Atlas Bio-Formats bridge jar path: {}", bridgeJarPath));
-  }
-  const std::string resolvedBridgeJarPath = bridgeJar.absoluteFilePath().toStdString();
-  if (runtimeInitialized()) {
-    if (runtimeResourcesDir() != resourcesDir || runtimeBridgeJarPath() != resolvedBridgeJarPath ||
-        runtimeJavaExecutablePath() != javaExecutablePath) {
-      throw ZException("zimg runtime is already initialized with different resource paths");
-    }
-    return;
-  }
-
   ZLogInit::instance("zimg"s);
-  ::FLAGS_atlas_bioformats_bridge_use_grpc = true;
-  ::FLAGS_atlas_bioformats_bridge_worker_count = 0;
-  ZImgInit::instance(QString::fromStdString(resourcesDir), "", bridgeJar.absolutePath(), false);
-  if (!javaExecutablePath.empty()) {
-    ZBioFormatsBridgeClient::configureJavaExecutablePath(QString::fromStdString(javaExecutablePath));
+  ZImgInit::instance(resourcesDir, QString(), jarsDir, false);
+  if (!javaExecutablePath.isEmpty()) {
+    ZBioFormatsBridgeClient::configureJavaExecutablePath(javaExecutablePath);
   }
-
-  runtimeResourcesDir() = resourcesDir;
-  runtimeBridgeJarPath() = resolvedBridgeJarPath;
-  runtimeJavaExecutablePath() = javaExecutablePath;
-  runtimeInitialized() = true;
 }
 
-void setBioFormatsJarPath(const std::string& bioFormatsJarPath)
+nb::dict bioFormatsRuntimePaths()
 {
-  std::lock_guard<std::mutex> lock(runtimeInitMutex());
-  if (!runtimeInitialized()) {
-    throw ZException("zimg runtime is not initialized");
-  }
-  if (bioFormatsJarPath.empty()) {
-    throw ZException("Bio-Formats jar path must not be empty");
-  }
-  ZBioFormatsBridgeClient::configureBioFormatsJarPath(QString::fromStdString(bioFormatsJarPath));
-}
-
-std::vector<std::string> missingBioFormatsRuntimeFiles()
-{
-  const QStringList missing = ZBioFormatsBridgeClient::missingRuntimeFiles();
-  std::vector<std::string> result;
-  result.reserve(missing.size());
-  for (const QString& item : missing) {
-    result.push_back(item.toStdString());
-  }
+  nb::dict result;
+  result["java_executable"] = ZBioFormatsBridgeClient::javaExecutablePath().toStdString();
+  result["bridge_jar"] = ZBioFormatsBridgeClient::bridgeJarPath().toStdString();
+  result["bioformats_jar"] = ZBioFormatsBridgeClient::bioFormatsJarPath().toStdString();
   return result;
 }
 
@@ -497,10 +424,14 @@ NB_MODULE(_imgpy, m)
         Python interface to img lib.
     )pbdoc";
 
-  m.def("_initialize_runtime", &initializeRuntime, "resources_dir"_a, "bridge_jar_path"_a, "java_executable_path"_a);
-  m.def("_set_bioformats_jar_path", &setBioFormatsJarPath, "bioformats_jar_path"_a);
+  m.def("_initialize_runtime", &initializeRuntime, "resources_dir"_a, "jars_dir"_a, "java_executable_path"_a);
+  m.def("_set_bioformats_jar_path", &ZBioFormatsBridgeClient::configureBioFormatsJarPath, "bioformats_jar_path"_a);
+  m.def("_set_bioformats_java_executable_path",
+        &ZBioFormatsBridgeClient::configureJavaExecutablePath,
+        "java_executable_path"_a);
   m.def("_has_bioformats_runtime_support", &ZBioFormatsBridgeClient::hasRuntimeSupport);
-  m.def("_missing_bioformats_runtime_files", &missingBioFormatsRuntimeFiles);
+  m.def("_missing_bioformats_runtime_files", &ZBioFormatsBridgeClient::missingRuntimeFiles);
+  m.def("_bioformats_runtime_paths", &bioFormatsRuntimePaths);
 
   nb::enum_<VoxelFormat>(m, "VoxelFormat", nb::is_arithmetic())
     .value("Unsigned", VoxelFormat::Unsigned)

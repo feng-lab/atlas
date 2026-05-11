@@ -497,6 +497,7 @@ ZQImagePack ZImgPackDisplay::toQImagePack(size_t tileWidth, size_t tileHeight) c
     }
   }
   catch (const ZException& e) {
+    LOG(ERROR) << "Can not compose image pack: " << e.what();
     showCriticalWithDetails(QApplication::activeWindow(), QStringLiteral("Can not compose image pack"), e.what());
   }
 

@@ -48,6 +48,7 @@ import loci.formats.FormatTools;
 import loci.formats.IFormatReader;
 import loci.formats.ImageReader;
 import loci.formats.MetadataTools;
+import loci.formats.in.SDTReader;
 import loci.formats.meta.IMetadata;
 import loci.formats.meta.MetadataStore;
 import ome.units.UNITS;
@@ -328,6 +329,7 @@ public final class AtlasBioFormatsBridge
         return ProbeResponse.newBuilder().setCanRead(false).build();
       }
       reader.setId(path);
+      configureReaderAfterOpen(reader);
       return ProbeResponse.newBuilder()
         .setCanRead(true)
         .setFormatName(nullToEmpty(reader.getFormat()))
@@ -349,6 +351,7 @@ public final class AtlasBioFormatsBridge
           createReader(request.getOpenDataset().getGroupingPolicy(), request.getOpenDataset().getMetadataFiltered());
         readers.add(reader);
         reader.setId(path);
+        configureReaderAfterOpen(reader);
       }
       final IFormatReader metadataReader = readers.get(0);
       final long sessionId = nextSessionId.getAndIncrement();
@@ -708,6 +711,17 @@ public final class AtlasBioFormatsBridge
       reader.setMetadataStore(store);
     }
     return reader;
+  }
+
+  private static void configureReaderAfterOpen(final IFormatReader reader)
+  {
+    final IFormatReader activeReader = reader instanceof ImageReader ? ((ImageReader)reader).getReader() : reader;
+    if (activeReader instanceof SDTReader) {
+      // SDTReader's default preload cache can retain hundreds of MB for one requested plane. Atlas reads SDT data as
+      // small regions through multiple long-lived bridge readers, so keep SDT reads streaming instead of retaining that
+      // per-reader cache.
+      ((SDTReader)activeReader).setPreLoad(false);
+    }
   }
 
   private static void requireExistingFile(final String path) throws FileNotFoundException

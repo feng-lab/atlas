@@ -45,8 +45,6 @@ ZImgInit::ZImgInit(const QString& resourcesDIR, const QString& jreDIR, const QSt
     LOG(WARNING) << "glog is not initialized, initialize it now";
   }
 
-  ZImgGlobal::instance().jarsDIR = "";
-  ZImgGlobal::instance().jreDIR = "";
   if (jarsDIR.isEmpty()) {
     LOG(INFO) << "no java support";
   } else {
@@ -54,11 +52,10 @@ ZImgInit::ZImgInit(const QString& resourcesDIR, const QString& jreDIR, const QSt
     if (!jarsD.exists() || !jarsD.exists(kAtlasBioFormatsBridgeJar)) {
       throw ZException(fmt::format("invalid jarsDIR: {}", jarsDIR));
     }
-    ZImgGlobal::instance().jarsDIR = jarsD.absolutePath();
     const QString bridgeJarPath = jarsD.absoluteFilePath(kAtlasBioFormatsBridgeJar);
     const QString bioFormatsJarPath = jarsD.exists(kBioFormatsJar) ? jarsD.absoluteFilePath(kBioFormatsJar) : QString();
     if (verbose) {
-      LOG(INFO) << "jarsDIR: " << ZImgGlobal::instance().jarsDIR;
+      LOG(INFO) << "jarsDIR: " << jarsD.absolutePath();
       LOG(INFO) << "Bio-Formats bridge jar: " << bridgeJarPath;
       if (bioFormatsJarPath.isEmpty()) {
         LOG(INFO) << "bioformats jar: not configured";
@@ -83,10 +80,9 @@ ZImgInit::ZImgInit(const QString& resourcesDIR, const QString& jreDIR, const QSt
         throw ZException(fmt::format("no java in jreDIR: {}", jreD.absolutePath()));
       }
 
-      ZImgGlobal::instance().jreDIR = jreD.absolutePath();
       ZBioFormatsBridgeClient::configureJavaExecutablePath(jreD.absoluteFilePath(kJavaExecutable));
       if (verbose) {
-        LOG(INFO) << "jreDIR: " << ZImgGlobal::instance().jreDIR;
+        LOG(INFO) << "jreDIR: " << jreD.absolutePath();
       }
     }
   }

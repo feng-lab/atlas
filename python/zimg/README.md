@@ -249,15 +249,41 @@ Supported file formats depend on how the wheel/source was built. The
 default. Configure an existing jar with
 `zimg.bioformats.configure("/path/to/bioformats_package.jar")`, or call
 `zimg.bioformats.download()` to fetch the pinned runtime jar and enable it for
-the current Python process. If no Bio-Formats jar is configured, native formats
-continue to work and Bio-Formats-backed readers report unavailable.
+the current Python process. Always verify availability before reading
+Bio-Formats-only files:
+
+```python
+import zimg
+
+if not zimg.bioformats.is_available():
+    # Optional if zimg auto-detects the right Java from JAVA_HOME or PATH.
+    # zimg.bioformats.configure_java("/absolute/path/to/java")
+    zimg.bioformats.configure("/absolute/path/to/bioformats_package.jar")
+    # Or let zimg fetch the pinned jar instead:
+    # zimg.bioformats.download()
+
+zimg.bioformats.ensure_available()
+
+img = zimg.ZImg("example.bif", format=zimg.FileFormat.BioFormats)
+print(img.to_arrays("numpy")[0].shape)
+```
+
+`ensure_available()` reports the exact Java executable,
+`atlas-bioformats-bridge.jar`, and `bioformats_package.jar` selected for this
+process. If no Bio-Formats jar is configured, native formats continue to work
+and Bio-Formats-backed readers report unavailable.
 
 The wheel does not ship Java. At import time, the Python package checks
 `JAVA_HOME/bin/java` first, then falls back to `java` from `PATH` if `JAVA_HOME`
-is unset or unsuitable, and passes the resolved executable to the native bridge
-runtime. The bridge jar is compiled for Java 11, so Bio-Formats reads require
-Java 11 or newer. Missing or older Java runtimes surface as Python exceptions
-from the Bio-Formats read/probe call; native formats do not start Java.
+is unset or unsuitable. If that auto-detected Java is correct, no extra Java
+configuration is needed. If you need a specific Java executable, call
+`zimg.bioformats.configure_java("/absolute/path/to/java")` before the first
+Bio-Formats read/probe. The explicit path replaces the detected Java executable
+until the bridge process starts; after that, the runtime rejects Java path
+changes so the printed path always matches the process in use. The bridge jar is
+compiled for Java 11, so Bio-Formats reads require Java 11 or newer. Missing or
+older Java runtimes surface as Python exceptions from the Bio-Formats read/probe
+call; native formats do not start Java.
 
 ## Notes / limitations
 
