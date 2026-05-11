@@ -515,7 +515,7 @@ void ZImgBioFormats::readInfo(const QString& filename,
                               std::vector<ZImgInfo>& infos,
                               std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks)
 {
-  const auto& dataset = ZBioFormatsBridgeClient::instance().openDataset(filename);
+  const auto dataset = ZBioFormatsBridgeClient::instance().readDatasetInfo(filename);
   infos.clear();
   infos.reserve(dataset.series.size());
   for (const auto& series : dataset.series) {
@@ -530,7 +530,7 @@ void ZImgBioFormats::readInfo(const QString& filename,
 
 void ZImgBioFormats::readMetadata(const QString& filename, ZImgMetadata& meta, size_t scene)
 {
-  const auto& dataset = ZBioFormatsBridgeClient::instance().openDataset(filename);
+  const auto dataset = ZBioFormatsBridgeClient::instance().readDatasetInfo(filename);
   if (scene >= dataset.series.size()) {
     throw ZException(fmt::format("Bio-Formats scene {} is out of range for {}", scene, filename));
   }
@@ -563,7 +563,7 @@ void ZImgBioFormats::readThumbnail(const QString& filename,
                                    size_t scene)
 {
   thumbnail.clear();
-  const auto& dataset = ZBioFormatsBridgeClient::instance().openDataset(filename);
+  const auto dataset = ZBioFormatsBridgeClient::instance().readDatasetInfo(filename);
   if (scene >= dataset.series.size()) {
     throw ZException(fmt::format("Bio-Formats scene {} is out of range for {}", scene, filename));
   }
@@ -614,7 +614,7 @@ void ZImgBioFormats::readThumbnail(const QString& filename,
 
 void ZImgBioFormats::readImg(const QString& filename, ZImg& img, const ZImgRegion& region, size_t scene)
 {
-  const auto& dataset = ZBioFormatsBridgeClient::instance().openDataset(filename);
+  const auto dataset = ZBioFormatsBridgeClient::instance().readDatasetInfo(filename);
   if (scene >= dataset.series.size()) {
     throw ZException(fmt::format("Bio-Formats scene {} is out of range for {}", scene, filename));
   }

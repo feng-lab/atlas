@@ -16,6 +16,7 @@
 #include <QTemporaryDir>
 #include <algorithm>
 #include <array>
+#include <future>
 #include <gflags/gflags.h>
 #include <map>
 #include <mutex>
@@ -25,7 +26,6 @@
 #include <string>
 
 DECLARE_int32(atlas_bioformats_bridge_io_timeout_ms);
-DECLARE_int32(atlas_bioformats_bridge_worker_count);
 DECLARE_bool(atlas_bioformats_bridge_use_grpc);
 
 namespace nim {
@@ -114,8 +114,7 @@ std::optional<std::string> bioFormatsRuntimeSkipReason()
 
   ZLogInit::instance("zbioformatstest");
   LOG(INFO) << "Bio-Formats test runtime: jreDIR=" << *jreDir << ", java=" << javaExecutableInJreDir(*jreDir)
-            << ", jarsDIR=" << jarsDir.absolutePath() << ", useGrpc=" << ::FLAGS_atlas_bioformats_bridge_use_grpc
-            << ", workerCount=" << ::FLAGS_atlas_bioformats_bridge_worker_count;
+            << ", jarsDIR=" << jarsDir.absolutePath() << ", useGrpc=" << ::FLAGS_atlas_bioformats_bridge_use_grpc;
 
   try {
     ZImgInit::instance("", *jreDir, jarsDir.absolutePath(), false);
@@ -134,14 +133,11 @@ struct BioFormatsBridgeTestTransport
 {
   const char* name;
   bool useGrpc;
-  int workerCount;
 };
 
-constexpr std::array<BioFormatsBridgeTestTransport, 3> kBioFormatsBridgeTestTransports = {
-  // Stdio intentionally uses an invalid gRPC worker count to verify that the gRPC-only flag is ignored.
-  BioFormatsBridgeTestTransport{"stdio",          false, -7},
-  BioFormatsBridgeTestTransport{"grpc-1-worker",  true,  1 },
-  BioFormatsBridgeTestTransport{"grpc-2-workers", true,  2 },
+constexpr std::array<BioFormatsBridgeTestTransport, 2> kBioFormatsBridgeTestTransports = {
+  BioFormatsBridgeTestTransport{"stdio", false},
+  BioFormatsBridgeTestTransport{"grpc",  true },
 };
 
 class ScopedBioFormatsBridgeTestTransport
@@ -150,7 +146,6 @@ public:
   explicit ScopedBioFormatsBridgeTestTransport(const BioFormatsBridgeTestTransport& transport)
   {
     ::FLAGS_atlas_bioformats_bridge_use_grpc = transport.useGrpc;
-    ::FLAGS_atlas_bioformats_bridge_worker_count = transport.workerCount;
     ZBioFormatsBridgeClient::resetInstanceForTesting();
   }
 
@@ -166,7 +161,6 @@ public:
   ScopedBioFormatsBridgeDefaultTransport()
   {
     ::FLAGS_atlas_bioformats_bridge_use_grpc = true;
-    ::FLAGS_atlas_bioformats_bridge_worker_count = 0;
     ZBioFormatsBridgeClient::resetInstanceForTesting();
   }
 
@@ -695,6 +689,43 @@ TEST(ZBioFormatsTest, FakeReaderReadReassemblesMultiplePixelChunks)
   });
 }
 
+TEST(ZBioFormatsTest, FakeReaderGrpcConcurrentRegionReads)
+{
+  const BioFormatsBridgeTestTransport grpcTransport{"grpc", true};
+  const ScopedBioFormatsBridgeTestTransport scopedTransport(grpcTransport);
+  if (const auto reason = bioFormatsRuntimeSkipReason(); reason.has_value()) {
+    GTEST_SKIP() << *reason;
+  }
+
+  QTemporaryDir dir;
+  ASSERT_TRUE(dir.isValid());
+  const QString path =
+    createFakeReaderFile(dir, QStringLiteral("concurrent&sizeX=64&sizeY=48&sizeZ=4&sizeC=2&sizeT=2&pixelType=uint16"));
+
+  const ZImgRegion regionA(0, 32, 0, 24, 0, 1, 0, 2, 0, 1);
+  const ZImgRegion regionB(16, 48, 8, 40, 1, 3, 0, 1, 0, 2);
+  const ZImgRegion regionC(32, 64, 16, 48, 3, 4, 1, 2, 1, 2);
+
+  ZBioFormatsBridgeClient& client = ZBioFormatsBridgeClient::instance();
+  const std::vector<uint8_t> expectedA = client.readRegion(path, 0, regionA);
+  const std::vector<uint8_t> expectedB = client.readRegion(path, 0, regionB);
+  const std::vector<uint8_t> expectedC = client.readRegion(path, 0, regionC);
+
+  auto readRegionAsync = [path](ZImgRegion region) {
+    return std::async(std::launch::async, [path, region]() {
+      return ZBioFormatsBridgeClient::instance().readRegion(path, 0, region);
+    });
+  };
+
+  std::future<std::vector<uint8_t>> actualA = readRegionAsync(regionA);
+  std::future<std::vector<uint8_t>> actualB = readRegionAsync(regionB);
+  std::future<std::vector<uint8_t>> actualC = readRegionAsync(regionC);
+
+  EXPECT_EQ(expectedA, actualA.get());
+  EXPECT_EQ(expectedB, actualB.get());
+  EXPECT_EQ(expectedC, actualC.get());
+}
+
 TEST(ZBioFormatsTest, FakeReaderResolutionMetadataCreatesPyramidSubBlocks)
 {
   runForEachBioFormatsBridgeTransport([]() {
@@ -705,7 +736,7 @@ TEST(ZBioFormatsTest, FakeReaderResolutionMetadataCreatesPyramidSubBlocks)
       QStringLiteral(
         "pyramid&sizeX=64&sizeY=48&sizeZ=1&sizeC=1&sizeT=1&pixelType=uint8&resolutions=3&resolutionScale=2"));
 
-    const ZBioFormatsDatasetInfo& dataset = ZBioFormatsBridgeClient::instance().openDataset(path);
+    const ZBioFormatsDatasetInfo dataset = ZBioFormatsBridgeClient::instance().readDatasetInfo(path);
     ASSERT_EQ(1u, dataset.series.size());
     ASSERT_GE(dataset.series.front().resolutions.size(), 3u);
     EXPECT_EQ(64u, dataset.series.front().resolutions[0].sizeX);
@@ -894,17 +925,15 @@ TEST(ZBioFormatsTest, PublicCorpusReadsMetadataAndSmallRegions)
     ZBioFormatsDatasetInfo dataset;
     std::vector<ZImgInfo> infos;
     try {
-      dataset = ZBioFormatsBridgeClient::instance().openDataset(path);
+      dataset = ZBioFormatsBridgeClient::instance().readDatasetInfo(path);
       ZImgIO::instance().readInfos(path, infos, nullptr, FileFormat::BioFormats);
     }
     catch (const std::exception& e) {
-      ZBioFormatsBridgeClient::instance().closeDataset(path);
       openFailureRecords.push_back(
         {canonicalPath, fmt::format("failed to open Bio-Formats corpus file {}: {}", path.toStdString(), e.what())});
       continue;
     }
     if (infos.empty()) {
-      ZBioFormatsBridgeClient::instance().closeDataset(path);
       openFailureRecords.push_back(
         {canonicalPath, fmt::format("Bio-Formats corpus file has no readable series: {}", path.toStdString())});
       continue;
@@ -946,7 +975,6 @@ TEST(ZBioFormatsTest, PublicCorpusReadsMetadataAndSmallRegions)
         coveredCompanionFiles.insert(usedPath);
       }
     }
-    ZBioFormatsBridgeClient::instance().closeDataset(path);
   }
 
   size_t suppressedCoveredCompanionFailures = 0;

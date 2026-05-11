@@ -70,7 +70,6 @@ struct ZBioFormatsSeriesInfo
 
 struct ZBioFormatsDatasetInfo
 {
-  uint64_t sessionId = 0;
   QString path;
   QString formatName;
   QString readerClass;
@@ -120,7 +119,7 @@ public:
 
   [[nodiscard]] bool canRead(const QString& filename);
 
-  [[nodiscard]] ZBioFormatsDatasetInfo openDataset(const QString& filename);
+  [[nodiscard]] ZBioFormatsDatasetInfo readDatasetInfo(const QString& filename);
 
   [[nodiscard]] std::vector<uint8_t> readRegion(const QString& filename, size_t scene, const ZImgRegion& region);
 
@@ -128,8 +127,6 @@ public:
   readRegion(const QString& filename, size_t scene, uint32_t resolution, const ZImgRegion& region);
 
   [[nodiscard]] ZBioFormatsThumbnail readThumbnail(const QString& filename, size_t scene, size_t z, size_t t);
-
-  void closeDataset(const QString& filename);
 
   void warmUp();
 

@@ -134,12 +134,6 @@ const std::vector<ZFlagSettingSpec>& atlasFlagSettingSpecs()
                                 ZFlagSettingEditorKind::Auto,
                                 {},
                                 true));
-    allSpecs.push_back(makeSpec("atlas_bioformats_bridge_worker_count",
-                                "I/O & Processing",
-                                "Bio-Formats gRPC reader count",
-                                ZFlagSettingEditorKind::Auto,
-                                {},
-                                true));
     allSpecs.push_back(makeSpec("atlas_bioformats_bridge_use_grpc",
                                 "I/O & Processing",
                                 "Use Bio-Formats gRPC bridge",

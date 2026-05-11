@@ -5,11 +5,10 @@ import io.grpc.Server;
 import io.grpc.netty.shaded.io.grpc.netty.NettyServerBuilder;
 import io.grpc.stub.StreamObserver;
 import org.fenglab.atlas.bioformats.proto.BioFormatsBridgeGrpc;
-import org.fenglab.atlas.bioformats.proto.BioFormatsBridgeProto.CloseDatasetResponse;
+import org.fenglab.atlas.bioformats.proto.BioFormatsBridgeProto.DatasetInfoResponse;
 import org.fenglab.atlas.bioformats.proto.BioFormatsBridgeProto.FileGroupingPolicy;
 import org.fenglab.atlas.bioformats.proto.BioFormatsBridgeProto.ListFormatsResponse;
 import org.fenglab.atlas.bioformats.proto.BioFormatsBridgeProto.MetadataEntry;
-import org.fenglab.atlas.bioformats.proto.BioFormatsBridgeProto.OpenDatasetResponse;
 import org.fenglab.atlas.bioformats.proto.BioFormatsBridgeProto.PixelChunk;
 import org.fenglab.atlas.bioformats.proto.BioFormatsBridgeProto.ProbeResponse;
 import org.fenglab.atlas.bioformats.proto.BioFormatsBridgeProto.ReaderFormat;
@@ -35,13 +34,18 @@ import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Hashtable;
-import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.concurrent.atomic.AtomicLong;
+import java.util.Objects;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import loci.formats.FormatException;
 import loci.formats.FormatTools;
@@ -61,27 +65,23 @@ public final class AtlasBioFormatsBridge
   private static final int PIXEL_CHUNK_BYTES = 8 * 1024 * 1024;
   private static final int GRPC_PIXEL_CHUNK_BYTES = 1024 * 1024;
   private static final int PROTOCOL_VERSION = 1;
+  private static final int READER_CACHE_MAX_IDLE_READERS = 4;
+  private static final long READER_CACHE_IDLE_MILLIS = 5 * 60 * 1000L;
 
   private final InputStream in;
   private final OutputStream out;
-  private final int workerCount;
-  private final Object sessionsLock = new Object();
-  private final Map<Long, ReaderSession> sessions = new LinkedHashMap<>();
-  private final AtomicLong nextSessionId = new AtomicLong(1);
+  private final ReaderCache readerCache;
 
-  private AtlasBioFormatsBridge(final InputStream in, final OutputStream out, final int workerCount)
+  private AtlasBioFormatsBridge(final InputStream in, final OutputStream out)
   {
-    if (workerCount <= 0) {
-      throw new IllegalArgumentException("worker count must be positive");
-    }
     this.in = in == null ? null : new BufferedInputStream(in);
     this.out = out == null ? null : new BufferedOutputStream(out);
-    this.workerCount = workerCount;
+    this.readerCache = new ReaderCache();
   }
 
-  private AtlasBioFormatsBridge(final int workerCount)
+  private AtlasBioFormatsBridge()
   {
-    this(null, null, workerCount);
+    this(null, null);
   }
 
   public static void main(final String[] args) throws Exception
@@ -92,23 +92,20 @@ public final class AtlasBioFormatsBridge
     System.setOut(System.err);
 
     int grpcPort = -1;
-    int workerCount = 1;
     for (final String arg : args) {
       if (arg.startsWith("--grpc-port=")) {
         grpcPort = parseNonNegativeIntArgument(arg, "--grpc-port=");
-      } else if (arg.startsWith("--worker-count=")) {
-        workerCount = parsePositiveIntArgument(arg, "--worker-count=");
       } else if (!arg.isEmpty()) {
         throw new IllegalArgumentException("unknown argument: " + arg);
       }
     }
 
     if (grpcPort >= 0) {
-      runGrpcServer(grpcPort, workerCount, protocolOut);
+      runGrpcServer(grpcPort, protocolOut);
       return;
     }
 
-    final AtlasBioFormatsBridge bridge = new AtlasBioFormatsBridge(System.in, protocolOut, workerCount);
+    final AtlasBioFormatsBridge bridge = new AtlasBioFormatsBridge(System.in, protocolOut);
     bridge.run();
   }
 
@@ -121,19 +118,9 @@ public final class AtlasBioFormatsBridge
     return value;
   }
 
-  private static int parsePositiveIntArgument(final String arg, final String prefix)
+  private static void runGrpcServer(final int grpcPort, final OutputStream startupOut) throws Exception
   {
-    final int value = Integer.parseInt(arg.substring(prefix.length()));
-    if (value <= 0) {
-      throw new IllegalArgumentException(prefix + " must be > 0");
-    }
-    return value;
-  }
-
-  private static void runGrpcServer(final int grpcPort, final int workerCount, final OutputStream startupOut)
-    throws Exception
-  {
-    final AtlasBioFormatsBridge bridge = new AtlasBioFormatsBridge(workerCount);
+    final AtlasBioFormatsBridge bridge = new AtlasBioFormatsBridge();
     final AtomicReference<Server> serverRef = new AtomicReference<>();
     final Runnable shutdown = () ->
     {
@@ -151,8 +138,12 @@ public final class AtlasBioFormatsBridge
     serverRef.set(server);
     startupOut.write(("ATLAS_BIOFORMATS_GRPC_PORT=" + server.getPort() + "\n").getBytes(StandardCharsets.US_ASCII));
     startupOut.flush();
-    server.awaitTermination();
-    bridge.closeAllSessions();
+    try {
+      server.awaitTermination();
+    }
+    finally {
+      bridge.closeCachedReaders();
+    }
   }
 
   private interface ResponseSink
@@ -171,24 +162,28 @@ public final class AtlasBioFormatsBridge
       throw new IllegalStateException("stdio bridge was not initialized with streams");
     }
     final ResponseSink sink = this::writeResponse;
-    boolean running = true;
-    while (running) {
-      final Request request;
-      try {
-        request = readRequest();
-      }
-      catch (final EOFException eof) {
-        break;
-      }
+    try {
+      boolean running = true;
+      while (running) {
+        final Request request;
+        try {
+          request = readRequest();
+        }
+        catch (final EOFException eof) {
+          break;
+        }
 
-      try {
-        running = handleRequest(request, sink);
-      }
-      catch (final Throwable t) {
-        sendError(sink, request.getRequestId(), statusFor(t), t.getMessage());
+        try {
+          running = handleRequest(request, sink);
+        }
+        catch (final Throwable t) {
+          sendError(sink, request.getRequestId(), statusFor(t), t.getMessage());
+        }
       }
     }
-    closeAllSessions();
+    finally {
+      closeCachedReaders();
+    }
   }
 
   private boolean handleRequest(final Request request, final ResponseSink sink) throws Exception
@@ -203,18 +198,14 @@ public final class AtlasBioFormatsBridge
       case PROBE:
         sendOk(sink, request.getRequestId(), Response.newBuilder().setProbe(probe(request)));
         return true;
-      case OPEN_DATASET:
-        sendOk(sink, request.getRequestId(), Response.newBuilder().setOpenDataset(openDataset(request)));
+      case DATASET_INFO:
+        sendOk(sink, request.getRequestId(), Response.newBuilder().setDatasetInfo(datasetInfo(request)));
         return true;
       case READ_REGION:
         readRegion(request, sink);
         return true;
       case READ_THUMBNAIL:
         readThumbnail(request, sink);
-        return true;
-      case CLOSE_DATASET:
-        closeDataset(request.getCloseDataset().getSessionId());
-        sendOk(sink, request.getRequestId(), Response.newBuilder().setCloseDataset(CloseDatasetResponse.newBuilder()));
         return true;
       case SHUTDOWN:
         sendOk(sink, request.getRequestId(), Response.newBuilder().setShutdown(ShutdownResponse.newBuilder()));
@@ -339,43 +330,23 @@ public final class AtlasBioFormatsBridge
     }
   }
 
-  private OpenDatasetResponse openDataset(final Request request) throws FormatException, IOException
+  private DatasetInfoResponse datasetInfo(final Request request) throws FormatException, IOException
   {
-    final String path = request.getOpenDataset().getPath();
-    requireExistingFile(path);
-    final ArrayList<IFormatReader> readers = new ArrayList<>(workerCount);
-    boolean success = false;
-    try {
-      for (int i = 0; i < workerCount; ++i) {
-        final IFormatReader reader =
-          createReader(request.getOpenDataset().getGroupingPolicy(), request.getOpenDataset().getMetadataFiltered());
-        readers.add(reader);
-        reader.setId(path);
-        configureReaderAfterOpen(reader);
-      }
-      final IFormatReader metadataReader = readers.get(0);
-      final long sessionId = nextSessionId.getAndIncrement();
-      final OpenDatasetResponse.Builder response = OpenDatasetResponse.newBuilder()
-                                                     .setSessionId(sessionId)
+    final String path = request.getDatasetInfo().getPath();
+    try (ReaderLease lease = readerCache.acquire(path,
+                                                 request.getDatasetInfo().getGroupingPolicy(),
+                                                 request.getDatasetInfo().getMetadataFiltered())) {
+      final IFormatReader reader = lease.reader();
+      final DatasetInfoResponse.Builder response = DatasetInfoResponse.newBuilder()
                                                      .setPath(path)
-                                                     .setFormatName(nullToEmpty(metadataReader.getFormat()))
-                                                     .setReaderClass(metadataReader.getClass().getName())
-                                                     .addAllUsedFiles(nonNullArray(metadataReader.getUsedFiles()));
-      for (int s = 0; s < metadataReader.getSeriesCount(); ++s) {
-        response.addSeries(seriesInfo(metadataReader, s));
+                                                     .setFormatName(nullToEmpty(reader.getFormat()))
+                                                     .setReaderClass(reader.getClass().getName())
+                                                     .addAllUsedFiles(nonNullArray(reader.getUsedFiles()));
+      for (int s = 0; s < reader.getSeriesCount(); ++s) {
+        response.addSeries(seriesInfo(reader, s));
       }
-      synchronized (sessionsLock) {
-        sessions.put(sessionId, new ReaderSession(sessionId, path, readers));
-      }
-      success = true;
+      lease.markReusable();
       return response.build();
-    }
-    finally {
-      if (!success) {
-        for (final IFormatReader reader : readers) {
-          reader.close();
-        }
-      }
     }
   }
 
@@ -475,7 +446,7 @@ public final class AtlasBioFormatsBridge
     }
     final IMetadata metadata = (IMetadata)reader.getMetadataStore();
     boolean hasAllColors = true;
-    final java.util.ArrayList<Integer> colors = new java.util.ArrayList<>();
+    final ArrayList<Integer> colors = new ArrayList<>();
     for (int c = 0; c < reader.getEffectiveSizeC(); ++c) {
       final String name = metadata.getChannelName(series, c);
       info.addChannelNames(name == null ? "" : name);
@@ -539,21 +510,23 @@ public final class AtlasBioFormatsBridge
 
   private void readRegion(final Request request, final ResponseSink sink) throws Exception
   {
-    final ReaderSession session = sessionFor(request.getReadRegion().getSessionId());
-    final IFormatReader reader = session.readReader();
-    synchronized (reader) {
-      final int series = toInt("series", request.getReadRegion().getSeries());
-      final int resolution = toInt("resolution", request.getReadRegion().getResolution());
-      final int x = toInt("x", request.getReadRegion().getX());
-      final int y = toInt("y", request.getReadRegion().getY());
-      final int z0 = toInt("z", request.getReadRegion().getZ());
-      final int c0 = toInt("c", request.getReadRegion().getC());
-      final int t0 = toInt("t", request.getReadRegion().getT());
-      final int width = toPositiveInt("width", request.getReadRegion().getWidth());
-      final int height = toPositiveInt("height", request.getReadRegion().getHeight());
-      final int depth = toPositiveInt("depth", request.getReadRegion().getDepth());
-      final int channelCount = toPositiveInt("channel_count", request.getReadRegion().getChannelCount());
-      final int timeCount = toPositiveInt("time_count", request.getReadRegion().getTimeCount());
+    final var readRegion = request.getReadRegion();
+    try (
+      ReaderLease lease =
+        readerCache.acquire(readRegion.getPath(), readRegion.getGroupingPolicy(), readRegion.getMetadataFiltered())) {
+      final IFormatReader reader = lease.reader();
+      final int series = toInt("series", readRegion.getSeries());
+      final int resolution = toInt("resolution", readRegion.getResolution());
+      final int x = toInt("x", readRegion.getX());
+      final int y = toInt("y", readRegion.getY());
+      final int z0 = toInt("z", readRegion.getZ());
+      final int c0 = toInt("c", readRegion.getC());
+      final int t0 = toInt("t", readRegion.getT());
+      final int width = toPositiveInt("width", readRegion.getWidth());
+      final int height = toPositiveInt("height", readRegion.getHeight());
+      final int depth = toPositiveInt("depth", readRegion.getDepth());
+      final int channelCount = toPositiveInt("channel_count", readRegion.getChannelCount());
+      final int timeCount = toPositiveInt("time_count", readRegion.getTimeCount());
 
       reader.setSeries(series);
       reader.setResolution(resolution);
@@ -581,17 +554,20 @@ public final class AtlasBioFormatsBridge
         }
       }
       chunks.finish();
+      lease.markReusable();
     }
   }
 
   private void readThumbnail(final Request request, final ResponseSink sink) throws Exception
   {
-    final ReaderSession session = sessionFor(request.getReadThumbnail().getSessionId());
-    final IFormatReader reader = session.primaryReader();
-    synchronized (reader) {
-      final int series = toInt("series", request.getReadThumbnail().getSeries());
-      final int z = toInt("z", request.getReadThumbnail().getZ());
-      final int t = toInt("t", request.getReadThumbnail().getT());
+    final var readThumbnail = request.getReadThumbnail();
+    try (ReaderLease lease = readerCache.acquire(readThumbnail.getPath(),
+                                                 readThumbnail.getGroupingPolicy(),
+                                                 readThumbnail.getMetadataFiltered())) {
+      final IFormatReader reader = lease.reader();
+      final int series = toInt("series", readThumbnail.getSeries());
+      final int z = toInt("z", readThumbnail.getZ());
+      final int t = toInt("t", readThumbnail.getT());
 
       reader.setSeries(series);
       reader.setResolution(0);
@@ -632,7 +608,13 @@ public final class AtlasBioFormatsBridge
         }
       }
       chunks.finish();
+      lease.markReusable();
     }
+  }
+
+  private void closeCachedReaders()
+  {
+    readerCache.close();
   }
 
   private void validateRegion(final IFormatReader reader,
@@ -655,43 +637,325 @@ public final class AtlasBioFormatsBridge
     }
   }
 
-  private void closeDataset(final long sessionId) throws IOException
+  private static final class ReaderKey
   {
-    final ReaderSession session;
-    synchronized (sessionsLock) {
-      session = sessions.remove(sessionId);
+    final String normalizedPath;
+    final FileGroupingPolicy groupingPolicy;
+    final boolean metadataFiltered;
+
+    private ReaderKey(final String normalizedPath,
+                      final FileGroupingPolicy groupingPolicy,
+                      final boolean metadataFiltered)
+    {
+      this.normalizedPath = normalizedPath;
+      this.groupingPolicy = groupingPolicy;
+      this.metadataFiltered = metadataFiltered;
     }
-    if (session != null) {
-      session.close();
+
+    static ReaderKey from(final String path, final FileGroupingPolicy groupingPolicy, final boolean metadataFiltered)
+      throws IOException
+    {
+      return new ReaderKey(normalizeExistingPath(path), groupingPolicy, metadataFiltered);
+    }
+
+    @Override public boolean equals(final Object other)
+    {
+      if (this == other) {
+        return true;
+      }
+      if (!(other instanceof ReaderKey)) {
+        return false;
+      }
+      final ReaderKey rhs = (ReaderKey)other;
+      return metadataFiltered == rhs.metadataFiltered && normalizedPath.equals(rhs.normalizedPath) &&
+        groupingPolicy == rhs.groupingPolicy;
+    }
+
+    @Override public int hashCode()
+    {
+      return Objects.hash(normalizedPath, groupingPolicy, metadataFiltered);
     }
   }
 
-  private void closeAllSessions()
+  private static final class CachedReader
   {
-    final ArrayList<ReaderSession> toClose;
-    synchronized (sessionsLock) {
-      toClose = new ArrayList<>(sessions.values());
-      sessions.clear();
+    final ReaderKey key;
+    final IFormatReader reader;
+    final ArrayList<FileFingerprint> fileFingerprints;
+    final long idleSinceMillis;
+
+    CachedReader(final ReaderKey key,
+                 final IFormatReader reader,
+                 final ArrayList<FileFingerprint> fileFingerprints,
+                 final long idleSinceMillis)
+    {
+      this.key = key;
+      this.reader = reader;
+      this.fileFingerprints = fileFingerprints;
+      this.idleSinceMillis = idleSinceMillis;
     }
-    for (final ReaderSession session : toClose) {
+
+    boolean isCurrent()
+    {
+      for (final FileFingerprint fingerprint : fileFingerprints) {
+        if (!fingerprint.matchesCurrentFile()) {
+          return false;
+        }
+      }
+      return true;
+    }
+  }
+
+  private static final class FileFingerprint
+  {
+    final String normalizedPath;
+    final long lastModifiedMillis;
+    final long length;
+
+    private FileFingerprint(final String normalizedPath, final long lastModifiedMillis, final long length)
+    {
+      this.normalizedPath = normalizedPath;
+      this.lastModifiedMillis = lastModifiedMillis;
+      this.length = length;
+    }
+
+    static FileFingerprint fromPath(final String path) throws IOException
+    {
+      final File file = requireExistingFile(path);
+      return new FileFingerprint(file.getCanonicalPath(), file.lastModified(), file.length());
+    }
+
+    boolean matchesCurrentFile()
+    {
+      final File file = new File(normalizedPath);
+      return file.exists() && file.lastModified() == lastModifiedMillis && file.length() == length;
+    }
+  }
+
+  private static final class ReaderCache
+  {
+    private final Object lock = new Object();
+    private final Map<ReaderKey, ArrayDeque<CachedReader>> idleByKey = new HashMap<>();
+    private final ArrayDeque<CachedReader> idleReaders = new ArrayDeque<>();
+    private final ScheduledExecutorService trimExecutor =
+      Executors.newSingleThreadScheduledExecutor(new ThreadFactory() {
+        @Override public Thread newThread(final Runnable runnable)
+        {
+          final Thread thread = new Thread(runnable, "atlas-bioformats-reader-cache-trim");
+          thread.setDaemon(true);
+          return thread;
+        }
+      });
+    private ScheduledFuture<?> scheduledTrim = null;
+    private boolean closed = false;
+
+    ReaderLease acquire(final String path, final FileGroupingPolicy groupingPolicy, final boolean metadataFiltered)
+      throws FormatException, IOException
+    {
+      final ReaderKey key = ReaderKey.from(path, groupingPolicy, metadataFiltered);
+      final CachedReader cachedReader = takeIdleReader(key);
+      if (cachedReader != null) {
+        return new ReaderLease(this, key, cachedReader.reader);
+      }
+      return new ReaderLease(this, key, openReader(key));
+    }
+
+    private CachedReader takeIdleReader(final ReaderKey key) throws IOException
+    {
+      final ArrayList<IFormatReader> readersToClose = new ArrayList<>();
+      final CachedReader cachedReader;
+      synchronized (lock) {
+        if (closed) {
+          throw new IOException("reader cache is closed");
+        }
+        readersToClose.addAll(trimLocked(System.currentTimeMillis()));
+        final ArrayDeque<CachedReader> queue = idleByKey.get(key);
+        CachedReader reusableReader = null;
+        while (queue != null && !queue.isEmpty()) {
+          final CachedReader candidate = queue.pollLast();
+          idleReaders.remove(candidate);
+          if (candidate.isCurrent()) {
+            reusableReader = candidate;
+            break;
+          }
+          readersToClose.add(candidate.reader);
+        }
+        cachedReader = reusableReader;
+        if (queue != null && queue.isEmpty()) {
+          idleByKey.remove(key);
+        }
+        scheduleTrimLocked(System.currentTimeMillis());
+      }
+      closeReadersQuietly(readersToClose);
+      return cachedReader;
+    }
+
+    void release(final ReaderKey key, final IFormatReader reader)
+    {
+      final ArrayList<IFormatReader> readersToClose = new ArrayList<>();
+      final ArrayList<FileFingerprint> fileFingerprints = fileFingerprintsFor(reader, key);
+      synchronized (lock) {
+        final long nowMillis = System.currentTimeMillis();
+        if (closed || READER_CACHE_MAX_IDLE_READERS == 0 || READER_CACHE_IDLE_MILLIS == 0 ||
+            fileFingerprints.isEmpty()) {
+          readersToClose.add(reader);
+        } else {
+          final CachedReader cachedReader = new CachedReader(key, reader, fileFingerprints, nowMillis);
+          idleByKey.computeIfAbsent(key, ignored -> new ArrayDeque<>()).addLast(cachedReader);
+          idleReaders.addLast(cachedReader);
+          readersToClose.addAll(trimLocked(nowMillis));
+          scheduleTrimLocked(nowMillis);
+        }
+      }
+      closeReadersQuietly(readersToClose);
+    }
+
+    void close()
+    {
+      final ArrayList<IFormatReader> readersToClose = new ArrayList<>();
+      synchronized (lock) {
+        if (closed) {
+          return;
+        }
+        closed = true;
+        cancelScheduledTrimLocked();
+        while (!idleReaders.isEmpty()) {
+          readersToClose.add(idleReaders.removeFirst().reader);
+        }
+        idleByKey.clear();
+      }
+      trimExecutor.shutdownNow();
+      closeReadersQuietly(readersToClose);
+    }
+
+    private static ArrayList<FileFingerprint> fileFingerprintsFor(final IFormatReader reader, final ReaderKey key)
+    {
+      final ArrayList<FileFingerprint> fingerprints = new ArrayList<>();
       try {
-        session.close();
+        final String[] usedFiles = reader.getUsedFiles();
+        if (usedFiles == null || usedFiles.length == 0) {
+          fingerprints.add(FileFingerprint.fromPath(key.normalizedPath));
+          return fingerprints;
+        }
+        for (final String usedFile : usedFiles) {
+          if (usedFile != null && !usedFile.isEmpty()) {
+            fingerprints.add(FileFingerprint.fromPath(usedFile));
+          }
+        }
       }
-      catch (final IOException ignored) {
-        // best-effort process shutdown
+      catch (final IOException | RuntimeException ignored) {
+        fingerprints.clear();
+      }
+      return fingerprints;
+    }
+
+    private void trimIdleReaders()
+    {
+      final ArrayList<IFormatReader> readersToClose = new ArrayList<>();
+      synchronized (lock) {
+        if (closed) {
+          return;
+        }
+        scheduledTrim = null;
+        readersToClose.addAll(trimLocked(System.currentTimeMillis()));
+        scheduleTrimLocked(System.currentTimeMillis());
+      }
+      closeReadersQuietly(readersToClose);
+    }
+
+    private ArrayList<IFormatReader> trimLocked(final long nowMillis)
+    {
+      final ArrayList<IFormatReader> readersToClose = new ArrayList<>();
+      while (!idleReaders.isEmpty()) {
+        final CachedReader oldest = idleReaders.peekFirst();
+        final boolean expired =
+          READER_CACHE_IDLE_MILLIS == 0 || nowMillis - oldest.idleSinceMillis >= READER_CACHE_IDLE_MILLIS;
+        final boolean overflow = idleReaders.size() > READER_CACHE_MAX_IDLE_READERS;
+        if (!expired && !overflow) {
+          break;
+        }
+        removeIdleReaderLocked(oldest);
+        readersToClose.add(oldest.reader);
+      }
+      return readersToClose;
+    }
+
+    private void scheduleTrimLocked(final long nowMillis)
+    {
+      if (closed || idleReaders.isEmpty() || READER_CACHE_IDLE_MILLIS == 0) {
+        cancelScheduledTrimLocked();
+        return;
+      }
+      if (scheduledTrim != null && !scheduledTrim.isDone()) {
+        return;
+      }
+      final long oldestIdleSinceMillis = idleReaders.peekFirst().idleSinceMillis;
+      final long delayMillis = Math.max(1L, oldestIdleSinceMillis + READER_CACHE_IDLE_MILLIS - nowMillis);
+      scheduledTrim = trimExecutor.schedule(this::trimIdleReaders, delayMillis, TimeUnit.MILLISECONDS);
+    }
+
+    private void cancelScheduledTrimLocked()
+    {
+      if (scheduledTrim != null) {
+        scheduledTrim.cancel(false);
+        scheduledTrim = null;
+      }
+    }
+
+    private void removeIdleReaderLocked(final CachedReader cachedReader)
+    {
+      idleReaders.remove(cachedReader);
+      final ArrayDeque<CachedReader> queue = idleByKey.get(cachedReader.key);
+      if (queue == null) {
+        return;
+      }
+      queue.remove(cachedReader);
+      if (queue.isEmpty()) {
+        idleByKey.remove(cachedReader.key);
       }
     }
   }
 
-  private ReaderSession sessionFor(final long sessionId)
+  private static final class ReaderLease implements AutoCloseable
   {
-    synchronized (sessionsLock) {
-      final ReaderSession session = sessions.get(sessionId);
-      if (session != null) {
-        return session;
+    private final ReaderCache cache;
+    private final ReaderKey key;
+    private IFormatReader reader;
+    private boolean reusable = false;
+
+    ReaderLease(final ReaderCache cache, final ReaderKey key, final IFormatReader reader)
+    {
+      this.cache = cache;
+      this.key = key;
+      this.reader = reader;
+    }
+
+    IFormatReader reader()
+    {
+      if (reader == null) {
+        throw new IllegalStateException("reader lease has already been closed");
+      }
+      return reader;
+    }
+
+    void markReusable()
+    {
+      reusable = true;
+    }
+
+    @Override public void close()
+    {
+      if (reader == null) {
+        return;
+      }
+      final IFormatReader readerToRelease = reader;
+      reader = null;
+      if (reusable) {
+        cache.release(key, readerToRelease);
+      } else {
+        closeReaderQuietly(readerToRelease);
       }
     }
-    throw new IllegalArgumentException("unknown Bio-Formats session id: " + sessionId);
   }
 
   private static IFormatReader createReader(final FileGroupingPolicy groupingPolicy, final boolean metadataFiltered)
@@ -713,24 +977,64 @@ public final class AtlasBioFormatsBridge
     return reader;
   }
 
+  private static IFormatReader openReader(final ReaderKey key) throws FormatException, IOException
+  {
+    final IFormatReader reader = createReader(key.groupingPolicy, key.metadataFiltered);
+    boolean success = false;
+    try {
+      reader.setId(key.normalizedPath);
+      configureReaderAfterOpen(reader);
+      success = true;
+      return reader;
+    }
+    finally {
+      if (!success) {
+        reader.close();
+      }
+    }
+  }
+
   private static void configureReaderAfterOpen(final IFormatReader reader)
   {
     final IFormatReader activeReader = reader instanceof ImageReader ? ((ImageReader)reader).getReader() : reader;
     if (activeReader instanceof SDTReader) {
       // SDTReader's default preload cache can retain hundreds of MB for one requested plane. Atlas reads SDT data as
-      // small regions through multiple long-lived bridge readers, so keep SDT reads streaming instead of retaining that
-      // per-reader cache.
+      // small regions through cached bridge readers, so keep SDT reads streaming instead of retaining that per-reader
+      // cache.
       ((SDTReader)activeReader).setPreLoad(false);
     }
   }
 
-  private static void requireExistingFile(final String path) throws FileNotFoundException
+  private static String normalizeExistingPath(final String path) throws IOException
+  {
+    return requireExistingFile(path).getCanonicalPath();
+  }
+
+  private static File requireExistingFile(final String path) throws FileNotFoundException
   {
     if (path == null || path.isEmpty()) {
       throw new FileNotFoundException("empty path");
     }
-    if (!new File(path).exists()) {
+    final File file = new File(path);
+    if (!file.exists()) {
       throw new FileNotFoundException(path);
+    }
+    return file;
+  }
+
+  private static void closeReadersQuietly(final Iterable<IFormatReader> readers)
+  {
+    for (final IFormatReader reader : readers) {
+      closeReaderQuietly(reader);
+    }
+  }
+
+  private static void closeReaderQuietly(final IFormatReader reader)
+  {
+    try {
+      reader.close();
+    }
+    catch (final IOException ignored) {
     }
   }
 
@@ -758,7 +1062,7 @@ public final class AtlasBioFormatsBridge
 
   private static java.util.List<String> nonNullArray(final String[] values)
   {
-    final java.util.ArrayList<String> result = new java.util.ArrayList<>();
+    final ArrayList<String> result = new ArrayList<>();
     if (values == null) {
       return result;
     }
@@ -1061,45 +1365,6 @@ public final class AtlasBioFormatsBridge
       }
       if (!keepRunning) {
         new Thread(shutdown, "atlas-bioformats-grpc-shutdown").start();
-      }
-    }
-  }
-
-  private static final class ReaderSession
-  {
-    final long id;
-    final String path;
-    final List<IFormatReader> readers;
-    final AtomicLong nextReadReader = new AtomicLong(0);
-
-    ReaderSession(final long id, final String path, final List<IFormatReader> readers)
-    {
-      if (readers.isEmpty()) {
-        throw new IllegalArgumentException("reader session requires at least one reader");
-      }
-      this.id = id;
-      this.path = path;
-      this.readers = readers;
-    }
-
-    IFormatReader primaryReader()
-    {
-      return readers.get(0);
-    }
-
-    IFormatReader readReader()
-    {
-      final long rawIndex = nextReadReader.getAndIncrement();
-      final int index = Math.floorMod(rawIndex, readers.size());
-      return readers.get(index);
-    }
-
-    void close() throws IOException
-    {
-      for (final IFormatReader reader : readers) {
-        synchronized (reader) {
-          reader.close();
-        }
       }
     }
   }

@@ -14,7 +14,7 @@ protocol:
 
 ```sh
 cd src/bioformats_bridge
-mvn -DskipTests package
+mvn -DskipTests clean package
 cp target/atlas-bioformats-bridge.jar ../3rdparty/build/jars/
 ```
 
@@ -25,9 +25,12 @@ vendored Protobuf runtime in a separate process and only shares protobuf wire
 frames with this sidecar.
 
 The protocol exposes Bio-Formats resolution metadata and streams both region
-pixels and thumbnails as chunked protobuf responses. Atlas uses full-resolution
-metadata for the canonical `ZImgInfo`, then adds integer-ratio Bio-Formats
-pyramid levels to the `ZImgPack` tile index when the reader reports compatible
-sub-resolutions. The gRPC backend starts the bridge with `--grpc-port=<port>`;
-`--worker-count=<count>` controls how many independent `IFormatReader`
-instances are opened per dataset inside that single Java process.
+pixels and thumbnails as chunked protobuf responses. The request API is
+path-based: Atlas sends the file path and read parameters for each metadata,
+region, or thumbnail request, while Java owns path normalization and internal
+reader reuse. Completed readers return to a small bounded idle cache and are
+closed by Java on overflow, idle trim, shutdown, or failed requests. Atlas uses
+full-resolution metadata for the canonical `ZImgInfo`, then adds integer-ratio
+Bio-Formats pyramid levels to the `ZImgPack` tile index when the reader reports
+compatible sub-resolutions. The gRPC backend starts the bridge with
+`--grpc-port=<port>`.

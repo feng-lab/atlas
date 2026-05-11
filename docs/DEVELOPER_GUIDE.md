@@ -157,7 +157,7 @@ Bio-Formats Image Bridge
   - C++ client: `src/img/zbioformatsbridgeclient.*`.
   - Atlas reader: `src/img/zimgbioformats.*`.
   - Java bridge source: `src/bioformats_bridge/src/main/java/org/fenglab/atlas/bioformats/AtlasBioFormatsBridge.java`.
-- gRPC transport: `--atlas_bioformats_bridge_use_grpc=true` starts `atlas-bioformats-bridge.jar`, one Java bridge process with a loopback gRPC server. `--atlas_bioformats_bridge_worker_count` controls the number of Java-side `IFormatReader` instances opened synchronously inside that process.
+- gRPC transport: `--atlas_bioformats_bridge_use_grpc=true` starts `atlas-bioformats-bridge.jar`, one Java bridge process with a loopback gRPC server.
 - stdio transport: `--atlas_bioformats_bridge_use_grpc=false` starts `atlas-bioformats-bridge.jar`, one Java sidecar that exchanges 4-byte little-endian length-prefixed protobuf frames over stdin/stdout. Pixel reads stream one or more `PixelChunk` responses for a single request id, so large regions are chunked without changing the requested data extent. Stdio always uses one Java process.
 - Runtime requirements:
   - `bioformats_package.jar`
@@ -167,11 +167,13 @@ Bio-Formats Image Bridge
 - Subblocks created by the Bio-Formats reader use `FileFormat::BioFormats` explicitly. This avoids repeatedly rediscovering the reader during tiled 2D/3D paging and prevents native extension matches from stealing Bio-Formats-managed tile reads.
 - Bio-Formats sub-resolutions are exposed in the bridge metadata. Atlas keeps resolution 0 as the canonical image geometry and adds compatible integer-ratio Bio-Formats pyramid levels directly to the `ZImgPack` tile index, so large pyramidal files can serve overview tiles from Bio-Formats instead of forcing Atlas to synthesize every pyramid level from full-resolution reads.
 - Bio-Formats thumbnails are read through a dedicated streamed bridge command. Thumbnail support is best-effort because not every Bio-Formats reader provides useful thumbnail planes.
-- On the gRPC backend, the singleton owns one Java process and one gRPC channel. Dataset open synchronously constructs one `IFormatReader` per requested Java-side worker because Bio-Formats readers must not be shared concurrently across threads. Pixel-region reads round-robin across those reader instances and synchronize per reader; metadata and thumbnail reads use the primary reader. gRPC pixel and thumbnail streams use smaller chunks than stdio so large responses do not depend on a single large HTTP/2 message.
-- Opening a Bio-Formats dataset synchronously opens it on every active Java-side reader before returning. This preserves Atlas' existing local-file behavior, where display callers receive a complete result instead of progressive/async placeholders, while keeping tiled reads parallel in the desktop gRPC backend once the dataset is displayed.
+- The bridge protocol is path-based for dataset reads. C++ sends the path and request parameters for `dataset_info`, `read_region`, and `read_thumbnail`; Java owns path normalization and internal reader reuse behind that request API.
+- Java-side reader reuse is bounded and internal to the bridge. Active requests borrow one reader at a time; concurrent gRPC requests can borrow different idle readers or open additional readers. Completed readers return to a small idle cache, and Java closes idle readers on overflow, idle trim, shutdown, or failed requests.
+- C++ treats bridge transport/process failures as recoverable. When the stdio process exits or the gRPC channel becomes unusable, Atlas clears the process/channel state, starts a fresh Java bridge on demand, and retries the failed request once. Bridge response status errors propagate to the caller.
+- The gRPC backend owns one Java process and one gRPC channel. gRPC pixel and thumbnail streams use smaller chunks than stdio so large responses do not depend on a single large HTTP/2 message.
+- Dataset info reads still open synchronously before returning. This preserves Atlas' existing local-file behavior, where display callers receive complete metadata instead of progressive/async placeholders.
 - Desktop Atlas schedules a background Bio-Formats warmup after the main window is shown. Warmup starts the selected Java bridge, performs the runtime handshake, and caches the supported reader list without blocking first paint.
 - Tunables:
-  - `--atlas_bioformats_bridge_worker_count=<count>` sets the gRPC reader count for pixel reads. On the default gRPC backend, workers are Java-side `IFormatReader` instances inside one JVM and default `0` uses `std::thread::hardware_concurrency()`. On the stdio backend, this flag is ignored and the single stdio sidecar is used.
   - `--atlas_bioformats_bridge_use_grpc=<bool>` selects the bridge transport inside the merged bridge jar. Default `true` uses the gRPC backend; `false` uses the stdio backend.
   - `--atlas_bioformats_bridge_io_timeout_ms=<ms>` bounds bridge operations when non-zero; default `0` waits indefinitely.
 

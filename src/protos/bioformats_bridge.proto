@@ -38,9 +38,8 @@ message Request
     RuntimeInfoRequest runtime_info = 9;
     ListFormatsRequest list_formats = 10;
     ProbeRequest probe = 11;
-    OpenDatasetRequest open_dataset = 12;
+    DatasetInfoRequest dataset_info = 12;
     ReadRegionRequest read_region = 13;
-    CloseDatasetRequest close_dataset = 14;
     ShutdownRequest shutdown = 15;
     ReadThumbnailRequest read_thumbnail = 16;
   }
@@ -57,9 +56,8 @@ message Response
     RuntimeInfoResponse runtime_info = 9;
     ListFormatsResponse list_formats = 10;
     ProbeResponse probe = 11;
-    OpenDatasetResponse open_dataset = 12;
+    DatasetInfoResponse dataset_info = 12;
     PixelChunk pixel_chunk = 13;
-    CloseDatasetResponse close_dataset = 14;
     ShutdownResponse shutdown = 15;
     ThumbnailChunk thumbnail_chunk = 16;
   }
@@ -108,7 +106,7 @@ message ProbeResponse
   repeated string used_files = 4;
 }
 
-message OpenDatasetRequest
+message DatasetInfoRequest
 {
   string path = 1;
   FileGroupingPolicy grouping_policy = 2;
@@ -170,31 +168,32 @@ message SeriesInfo
   repeated ResolutionInfo resolutions = 32;
 }
 
-message OpenDatasetResponse
+message DatasetInfoResponse
 {
-  uint64 session_id = 1;
-  string path = 2;
-  string format_name = 3;
-  string reader_class = 4;
-  repeated string used_files = 5;
-  repeated SeriesInfo series = 6;
+  string path = 1;
+  string format_name = 2;
+  string reader_class = 3;
+  repeated string used_files = 4;
+  repeated SeriesInfo series = 5;
 }
 
 message ReadRegionRequest
 {
-  uint64 session_id = 1;
-  uint32 series = 2;
-  uint32 resolution = 3;
-  uint64 x = 4;
-  uint64 y = 5;
-  uint64 z = 6;
-  uint64 c = 7;
-  uint64 t = 8;
-  uint64 width = 9;
-  uint64 height = 10;
-  uint64 depth = 11;
-  uint64 channel_count = 12;
-  uint64 time_count = 13;
+  string path = 1;
+  FileGroupingPolicy grouping_policy = 2;
+  bool metadata_filtered = 3;
+  uint32 series = 4;
+  uint32 resolution = 5;
+  uint64 x = 6;
+  uint64 y = 7;
+  uint64 z = 8;
+  uint64 c = 9;
+  uint64 t = 10;
+  uint64 width = 11;
+  uint64 height = 12;
+  uint64 depth = 13;
+  uint64 channel_count = 14;
+  uint64 time_count = 15;
 }
 
 message PixelChunk
@@ -207,10 +206,12 @@ message PixelChunk
 
 message ReadThumbnailRequest
 {
-  uint64 session_id = 1;
-  uint32 series = 2;
-  uint64 z = 3;
-  uint64 t = 4;
+  string path = 1;
+  FileGroupingPolicy grouping_policy = 2;
+  bool metadata_filtered = 3;
+  uint32 series = 4;
+  uint64 z = 5;
+  uint64 t = 6;
 }
 
 message ThumbnailChunk
@@ -225,13 +226,6 @@ message ThumbnailChunk
   string pixel_type = 8;
   bytes data = 9;
 }
-
-message CloseDatasetRequest
-{
-  uint64 session_id = 1;
-}
-
-message CloseDatasetResponse {}
 
 message ShutdownRequest {}
 
