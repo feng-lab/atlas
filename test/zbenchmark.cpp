@@ -35,7 +35,6 @@
 #include <tuple>
 #include <vector>
 
-DECLARE_bool(atlas_bioformats_bridge_use_grpc);
 DECLARE_bool(atlas_bioformats_bridge_diagnostics);
 DECLARE_int32(atlas_bioformats_bridge_io_timeout_ms);
 DECLARE_int32(v);
@@ -535,7 +534,6 @@ const std::optional<std::string>& bioFormatsBenchmarkRuntimeError()
   static std::once_flag once;
   static std::optional<std::string> error;
   std::call_once(once, []() {
-    ::FLAGS_atlas_bioformats_bridge_use_grpc = true;
     if (::FLAGS_atlas_bioformats_bridge_io_timeout_ms <= 0) {
       ::FLAGS_atlas_bioformats_bridge_io_timeout_ms = kBioFormatsBenchmarkIoTimeoutMs;
     }
@@ -559,7 +557,6 @@ const std::optional<std::string>& bioFormatsBenchmarkRuntimeError()
     ZLogInit::instance("zbenchmark");
     LOG(INFO) << "Bio-Formats benchmark runtime: file=" << bioFormatsBenchmarkFile()
               << ", java=" << javaExecutableInJreDir(*jreDir) << ", jarsDIR=" << jarsDir.absolutePath()
-              << ", useGrpc=" << ::FLAGS_atlas_bioformats_bridge_use_grpc
               << ", bridgeDiagnostics=" << ::FLAGS_atlas_bioformats_bridge_diagnostics;
 
     try {

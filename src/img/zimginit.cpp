@@ -46,7 +46,9 @@ ZImgInit::ZImgInit(const QString& resourcesDIR, const QString& jreDIR, const QSt
   }
 
   if (jarsDIR.isEmpty()) {
-    LOG(INFO) << "no java support";
+    if (verbose) {
+      LOG(INFO) << "no java support";
+    }
   } else {
     QDir jarsD(jarsDIR);
     if (!jarsD.exists() || !jarsD.exists(kAtlasBioFormatsBridgeJar)) {
@@ -70,7 +72,9 @@ ZImgInit::ZImgInit(const QString& resourcesDIR, const QString& jreDIR, const QSt
     }
 
     if (jreDIR.isEmpty()) {
-      LOG(INFO) << "no bundled jreDIR; Bio-Formats Java executable is not configured";
+      if (verbose) {
+        LOG(INFO) << "no bundled jreDIR; Bio-Formats Java executable is not configured";
+      }
     } else {
       QDir jreD(jreDIR);
       if (!jreD.exists() || !jreD.exists("bin")) {

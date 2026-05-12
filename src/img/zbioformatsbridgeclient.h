@@ -103,8 +103,8 @@ public:
   static QString bridgeJarPath();
   static QString bioFormatsJarPath();
 
-  // Tests change bridge transport flags in-process; reset before the next
-  // instance() call so the singleton captures the new flag values.
+  // Tests reconfigure runtime paths in-process; reset before the next
+  // instance() call so the singleton captures the new paths.
   static void resetInstanceForTesting();
 
   ZBioFormatsBridgeClient();

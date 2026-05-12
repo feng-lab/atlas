@@ -183,7 +183,6 @@ print_target_properties(ITKIOMeta)
 print_target_properties(ITKIONIFTI)
 print_target_properties(ITKIONRRD)
 print_target_properties(ITKIOGDCM)
-print_target_properties(ITKBinaryMathematicalMorphology)
 print_target_properties(ITKSmoothing)
 
 find_package(gflags REQUIRED

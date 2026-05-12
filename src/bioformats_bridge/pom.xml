@@ -10,7 +10,7 @@
   <packaging>jar</packaging>
 
   <name>Atlas Bio-Formats Bridge</name>
-  <description>Atlas-owned stdio/protobuf sidecar for reading Bio-Formats datasets.</description>
+  <description>Atlas-owned gRPC/protobuf bridge for reading Bio-Formats datasets.</description>
 
   <properties>
     <bioformats.package.jar>${project.basedir}/../3rdparty/build/jars/bioformats_package.jar</bioformats.package.jar>

@@ -1,9 +1,7 @@
 # Atlas Bio-Formats Bridge
 
 This directory owns the Java bridge used by Atlas' native `ZImgBioFormats`
-reader. The default desktop transport is a single-JVM gRPC service. The same
-protobuf schema also supports the legacy sidecar protocol over length-prefixed
-stdin/stdout frames.
+reader. The desktop and Python transports use a single-JVM gRPC service.
 
 Atlas does not pin a separate Bio-Formats Maven version here. The Maven build
 uses `../3rdparty/build/jars/bioformats_package.jar` as a system-scoped compile

@@ -15,7 +15,6 @@
 #include <QStringList>
 #include <QTemporaryDir>
 #include <algorithm>
-#include <array>
 #include <future>
 #include <gflags/gflags.h>
 #include <map>
@@ -26,7 +25,6 @@
 #include <string>
 
 DECLARE_int32(atlas_bioformats_bridge_io_timeout_ms);
-DECLARE_bool(atlas_bioformats_bridge_use_grpc);
 
 namespace nim {
 
@@ -114,7 +112,7 @@ std::optional<std::string> bioFormatsRuntimeSkipReason()
 
   ZLogInit::instance("zbioformatstest");
   LOG(INFO) << "Bio-Formats test runtime: jreDIR=" << *jreDir << ", java=" << javaExecutableInJreDir(*jreDir)
-            << ", jarsDIR=" << jarsDir.absolutePath() << ", useGrpc=" << ::FLAGS_atlas_bioformats_bridge_use_grpc;
+            << ", jarsDIR=" << jarsDir.absolutePath();
 
   try {
     ZImgInit::instance("", *jreDir, jarsDir.absolutePath(), false);
@@ -129,61 +127,28 @@ std::optional<std::string> bioFormatsRuntimeSkipReason()
   return std::nullopt;
 }
 
-struct BioFormatsBridgeTestTransport
-{
-  const char* name;
-  bool useGrpc;
-};
-
-constexpr std::array<BioFormatsBridgeTestTransport, 2> kBioFormatsBridgeTestTransports = {
-  BioFormatsBridgeTestTransport{"stdio", false},
-  BioFormatsBridgeTestTransport{"grpc",  true },
-};
-
-class ScopedBioFormatsBridgeTestTransport
+class ScopedBioFormatsBridgeTestProcess
 {
 public:
-  explicit ScopedBioFormatsBridgeTestTransport(const BioFormatsBridgeTestTransport& transport)
-  {
-    ::FLAGS_atlas_bioformats_bridge_use_grpc = transport.useGrpc;
-    ZBioFormatsBridgeClient::resetInstanceForTesting();
-  }
-
-  ~ScopedBioFormatsBridgeTestTransport()
+  ScopedBioFormatsBridgeTestProcess()
   {
     ZBioFormatsBridgeClient::resetInstanceForTesting();
   }
-};
 
-class ScopedBioFormatsBridgeDefaultTransport
-{
-public:
-  ScopedBioFormatsBridgeDefaultTransport()
-  {
-    ::FLAGS_atlas_bioformats_bridge_use_grpc = true;
-    ZBioFormatsBridgeClient::resetInstanceForTesting();
-  }
-
-  ~ScopedBioFormatsBridgeDefaultTransport()
+  ~ScopedBioFormatsBridgeTestProcess()
   {
     ZBioFormatsBridgeClient::resetInstanceForTesting();
   }
 };
 
 template<typename Fn>
-void runForEachBioFormatsBridgeTransport(Fn&& fn)
+void runWithBioFormatsBridge(Fn&& fn)
 {
-  for (const BioFormatsBridgeTestTransport& transport : kBioFormatsBridgeTestTransports) {
-    SCOPED_TRACE(transport.name);
-    const ScopedBioFormatsBridgeTestTransport scopedTransport(transport);
-    if (const auto reason = bioFormatsRuntimeSkipReason(); reason.has_value()) {
-      GTEST_SKIP() << *reason;
-    }
-    fn();
-    if (::testing::Test::HasFatalFailure()) {
-      return;
-    }
+  const ScopedBioFormatsBridgeTestProcess scopedBridge;
+  if (const auto reason = bioFormatsRuntimeSkipReason(); reason.has_value()) {
+    GTEST_SKIP() << *reason;
   }
+  fn();
 }
 
 QString createFakeReaderFile(QTemporaryDir& dir, const QString& basename)
@@ -553,7 +518,7 @@ std::vector<ZImgRegion> smokeRegions(const ZImgInfo& info)
 
 TEST(ZBioFormatsTest, FormatExtensionListDoesNotRequireAnOpenFile)
 {
-  runForEachBioFormatsBridgeTransport([]() {
+  runWithBioFormatsBridge([]() {
     const QStringList extensions = ZImgBioFormats().extensions();
     ASSERT_FALSE(extensions.empty());
     EXPECT_TRUE(extensions.contains(QStringLiteral("fake"), Qt::CaseInsensitive));
@@ -562,7 +527,7 @@ TEST(ZBioFormatsTest, FormatExtensionListDoesNotRequireAnOpenFile)
 
 TEST(ZBioFormatsTest, FakeReaderMetadataCreatesDeterministicInfoAndSubBlocks)
 {
-  runForEachBioFormatsBridgeTransport([]() {
+  runWithBioFormatsBridge([]() {
     QTemporaryDir dir;
     ASSERT_TRUE(dir.isValid());
     const QString path =
@@ -612,7 +577,7 @@ TEST(ZBioFormatsTest, FakeReaderMetadataCreatesDeterministicInfoAndSubBlocks)
 
 TEST(ZBioFormatsTest, IndexedFalseColorDataStaysSingleChannel)
 {
-  runForEachBioFormatsBridgeTransport([]() {
+  runWithBioFormatsBridge([]() {
     QTemporaryDir dir;
     ASSERT_TRUE(dir.isValid());
     const QString path = createFakeReaderFile(
@@ -635,7 +600,7 @@ TEST(ZBioFormatsTest, IndexedFalseColorDataStaysSingleChannel)
 
 TEST(ZBioFormatsTest, ChannelColorMetadataIsPreserved)
 {
-  runForEachBioFormatsBridgeTransport([]() {
+  runWithBioFormatsBridge([]() {
     QTemporaryDir dir;
     ASSERT_TRUE(dir.isValid());
     const QString path = createFakeReaderFile(
@@ -656,7 +621,7 @@ TEST(ZBioFormatsTest, ChannelColorMetadataIsPreserved)
 
 TEST(ZBioFormatsTest, FakeReaderRegionMatchesTheSameCoordinatesFromFullRead)
 {
-  runForEachBioFormatsBridgeTransport([]() {
+  runWithBioFormatsBridge([]() {
     QTemporaryDir dir;
     ASSERT_TRUE(dir.isValid());
     const QString path =
@@ -681,7 +646,7 @@ TEST(ZBioFormatsTest, FakeReaderRegionMatchesTheSameCoordinatesFromFullRead)
 
 TEST(ZBioFormatsTest, FakeReaderReadReassemblesMultiplePixelChunks)
 {
-  runForEachBioFormatsBridgeTransport([]() {
+  runWithBioFormatsBridge([]() {
     QTemporaryDir dir;
     ASSERT_TRUE(dir.isValid());
     const QString path =
@@ -706,8 +671,7 @@ TEST(ZBioFormatsTest, FakeReaderReadReassemblesMultiplePixelChunks)
 
 TEST(ZBioFormatsTest, FakeReaderGrpcConcurrentRegionReads)
 {
-  const BioFormatsBridgeTestTransport grpcTransport{"grpc", true};
-  const ScopedBioFormatsBridgeTestTransport scopedTransport(grpcTransport);
+  const ScopedBioFormatsBridgeTestProcess scopedBridge;
   if (const auto reason = bioFormatsRuntimeSkipReason(); reason.has_value()) {
     GTEST_SKIP() << *reason;
   }
@@ -743,7 +707,7 @@ TEST(ZBioFormatsTest, FakeReaderGrpcConcurrentRegionReads)
 
 TEST(ZBioFormatsTest, FakeReaderResolutionMetadataCreatesPyramidSubBlocks)
 {
-  runForEachBioFormatsBridgeTransport([]() {
+  runWithBioFormatsBridge([]() {
     QTemporaryDir dir;
     ASSERT_TRUE(dir.isValid());
     const QString path = createFakeReaderFile(
@@ -852,7 +816,7 @@ TEST(ZBioFormatsTest, ZDownsampledResolutionCreatesPyramidSubBlocks)
 
 TEST(ZBioFormatsTest, FakeReaderThumbnailIsReadWhenAvailable)
 {
-  runForEachBioFormatsBridgeTransport([]() {
+  runWithBioFormatsBridge([]() {
     QTemporaryDir dir;
     ASSERT_TRUE(dir.isValid());
     const QString path = createFakeReaderFile(
@@ -877,7 +841,7 @@ TEST(ZBioFormatsTest, PublicCorpusReadsMetadataAndSmallRegions)
     GTEST_SKIP() << "set ATLAS_BIOFORMATS_BREADTH_DIR to run public Bio-Formats corpus smoke tests";
   }
 
-  const ScopedBioFormatsBridgeDefaultTransport scopedTransport;
+  const ScopedBioFormatsBridgeTestProcess scopedBridge;
   if (const auto reason = bioFormatsRuntimeSkipReason(); reason.has_value()) {
     GTEST_SKIP() << *reason;
   }
