@@ -1535,7 +1535,6 @@ Use **Help → Shortcuts** in either the 2D or 3D window to open this section di
 | `--atlas_http_backend` | Select remote-dataset HTTP transport: `proxygen` or `curl`. |
 | `--atlas_http_ca_bundle` | Override the PEM CA bundle used for HTTPS remote-dataset requests. |
 | `--atlas_http_windows_trust_source` | On Windows, choose the default HTTPS trust source shared by both HTTP backends: `auto`, `windows_store`, or `bundled_pem`. |
-| `--atlas_bioformats_bridge_use_grpc` | Bio-Formats bridge transport. Default `true` starts the gRPC bridge. Set `false` to use the stdio bridge. |
 | `--filename` | Input path for headless export (`.animation3d` for animation export, `.scene` for scene export). |
 | `--output_filename` | Output path (`.mp4`/video for animation export, image path for scene export). |
 | `--output_fps`, `--output_start_frame`, `--output_end_frame` | Output frame timing. |

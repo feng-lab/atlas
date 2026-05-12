@@ -416,10 +416,9 @@ protected:
   void buildPyramidal(ZImg& img);
 
   void buildPyramidal();
-  // Build only the pyramidal tile index (metadata + R-tree) using ZImgTileSubBlock
-  // without reading or generating downsampled images. This is fast and sufficient
-  // for on-demand rendering paths.
-  void buildPyramidalIndexOnly();
+  // Build only the pyramidal tile index (metadata + R-tree) without reading or generating downsampled images.
+  // Reader-provided base tiles are preserved so format-specific subblock read paths still own base-ratio I/O.
+  void buildPyramidalIndexOnly(const std::vector<std::shared_ptr<ZImgSubBlock>>& baseSubBlocks);
 
   // Compute a fast percentile-based display window for float data by sampling
   // a few base-ratio tiles. Sets m_minIntensity/m_maxIntensity and marks

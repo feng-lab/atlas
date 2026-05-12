@@ -233,18 +233,18 @@ ZImgInfo toResolutionImgInfo(const ZBioFormatsSeriesInfo& series, const ZBioForm
   return toImgInfo(adjusted);
 }
 
-class ZImgBioFormatsPyramidSubBlock final : public ZImgSubBlock
+class ZImgBioFormatsSubBlock final : public ZImgSubBlock
 {
 public:
-  ZImgBioFormatsPyramidSubBlock(QString filename,
-                                size_t scene,
-                                uint32_t resolution,
-                                ZImgRegion baseRegion,
-                                ZImgRegion resolutionRegion,
-                                ZImgInfo resolutionInfo,
-                                size_t xRatio,
-                                size_t yRatio,
-                                size_t zRatio)
+  ZImgBioFormatsSubBlock(QString filename,
+                         size_t scene,
+                         uint32_t resolution,
+                         ZImgRegion baseRegion,
+                         ZImgRegion resolutionRegion,
+                         ZImgInfo resolutionInfo,
+                         size_t xRatio,
+                         size_t yRatio,
+                         size_t zRatio)
     : ZImgSubBlock(baseRegion.start.t,
                    baseRegion.start.x,
                    baseRegion.start.y,
@@ -261,7 +261,6 @@ public:
     , m_resolutionRegion(std::move(resolutionRegion))
     , m_resolutionInfo(std::move(resolutionInfo))
   {
-    CHECK(m_resolution > 0);
     CHECK(m_resolutionRegion.isValid(m_resolutionInfo));
     CHECK(xRatio > 0);
     CHECK(yRatio > 0);
@@ -275,7 +274,7 @@ public:
     std::vector<uint8_t> pixels =
       ZBioFormatsBridgeClient::instance().readRegion(m_filename, m_scene, m_resolution, m_resolutionRegion);
     if (pixels.size() != img->byteNumber()) {
-      throw ZException(fmt::format("Bio-Formats bridge returned {} pyramid tile bytes, expected {} for image '{}'",
+      throw ZException(fmt::format("Bio-Formats bridge returned {} tile bytes, expected {} for image '{}'",
                                    pixels.size(),
                                    img->byteNumber(),
                                    info));
@@ -349,20 +348,15 @@ void addBioFormatsTiledSubBlocks(const QString& filename,
                              checkedIndex("pyramid resolution z end", z + 1),
                              checkedIndex("pyramid resolution channel end", resolutionInfo.numChannels),
                              checkedIndex("pyramid resolution t end", t + 1)));
-          if (resolution == 0) {
-            subBlocks.emplace_back(
-              std::make_shared<ZImgTileSubBlock>(ZImgSource(filename, baseRegion, scene, FileFormat::BioFormats)));
-          } else {
-            subBlocks.emplace_back(std::make_shared<ZImgBioFormatsPyramidSubBlock>(filename,
-                                                                                   scene,
-                                                                                   resolution,
-                                                                                   std::move(baseRegion),
-                                                                                   std::move(resolutionRegion),
-                                                                                   resolutionInfo,
-                                                                                   xRatio,
-                                                                                   yRatio,
-                                                                                   zRatio));
-          }
+          subBlocks.emplace_back(std::make_shared<ZImgBioFormatsSubBlock>(filename,
+                                                                          scene,
+                                                                          resolution,
+                                                                          std::move(baseRegion),
+                                                                          std::move(resolutionRegion),
+                                                                          resolutionInfo,
+                                                                          xRatio,
+                                                                          yRatio,
+                                                                          zRatio));
         }
       }
     }

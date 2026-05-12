@@ -6,7 +6,10 @@
 #include "zlog.h"
 
 #include <QByteArray>
+#include <QCoreApplication>
+#include <QDir>
 #include <QElapsedTimer>
+#include <QFile>
 #include <QFileInfo>
 #include <QProcess>
 #include <QRegularExpression>
@@ -39,7 +42,10 @@ DEFINE_int32(atlas_bioformats_bridge_io_timeout_ms,
              "Timeout for Bio-Formats bridge operations in milliseconds. 0 means wait indefinitely.");
 DEFINE_bool(atlas_bioformats_bridge_use_grpc,
             true,
-            "Use the single-JVM gRPC Bio-Formats bridge. Set false to use the single-process stdio bridge.");
+            "Use the single-JVM gRPC Bio-Formats bridge. Set false to use the legacy single-process stdio bridge.");
+DEFINE_bool(atlas_bioformats_bridge_diagnostics,
+            false,
+            "Write structured Java-side Bio-Formats bridge diagnostics to a temporary log file.");
 
 namespace nim {
 
@@ -81,6 +87,50 @@ class ZBioFormatsBridgeProcessFailure final : public ZException
 public:
   using ZException::ZException;
 };
+
+bool bioFormatsBridgeDiagnosticsEnabled()
+{
+  return FLAGS_atlas_bioformats_bridge_diagnostics;
+}
+
+std::atomic<uint64_t>& bioFormatsDiagnosticsFileCounter()
+{
+  static std::atomic<uint64_t> counter = 1;
+  return counter;
+}
+
+QString createBioFormatsDiagnosticsFilePath()
+{
+  const uint64_t id = bioFormatsDiagnosticsFileCounter().fetch_add(1, std::memory_order_relaxed);
+  return QDir::temp().filePath(
+    QStringLiteral("atlas-bioformats-bridge-%1-%2.diag").arg(QCoreApplication::applicationPid()).arg(id));
+}
+
+QString prepareBioFormatsDiagnosticsFile()
+{
+  if (!bioFormatsBridgeDiagnosticsEnabled()) {
+    return {};
+  }
+
+  const QString diagnosticsFilePath = createBioFormatsDiagnosticsFilePath();
+  QFile file(diagnosticsFilePath);
+  if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+    throw ZException(
+      fmt::format("failed to create Bio-Formats diagnostics file '{}': {}", diagnosticsFilePath, file.errorString()));
+  }
+  file.close();
+  return diagnosticsFilePath;
+}
+
+void appendBioFormatsJavaBridgeArgs(QStringList& args, const QString& diagnosticsFilePath)
+{
+  if (bioFormatsBridgeDiagnosticsEnabled()) {
+    args << "--verbose";
+    if (!diagnosticsFilePath.isEmpty()) {
+      args << (QStringLiteral("--diagnostics-file=") + diagnosticsFilePath);
+    }
+  }
+}
 
 template<typename Fn>
 decltype(auto) retryAfterBridgeProcessRestart(std::string_view operation, Fn&& fn)
@@ -659,6 +709,8 @@ private:
                                      response.request_id(),
                                      request.request_id()));
       }
+      VLOG(1) << "Bio-Formats bridge worker " << m_workerIndex << " request_id=" << request.request_id()
+              << " response=" << responseCaseName(response);
       return response;
     });
   }
@@ -690,6 +742,10 @@ private:
     }
 
     m_stdoutBuffer.clear();
+    m_diagnosticsFilePath = prepareBioFormatsDiagnosticsFile();
+    if (!m_diagnosticsFilePath.isEmpty()) {
+      LOG(INFO) << "Bio-Formats bridge worker " << m_workerIndex << " Java diagnostics log: " << m_diagnosticsFilePath;
+    }
 
     QElapsedTimer startupTimer;
     startupTimer.start();
@@ -699,12 +755,17 @@ private:
       args.push_back(QString("-Xmx%1").arg(QString::fromStdString(FLAGS_atlas_bioformats_java_xmx)));
     }
     args << "-Djava.awt.headless=true"
+         << "-Dorg.slf4j.simpleLogger.logFile=System.err"
+         << "-Dorg.slf4j.simpleLogger.defaultLogLevel=warn"
+         << "-Dorg.slf4j.simpleLogger.log.io.grpc.netty.shaded.io.netty=warn"
          << "-cp" << bridgeClasspath() << kAtlasBioFormatsBridgeMainClass;
+    appendBioFormatsJavaBridgeArgs(args, m_diagnosticsFilePath);
 
     const QString java = javaExecutable();
     m_process.setProgram(java);
     m_process.setArguments(args);
     m_process.setProcessChannelMode(QProcess::SeparateChannels);
+    m_process.setStandardErrorFile(QProcess::nullDevice());
     m_process.start();
     if (!m_process.waitForStarted(30000)) {
       const QString error = m_process.errorString();
@@ -864,11 +925,8 @@ private:
 
   [[noreturn]] void throwProcessError(const char* message)
   {
-    const QString stderrText = QString::fromUtf8(m_process.readAllStandardError());
     QString detail = QString::fromUtf8(message);
-    if (!stderrText.isEmpty()) {
-      detail += QString(": ") + stderrText;
-    } else if (!m_process.errorString().isEmpty()) {
+    if (!m_process.errorString().isEmpty()) {
       detail += QString(": ") + m_process.errorString();
     }
 
@@ -883,6 +941,7 @@ private:
       m_process.waitForFinished(1000);
     }
     m_stdoutBuffer.clear();
+    m_diagnosticsFilePath.clear();
   }
 
   void requireOk(const proto::Response& response, std::string_view operation) const
@@ -900,6 +959,7 @@ private:
   size_t m_workerIndex = 0;
   QProcess m_process;
   QByteArray m_stdoutBuffer;
+  QString m_diagnosticsFilePath;
   QString m_javaExecutable;
   uint64_t m_nextRequestId = 1;
   std::vector<ZBioFormatsReaderFormat> m_cachedFormats;
@@ -1368,6 +1428,10 @@ private:
     }
 
     m_stdoutBuffer.clear();
+    m_diagnosticsFilePath = prepareBioFormatsDiagnosticsFile();
+    if (!m_diagnosticsFilePath.isEmpty()) {
+      LOG(INFO) << "Bio-Formats gRPC bridge Java diagnostics log: " << m_diagnosticsFilePath;
+    }
 
     QElapsedTimer startupTimer;
     startupTimer.start();
@@ -1377,7 +1441,11 @@ private:
       args.push_back(QString("-Xmx%1").arg(QString::fromStdString(FLAGS_atlas_bioformats_java_xmx)));
     }
     args << "-Djava.awt.headless=true"
+         << "-Dorg.slf4j.simpleLogger.logFile=System.err"
+         << "-Dorg.slf4j.simpleLogger.defaultLogLevel=warn"
+         << "-Dorg.slf4j.simpleLogger.log.io.grpc.netty.shaded.io.netty=warn"
          << "-cp" << bridgeClasspath() << kAtlasBioFormatsBridgeMainClass << "--grpc-port=0";
+    appendBioFormatsJavaBridgeArgs(args, m_diagnosticsFilePath);
 
     const QString java = javaExecutable();
     m_process.setProgram(java);
@@ -1525,7 +1593,10 @@ private:
     for (int attempt = 0; attempt < 2; ++attempt) {
       try {
         const std::shared_ptr<proto::BioFormatsBridge::Stub> stub = stubForRequest();
-        return executeStreamWithStub(stub, request, operation);
+        std::vector<proto::Response> responses = executeStreamWithStub(stub, request, operation);
+        VLOG(1) << "Bio-Formats gRPC bridge request_id=" << request.request_id() << " operation=" << operation
+                << " responses=" << responses.size();
+        return responses;
       }
       catch (const ZBioFormatsBridgeProcessFailure& e) {
         resetGrpcProcessAfterFailure();
@@ -1545,7 +1616,15 @@ private:
   {
     CHECK(m_stub != nullptr);
     const std::shared_ptr<proto::BioFormatsBridge::Stub> stub = m_stub;
-    return executeStreamWithStub(stub, request, operation);
+    try {
+      std::vector<proto::Response> responses = executeStreamWithStub(stub, request, operation);
+      VLOG(1) << "Bio-Formats gRPC bridge request_id=" << request.request_id() << " operation=" << operation
+              << " responses=" << responses.size();
+      return responses;
+    }
+    catch (...) {
+      throw;
+    }
   }
 
   [[nodiscard]] std::vector<proto::Response>
@@ -1616,15 +1695,13 @@ private:
       m_process.waitForFinished(1000);
     }
     m_stdoutBuffer.clear();
+    m_diagnosticsFilePath.clear();
   }
 
   [[noreturn]] void throwGrpcProcessErrorLocked(const char* message)
   {
-    const QString stderrText = QString::fromUtf8(m_process.readAllStandardError());
     QString detail = QString::fromUtf8(message);
-    if (!stderrText.isEmpty()) {
-      detail += QString(": ") + stderrText;
-    } else if (!m_process.errorString().isEmpty()) {
+    if (!m_process.errorString().isEmpty()) {
       detail += QString(": ") + m_process.errorString();
     }
 
@@ -1636,6 +1713,7 @@ private:
   std::mutex m_cacheMutex;
   QProcess m_process;
   QByteArray m_stdoutBuffer;
+  QString m_diagnosticsFilePath;
   QString m_javaExecutable;
   std::shared_ptr<grpc::Channel> m_channel;
   std::shared_ptr<proto::BioFormatsBridge::Stub> m_stub;

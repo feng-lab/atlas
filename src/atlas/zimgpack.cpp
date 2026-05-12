@@ -66,6 +66,10 @@ DEFINE_uint32(atlas_readRegionToImg_version,
 
 namespace {
 
+// Materialized local pyramids keep a tiny cached overview for zoomed-out rendering.
+// This is an overview-quality threshold, not the 512-pixel tile size.
+constexpr size_t kMaterializedPyramidTerminalOverviewPixels = 64;
+
 struct MaxOp
 {
   template<typename TVoxel, typename TVoxelOther>
@@ -543,7 +547,7 @@ ZImgPack::ZImgPack(ZImgSource imgSource, ZImgInfo* pInfo, std::vector<std::share
   } else {
     if (FLAGS_atlas_imgpack_defer_pyramidal) {
       VLOG(1) << "building pyramidal index only (no I/O)";
-      buildPyramidalIndexOnly();
+      buildPyramidalIndexOnly(sceneSubBlock);
     } else {
       VLOG(1) << "building pyramidal";
       buildPyramidal();
@@ -2723,7 +2727,8 @@ void ZImgPack::createSliceTiles(ZImg* img, size_t z, size_t t)
     if (numX == 1 && numY == 1) {
       size_t width = m_imgInfo.width;
       size_t height = m_imgInfo.height;
-      if (img->width() <= 64 && img->height() <= 64) {
+      if (img->width() <= kMaterializedPyramidTerminalOverviewPixels &&
+          img->height() <= kMaterializedPyramidTerminalOverviewPixels) {
         std::shared_ptr<ZImg> simg(img);
         m_allTiles.emplace_back(new ZImgPackSubBlock(simg, ratio, t, z, 0, 0, width, height));
 
@@ -2869,7 +2874,7 @@ void ZImgPack::buildPyramidal()
   createTileIndexStructure();
 }
 
-void ZImgPack::buildPyramidalIndexOnly()
+void ZImgPack::buildPyramidalIndexOnly(const std::vector<std::shared_ptr<ZImgSubBlock>>& baseSubBlocks)
 {
   // Do not compute global min/max here; keep Invalid to avoid long stalls.
   m_minMaxState = MinMaxState::Invalid;
@@ -2879,15 +2884,30 @@ void ZImgPack::buildPyramidalIndexOnly()
   m_rtToTileBoxRTree.clear();
   m_pyramidalRatios.clear();
 
+  for (const auto& baseSubBlock : baseSubBlocks) {
+    CHECK(baseSubBlock);
+  }
+  m_allTiles = baseSubBlocks;
+
   const size_t width = m_imgInfo.width;
   const size_t height = m_imgInfo.height;
   const size_t depth = m_imgInfo.depth;
   const size_t times = m_imgInfo.numTimes;
+  const size_t overviewStopPixels = m_tileSize;
+  CHECK(overviewStopPixels > 0);
+  const auto downsampledImageFitsOneTile = [width, height, overviewStopPixels](uint32_t ratio) {
+    CHECK(ratio > 0);
+    return (width + ratio - 1) / ratio <= overviewStopPixels && (height + ratio - 1) / ratio <= overviewStopPixels;
+  };
+  if (!baseSubBlocks.empty() && downsampledImageFitsOneTile(1)) {
+    createTileIndexStructure();
+    return;
+  }
 
   // Iterate times and Z slices, generate XY tiles for powers-of-two ratios.
   for (size_t t = 0; t < times; ++t) {
     for (size_t z = 0; z < std::max<size_t>(depth, 1); ++z) {
-      for (uint32_t r = 1;; r <<= 1U) {
+      for (uint32_t r = baseSubBlocks.empty() ? 1U : 2U;; r <<= 1U) {
         const size_t tileSpanX = m_tileSize * static_cast<size_t>(r);
         const size_t tileSpanY = m_tileSize * static_cast<size_t>(r);
         const size_t numX = (width + tileSpanX - 1) / tileSpanX;
@@ -2914,8 +2934,8 @@ void ZImgPack::buildPyramidalIndexOnly()
             m_allTiles.emplace_back(std::move(tile));
           }
         }
-        // Stop when the downsampled image at this ratio would be small (<=64) in both axes
-        if ((width + r - 1) / r <= 64 && (height + r - 1) / r <= 64) {
+        // Stop once a single tile covers the downsampled overview; smaller synthetic levels do not improve indexing.
+        if (downsampledImageFitsOneTile(r)) {
           break;
         }
       }

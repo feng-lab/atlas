@@ -31,6 +31,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.PrintStream;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
@@ -38,6 +39,7 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Hashtable;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
@@ -46,6 +48,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import loci.formats.FormatException;
 import loci.formats.FormatTools;
@@ -65,23 +68,34 @@ public final class AtlasBioFormatsBridge
   private static final int PIXEL_CHUNK_BYTES = 8 * 1024 * 1024;
   private static final int GRPC_PIXEL_CHUNK_BYTES = 1024 * 1024;
   private static final int PROTOCOL_VERSION = 1;
-  private static final int READER_CACHE_MAX_IDLE_READERS = 4;
+  private static final int READER_CACHE_MIN_IDLE_READERS = 4;
+  private static final int READER_CACHE_MAX_IDLE_READERS =
+    Math.max(READER_CACHE_MIN_IDLE_READERS, Runtime.getRuntime().availableProcessors());
   private static final long READER_CACHE_IDLE_MILLIS = 5 * 60 * 1000L;
+  private static final int READER_CACHE_HEAP_PRESSURE_USED_PERCENT = 75;
+  private static final int READER_CACHE_HEAP_CRITICAL_USED_PERCENT = 90;
 
   private final InputStream in;
   private final OutputStream out;
   private final ReaderCache readerCache;
+  private final BridgeDiagnostics diagnostics;
 
-  private AtlasBioFormatsBridge(final InputStream in, final OutputStream out)
+  private AtlasBioFormatsBridge(final InputStream in, final OutputStream out, final BridgeDiagnostics diagnostics)
   {
     this.in = in == null ? null : new BufferedInputStream(in);
     this.out = out == null ? null : new BufferedOutputStream(out);
-    this.readerCache = new ReaderCache();
+    this.diagnostics = diagnostics;
+    this.readerCache = new ReaderCache(diagnostics);
   }
 
-  private AtlasBioFormatsBridge()
+  private AtlasBioFormatsBridge(final InputStream in, final OutputStream out)
   {
-    this(null, null);
+    this(in, out, BridgeDiagnostics.disabled());
+  }
+
+  private AtlasBioFormatsBridge(final BridgeDiagnostics diagnostics)
+  {
+    this(null, null, diagnostics);
   }
 
   public static void main(final String[] args) throws Exception
@@ -92,20 +106,29 @@ public final class AtlasBioFormatsBridge
     System.setOut(System.err);
 
     int grpcPort = -1;
+    boolean verbose = false;
+    String diagnosticsFile = "";
     for (final String arg : args) {
       if (arg.startsWith("--grpc-port=")) {
         grpcPort = parseNonNegativeIntArgument(arg, "--grpc-port=");
+      } else if (arg.equals("--verbose")) {
+        verbose = true;
+      } else if (arg.startsWith("--diagnostics-file=")) {
+        diagnosticsFile = arg.substring("--diagnostics-file=".length());
       } else if (!arg.isEmpty()) {
         throw new IllegalArgumentException("unknown argument: " + arg);
       }
     }
+    final BridgeDiagnostics diagnostics = new BridgeDiagnostics(verbose, diagnosticsFile);
+    diagnostics.log("event=startup mode=" + (grpcPort >= 0 ? "grpc" : "stdio") + " diagnostics_file=" +
+                    BridgeDiagnostics.quote(diagnosticsFile) + " java_pid=" + ProcessHandle.current().pid());
 
     if (grpcPort >= 0) {
-      runGrpcServer(grpcPort, protocolOut);
+      runGrpcServer(grpcPort, protocolOut, diagnostics);
       return;
     }
 
-    final AtlasBioFormatsBridge bridge = new AtlasBioFormatsBridge(System.in, protocolOut);
+    final AtlasBioFormatsBridge bridge = new AtlasBioFormatsBridge(System.in, protocolOut, diagnostics);
     bridge.run();
   }
 
@@ -118,9 +141,10 @@ public final class AtlasBioFormatsBridge
     return value;
   }
 
-  private static void runGrpcServer(final int grpcPort, final OutputStream startupOut) throws Exception
+  private static void
+  runGrpcServer(final int grpcPort, final OutputStream startupOut, final BridgeDiagnostics diagnostics) throws Exception
   {
-    final AtlasBioFormatsBridge bridge = new AtlasBioFormatsBridge();
+    final AtlasBioFormatsBridge bridge = new AtlasBioFormatsBridge(diagnostics);
     final AtomicReference<Server> serverRef = new AtomicReference<>();
     final Runnable shutdown = () ->
     {
@@ -143,6 +167,7 @@ public final class AtlasBioFormatsBridge
     }
     finally {
       bridge.closeCachedReaders();
+      diagnostics.close();
     }
   }
 
@@ -153,6 +178,318 @@ public final class AtlasBioFormatsBridge
     default int pixelChunkBytes()
     {
       return PIXEL_CHUNK_BYTES;
+    }
+  }
+
+  private static final class DiagnosticResponseSink implements ResponseSink
+  {
+    private final ResponseSink delegate;
+    private long responseCount = 0;
+    private long errorResponses = 0;
+    private long pixelChunks = 0;
+    private long pixelBytes = 0;
+    private long thumbnailChunks = 0;
+    private long thumbnailBytes = 0;
+
+    DiagnosticResponseSink(final ResponseSink delegate)
+    {
+      this.delegate = delegate;
+    }
+
+    @Override public void send(final Response response) throws Exception
+    {
+      ++responseCount;
+      if (response.getStatus() != StatusCode.STATUS_CODE_OK) {
+        ++errorResponses;
+      }
+      if (response.hasPixelChunk()) {
+        ++pixelChunks;
+        pixelBytes += response.getPixelChunk().getData().size();
+      }
+      if (response.hasThumbnailChunk()) {
+        ++thumbnailChunks;
+        thumbnailBytes += response.getThumbnailChunk().getData().size();
+      }
+      delegate.send(response);
+    }
+
+    @Override public int pixelChunkBytes()
+    {
+      return delegate.pixelChunkBytes();
+    }
+
+    long responseCount()
+    {
+      return responseCount;
+    }
+
+    long errorResponses()
+    {
+      return errorResponses;
+    }
+
+    long pixelChunks()
+    {
+      return pixelChunks;
+    }
+
+    long pixelBytes()
+    {
+      return pixelBytes;
+    }
+
+    long thumbnailChunks()
+    {
+      return thumbnailChunks;
+    }
+
+    long thumbnailBytes()
+    {
+      return thumbnailBytes;
+    }
+  }
+
+  private static final class BridgeDiagnostics
+  {
+    private static final BridgeDiagnostics DISABLED = new BridgeDiagnostics(false);
+
+    private final boolean enabled;
+    private final PrintStream output;
+    private final boolean closeOutput;
+    private final AtomicLong sequence = new AtomicLong(1);
+
+    BridgeDiagnostics(final boolean enabled)
+    {
+      this(enabled, System.err, false);
+    }
+
+    BridgeDiagnostics(final boolean enabled, final String diagnosticsFile) throws FileNotFoundException
+    {
+      this(enabled,
+           createOutput(enabled, diagnosticsFile),
+           enabled && diagnosticsFile != null && !diagnosticsFile.isEmpty());
+    }
+
+    private BridgeDiagnostics(final boolean enabled, final PrintStream output, final boolean closeOutput)
+    {
+      this.enabled = enabled;
+      this.output = output;
+      this.closeOutput = closeOutput;
+    }
+
+    static BridgeDiagnostics disabled()
+    {
+      return DISABLED;
+    }
+
+    boolean isEnabled()
+    {
+      return enabled;
+    }
+
+    void logRequestFinished(final Request request,
+                            final String status,
+                            final long elapsedNanos,
+                            final DiagnosticResponseSink sink,
+                            final Throwable failure)
+    {
+      if (!enabled) {
+        return;
+      }
+
+      final StringBuilder builder = new StringBuilder();
+      builder.append("event=request_end status=")
+        .append(status)
+        .append(" elapsed_ms=")
+        .append(formatMillis(elapsedNanos))
+        .append(' ')
+        .append(requestDetail(request));
+      if (sink != null) {
+        builder.append(" responses=")
+          .append(sink.responseCount())
+          .append(" error_responses=")
+          .append(sink.errorResponses())
+          .append(" pixel_chunks=")
+          .append(sink.pixelChunks())
+          .append(" pixel_bytes=")
+          .append(sink.pixelBytes())
+          .append(" thumbnail_chunks=")
+          .append(sink.thumbnailChunks())
+          .append(" thumbnail_bytes=")
+          .append(sink.thumbnailBytes());
+      }
+      if (failure != null) {
+        builder.append(" exception=")
+          .append(quote(failure.getClass().getName()))
+          .append(" message=")
+          .append(quote(failure.getMessage()));
+      }
+      log(builder.toString());
+    }
+
+    void log(final String message)
+    {
+      if (!enabled) {
+        return;
+      }
+      output.println("ATLAS_BIOFORMATS_DIAG seq=" + sequence.getAndIncrement() + " " + message + " " + heapSummary());
+      output.flush();
+    }
+
+    void close()
+    {
+      if (closeOutput) {
+        output.close();
+      }
+    }
+
+    private static PrintStream createOutput(final boolean enabled, final String diagnosticsFile)
+      throws FileNotFoundException
+    {
+      if (enabled && diagnosticsFile != null && !diagnosticsFile.isEmpty()) {
+        return new PrintStream(new FileOutputStream(diagnosticsFile, true), true, StandardCharsets.UTF_8);
+      }
+      return System.err;
+    }
+
+    static String formatMillis(final long elapsedNanos)
+    {
+      return String.format(Locale.ROOT, "%.3f", elapsedNanos / 1_000_000.0);
+    }
+
+    static String quote(final String value)
+    {
+      if (value == null) {
+        return "\"\"";
+      }
+      final StringBuilder builder = new StringBuilder(value.length() + 2);
+      builder.append('"');
+      for (int i = 0; i < value.length(); ++i) {
+        final char c = value.charAt(i);
+        switch (c) {
+          case '\\':
+            builder.append("\\\\");
+            break;
+          case '"':
+            builder.append("\\\"");
+            break;
+          case '\n':
+            builder.append("\\n");
+            break;
+          case '\r':
+            builder.append("\\r");
+            break;
+          case '\t':
+            builder.append("\\t");
+            break;
+          default:
+            builder.append(c);
+            break;
+        }
+      }
+      builder.append('"');
+      return builder.toString();
+    }
+
+    private static String heapSummary()
+    {
+      return HeapSnapshot.capture().summary();
+    }
+
+    private static String requestDetail(final Request request)
+    {
+      final StringBuilder builder = new StringBuilder();
+      builder.append("request_id=").append(request.getRequestId()).append(" command=").append(commandName(request));
+      switch (request.getCommandCase()) {
+        case PROBE:
+          builder.append(" path=")
+            .append(quote(request.getProbe().getPath()))
+            .append(" grouping_policy=")
+            .append(request.getProbe().getGroupingPolicy().name())
+            .append(" metadata_filtered=")
+            .append(request.getProbe().getMetadataFiltered());
+          break;
+        case DATASET_INFO:
+          builder.append(" path=")
+            .append(quote(request.getDatasetInfo().getPath()))
+            .append(" grouping_policy=")
+            .append(request.getDatasetInfo().getGroupingPolicy().name())
+            .append(" metadata_filtered=")
+            .append(request.getDatasetInfo().getMetadataFiltered());
+          break;
+        case READ_REGION:
+          builder.append(" path=")
+            .append(quote(request.getReadRegion().getPath()))
+            .append(" grouping_policy=")
+            .append(request.getReadRegion().getGroupingPolicy().name())
+            .append(" metadata_filtered=")
+            .append(request.getReadRegion().getMetadataFiltered())
+            .append(" series=")
+            .append(request.getReadRegion().getSeries())
+            .append(" resolution=")
+            .append(request.getReadRegion().getResolution())
+            .append(" x=")
+            .append(request.getReadRegion().getX())
+            .append(" y=")
+            .append(request.getReadRegion().getY())
+            .append(" width=")
+            .append(request.getReadRegion().getWidth())
+            .append(" height=")
+            .append(request.getReadRegion().getHeight())
+            .append(" z=")
+            .append(request.getReadRegion().getZ())
+            .append(" depth=")
+            .append(request.getReadRegion().getDepth())
+            .append(" c=")
+            .append(request.getReadRegion().getC())
+            .append(" channel_count=")
+            .append(request.getReadRegion().getChannelCount())
+            .append(" t=")
+            .append(request.getReadRegion().getT())
+            .append(" time_count=")
+            .append(request.getReadRegion().getTimeCount());
+          break;
+        case READ_THUMBNAIL:
+          builder.append(" path=")
+            .append(quote(request.getReadThumbnail().getPath()))
+            .append(" grouping_policy=")
+            .append(request.getReadThumbnail().getGroupingPolicy().name())
+            .append(" metadata_filtered=")
+            .append(request.getReadThumbnail().getMetadataFiltered())
+            .append(" series=")
+            .append(request.getReadThumbnail().getSeries())
+            .append(" z=")
+            .append(request.getReadThumbnail().getZ())
+            .append(" t=")
+            .append(request.getReadThumbnail().getT());
+          break;
+        default:
+          break;
+      }
+      return builder.toString();
+    }
+
+    private static String commandName(final Request request)
+    {
+      switch (request.getCommandCase()) {
+        case RUNTIME_INFO:
+          return "runtime_info";
+        case LIST_FORMATS:
+          return "list_formats";
+        case PROBE:
+          return "probe";
+        case DATASET_INFO:
+          return "dataset_info";
+        case READ_REGION:
+          return "read_region";
+        case READ_THUMBNAIL:
+          return "read_thumbnail";
+        case SHUTDOWN:
+          return "shutdown";
+        case COMMAND_NOT_SET:
+          return "missing";
+      }
+      return "unknown";
     }
   }
 
@@ -183,10 +520,31 @@ public final class AtlasBioFormatsBridge
     }
     finally {
       closeCachedReaders();
+      diagnostics.close();
     }
   }
 
   private boolean handleRequest(final Request request, final ResponseSink sink) throws Exception
+  {
+    final long startNanos = System.nanoTime();
+    final DiagnosticResponseSink diagnosticSink = diagnostics.isEnabled() ? new DiagnosticResponseSink(sink) : null;
+    final ResponseSink actualSink = diagnosticSink == null ? sink : diagnosticSink;
+    try {
+      final boolean keepRunning = handleRequestCommand(request, actualSink);
+      diagnostics.logRequestFinished(request,
+                                     keepRunning ? "ok" : "shutdown",
+                                     System.nanoTime() - startNanos,
+                                     diagnosticSink,
+                                     null);
+      return keepRunning;
+    }
+    catch (final Throwable t) {
+      diagnostics.logRequestFinished(request, "error", System.nanoTime() - startNanos, diagnosticSink, t);
+      throw t;
+    }
+  }
+
+  private boolean handleRequestCommand(final Request request, final ResponseSink sink) throws Exception
   {
     switch (request.getCommandCase()) {
       case RUNTIME_INFO:
@@ -732,9 +1090,149 @@ public final class AtlasBioFormatsBridge
     }
   }
 
+  private enum HeapPressureLevel
+  {
+    NORMAL("normal"),
+    PRESSURE("pressure"),
+    CRITICAL("critical");
+
+    private final String diagnosticName;
+
+    HeapPressureLevel(final String diagnosticName)
+    {
+      this.diagnosticName = diagnosticName;
+    }
+
+    String diagnosticName()
+    {
+      return diagnosticName;
+    }
+  }
+
+  private static final class HeapSnapshot
+  {
+    private final long usedBytes;
+    private final long committedBytes;
+    private final long maxBytes;
+
+    private HeapSnapshot(final long usedBytes, final long committedBytes, final long maxBytes)
+    {
+      this.usedBytes = usedBytes;
+      this.committedBytes = committedBytes;
+      this.maxBytes = maxBytes;
+    }
+
+    static HeapSnapshot capture()
+    {
+      final Runtime runtime = Runtime.getRuntime();
+      final long committedBytes = runtime.totalMemory();
+      return new HeapSnapshot(committedBytes - runtime.freeMemory(), committedBytes, runtime.maxMemory());
+    }
+
+    boolean hasBoundedMax()
+    {
+      return maxBytes > 0 && maxBytes != Long.MAX_VALUE;
+    }
+
+    long usedPercentOfMax()
+    {
+      if (!hasBoundedMax()) {
+        return 0;
+      }
+      return Math.min(100, (usedBytes * 100) / maxBytes);
+    }
+
+    HeapPressureLevel pressureLevel()
+    {
+      if (!hasBoundedMax()) {
+        return HeapPressureLevel.NORMAL;
+      }
+      final long usedPercent = usedPercentOfMax();
+      if (usedPercent >= READER_CACHE_HEAP_CRITICAL_USED_PERCENT) {
+        return HeapPressureLevel.CRITICAL;
+      }
+      if (usedPercent >= READER_CACHE_HEAP_PRESSURE_USED_PERCENT) {
+        return HeapPressureLevel.PRESSURE;
+      }
+      return HeapPressureLevel.NORMAL;
+    }
+
+    String summary()
+    {
+      return "heap_used_mb=" + bytesToMiB(usedBytes) + " heap_committed_mb=" + bytesToMiB(committedBytes) +
+        " heap_max_mb=" + bytesToMiB(maxBytes);
+    }
+
+    private static long bytesToMiB(final long bytes)
+    {
+      return bytes / (1024L * 1024L);
+    }
+  }
+
+  private static final class TrimResult
+  {
+    private final ArrayList<IFormatReader> readersToClose = new ArrayList<>();
+    private final HeapPressureLevel heapPressureLevel;
+    private final int idleReaderTarget;
+    private int expiredReaders = 0;
+    private int overflowReaders = 0;
+    private int heapPressureReaders = 0;
+
+    TrimResult(final HeapPressureLevel heapPressureLevel, final int idleReaderTarget)
+    {
+      this.heapPressureLevel = heapPressureLevel;
+      this.idleReaderTarget = idleReaderTarget;
+    }
+
+    static TrimResult empty()
+    {
+      return new TrimResult(HeapPressureLevel.NORMAL, 0);
+    }
+
+    boolean isEmpty()
+    {
+      return readersToClose.isEmpty();
+    }
+
+    int size()
+    {
+      return readersToClose.size();
+    }
+
+    void addExpired(final IFormatReader reader)
+    {
+      readersToClose.add(reader);
+      ++expiredReaders;
+    }
+
+    void addOverflow(final IFormatReader reader)
+    {
+      readersToClose.add(reader);
+      ++overflowReaders;
+    }
+
+    void addHeapPressure(final IFormatReader reader)
+    {
+      readersToClose.add(reader);
+      ++heapPressureReaders;
+    }
+
+    String detail()
+    {
+      if (isEmpty()) {
+        return "";
+      }
+      return " trim_expired=" + expiredReaders + " trim_overflow=" + overflowReaders +
+        " trim_heap_pressure=" + heapPressureReaders +
+        " trim_heap_pressure_level=" + heapPressureLevel.diagnosticName() +
+        " trim_idle_reader_target=" + idleReaderTarget;
+    }
+  }
+
   private static final class ReaderCache
   {
     private final Object lock = new Object();
+    private final BridgeDiagnostics diagnostics;
     private final Map<ReaderKey, ArrayDeque<CachedReader>> idleByKey = new HashMap<>();
     private final ArrayDeque<CachedReader> idleReaders = new ArrayDeque<>();
     private final ScheduledExecutorService trimExecutor =
@@ -748,16 +1246,59 @@ public final class AtlasBioFormatsBridge
       });
     private ScheduledFuture<?> scheduledTrim = null;
     private boolean closed = false;
+    private int activeReaders = 0;
+    private long openedReaders = 0;
+    private long cacheHits = 0;
+    private long cacheMisses = 0;
+    private long closedReaders = 0;
+    private long heapPressureClosedReaders = 0;
+    private int peakActiveReaders = 0;
+
+    ReaderCache(final BridgeDiagnostics diagnostics)
+    {
+      this.diagnostics = diagnostics;
+    }
 
     ReaderLease acquire(final String path, final FileGroupingPolicy groupingPolicy, final boolean metadataFiltered)
       throws FormatException, IOException
     {
       final ReaderKey key = ReaderKey.from(path, groupingPolicy, metadataFiltered);
+      final long startNanos = System.nanoTime();
       final CachedReader cachedReader = takeIdleReader(key);
       if (cachedReader != null) {
+        log("event=reader_cache action=acquire result=hit " + keyDetail(key) +
+            " elapsed_ms=" + BridgeDiagnostics.formatMillis(System.nanoTime() - startNanos) + stats());
         return new ReaderLease(this, key, cachedReader.reader);
       }
-      return new ReaderLease(this, key, openReader(key));
+      final long openStartNanos = System.nanoTime();
+      final IFormatReader reader;
+      try {
+        reader = openReader(key);
+      }
+      catch (final FormatException | IOException | RuntimeException e) {
+        log("event=reader_cache action=open result=error " + keyDetail(key) +
+            " elapsed_ms=" + BridgeDiagnostics.formatMillis(System.nanoTime() - openStartNanos) + " exception=" +
+            BridgeDiagnostics.quote(e.getClass().getName()) + " message=" + BridgeDiagnostics.quote(e.getMessage()));
+        throw e;
+      }
+
+      boolean keepReader = false;
+      synchronized (lock) {
+        if (!closed) {
+          markActiveReaderLocked();
+          ++openedReaders;
+          ++cacheMisses;
+          keepReader = true;
+        }
+      }
+      if (!keepReader) {
+        closeReaderQuietly(reader);
+        throw new IOException("reader cache is closed");
+      }
+      log("event=reader_cache action=acquire result=miss " + keyDetail(key) +
+          " elapsed_ms=" + BridgeDiagnostics.formatMillis(System.nanoTime() - startNanos) +
+          " open_ms=" + BridgeDiagnostics.formatMillis(System.nanoTime() - openStartNanos) + stats());
+      return new ReaderLease(this, key, reader);
     }
 
     private CachedReader takeIdleReader(final ReaderKey key) throws IOException
@@ -768,7 +1309,8 @@ public final class AtlasBioFormatsBridge
         if (closed) {
           throw new IOException("reader cache is closed");
         }
-        readersToClose.addAll(trimLocked(System.currentTimeMillis()));
+        final TrimResult trimResult = trimLocked(System.currentTimeMillis());
+        readersToClose.addAll(trimResult.readersToClose);
         final ArrayDeque<CachedReader> queue = idleByKey.get(key);
         CachedReader reusableReader = null;
         while (queue != null && !queue.isEmpty()) {
@@ -784,9 +1326,18 @@ public final class AtlasBioFormatsBridge
         if (queue != null && queue.isEmpty()) {
           idleByKey.remove(key);
         }
+        if (cachedReader != null) {
+          markActiveReaderLocked();
+          ++cacheHits;
+        }
+        closedReaders += readersToClose.size();
+        heapPressureClosedReaders += trimResult.heapPressureReaders;
         scheduleTrimLocked(System.currentTimeMillis());
       }
       closeReadersQuietly(readersToClose);
+      if (!readersToClose.isEmpty()) {
+        log("event=reader_cache action=close_stale count=" + readersToClose.size() + " " + keyDetail(key) + stats());
+      }
       return cachedReader;
     }
 
@@ -794,20 +1345,40 @@ public final class AtlasBioFormatsBridge
     {
       final ArrayList<IFormatReader> readersToClose = new ArrayList<>();
       final ArrayList<FileFingerprint> fileFingerprints = fileFingerprintsFor(reader, key);
+      final String action;
+      TrimResult trimResult = TrimResult.empty();
       synchronized (lock) {
+        decrementActiveReaderLocked();
         final long nowMillis = System.currentTimeMillis();
-        if (closed || READER_CACHE_MAX_IDLE_READERS == 0 || READER_CACHE_IDLE_MILLIS == 0 ||
-            fileFingerprints.isEmpty()) {
+        if (closed || READER_CACHE_IDLE_MILLIS == 0 || fileFingerprints.isEmpty()) {
           readersToClose.add(reader);
+          action = "release_close";
         } else {
           final CachedReader cachedReader = new CachedReader(key, reader, fileFingerprints, nowMillis);
           idleByKey.computeIfAbsent(key, ignored -> new ArrayDeque<>()).addLast(cachedReader);
           idleReaders.addLast(cachedReader);
-          readersToClose.addAll(trimLocked(nowMillis));
+          trimResult = trimLocked(nowMillis);
+          readersToClose.addAll(trimResult.readersToClose);
           scheduleTrimLocked(nowMillis);
+          action = "release_cache";
         }
+        closedReaders += readersToClose.size();
+        heapPressureClosedReaders += trimResult.heapPressureReaders;
       }
+      log("event=reader_cache action=" + action + " " + keyDetail(key) + " fingerprint_count=" +
+          fileFingerprints.size() + " closed_now=" + readersToClose.size() + trimResult.detail() + stats());
       closeReadersQuietly(readersToClose);
+    }
+
+    void discard(final ReaderKey key, final IFormatReader reader, final String reason)
+    {
+      synchronized (lock) {
+        decrementActiveReaderLocked();
+        ++closedReaders;
+      }
+      log("event=reader_cache action=discard reason=" + BridgeDiagnostics.quote(reason) + " " + keyDetail(key) +
+          stats());
+      closeReaderQuietly(reader);
     }
 
     void close()
@@ -823,8 +1394,10 @@ public final class AtlasBioFormatsBridge
           readersToClose.add(idleReaders.removeFirst().reader);
         }
         idleByKey.clear();
+        closedReaders += readersToClose.size();
       }
       trimExecutor.shutdownNow();
+      log("event=reader_cache action=shutdown closed_now=" + readersToClose.size() + stats());
       closeReadersQuietly(readersToClose);
     }
 
@@ -851,33 +1424,47 @@ public final class AtlasBioFormatsBridge
 
     private void trimIdleReaders()
     {
-      final ArrayList<IFormatReader> readersToClose = new ArrayList<>();
+      final TrimResult trimResult;
       synchronized (lock) {
         if (closed) {
           return;
         }
         scheduledTrim = null;
-        readersToClose.addAll(trimLocked(System.currentTimeMillis()));
+        trimResult = trimLocked(System.currentTimeMillis());
+        closedReaders += trimResult.size();
+        heapPressureClosedReaders += trimResult.heapPressureReaders;
         scheduleTrimLocked(System.currentTimeMillis());
       }
-      closeReadersQuietly(readersToClose);
+      if (!trimResult.isEmpty()) {
+        log("event=reader_cache action=trim closed_now=" + trimResult.size() + trimResult.detail() + stats());
+      }
+      closeReadersQuietly(trimResult.readersToClose);
     }
 
-    private ArrayList<IFormatReader> trimLocked(final long nowMillis)
+    private TrimResult trimLocked(final long nowMillis)
     {
-      final ArrayList<IFormatReader> readersToClose = new ArrayList<>();
+      final HeapSnapshot heapSnapshot = HeapSnapshot.capture();
+      final HeapPressureLevel heapPressureLevel = heapSnapshot.pressureLevel();
+      final int idleReaderTarget = idleReaderTargetLocked(heapSnapshot);
+      final TrimResult trimResult = new TrimResult(heapPressureLevel, idleReaderTarget);
       while (!idleReaders.isEmpty()) {
         final CachedReader oldest = idleReaders.peekFirst();
         final boolean expired =
           READER_CACHE_IDLE_MILLIS == 0 || nowMillis - oldest.idleSinceMillis >= READER_CACHE_IDLE_MILLIS;
-        final boolean overflow = idleReaders.size() > READER_CACHE_MAX_IDLE_READERS;
+        final boolean overflow = idleReaders.size() > idleReaderTarget;
         if (!expired && !overflow) {
           break;
         }
         removeIdleReaderLocked(oldest);
-        readersToClose.add(oldest.reader);
+        if (expired) {
+          trimResult.addExpired(oldest.reader);
+        } else if (heapPressureLevel != HeapPressureLevel.NORMAL) {
+          trimResult.addHeapPressure(oldest.reader);
+        } else {
+          trimResult.addOverflow(oldest.reader);
+        }
       }
-      return readersToClose;
+      return trimResult;
     }
 
     private void scheduleTrimLocked(final long nowMillis)
@@ -913,6 +1500,66 @@ public final class AtlasBioFormatsBridge
       if (queue.isEmpty()) {
         idleByKey.remove(cachedReader.key);
       }
+    }
+
+    private void markActiveReaderLocked()
+    {
+      ++activeReaders;
+      if (activeReaders > peakActiveReaders) {
+        peakActiveReaders = activeReaders;
+      }
+    }
+
+    private int idleReaderTargetLocked(final HeapSnapshot heapSnapshot)
+    {
+      final int adaptiveTarget =
+        Math.min(READER_CACHE_MAX_IDLE_READERS, Math.max(READER_CACHE_MIN_IDLE_READERS, peakActiveReaders));
+      final HeapPressureLevel pressureLevel = heapSnapshot.pressureLevel();
+      if (pressureLevel == HeapPressureLevel.NORMAL) {
+        return adaptiveTarget;
+      }
+      if (pressureLevel == HeapPressureLevel.CRITICAL) {
+        return 0;
+      }
+      final int pressureRange = READER_CACHE_HEAP_CRITICAL_USED_PERCENT - READER_CACHE_HEAP_PRESSURE_USED_PERCENT;
+      final long remainingRange = READER_CACHE_HEAP_CRITICAL_USED_PERCENT - heapSnapshot.usedPercentOfMax();
+      final int pressureTarget = (int)((adaptiveTarget * remainingRange + pressureRange - 1) / pressureRange);
+      return Math.min(adaptiveTarget, Math.max(READER_CACHE_MIN_IDLE_READERS, pressureTarget));
+    }
+
+    private void decrementActiveReaderLocked()
+    {
+      if (activeReaders <= 0) {
+        throw new IllegalStateException("reader cache active reader count underflow");
+      }
+      --activeReaders;
+    }
+
+    private String stats()
+    {
+      if (!diagnostics.isEnabled()) {
+        return "";
+      }
+      synchronized (lock) {
+        return statsLocked();
+      }
+    }
+
+    private String statsLocked()
+    {
+      final HeapSnapshot heapSnapshot = HeapSnapshot.capture();
+      return " active_readers=" + activeReaders + " idle_readers=" + idleReaders.size() +
+        " opened_readers=" + openedReaders + " cache_hits=" + cacheHits + " cache_misses=" + cacheMisses +
+        " closed_readers=" + closedReaders + " peak_active_readers=" + peakActiveReaders +
+        " idle_reader_target=" + idleReaderTargetLocked(heapSnapshot) +
+        " idle_reader_limit=" + READER_CACHE_MAX_IDLE_READERS +
+        " heap_pressure_level=" + heapSnapshot.pressureLevel().diagnosticName() +
+        " heap_pressure_closed_readers=" + heapPressureClosedReaders;
+    }
+
+    private void log(final String message)
+    {
+      diagnostics.log(message);
     }
   }
 
@@ -953,9 +1600,15 @@ public final class AtlasBioFormatsBridge
       if (reusable) {
         cache.release(key, readerToRelease);
       } else {
-        closeReaderQuietly(readerToRelease);
+        cache.discard(key, readerToRelease, "not_reusable");
       }
     }
+  }
+
+  private static String keyDetail(final ReaderKey key)
+  {
+    return "path=" + BridgeDiagnostics.quote(key.normalizedPath) + " grouping_policy=" + key.groupingPolicy.name() +
+      " metadata_filtered=" + key.metadataFiltered;
   }
 
   private static IFormatReader createReader(final FileGroupingPolicy groupingPolicy, final boolean metadataFiltered)

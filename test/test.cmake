@@ -157,3 +157,4 @@ print_target_properties(benchmark::benchmark)
 
 add_executable(zbenchmark ${CMAKE_CURRENT_LIST_DIR}/zbenchmark.cpp)
 target_link_libraries(zbenchmark img benchmark::benchmark)
+target_compile_definitions(zbenchmark PRIVATE ATLAS_THIRDPARTY_BUILD_DIR="${CMAKE_CURRENT_LIST_DIR}/../src/3rdparty/build")

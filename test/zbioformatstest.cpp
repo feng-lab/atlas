@@ -592,6 +592,21 @@ TEST(ZBioFormatsTest, FakeReaderMetadataCreatesDeterministicInfoAndSubBlocks)
     EXPECT_EQ(7, firstBlock->width);
     EXPECT_EQ(5, firstBlock->height);
     EXPECT_EQ(1, firstBlock->depth);
+
+    const ZImgInfo firstBlockInfo = firstBlock->readInfo();
+    EXPECT_EQ(7u, firstBlockInfo.width);
+    EXPECT_EQ(5u, firstBlockInfo.height);
+    EXPECT_EQ(1u, firstBlockInfo.depth);
+    EXPECT_EQ(2u, firstBlockInfo.numChannels);
+    EXPECT_EQ(1u, firstBlockInfo.numTimes);
+
+    const std::shared_ptr<ZImg> firstBlockImg = firstBlock->read();
+    ASSERT_NE(nullptr, firstBlockImg);
+    EXPECT_EQ(7u, firstBlockImg->width());
+    EXPECT_EQ(5u, firstBlockImg->height());
+    EXPECT_EQ(1u, firstBlockImg->depth());
+    EXPECT_EQ(2u, firstBlockImg->numChannels());
+    EXPECT_EQ(1u, firstBlockImg->numTimes());
   });
 }
 
