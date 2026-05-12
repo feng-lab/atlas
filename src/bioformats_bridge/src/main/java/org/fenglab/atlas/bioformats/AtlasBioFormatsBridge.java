@@ -43,7 +43,10 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ThreadFactory;
@@ -66,11 +69,12 @@ public final class AtlasBioFormatsBridge
 {
   private static final int MAX_FRAME_BYTES = 512 * 1024 * 1024;
   private static final int PIXEL_CHUNK_BYTES = 8 * 1024 * 1024;
-  private static final int GRPC_PIXEL_CHUNK_BYTES = 1024 * 1024;
+  private static final int GRPC_PIXEL_CHUNK_BYTES = PIXEL_CHUNK_BYTES;
   private static final int PROTOCOL_VERSION = 1;
+  private static final int JAVA_AVAILABLE_PROCESSORS = Math.max(1, Runtime.getRuntime().availableProcessors());
   private static final int READER_CACHE_MIN_IDLE_READERS = 4;
   private static final int READER_CACHE_MAX_IDLE_READERS =
-    Math.max(READER_CACHE_MIN_IDLE_READERS, Runtime.getRuntime().availableProcessors());
+    Math.max(READER_CACHE_MIN_IDLE_READERS, JAVA_AVAILABLE_PROCESSORS);
   private static final long READER_CACHE_IDLE_MILLIS = 5 * 60 * 1000L;
   private static final int READER_CACHE_HEAP_PRESSURE_USED_PERCENT = 75;
   private static final int READER_CACHE_HEAP_CRITICAL_USED_PERCENT = 90;
@@ -78,6 +82,7 @@ public final class AtlasBioFormatsBridge
   private final InputStream in;
   private final OutputStream out;
   private final ReaderCache readerCache;
+  private final ExecutorService planeReadExecutor;
   private final BridgeDiagnostics diagnostics;
 
   private AtlasBioFormatsBridge(final InputStream in, final OutputStream out, final BridgeDiagnostics diagnostics)
@@ -86,6 +91,16 @@ public final class AtlasBioFormatsBridge
     this.out = out == null ? null : new BufferedOutputStream(out);
     this.diagnostics = diagnostics;
     this.readerCache = new ReaderCache(diagnostics);
+    this.planeReadExecutor = Executors.newFixedThreadPool(JAVA_AVAILABLE_PROCESSORS, new ThreadFactory() {
+      private final AtomicLong threadId = new AtomicLong(1);
+
+      @Override public Thread newThread(final Runnable runnable)
+      {
+        final Thread thread = new Thread(runnable, "atlas-bioformats-plane-read-" + threadId.getAndIncrement());
+        thread.setDaemon(true);
+        return thread;
+      }
+    });
   }
 
   private AtlasBioFormatsBridge(final InputStream in, final OutputStream out)
@@ -179,6 +194,13 @@ public final class AtlasBioFormatsBridge
     {
       return PIXEL_CHUNK_BYTES;
     }
+
+    default boolean recordsImagePlaneReads()
+    {
+      return false;
+    }
+
+    default void recordImagePlaneRead(final long bytes, final long elapsedNanos) {}
   }
 
   private static final class DiagnosticResponseSink implements ResponseSink
@@ -190,6 +212,10 @@ public final class AtlasBioFormatsBridge
     private long pixelBytes = 0;
     private long thumbnailChunks = 0;
     private long thumbnailBytes = 0;
+    private long imagePlaneReads = 0;
+    private long imagePlaneBytes = 0;
+    private long imagePlaneReadNanos = 0;
+    private long maxImagePlaneReadNanos = 0;
 
     DiagnosticResponseSink(final ResponseSink delegate)
     {
@@ -216,6 +242,19 @@ public final class AtlasBioFormatsBridge
     @Override public int pixelChunkBytes()
     {
       return delegate.pixelChunkBytes();
+    }
+
+    @Override public boolean recordsImagePlaneReads()
+    {
+      return true;
+    }
+
+    @Override public synchronized void recordImagePlaneRead(final long bytes, final long elapsedNanos)
+    {
+      ++imagePlaneReads;
+      imagePlaneBytes += bytes;
+      imagePlaneReadNanos += elapsedNanos;
+      maxImagePlaneReadNanos = Math.max(maxImagePlaneReadNanos, elapsedNanos);
     }
 
     long responseCount()
@@ -246,6 +285,22 @@ public final class AtlasBioFormatsBridge
     long thumbnailBytes()
     {
       return thumbnailBytes;
+    }
+
+    synchronized long imagePlaneReads() {
+      return imagePlaneReads;
+    }
+
+    synchronized long imagePlaneBytes() {
+      return imagePlaneBytes;
+    }
+
+    synchronized long imagePlaneReadNanos() {
+      return imagePlaneReadNanos;
+    }
+
+    synchronized long maxImagePlaneReadNanos() {
+      return maxImagePlaneReadNanos;
     }
   }
 
@@ -316,7 +371,15 @@ public final class AtlasBioFormatsBridge
           .append(" thumbnail_chunks=")
           .append(sink.thumbnailChunks())
           .append(" thumbnail_bytes=")
-          .append(sink.thumbnailBytes());
+          .append(sink.thumbnailBytes())
+          .append(" image_plane_reads=")
+          .append(sink.imagePlaneReads())
+          .append(" image_plane_bytes=")
+          .append(sink.imagePlaneBytes())
+          .append(" image_plane_read_ms=")
+          .append(formatMillis(sink.imagePlaneReadNanos()))
+          .append(" image_plane_max_read_ms=")
+          .append(formatMillis(sink.maxImagePlaneReadNanos()));
       }
       if (failure != null) {
         builder.append(" exception=")
@@ -895,16 +958,64 @@ public final class AtlasBioFormatsBridge
       final int bytesPerPixel = FormatTools.getBytesPerPixel(reader.getPixelType());
       final boolean littleEndian = reader.isLittleEndian();
       final boolean interleaved = reader.isInterleaved();
+      final int independentPlaneConcurrency =
+        rgbChannelCount == 1
+          ? readerCache.internalPlaneReadConcurrency(saturatedPlaneCount(depth, channelCount, timeCount))
+          : 1;
+      if (independentPlaneConcurrency > 1) {
+        // Return the validated reader before fan-out so one worker can reuse it from the cache.
+        lease.markReusable();
+        lease.close();
+        readIndependentPlanesConcurrently(sink,
+                                          readRegion.getPath(),
+                                          readRegion.getGroupingPolicy(),
+                                          readRegion.getMetadataFiltered(),
+                                          series,
+                                          resolution,
+                                          x,
+                                          y,
+                                          z0,
+                                          c0,
+                                          t0,
+                                          width,
+                                          height,
+                                          depth,
+                                          channelCount,
+                                          timeCount,
+                                          independentPlaneConcurrency,
+                                          chunks,
+                                          bytesPerPixel,
+                                          littleEndian);
+        chunks.finish();
+        return;
+      }
+      byte[] cachedRgbPlane = null;
+      int cachedRgbPlaneT = Integer.MIN_VALUE;
+      int cachedRgbPlaneZ = Integer.MIN_VALUE;
+      int cachedRgbPlaneBioC = Integer.MIN_VALUE;
       for (int t = t0; t < t0 + timeCount; ++t) {
         for (int atlasC = c0; atlasC < c0 + channelCount; ++atlasC) {
           final int bioC = atlasC / rgbChannelCount;
           final int rgbC = atlasC % rgbChannelCount;
           for (int z = z0; z < z0 + depth; ++z) {
             final int plane = reader.getIndex(z, bioC, t);
-            final byte[] image = reader.openBytes(plane, x, y, width, height);
             if (rgbChannelCount == 1) {
+              final byte[] image = openRegionBytes(sink, reader, plane, x, y, width, height);
               chunks.writePlane(image, bytesPerPixel, littleEndian);
             } else {
+              final byte[] image;
+              if (depth == 1 && cachedRgbPlane != null && cachedRgbPlaneT == t && cachedRgbPlaneZ == z &&
+                  cachedRgbPlaneBioC == bioC) {
+                image = cachedRgbPlane;
+              } else {
+                image = openRegionBytes(sink, reader, plane, x, y, width, height);
+                if (depth == 1) {
+                  cachedRgbPlane = image;
+                  cachedRgbPlaneT = t;
+                  cachedRgbPlaneZ = z;
+                  cachedRgbPlaneBioC = bioC;
+                }
+              }
               chunks
                 .writeRgbChannel(image, width, height, rgbChannelCount, rgbC, bytesPerPixel, littleEndian, interleaved);
             }
@@ -914,6 +1025,165 @@ public final class AtlasBioFormatsBridge
       chunks.finish();
       lease.markReusable();
     }
+  }
+
+  private void readIndependentPlanesConcurrently(final ResponseSink sink,
+                                                 final String path,
+                                                 final FileGroupingPolicy groupingPolicy,
+                                                 final boolean metadataFiltered,
+                                                 final int series,
+                                                 final int resolution,
+                                                 final int x,
+                                                 final int y,
+                                                 final int z0,
+                                                 final int c0,
+                                                 final int t0,
+                                                 final int width,
+                                                 final int height,
+                                                 final int depth,
+                                                 final int channelCount,
+                                                 final int timeCount,
+                                                 final int concurrency,
+                                                 final ChunkWriter chunks,
+                                                 final int bytesPerPixel,
+                                                 final boolean littleEndian) throws Exception
+  {
+    final ArrayList<Future<byte[]>> pendingReads = new ArrayList<>(concurrency);
+    for (int t = t0; t < t0 + timeCount; ++t) {
+      for (int bioC = c0; bioC < c0 + channelCount; ++bioC) {
+        for (int z = z0; z < z0 + depth; ++z) {
+          pendingReads.add(submitIndependentPlaneRead(sink,
+                                                      path,
+                                                      groupingPolicy,
+                                                      metadataFiltered,
+                                                      series,
+                                                      resolution,
+                                                      x,
+                                                      y,
+                                                      width,
+                                                      height,
+                                                      new PlaneReadRequest(z, bioC, t)));
+          if (pendingReads.size() == concurrency) {
+            writeIndependentPlaneBatch(pendingReads, chunks, bytesPerPixel, littleEndian);
+            pendingReads.clear();
+          }
+        }
+      }
+    }
+    if (!pendingReads.isEmpty()) {
+      writeIndependentPlaneBatch(pendingReads, chunks, bytesPerPixel, littleEndian);
+    }
+  }
+
+  private Future<byte[]> submitIndependentPlaneRead(final ResponseSink sink,
+                                                    final String path,
+                                                    final FileGroupingPolicy groupingPolicy,
+                                                    final boolean metadataFiltered,
+                                                    final int series,
+                                                    final int resolution,
+                                                    final int x,
+                                                    final int y,
+                                                    final int width,
+                                                    final int height,
+                                                    final PlaneReadRequest request)
+  {
+    return planeReadExecutor.submit(() -> {
+      try (ReaderLease lease = readerCache.acquire(path, groupingPolicy, metadataFiltered)) {
+        final IFormatReader reader = lease.reader();
+        reader.setSeries(series);
+        reader.setResolution(resolution);
+        final byte[] image =
+          openRegionBytes(sink, reader, reader.getIndex(request.z, request.bioC, request.t), x, y, width, height);
+        lease.markReusable();
+        return image;
+      }
+    });
+  }
+
+  private void writeIndependentPlaneBatch(final ArrayList<Future<byte[]>> pendingReads,
+                                          final ChunkWriter chunks,
+                                          final int bytesPerPixel,
+                                          final boolean littleEndian) throws Exception
+  {
+    boolean completed = false;
+    try {
+      for (final Future<byte[]> pendingRead : pendingReads) {
+        chunks.writePlane(waitForPlaneRead(pendingRead), bytesPerPixel, littleEndian);
+      }
+      completed = true;
+    }
+    finally {
+      if (!completed) {
+        for (final Future<byte[]> pendingRead : pendingReads) {
+          pendingRead.cancel(true);
+        }
+      }
+    }
+  }
+
+  private static byte[] waitForPlaneRead(final Future<byte[]> pendingRead) throws Exception
+  {
+    try {
+      return pendingRead.get();
+    }
+    catch (final InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw e;
+    }
+    catch (final ExecutionException e) {
+      final Throwable cause = e.getCause();
+      if (cause instanceof Exception) {
+        throw (Exception)cause;
+      }
+      if (cause instanceof Error) {
+        throw (Error)cause;
+      }
+      throw new RuntimeException(cause);
+    }
+  }
+
+  private static long saturatedPlaneCount(final int depth, final int channelCount, final int timeCount)
+  {
+    return saturatedMultiply(saturatedMultiply(depth, channelCount), timeCount);
+  }
+
+  private static long saturatedMultiply(final long lhs, final int rhs)
+  {
+    if (lhs > Long.MAX_VALUE / rhs) {
+      return Long.MAX_VALUE;
+    }
+    return lhs * rhs;
+  }
+
+  private static final class PlaneReadRequest
+  {
+    final int z;
+    final int bioC;
+    final int t;
+
+    PlaneReadRequest(final int z, final int bioC, final int t)
+    {
+      this.z = z;
+      this.bioC = bioC;
+      this.t = t;
+    }
+  }
+
+  private static byte[] openRegionBytes(final ResponseSink sink,
+                                        final IFormatReader reader,
+                                        final int plane,
+                                        final int x,
+                                        final int y,
+                                        final int width,
+                                        final int height) throws Exception
+  {
+    if (!sink.recordsImagePlaneReads()) {
+      return reader.openBytes(plane, x, y, width, height);
+    }
+    final long startNanos = System.nanoTime();
+    final byte[] image = reader.openBytes(plane, x, y, width, height);
+    sink.recordImagePlaneRead(image.length, System.nanoTime() - startNanos);
+    return image;
   }
 
   private void readThumbnail(final Request request, final ResponseSink sink) throws Exception
@@ -972,6 +1242,7 @@ public final class AtlasBioFormatsBridge
 
   private void closeCachedReaders()
   {
+    planeReadExecutor.shutdownNow();
     readerCache.close();
   }
 
@@ -1399,6 +1670,20 @@ public final class AtlasBioFormatsBridge
       trimExecutor.shutdownNow();
       log("event=reader_cache action=shutdown closed_now=" + readersToClose.size() + stats());
       closeReadersQuietly(readersToClose);
+    }
+
+    int internalPlaneReadConcurrency(final long planeReadCount)
+    {
+      if (planeReadCount <= 1 || HeapSnapshot.capture().pressureLevel() != HeapPressureLevel.NORMAL) {
+        return 1;
+      }
+      synchronized (lock) {
+        // External bridge concurrency takes precedence over multiplying readers inside each request.
+        if (closed || activeReaders > 1) {
+          return 1;
+        }
+      }
+      return (int)Math.min(planeReadCount, JAVA_AVAILABLE_PROCESSORS);
     }
 
     private static ArrayList<FileFingerprint> fileFingerprintsFor(final IFormatReader reader, final ReaderKey key)

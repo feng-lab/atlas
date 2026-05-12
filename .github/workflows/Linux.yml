@@ -247,7 +247,7 @@ jobs:
 
       - name: Setup Miniconda
         if: steps.detect-conda-linux.outputs.found != 'true'
-        uses: conda-incubator/setup-miniconda@v3
+        uses: conda-incubator/setup-miniconda@v4
         with:
           auto-update-conda: true
           activate-environment: ""

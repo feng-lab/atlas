@@ -41,10 +41,10 @@ Run Atlas or `zbenchmark` with `--atlas_bioformats_bridge_diagnostics=true` to
 enable Java bridge diagnostics. Atlas logs the Java diagnostics file path when
 the bridge starts, and Java writes `ATLAS_BIOFORMATS_DIAG` lines to that file.
 The diagnostics include request timing, streamed pixel/thumbnail byte counts,
-reader-cache hit/miss/open/trim/shutdown state, active/idle reader counts,
-reader-cache heap pressure state, and Java heap snapshots. Compare the Atlas log
-and Java diagnostics file by `request_id`; C++ does not read or mirror the Java
-file back into the Atlas log.
+Bio-Formats plane-read counts/timing, reader-cache hit/miss/open/trim/shutdown
+state, active/idle reader counts, reader-cache heap pressure state, and Java
+heap snapshots. Compare the Atlas log and Java diagnostics file by
+`request_id`; C++ does not read or mirror the Java file back into the Atlas log.
 
 For local policy work, use the deterministic Bio-Formats benchmark group:
 
@@ -82,3 +82,10 @@ active requests are never interrupted by cache trimming. The diagnostics expose
 `heap_pressure_level`, `idle_reader_target`, `trim_heap_pressure`, and
 `heap_pressure_closed_readers` to make cache behavior measurable during
 benchmark runs.
+
+Independent non-RGB planes in one region request can be read concurrently inside
+Java when the bridge is otherwise idle and heap pressure is normal. This uses the
+same reader cache, batches at the Java runtime's available processor count, and
+writes completed planes back in Atlas' requested order. Packed RGB data uses a
+separate same-plane reuse path because Bio-Formats returns those channels from
+one decoded image plane.

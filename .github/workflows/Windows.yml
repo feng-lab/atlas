@@ -259,7 +259,7 @@ jobs:
           Get-ChildItem -Force "C:\VulkanSDK\$env:VULKAN_SDK_VERSION" | Select-Object FullName
 
       - name: Setup conda
-        uses: conda-incubator/setup-miniconda@v3
+        uses: conda-incubator/setup-miniconda@v4
         with:
           auto-update-conda: true
           activate-environment: ""

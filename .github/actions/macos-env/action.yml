@@ -156,7 +156,7 @@ runs:
 
     - name: Setup Miniconda
       if: ${{ (inputs.force-setup == 'true' || steps.cache-extlibs.outputs.cache-hit != 'true') && steps.detect-conda.outputs.found != 'true' }}
-      uses: conda-incubator/setup-miniconda@v3
+      uses: conda-incubator/setup-miniconda@v4
       with:
         auto-update-conda: true
         activate-environment: ""

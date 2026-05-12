@@ -478,6 +478,7 @@ constexpr const char* kDefaultBioFormatsBenchmarkFile =
   "/Users/feng/Documents/omeimages/Ventana/openslide/Ventana-1.bif";
 constexpr uint64_t kBioFormatsBenchmarkTileSize = 1024;
 constexpr uint32_t kBioFormatsBenchmarkAxisSamples = 4;
+constexpr int kBioFormatsBenchmarkMaxConcurrency = 16;
 
 QString platformJavaExecutableName()
 {
@@ -688,15 +689,17 @@ uint64_t readBioFormatsRegionsSequential(const BioFormatsBenchmarkDataset& datas
   return totalBytes;
 }
 
-uint64_t readBioFormatsRegionsConcurrent(const BioFormatsBenchmarkDataset& dataset, int concurrency)
+uint64_t readBioFormatsRegionsConcurrent(const BioFormatsBenchmarkDataset& dataset,
+                                         const std::vector<ZImgRegion>& regions,
+                                         int concurrency)
 {
   CHECK(concurrency > 0);
   uint64_t totalBytes = 0;
-  for (size_t first = 0; first < dataset.regions.size();) {
+  for (size_t first = 0; first < regions.size();) {
     std::vector<std::future<std::vector<uint8_t>>> futures;
     futures.reserve(static_cast<size_t>(concurrency));
-    for (int i = 0; i < concurrency && first < dataset.regions.size(); ++i, ++first) {
-      const ZImgRegion region = dataset.regions[first];
+    for (int i = 0; i < concurrency && first < regions.size(); ++i, ++first) {
+      const ZImgRegion region = regions[first];
       futures.push_back(std::async(std::launch::async, [&dataset, region]() {
         return ZBioFormatsBridgeClient::instance().readRegion(dataset.path, dataset.series, dataset.resolution, region);
       }));
@@ -708,6 +711,28 @@ uint64_t readBioFormatsRegionsConcurrent(const BioFormatsBenchmarkDataset& datas
     }
   }
   return totalBytes;
+}
+
+uint64_t readBioFormatsRegionsConcurrent(const BioFormatsBenchmarkDataset& dataset, int concurrency)
+{
+  return readBioFormatsRegionsConcurrent(dataset, dataset.regions, concurrency);
+}
+
+std::vector<ZImgRegion> splitBioFormatsRegionsByChannel(const BioFormatsBenchmarkDataset& dataset)
+{
+  std::vector<ZImgRegion> regions;
+  for (const ZImgRegion& region : dataset.regions) {
+    for (index_t c = region.start.c; c < region.end.c; ++c) {
+      ZImgRegion channelRegion = region;
+      channelRegion.start.c = c;
+      channelRegion.end.c = c + 1;
+      regions.push_back(channelRegion);
+    }
+  }
+  if (regions.empty()) {
+    throw std::runtime_error("benchmark dataset produced no split-channel regions");
+  }
+  return regions;
 }
 
 static void BM_BioFormatsVentanaDatasetInfo(benchmark::State& state)
@@ -787,6 +812,33 @@ static void BM_BioFormatsVentanaConcurrentRegions(benchmark::State& state)
   }
 }
 
+static void BM_BioFormatsSplitChannelConcurrentRegions(benchmark::State& state)
+{
+  try {
+    const int concurrency = static_cast<int>(state.range(0));
+    const BioFormatsBenchmarkDataset dataset = makeBioFormatsBenchmarkDataset();
+    const std::vector<ZImgRegion> channelRegions = splitBioFormatsRegionsByChannel(dataset);
+    readBioFormatsRegionsConcurrent(dataset, channelRegions, concurrency);
+
+    uint64_t totalBytes = 0;
+    for (auto _ : state) {
+      QElapsedTimer timer;
+      timer.start();
+      totalBytes += readBioFormatsRegionsConcurrent(dataset, channelRegions, concurrency);
+      state.SetIterationTime(timer.nsecsElapsed() / 1.0e9);
+    }
+    state.SetItemsProcessed(state.iterations() * static_cast<int64_t>(channelRegions.size()));
+    state.SetBytesProcessed(checkedBenchmarkBytes(totalBytes));
+    state.counters["concurrency"] = concurrency;
+    state.counters["source_regions_per_iteration"] = static_cast<double>(dataset.regions.size());
+    state.counters["regions_per_iteration"] = static_cast<double>(channelRegions.size());
+    state.counters["bytes_per_iteration"] = static_cast<double>(dataset.bytesPerIteration);
+  }
+  catch (const std::exception& e) {
+    state.SkipWithError(e.what());
+  }
+}
+
 static void addBioFormatsBench()
 {
   BENCHMARK(BM_BioFormatsVentanaDatasetInfo)->Unit(benchmark::kMillisecond)->UseManualTime()->Iterations(5);
@@ -797,6 +849,15 @@ static void addBioFormatsBench()
     ->Arg(4)
     ->Arg(8)
     ->Arg(16)
+    ->Unit(benchmark::kMillisecond)
+    ->UseManualTime()
+    ->Iterations(3);
+  BENCHMARK(BM_BioFormatsSplitChannelConcurrentRegions)
+    ->Arg(1)
+    ->Arg(2)
+    ->Arg(4)
+    ->Arg(8)
+    ->Arg(kBioFormatsBenchmarkMaxConcurrency)
     ->Unit(benchmark::kMillisecond)
     ->UseManualTime()
     ->Iterations(3);
