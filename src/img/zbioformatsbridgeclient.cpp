@@ -513,7 +513,7 @@ public:
     return response.probe().can_read();
   }
 
-  [[nodiscard]] ZBioFormatsDatasetInfo readDatasetInfo(const QString& filename)
+  [[nodiscard]] ZBioFormatsDatasetInfo readDatasetInfo(const QString& filename, bool metadataFiltered)
   {
     QElapsedTimer timer;
     timer.start();
@@ -521,7 +521,7 @@ public:
     auto* datasetInfo = request.mutable_dataset_info();
     datasetInfo->set_path(filename.toStdString());
     datasetInfo->set_grouping_policy(proto::FILE_GROUPING_POLICY_DEFAULT);
-    datasetInfo->set_metadata_filtered(false);
+    datasetInfo->set_metadata_filtered(metadataFiltered);
 
     proto::Response response = transact(request, "read Bio-Formats dataset info");
     requireOk(response, "read Bio-Formats dataset info");
@@ -530,7 +530,8 @@ public:
         fmt::format("Bio-Formats gRPC bridge returned '{}' for dataset_info", responseCaseName(response)));
     }
     ZBioFormatsDatasetInfo result = convertDatasetInfo(response.dataset_info());
-    VLOG(1) << "Bio-Formats gRPC bridge readDatasetInfo took " << timer.elapsed() << " ms for " << filename;
+    VLOG(1) << "Bio-Formats gRPC bridge readDatasetInfo took " << timer.elapsed() << " ms for " << filename
+            << " metadataFiltered=" << metadataFiltered;
     return result;
   }
 
@@ -551,7 +552,7 @@ public:
     auto* readRegion = request.mutable_read_region();
     readRegion->set_path(filename.toStdString());
     readRegion->set_grouping_policy(proto::FILE_GROUPING_POLICY_DEFAULT);
-    readRegion->set_metadata_filtered(false);
+    readRegion->set_metadata_filtered(true);
     readRegion->set_series(static_cast<uint32_t>(scene));
     readRegion->set_resolution(resolution);
     readRegion->set_x(static_cast<uint64_t>(region.start.x));
@@ -615,7 +616,7 @@ public:
     auto* readThumbnail = request.mutable_read_thumbnail();
     readThumbnail->set_path(filename.toStdString());
     readThumbnail->set_grouping_policy(proto::FILE_GROUPING_POLICY_DEFAULT);
-    readThumbnail->set_metadata_filtered(false);
+    readThumbnail->set_metadata_filtered(true);
     readThumbnail->set_series(static_cast<uint32_t>(scene));
     readThumbnail->set_z(static_cast<uint64_t>(z));
     readThumbnail->set_t(static_cast<uint64_t>(t));
@@ -1018,9 +1019,9 @@ public:
     return m_grpc->canRead(filename);
   }
 
-  [[nodiscard]] ZBioFormatsDatasetInfo readDatasetInfo(const QString& filename)
+  [[nodiscard]] ZBioFormatsDatasetInfo readDatasetInfo(const QString& filename, bool metadataFiltered)
   {
-    return m_grpc->readDatasetInfo(filename);
+    return m_grpc->readDatasetInfo(filename, metadataFiltered);
   }
 
   [[nodiscard]] std::vector<uint8_t> readRegion(const QString& filename, size_t scene, const ZImgRegion& region)
@@ -1171,9 +1172,9 @@ bool ZBioFormatsBridgeClient::canRead(const QString& filename)
   return m_impl->canRead(filename);
 }
 
-ZBioFormatsDatasetInfo ZBioFormatsBridgeClient::readDatasetInfo(const QString& filename)
+ZBioFormatsDatasetInfo ZBioFormatsBridgeClient::readDatasetInfo(const QString& filename, bool metadataFiltered)
 {
-  return m_impl->readDatasetInfo(filename);
+  return m_impl->readDatasetInfo(filename, metadataFiltered);
 }
 
 std::vector<uint8_t>

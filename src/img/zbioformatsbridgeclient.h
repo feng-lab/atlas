@@ -119,7 +119,7 @@ public:
 
   [[nodiscard]] bool canRead(const QString& filename);
 
-  [[nodiscard]] ZBioFormatsDatasetInfo readDatasetInfo(const QString& filename);
+  [[nodiscard]] ZBioFormatsDatasetInfo readDatasetInfo(const QString& filename, bool metadataFiltered = false);
 
   [[nodiscard]] std::vector<uint8_t> readRegion(const QString& filename, size_t scene, const ZImgRegion& region);
 

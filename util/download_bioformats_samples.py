@@ -120,6 +120,18 @@ DRIVER_ONLY_FORMATS = {
     "ScanR",
 }
 
+MANDATORY_COMPANION_GROUP_PREFIXES = (
+    # The companion OME metadata in this binary-only dataset references field
+    # TIFFs throughout the directory, so selecting any member without the full
+    # directory creates an unreadable partial dataset.
+    pathlib.PurePosixPath("OME-TIFF/2016-06/BBBC017/multi-file"),
+    # These Operetta accessions store Index.ref.xml under a measurement
+    # directory while the referenced TIFF planes live in sibling UUID
+    # directories under the accession root.
+    pathlib.PurePosixPath("PerkinElmer-Operetta/59548"),
+    pathlib.PurePosixPath("PerkinElmer-Operetta/59549"),
+)
+
 
 class LinkParser(html.parser.HTMLParser):
     def __init__(self) -> None:
@@ -652,6 +664,8 @@ def derive_plan_from_full_manifest(
     total_limit_reached = False
     dataset_groups_selected = 0
     dataset_group_files_selected = 0
+    mandatory_companion_groups_closed = 0
+    mandatory_companion_files_selected = 0
     per_format_overrun_files = 0
     group_records_by_prefix: dict[
         pathlib.PurePosixPath,
@@ -689,6 +703,7 @@ def derive_plan_from_full_manifest(
         *,
         label: str,
         complete_dataset_group: bool,
+        ignore_per_format_limit: bool = False,
     ) -> int:
         nonlocal selected_bytes
         nonlocal skipped_by_size
@@ -722,7 +737,11 @@ def derive_plan_from_full_manifest(
             return 0
 
         before_count = per_format_counts.get(format_name, 0)
-        if format_limit is not None and before_count >= format_limit:
+        if (
+            format_limit is not None
+            and before_count >= format_limit
+            and not ignore_per_format_limit
+        ):
             skipped_by_per_format += len(new_records)
             return 0
 
@@ -825,11 +844,28 @@ def derive_plan_from_full_manifest(
             if total_limit_reached:
                 break
 
+    for mandatory_prefix in MANDATORY_COMPANION_GROUP_PREFIXES:
+        group_records = records_for_prefix(mandatory_prefix)
+        if not any(
+            str(record_info[1]) in selected_paths for record_info in group_records
+        ):
+            continue
+        added = add_record_group(
+            group_records,
+            label=mandatory_prefix.as_posix(),
+            complete_dataset_group=True,
+            ignore_per_format_limit=True,
+        )
+        if added:
+            mandatory_companion_groups_closed += 1
+            mandatory_companion_files_selected += added
+
     logger.info(
         "derived download plan: selected=%d selected_bytes=%s "
         "formats=%d skipped_by_mode=%d skipped_by_depth=%d skipped_by_size=%d "
         "skipped_by_per_format=%d skipped_by_total_size=%d dataset_groups=%d "
-        "dataset_group_files=%d per_format_overrun_files=%d total_limit_reached=%s",
+        "dataset_group_files=%d mandatory_companion_groups=%d "
+        "mandatory_companion_files=%d per_format_overrun_files=%d total_limit_reached=%s",
         len(selected),
         format_byte_count(selected_bytes),
         len(per_format_counts),
@@ -840,6 +876,8 @@ def derive_plan_from_full_manifest(
         skipped_by_total_size,
         dataset_groups_selected,
         dataset_group_files_selected,
+        mandatory_companion_groups_closed,
+        mandatory_companion_files_selected,
         per_format_overrun_files,
         total_limit_reached,
     )

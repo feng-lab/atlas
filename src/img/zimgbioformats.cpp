@@ -165,6 +165,38 @@ ZImgInfo toImgInfo(const ZBioFormatsSeriesInfo& series)
   return info;
 }
 
+void attachBioFormatsMetadata(const ZBioFormatsDatasetInfo& dataset,
+                              ZImgMetadata& meta,
+                              size_t scene,
+                              bool includeOriginalMetadata)
+{
+  CHECK(scene < dataset.series.size());
+  const auto& series = dataset.series[scene];
+  meta.attachToTopLevel(ZImgMetatag("Bio-Formats Format", dataset.formatName.toStdString()));
+  meta.attachToTopLevel(ZImgMetatag("Bio-Formats Reader", dataset.readerClass.toStdString()));
+  const QStringList& usedFiles = series.usedFiles.isEmpty() ? dataset.usedFiles : series.usedFiles;
+  for (const QString& usedFile : usedFiles) {
+    meta.attachToTopLevel(ZImgMetatag("Bio-Formats Used File", usedFile.toStdString()));
+  }
+  if (includeOriginalMetadata) {
+    for (const auto& entry : series.metadata) {
+      meta.attachToTopLevel(ZImgMetatag(entry.key, entry.value));
+    }
+  }
+  for (const auto& resolution : series.resolutions) {
+    meta.attachToTopLevel(ZImgMetatag("Bio-Formats Resolution",
+                                      fmt::format("{}: {}x{}x{}, C={}, T={}, tile={}x{}",
+                                                  resolution.resolution,
+                                                  resolution.sizeX,
+                                                  resolution.sizeY,
+                                                  resolution.sizeZ,
+                                                  resolution.effectiveSizeC,
+                                                  resolution.sizeT,
+                                                  resolution.optimalTileWidth,
+                                                  resolution.optimalTileHeight)));
+  }
+}
+
 QStringList uniqueSortedExtensions(const std::vector<ZBioFormatsReaderFormat>& formats)
 {
   QStringList extensions;
@@ -509,7 +541,7 @@ void ZImgBioFormats::readInfo(const QString& filename,
                               std::vector<ZImgInfo>& infos,
                               std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks)
 {
-  const auto dataset = ZBioFormatsBridgeClient::instance().readDatasetInfo(filename);
+  const auto dataset = ZBioFormatsBridgeClient::instance().readDatasetInfo(filename, true);
   infos.clear();
   infos.reserve(dataset.series.size());
   for (const auto& series : dataset.series) {
@@ -524,31 +556,11 @@ void ZImgBioFormats::readInfo(const QString& filename,
 
 void ZImgBioFormats::readMetadata(const QString& filename, ZImgMetadata& meta, size_t scene)
 {
-  const auto dataset = ZBioFormatsBridgeClient::instance().readDatasetInfo(filename);
+  const auto dataset = ZBioFormatsBridgeClient::instance().readDatasetInfo(filename, false);
   if (scene >= dataset.series.size()) {
     throw ZException(fmt::format("Bio-Formats scene {} is out of range for {}", scene, filename));
   }
-  const auto& series = dataset.series[scene];
-  meta.attachToTopLevel(ZImgMetatag("Bio-Formats Format", dataset.formatName.toStdString()));
-  meta.attachToTopLevel(ZImgMetatag("Bio-Formats Reader", dataset.readerClass.toStdString()));
-  for (const QString& usedFile : series.usedFiles) {
-    meta.attachToTopLevel(ZImgMetatag("Bio-Formats Used File", usedFile.toStdString()));
-  }
-  for (const auto& entry : series.metadata) {
-    meta.attachToTopLevel(ZImgMetatag(entry.key, entry.value));
-  }
-  for (const auto& resolution : series.resolutions) {
-    meta.attachToTopLevel(ZImgMetatag("Bio-Formats Resolution",
-                                      fmt::format("{}: {}x{}x{}, C={}, T={}, tile={}x{}",
-                                                  resolution.resolution,
-                                                  resolution.sizeX,
-                                                  resolution.sizeY,
-                                                  resolution.sizeZ,
-                                                  resolution.effectiveSizeC,
-                                                  resolution.sizeT,
-                                                  resolution.optimalTileWidth,
-                                                  resolution.optimalTileHeight)));
-  }
+  attachBioFormatsMetadata(dataset, meta, scene, true);
 }
 
 void ZImgBioFormats::readThumbnail(const QString& filename,
@@ -557,7 +569,7 @@ void ZImgBioFormats::readThumbnail(const QString& filename,
                                    size_t scene)
 {
   thumbnail.clear();
-  const auto dataset = ZBioFormatsBridgeClient::instance().readDatasetInfo(filename);
+  const auto dataset = ZBioFormatsBridgeClient::instance().readDatasetInfo(filename, true);
   if (scene >= dataset.series.size()) {
     throw ZException(fmt::format("Bio-Formats scene {} is out of range for {}", scene, filename));
   }
@@ -608,7 +620,7 @@ void ZImgBioFormats::readThumbnail(const QString& filename,
 
 void ZImgBioFormats::readImg(const QString& filename, ZImg& img, const ZImgRegion& region, size_t scene)
 {
-  const auto dataset = ZBioFormatsBridgeClient::instance().readDatasetInfo(filename);
+  const auto dataset = ZBioFormatsBridgeClient::instance().readDatasetInfo(filename, true);
   if (scene >= dataset.series.size()) {
     throw ZException(fmt::format("Bio-Formats scene {} is out of range for {}", scene, filename));
   }
@@ -637,7 +649,10 @@ void ZImgBioFormats::readImg(const QString& filename, ZImg& img, const ZImgRegio
     offset += img.timeByteNumber();
   }
 
-  readMetadata(filename, img.metadataRef(), scene);
+  // Full original metadata can be very large for formats such as Micro-Manager.
+  // Pixel reads attach lightweight provenance metadata; callers that need the full
+  // original table should use readMetadata explicitly.
+  attachBioFormatsMetadata(dataset, img.metadataRef(), scene, false);
 }
 
 } // namespace nim

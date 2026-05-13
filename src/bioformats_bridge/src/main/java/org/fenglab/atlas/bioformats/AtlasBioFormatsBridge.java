@@ -54,6 +54,8 @@ import loci.formats.FormatTools;
 import loci.formats.IFormatReader;
 import loci.formats.ImageReader;
 import loci.formats.MetadataTools;
+import loci.formats.in.DefaultMetadataOptions;
+import loci.formats.in.MetadataLevel;
 import loci.formats.in.SDTReader;
 import loci.formats.meta.IMetadata;
 import loci.formats.meta.MetadataStore;
@@ -663,20 +665,24 @@ public final class AtlasBioFormatsBridge
                                                  request.getDatasetInfo().getGroupingPolicy(),
                                                  request.getDatasetInfo().getMetadataFiltered())) {
       final IFormatReader reader = lease.reader();
+      final boolean metadataFiltered = request.getDatasetInfo().getMetadataFiltered();
+      final String[] usedFiles = metadataFiltered ? reader.getUsedFiles(true) : reader.getUsedFiles();
       final DatasetInfoResponse.Builder response = DatasetInfoResponse.newBuilder()
                                                      .setPath(path)
                                                      .setFormatName(nullToEmpty(reader.getFormat()))
                                                      .setReaderClass(reader.getClass().getName())
-                                                     .addAllUsedFiles(nonNullArray(reader.getUsedFiles()));
+                                                     .addAllUsedFiles(nonNullArray(usedFiles));
+      final boolean includeSeriesUsedFiles = !metadataFiltered;
       for (int s = 0; s < reader.getSeriesCount(); ++s) {
-        response.addSeries(seriesInfo(reader, s));
+        response.addSeries(seriesInfo(reader, s, includeSeriesUsedFiles));
       }
       lease.markReusable();
       return response.build();
     }
   }
 
-  private SeriesInfo seriesInfo(final IFormatReader reader, final int series) throws FormatException, IOException
+  private SeriesInfo seriesInfo(final IFormatReader reader, final int series, final boolean includeSeriesUsedFiles)
+    throws FormatException, IOException
   {
     final int oldSeries = reader.getSeries();
     final int oldResolution = reader.getResolution();
@@ -706,8 +712,14 @@ public final class AtlasBioFormatsBridge
                                         .setResolutionCount(reader.getResolutionCount())
                                         .setOptimalTileWidth(reader.getOptimalTileWidth())
                                         .setOptimalTileHeight(reader.getOptimalTileHeight())
-                                        .setThumbnailSeries(reader.isThumbnailSeries())
-                                        .addAllUsedFiles(nonNullArray(reader.getSeriesUsedFiles()));
+                                        .setThumbnailSeries(reader.isThumbnailSeries());
+      if (includeSeriesUsedFiles) {
+        // Some readers discover series-specific files by probing every plane
+        // path. On cold readInfo this can be much slower than the metadata
+        // needed for geometry and tiling, and may even trigger network URL
+        // checks for locally downloaded corpus samples.
+        info.addAllUsedFiles(nonNullArray(reader.getSeriesUsedFiles()));
+      }
       addPhysicalSizes(reader, series, info);
       addChannelMetadata(reader, series, info);
       addOriginalMetadata(reader, info);
@@ -1595,7 +1607,7 @@ public final class AtlasBioFormatsBridge
     {
       final ArrayList<FileFingerprint> fingerprints = new ArrayList<>();
       try {
-        final String[] usedFiles = reader.getUsedFiles();
+        final String[] usedFiles = key.metadataFiltered ? reader.getUsedFiles(true) : reader.getUsedFiles();
         if (usedFiles == null || usedFiles.length == 0) {
           fingerprints.add(FileFingerprint.fromPath(key.normalizedPath));
           return fingerprints;
@@ -1811,8 +1823,13 @@ public final class AtlasBioFormatsBridge
     } else if (groupingPolicy == FileGroupingPolicy.FILE_GROUPING_POLICY_DISABLED) {
       reader.setGroupFiles(false);
     }
+    // Atlas readInfo/readRegion paths need core image metadata and tiling hints,
+    // but not expensive ROI/overlay metadata. CellH5Reader, for example, parses
+    // segmentation ROIs during setId() only at MetadataLevel.ALL.
+    reader.setMetadataOptions(
+      new DefaultMetadataOptions(metadataFiltered ? MetadataLevel.NO_OVERLAYS : MetadataLevel.ALL));
     reader.setMetadataFiltered(metadataFiltered);
-    reader.setOriginalMetadataPopulated(true);
+    reader.setOriginalMetadataPopulated(!metadataFiltered);
     final MetadataStore store = MetadataTools.createOMEXMLMetadata();
     if (store != null) {
       reader.setMetadataStore(store);
