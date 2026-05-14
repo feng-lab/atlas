@@ -112,6 +112,7 @@ extern "C" {
 #include "zswclayertrunkanalyzer.h"
 #include "zswclayershollfeatureanalyzer.h"
 #include "zswcnodebufferfeatureanalyzer.h"
+#include "ztiff.h"
 #include "zswctree.h"
 #include "zswctreematcher.h"
 
@@ -888,7 +889,14 @@ void writeSimpleLineTiff(const fs::path& path, size_t w, size_t h, size_t d, uin
     *img.data<uint8_t>(x, y, z) = value;
   }
 
-  img.save(QString::fromStdString(path.string()));
+  // The legacy neurolabi TIFF reader used by ZRunNeuTuCommand is not robust
+  // against the tiled/LZW files emitted by ZImg::save; use its classic layout.
+  nim::ZTiffWriter writer;
+  writer.startWriting(QString::fromStdString(path.string()), nim::Compression::NONE, -1, false);
+  for (size_t z = 0; z < d; ++z) {
+    writer.writeIFD(img, z, 0, -1, false);
+  }
+  writer.finishWriting();
 }
 
 [[nodiscard]] size_t firstDiffIndex(std::string_view a, std::string_view b)
