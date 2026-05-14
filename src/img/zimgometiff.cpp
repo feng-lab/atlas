@@ -217,9 +217,48 @@ QString resolveOmeFilename(const QString& metadataFilename, const QString& filen
   return QFileInfo(QFileInfo(metadataFilename).dir(), filename).absoluteFilePath();
 }
 
+std::string omeXmlPayloadFromImageDescription(const std::string& imageDescription)
+{
+  const size_t xmlDeclaration = imageDescription.find("<?xml");
+  const size_t omeElement = imageDescription.find("<OME");
+  size_t xmlStart = std::string::npos;
+  if (xmlDeclaration != std::string::npos && omeElement != std::string::npos) {
+    xmlStart = std::min(xmlDeclaration, omeElement);
+  } else if (xmlDeclaration != std::string::npos) {
+    xmlStart = xmlDeclaration;
+  } else {
+    xmlStart = omeElement;
+  }
+
+  if (xmlStart == std::string::npos) {
+    return imageDescription;
+  }
+  return imageDescription.substr(xmlStart);
+}
+
+uint32_t parseOmeChannelColor(const QString& value)
+{
+  const QString trimmed = value.trimmed();
+  bool ok = false;
+  const qlonglong signedValue = trimmed.toLongLong(&ok, 10);
+  if (ok && signedValue < 0) {
+    if (signedValue < std::numeric_limits<int32_t>::min()) {
+      throw ZException("Can not parse OME-TIFF channel Color");
+    }
+    return static_cast<uint32_t>(static_cast<int32_t>(signedValue));
+  }
+
+  const qulonglong unsignedValue = trimmed.toULongLong(&ok, 10);
+  if (!ok || unsignedValue > std::numeric_limits<uint32_t>::max()) {
+    throw ZException("Can not parse OME-TIFF channel Color");
+  }
+  return static_cast<uint32_t>(unsignedValue);
+}
+
 std::optional<QString> binaryOnlyMetadataFilename(const std::string& omeXml, const QString& binaryFilename)
 {
-  QXmlStreamReader xml(QByteArray::fromRawData(omeXml.data(), static_cast<int>(omeXml.size())));
+  const std::string xmlPayload = omeXmlPayloadFromImageDescription(omeXml);
+  QXmlStreamReader xml(QByteArray::fromRawData(xmlPayload.data(), static_cast<int>(xmlPayload.size())));
   while (!xml.atEnd() && !xml.hasError()) {
     if (xml.readNext() != QXmlStreamReader::StartElement) {
       continue;
@@ -248,6 +287,28 @@ std::string readUtf8TextFile(const QString& filename)
       fmt::format("Can not open OME-TIFF companion metadata file '{}': {}", filename, file.errorString()));
   }
   return file.readAll().toStdString();
+}
+
+bool isTiffLikeFilename(const QString& filename)
+{
+  const QString suffix = QFileInfo(filename).suffix().toLower();
+  return suffix == QStringLiteral("tif") || suffix == QStringLiteral("tiff") || suffix == QStringLiteral("tf2") ||
+         suffix == QStringLiteral("tf8") || suffix == QStringLiteral("btf");
+}
+
+std::string readOmeMetadataFile(const QString& filename)
+{
+  if (isTiffLikeFilename(filename)) {
+    ZTiff metadataTiff;
+    metadataTiff.load(filename);
+    if (metadataTiff.isValid()) {
+      const std::string imageDescription = metadataTiff.ifds().front().imageDescription();
+      if (!imageDescription.empty()) {
+        return imageDescription;
+      }
+    }
+  }
+  return readUtf8TextFile(filename);
 }
 
 ZTiff& tiffForFile(std::map<QString, std::unique_ptr<ZTiff>>& cache, const QString& filename)
@@ -543,14 +604,21 @@ void ZImgOmeTiff::readIntoInternalStructure(const QString& filename, ZTiff& tiff
     throw ZException("Not OME Tiff file");
   }
 
-  if (!absl::StrContains(m_imageDescription, "<Pixels"sv) && absl::StrContains(m_imageDescription, "<BinaryOnly"sv)) {
+  for (size_t binaryOnlyDepth = 0;
+       !absl::StrContains(m_imageDescription, "<Pixels"sv) && absl::StrContains(m_imageDescription, "<BinaryOnly"sv);
+       ++binaryOnlyDepth) {
+    if (binaryOnlyDepth >= 8) {
+      throw ZException("OME-TIFF BinaryOnly metadata indirection is too deep");
+    }
     const std::optional<QString> metadataFile = binaryOnlyMetadataFilename(m_imageDescription, m_currentFilename);
     if (!metadataFile) {
       throw ZException("OME-TIFF BinaryOnly block does not specify a companion MetadataFile");
     }
     m_omeXmlBaseFilename = absoluteCleanPath(*metadataFile);
-    m_imageDescription = readUtf8TextFile(*metadataFile);
+    m_imageDescription = readOmeMetadataFile(*metadataFile);
+    m_imageDescription = omeXmlPayloadFromImageDescription(m_imageDescription);
   }
+  m_imageDescription = omeXmlPayloadFromImageDescription(m_imageDescription);
 
   if (absl::StrContains(m_imageDescription, "<Pixels"sv)) {
     readOmeInfo(tiff);
@@ -648,19 +716,27 @@ void ZImgOmeTiff::detectImgInfo(ZTiff& tiff)
       ZImgInfo ifdInfo;
       planeTiff.readInfoFromIFD(planeTiff.ifds()[plane.ifdIndex], ifdInfo);
       if (series.info.width != ifdInfo.width || series.info.height != ifdInfo.height ||
-          series.info.bytesPerVoxel != ifdInfo.bytesPerVoxel || series.info.voxelFormat != ifdInfo.voxelFormat) {
+          series.info.bytesPerVoxel != ifdInfo.bytesPerVoxel) {
         throw ZException(fmt::format("OME-TIFF metadata for series {} <{}> doesn't match image data <{}>",
                                      seriesIndex,
                                      series.info,
                                      ifdInfo));
       }
       if (ifdInfo.numChannels != plane.channelCount) {
-        throw ZException(fmt::format("OME-TIFF series {} maps {} channel(s) to IFD {}, but that IFD contains {} "
-                                     "sample(s)",
-                                     seriesIndex,
-                                     plane.channelCount,
-                                     plane.ifdIndex,
-                                     ifdInfo.numChannels));
+        if (ifdInfo.numChannels < plane.channelCount) {
+          throw ZException(fmt::format("OME-TIFF series {} maps {} channel(s) to IFD {}, but that IFD contains {} "
+                                       "sample(s)",
+                                       seriesIndex,
+                                       plane.channelCount,
+                                       plane.ifdIndex,
+                                       ifdInfo.numChannels));
+        }
+        VLOG(1) << fmt::format("OME-TIFF series {} maps {} channel(s) to IFD {}, which contains {} sample(s); "
+                               "reading the mapped leading sample(s)",
+                               seriesIndex,
+                               plane.channelCount,
+                               plane.ifdIndex,
+                               ifdInfo.numChannels);
       }
       if (!firstIFDInfoSet) {
         firstIFDInfo = ifdInfo;
@@ -670,6 +746,7 @@ void ZImgOmeTiff::detectImgInfo(ZTiff& tiff)
       }
     }
 
+    series.info.voxelFormat = firstIFDInfo.voxelFormat;
     series.info.validBitCount = series.significantBits.value_or(firstIFDInfo.validBitCount);
     series.info.createDefaultDescriptions();
     m_imgInfo.push_back(series.info);
@@ -1261,11 +1338,7 @@ void ZImgOmeTiff::parseChannel(QXmlStreamReader& xml, size_t seriesIndex)
     series.info.channelNames.push_back(attributes.value("Name").toString().toStdString());
   }
   if (attributes.hasAttribute("Color")) {
-    bool ok = false;
-    int32_t color = attributes.value("Color").toString().toInt(&ok);
-    if (!ok) {
-      throw ZException("Can not parse OME-TIFF channel Color");
-    }
+    const uint32_t color = parseOmeChannelColor(attributes.value("Color").toString());
     col4 col = std::bit_cast<col4>(color);
     col.a = 255;
     std::swap(col.r, col.b);

@@ -170,6 +170,38 @@ QString binaryOnlyXml(const QString& metadataFilename)
     .arg(metadataFilename);
 }
 
+QString omeXmlForChannelColor(const QString& color)
+{
+  return QStringLiteral(R"(<?xml version="1.0" encoding="UTF-8"?>
+<OME xmlns="http://www.openmicroscopy.org/Schemas/OME/2016-06"
+     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+     xsi:schemaLocation="http://www.openmicroscopy.org/Schemas/OME/2016-06 http://www.openmicroscopy.org/Schemas/OME/2016-06/ome.xsd">
+  <Image ID="Image:0" Name="channel-color">
+    <Pixels ID="Pixels:0" DimensionOrder="XYZCT" Type="uint8" SizeX="2" SizeY="2" SizeZ="1" SizeC="1" SizeT="1">
+      <Channel ID="Channel:0:0" Color="%1"/>
+      <TiffData IFD="0" FirstZ="0" FirstC="0" FirstT="0" PlaneCount="1"/>
+    </Pixels>
+  </Image>
+</OME>)")
+    .arg(color);
+}
+
+QString omeXmlForSingleMappedPlane(const QString& pixelType)
+{
+  return QStringLiteral(R"(<?xml version="1.0" encoding="UTF-8"?>
+<OME xmlns="http://www.openmicroscopy.org/Schemas/OME/2016-06"
+     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+     xsi:schemaLocation="http://www.openmicroscopy.org/Schemas/OME/2016-06 http://www.openmicroscopy.org/Schemas/OME/2016-06/ome.xsd">
+  <Image ID="Image:0" Name="single-plane">
+    <Pixels ID="Pixels:0" DimensionOrder="XYZCT" Type="%1" SizeX="2" SizeY="2" SizeZ="1" SizeC="1" SizeT="1">
+      <Channel ID="Channel:0:0"/>
+      <TiffData IFD="0" FirstZ="0" FirstC="0" FirstT="0" PlaneCount="1"/>
+    </Pixels>
+  </Image>
+</OME>)")
+    .arg(pixelType);
+}
+
 QString omeXmlForSamplesPerPixel()
 {
   return QStringLiteral(R"(<?xml version="1.0" encoding="UTF-8"?>
@@ -433,6 +465,96 @@ TEST(ZImgOmeTiff, MultiFileAndBinaryOnlyResolveRelativePixelFiles)
   const ZImg binaryOnlyRead(binaryFilename, ZImgRegion(), 0, 1, 1, 1, FileFormat::OmeTiff);
   EXPECT_EQ(*binaryOnlyRead.data<uint8_t>(0, 0), 90u);
   EXPECT_EQ(*binaryOnlyRead.data<uint8_t>(1, 1), 93u);
+
+  const QString prefixedBinaryFilename = dir.filePath(QStringLiteral("prefixed-binary.ome.tif"));
+  {
+    ZTiffWriter writer;
+    writer.startWriting(prefixedBinaryFilename, Compression::NONE, -1, false);
+    std::vector<ZImgMetatag> tags;
+    const QString prefixedDescription =
+      QStringLiteral("ImageJ=1.53\nimages=1\n") + binaryOnlyXml(QStringLiteral("companion.ome"));
+    tags.emplace_back("ImageDescription", prefixedDescription, 270);
+    writeSingleIfd(writer, singleChannelImage(2, 2, 100), tags);
+    writer.finishWriting();
+  }
+  const ZImg prefixedBinaryOnlyRead(prefixedBinaryFilename, ZImgRegion(), 0, 1, 1, 1, FileFormat::OmeTiff);
+  EXPECT_EQ(*prefixedBinaryOnlyRead.data<uint8_t>(0, 0), 90u);
+  EXPECT_EQ(*prefixedBinaryOnlyRead.data<uint8_t>(1, 1), 93u);
+
+  const QString metadataTiffFilename = dir.filePath(QStringLiteral("metadata-as-tiff.ome.tif"));
+  {
+    ZTiffWriter writer;
+    writer.startWriting(metadataTiffFilename, Compression::NONE, -1, false);
+    std::vector<ZImgMetatag> tags;
+    tags.emplace_back("ImageDescription", omeXmlForMultiFile(QStringLiteral("binary-from-tiff.ome.tif")), 270);
+    writeSingleIfd(writer, singleChannelImage(1, 1, 1), tags);
+    writer.finishWriting();
+  }
+  const QString binaryFromTiffFilename = dir.filePath(QStringLiteral("binary-from-tiff.ome.tif"));
+  {
+    ZTiffWriter writer;
+    writer.startWriting(binaryFromTiffFilename, Compression::NONE, -1, false);
+    std::vector<ZImgMetatag> tags;
+    tags.emplace_back("ImageDescription", binaryOnlyXml(QStringLiteral("metadata-as-tiff.ome.tif")), 270);
+    writeSingleIfd(writer, singleChannelImage(2, 2, 110), tags);
+    writer.finishWriting();
+  }
+  const ZImg binaryOnlyTiffMetadataRead(binaryFromTiffFilename, ZImgRegion(), 0, 1, 1, 1, FileFormat::OmeTiff);
+  EXPECT_EQ(*binaryOnlyTiffMetadataRead.data<uint8_t>(0, 0), 110u);
+  EXPECT_EQ(*binaryOnlyTiffMetadataRead.data<uint8_t>(1, 1), 113u);
+}
+
+TEST(ZImgOmeTiff, ParsesUnsignedChannelColor)
+{
+  QTemporaryDir tmp;
+  ASSERT_TRUE(tmp.isValid());
+  const QString filename = QDir(tmp.path()).filePath(QStringLiteral("unsigned-color.ome.tif"));
+
+  ZTiffWriter writer;
+  writer.startWriting(filename, Compression::NONE, -1, false);
+  std::vector<ZImgMetatag> tags;
+  tags.emplace_back("ImageDescription", omeXmlForChannelColor(QStringLiteral("4294967295")), 270);
+  writeSingleIfd(writer, singleChannelImage(2, 2, 7), tags);
+  writer.finishWriting();
+
+  const std::vector<ZImgInfo> infos = ZImg::readImgInfos(filename, nullptr, FileFormat::OmeTiff);
+  ASSERT_EQ(infos.size(), 1u);
+  ASSERT_EQ(infos.front().channelColors.size(), 1u);
+  EXPECT_EQ(infos.front().channelColors.front(), col4(255, 255, 255, 255));
+}
+
+TEST(ZImgOmeTiff, UsesTiffSampleLayoutForMappedPlane)
+{
+  QTemporaryDir tmp;
+  ASSERT_TRUE(tmp.isValid());
+  const QString signedMetadataFilename = QDir(tmp.path()).filePath(QStringLiteral("signed-metadata.ome.tif"));
+
+  {
+    ZTiffWriter writer;
+    writer.startWriting(signedMetadataFilename, Compression::NONE, -1, false);
+    std::vector<ZImgMetatag> tags;
+    tags.emplace_back("ImageDescription", omeXmlForSingleMappedPlane(QStringLiteral("int8")), 270);
+    writeSingleIfd(writer, singleChannelImage(2, 2, 7), tags);
+    writer.finishWriting();
+  }
+  const std::vector<ZImgInfo> signedMetadataInfos =
+    ZImg::readImgInfos(signedMetadataFilename, nullptr, FileFormat::OmeTiff);
+  ASSERT_EQ(signedMetadataInfos.size(), 1u);
+  EXPECT_EQ(signedMetadataInfos.front().voxelFormat, VoxelFormat::Unsigned);
+
+  const QString extraSamplesFilename = QDir(tmp.path()).filePath(QStringLiteral("extra-samples.ome.tif"));
+  {
+    ZTiffWriter writer;
+    writer.startWriting(extraSamplesFilename, Compression::NONE, -1, false);
+    std::vector<ZImgMetatag> tags;
+    tags.emplace_back("ImageDescription", omeXmlForSingleMappedPlane(QStringLiteral("uint8")), 270);
+    writeSingleIfd(writer, multiChannelImage(2, 2, {10, 50, 90, 130}), tags);
+    writer.finishWriting();
+  }
+  const ZImg extraSamplesRead(extraSamplesFilename, ZImgRegion(), 0, 1, 1, 1, FileFormat::OmeTiff);
+  EXPECT_EQ(extraSamplesRead.numChannels(), 1u);
+  EXPECT_EQ(*extraSamplesRead.data<uint8_t>(0, 0), 10u);
+  EXPECT_EQ(*extraSamplesRead.data<uint8_t>(1, 1), 13u);
 }
 
 TEST(ZImgOmeTiff, SubIfdsCreateReadablePyramidSubBlocks)

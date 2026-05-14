@@ -7,7 +7,10 @@
 #include <QXmlStreamReader>
 #include <QFile>
 #include <QUrl>
+#include <limits>
+#include <map>
 #include <set>
+#include <string_view>
 
 namespace {
 
@@ -62,6 +65,95 @@ struct MemoryBlock64
 
 namespace nim {
 
+namespace {
+
+std::vector<size_t>
+leicaDimensionStrides(const ImageInfo& imageInfo, const ZImgInfo& info, bool throwOnUnknownDimension)
+{
+  std::vector<size_t> dimensionStrides(5, 0); // XYZCT
+  std::vector<uint64_t> channelOffsets;
+  channelOffsets.reserve(imageInfo.channels.size());
+  for (const auto& cd : imageInfo.channels) {
+    channelOffsets.push_back(cd.bytesInc);
+  }
+  if (channelOffsets.size() > 1) {
+    std::ranges::sort(channelOffsets);
+    dimensionStrides[3] = channelOffsets[1] - channelOffsets[0];
+  }
+  for (const auto& dd : imageInfo.dimensions) {
+    switch (dd.dimID) {
+      case 1:
+        dimensionStrides[0] = dd.bytesInc;
+        break;
+      case 2:
+        dimensionStrides[1] = dd.bytesInc;
+        break;
+      case 3:
+        dimensionStrides[2] = dd.bytesInc;
+        break;
+      case 4:
+        dimensionStrides[4] = dd.bytesInc;
+        break;
+      default:
+        if (throwOnUnknownDimension) {
+          throw ZException(fmt::format("impossible dimension {}", dd.dimID));
+        }
+        break;
+    }
+  }
+  if (dimensionStrides[0] == 0) {
+    dimensionStrides[0] = info.voxelByteNumber();
+  }
+  if (dimensionStrides[1] == 0) {
+    dimensionStrides[1] = dimensionStrides[0] * info.size(0);
+  }
+  if (dimensionStrides[2] == 0) {
+    dimensionStrides[2] = std::max(dimensionStrides[0] * info.size(0), dimensionStrides[1] * info.size(1));
+  }
+  if (dimensionStrides[3] == 0) {
+    dimensionStrides[3] = std::max(std::max(dimensionStrides[0] * info.size(0), dimensionStrides[1] * info.size(1)),
+                                   dimensionStrides[2] * info.size(2));
+  }
+  if (dimensionStrides[4] == 0) {
+    dimensionStrides[4] =
+      std::max(std::max(std::max(dimensionStrides[0] * info.size(0), dimensionStrides[1] * info.size(1)),
+                        dimensionStrides[2] * info.size(2)),
+               dimensionStrides[3] * info.size(3));
+  }
+  return dimensionStrides;
+}
+
+bool allFilesAreLeicaLof(const QStringList& fileNames)
+{
+  return !fileNames.empty() && std::ranges::all_of(fileNames, [](const QString& filename) {
+    return filename.endsWith(QStringLiteral(".lof"), Qt::CaseInsensitive);
+  });
+}
+
+ZImgInfo leicaSinglePlaneInfo(const ZImgInfo& info)
+{
+  ZImgInfo planeInfo = info;
+  planeInfo.depth = 1;
+  planeInfo.numChannels = 1;
+  planeInfo.numTimes = 1;
+  planeInfo.channelNames.clear();
+  planeInfo.channelColors.clear();
+  planeInfo.createDefaultDescriptions();
+  return planeInfo;
+}
+
+std::vector<size_t> leicaFileChannelSourceOrder(const ImageInfo& imageInfo)
+{
+  std::vector<uint64_t> channelOffsets;
+  channelOffsets.reserve(imageInfo.channels.size());
+  for (const auto& cd : imageInfo.channels) {
+    channelOffsets.push_back(cd.bytesInc);
+  }
+  return argSort(channelOffsets);
+}
+
+} // namespace
+
 bool ZImgLeica::supportRead() const
 {
   return true;
@@ -87,8 +179,7 @@ QStringList ZImgLeica::extensions() const
   QStringList res;
   res << "lif"
       << "lof"
-      << "xlef"
-      << "xllf";
+      << "xlef";
   return res;
 }
 
@@ -187,58 +278,121 @@ void ZImgLeica::readImg(const QString& filename, ZImg& img, const ZImgRegion& re
     if (std::get<2>(monl) == 0) {
       throw ZException("find invalid memory, please send this file to flq@live.com");
     }
-    std::vector<size_t> dimensionStrides(5, 0); // XYZCT
-    std::vector<uint64_t> channelOffsets;
-    for (const auto& cd : ii.channels) {
-      channelOffsets.push_back(cd.bytesInc);
-    }
-    if (channelOffsets.size() > 1) {
-      std::ranges::sort(channelOffsets);
-      dimensionStrides[3] = channelOffsets[1] - channelOffsets[0];
-    }
-    for (const auto& dd : ii.dimensions) {
-      switch (dd.dimID) {
-        case 1:
-          dimensionStrides[0] = dd.bytesInc;
-          break;
-        case 2:
-          dimensionStrides[1] = dd.bytesInc;
-          break;
-        case 3:
-          dimensionStrides[2] = dd.bytesInc;
-          break;
-        case 4:
-          dimensionStrides[4] = dd.bytesInc;
-          break;
-        default:
-          throw ZException(fmt::format("impossible dimension {}", dd.dimID));
-      }
-    }
-    if (dimensionStrides[0] == 0) {
-      dimensionStrides[0] = info.voxelByteNumber();
-    }
-    if (dimensionStrides[1] == 0) {
-      dimensionStrides[1] = dimensionStrides[0] * info.size(0);
-    }
-    if (dimensionStrides[2] == 0) {
-      dimensionStrides[2] = std::max(dimensionStrides[0] * info.size(0), dimensionStrides[1] * info.size(1));
-    }
-    if (dimensionStrides[3] == 0) {
-      dimensionStrides[3] = std::max(std::max(dimensionStrides[0] * info.size(0), dimensionStrides[1] * info.size(1)),
-                                     dimensionStrides[2] * info.size(2));
-    }
-    if (dimensionStrides[4] == 0) {
-      dimensionStrides[4] =
-        std::max(std::max(std::max(dimensionStrides[0] * info.size(0), dimensionStrides[1] * info.size(1)),
-                          dimensionStrides[2] * info.size(2)),
-                 dimensionStrides[3] * info.size(3));
-    }
+    const std::vector<size_t> dimensionStrides = leicaDimensionStrides(ii, info, true);
 
     img = readRawImg(fn, info, dimensionStrides, std::get<0>(monl) + ii.imageMemory.sceneOffset, rgn);
   } else {
     ZImgIO imgIO;
     ZImgInfo resInfo = rgn.clip(info);
-    if (ii.imageMemory.fileNames.size() == 1) {
+    const bool lofPayloadFiles = allFilesAreLeicaLof(ii.imageMemory.fileNames);
+    std::map<QString, size_t> lofPayloadOffsets;
+    auto lofPayloadOffset = [&](const QString& lofFilename) {
+      const QString cleanFilename = QDir::cleanPath(lofFilename);
+      if (const auto it = lofPayloadOffsets.find(cleanFilename); it != lofPayloadOffsets.end()) {
+        return it->second;
+      }
+      QString lofXml;
+      std::vector<std::tuple<size_t, QString, size_t>> memoryOffsetNameLength;
+      readXml(cleanFilename, lofXml, memoryOffsetNameLength);
+      if (memoryOffsetNameLength.empty()) {
+        throw ZException("Leica LOF companion does not contain a raw memory payload");
+      }
+      const size_t offset = std::get<0>(memoryOffsetNameLength.front());
+      lofPayloadOffsets.emplace(cleanFilename, offset);
+      return offset;
+    };
+
+    if (lofPayloadFiles && ii.imageMemory.fileNames.size() == 1 && !ii.imageMemory.fileOffsets.empty()) {
+      const std::vector<size_t> dimensionStrides = leicaDimensionStrides(ii, info, false);
+      const size_t dataOffset = lofPayloadOffset(ii.imageMemory.fileNames.front()) +
+                                ii.imageMemory.fileOffsets.front() + ii.imageMemory.sceneOffset;
+      img = readRawImg(ii.imageMemory.fileNames.front(), info, dimensionStrides, dataOffset, rgn);
+    } else if (lofPayloadFiles &&
+               static_cast<size_t>(ii.imageMemory.fileNames.size()) == ii.imageMemory.fileOffsets.size()) {
+      const size_t fileCount = static_cast<size_t>(ii.imageMemory.fileNames.size());
+      const std::vector<size_t> dimensionStrides = leicaDimensionStrides(ii, info, false);
+
+      struct PlaneFile
+      {
+        QString filename;
+        size_t fileIndex = 0;
+        size_t z = 0;
+        size_t c = 0;
+        size_t t = 0;
+      };
+      std::vector<PlaneFile> planeFiles;
+      planeFiles.reserve(fileCount);
+      for (size_t fileIndex = 0; fileIndex < fileCount; ++fileIndex) {
+        bool foundPlane = false;
+        for (size_t tIndex = 0; tIndex < info.numTimes && !foundPlane; ++tIndex) {
+          for (size_t cIndex = 0; cIndex < info.numChannels && !foundPlane; ++cIndex) {
+            for (size_t zIndex = 0; zIndex < info.depth; ++zIndex) {
+              const uint64_t expectedOffset = ii.imageMemory.sceneOffset + zIndex * dimensionStrides[2] +
+                                              cIndex * dimensionStrides[3] + tIndex * dimensionStrides[4];
+              if (expectedOffset == ii.imageMemory.fileOffsets[fileIndex]) {
+                planeFiles.push_back({ii.imageMemory.fileNames[fileIndex], fileIndex, zIndex, cIndex, tIndex});
+                foundPlane = true;
+                break;
+              }
+            }
+          }
+        }
+      }
+
+      if (planeFiles.empty()) {
+        throw ZException("Unhandled leica image sequence, please send this file to flq@live.com");
+      }
+
+      ZImg result(resInfo);
+      std::vector<uint8_t> planeFilled(resInfo.depth * resInfo.numChannels * resInfo.numTimes, 0);
+      const ZImgInfo planeInfo = leicaSinglePlaneInfo(info);
+      auto checkedLeicaIndex = [](std::string_view field, size_t value) {
+        if (value > static_cast<size_t>(std::numeric_limits<index_t>::max())) {
+          throw ZException(fmt::format("Leica {} value is too large for Atlas index_t: {}", field, value));
+        }
+        return static_cast<index_t>(value);
+      };
+      auto markIndex = [&](size_t z, size_t c, size_t t) {
+        const size_t localZ = z - static_cast<size_t>(rgn.start.z);
+        const size_t localC = c - static_cast<size_t>(rgn.start.c);
+        const size_t localT = t - static_cast<size_t>(rgn.start.t);
+        return (localT * resInfo.numChannels + localC) * resInfo.depth + localZ;
+      };
+
+      for (const PlaneFile& planeFile : planeFiles) {
+        if (!rgn.zInRegion(checkedLeicaIndex("plane z", planeFile.z)) ||
+            !rgn.cInRegion(checkedLeicaIndex("plane channel", planeFile.c)) ||
+            !rgn.tInRegion(checkedLeicaIndex("plane time", planeFile.t))) {
+          continue;
+        }
+
+        const size_t dataOffset =
+          lofPayloadOffset(planeFile.filename) + ii.imageMemory.fileOffsets.at(planeFile.fileIndex);
+        const ZImgRegion fileRegion(rgn.start.x, rgn.end.x, rgn.start.y, rgn.end.y, 0, 1, 0, 1, 0, 1);
+        ZImg planeImg = readRawImg(planeFile.filename, planeInfo, QStringLiteral("XYZCT"), dataOffset, fileRegion);
+        result.pasteImg(
+          planeImg,
+          ZVoxelCoordinate(0,
+                           0,
+                           checkedLeicaIndex("paste z", planeFile.z - static_cast<size_t>(rgn.start.z)),
+                           checkedLeicaIndex("paste channel", planeFile.c - static_cast<size_t>(rgn.start.c)),
+                           checkedLeicaIndex("paste time", planeFile.t - static_cast<size_t>(rgn.start.t))),
+          false);
+        planeFilled[markIndex(planeFile.z, planeFile.c, planeFile.t)] = 1;
+      }
+
+      for (size_t tIndex = 0; tIndex < resInfo.numTimes; ++tIndex) {
+        for (size_t cIndex = 0; cIndex < resInfo.numChannels; ++cIndex) {
+          for (size_t zIndex = 0; zIndex < resInfo.depth; ++zIndex) {
+            const size_t index = (tIndex * resInfo.numChannels + cIndex) * resInfo.depth + zIndex;
+            if (planeFilled[index] == 0) {
+              throw ZException("Unhandled leica image sequence, please send this file to flq@live.com");
+            }
+          }
+        }
+      }
+      result.swap(img);
+    } else if (ii.imageMemory.fileNames.size() == 1) {
       std::vector<ZImgInfo> fileInfos;
       imgIO.readInfos(ii.imageMemory.fileNames[0], fileInfos);
       if (!fileInfos.empty() && fileInfos[0].isSameType(info) && fileInfos[0].isSameSize(info)) {
@@ -265,6 +419,95 @@ void ZImgLeica::readImg(const QString& filename, ZImg& img, const ZImgRegion& re
       } else {
         throw ZException("image and metadata do not match, please send this file to flq@live.com");
       }
+    } else if (static_cast<size_t>(ii.imageMemory.fileNames.size()) == ii.imageMemory.fileOffsets.size()) {
+      const size_t fileCount = static_cast<size_t>(ii.imageMemory.fileNames.size());
+      const std::vector<size_t> dimensionStrides = leicaDimensionStrides(ii, info, false);
+
+      struct PlaneFile
+      {
+        QString filename;
+        size_t z = 0;
+        size_t c = 0;
+        size_t t = 0;
+      };
+      std::vector<PlaneFile> planeFiles;
+      planeFiles.reserve(fileCount);
+      for (size_t fileIndex = 0; fileIndex < fileCount; ++fileIndex) {
+        bool foundPlane = false;
+        for (size_t tIndex = 0; tIndex < info.numTimes && !foundPlane; ++tIndex) {
+          for (size_t cIndex = 0; cIndex < info.numChannels && !foundPlane; ++cIndex) {
+            for (size_t zIndex = 0; zIndex < info.depth; ++zIndex) {
+              const uint64_t expectedOffset = ii.imageMemory.sceneOffset + zIndex * dimensionStrides[2] +
+                                              cIndex * dimensionStrides[3] + tIndex * dimensionStrides[4];
+              if (expectedOffset == ii.imageMemory.fileOffsets[fileIndex]) {
+                planeFiles.push_back({ii.imageMemory.fileNames[fileIndex], zIndex, cIndex, tIndex});
+                foundPlane = true;
+                break;
+              }
+            }
+          }
+        }
+      }
+
+      if (planeFiles.empty()) {
+        throw ZException("Unhandled leica image sequence, please send this file to flq@live.com");
+      }
+
+      ZImg result(resInfo);
+      std::vector<uint8_t> planeFilled(resInfo.depth * resInfo.numChannels * resInfo.numTimes, 0);
+      auto checkedLeicaIndex = [](std::string_view field, size_t value) {
+        if (value > static_cast<size_t>(std::numeric_limits<index_t>::max())) {
+          throw ZException(fmt::format("Leica {} value is too large for Atlas index_t: {}", field, value));
+        }
+        return static_cast<index_t>(value);
+      };
+      auto markIndex = [&](size_t z, size_t c, size_t t) {
+        const size_t localZ = z - static_cast<size_t>(rgn.start.z);
+        const size_t localC = c - static_cast<size_t>(rgn.start.c);
+        const size_t localT = t - static_cast<size_t>(rgn.start.t);
+        return (localT * resInfo.numChannels + localC) * resInfo.depth + localZ;
+      };
+
+      for (const PlaneFile& planeFile : planeFiles) {
+        if (!rgn.zInRegion(checkedLeicaIndex("plane z", planeFile.z)) ||
+            !rgn.cInRegion(checkedLeicaIndex("plane channel", planeFile.c)) ||
+            !rgn.tInRegion(checkedLeicaIndex("plane time", planeFile.t))) {
+          continue;
+        }
+
+        std::vector<ZImgInfo> fileInfos;
+        imgIO.readInfos(planeFile.filename, fileInfos);
+        if (fileInfos.empty() || fileInfos[0].width != info.width || fileInfos[0].height != info.height ||
+            fileInfos[0].bytesPerVoxel != info.bytesPerVoxel || fileInfos[0].voxelFormat != info.voxelFormat ||
+            fileInfos[0].numChannels < 1) {
+          throw ZException("image and metadata do not match, please send this file to flq@live.com");
+        }
+
+        ZImg planeImg;
+        ZImgRegion fileRegion(rgn.start.x, rgn.end.x, rgn.start.y, rgn.end.y, 0, 1, 0, 1, 0, 1);
+        imgIO.readImg(planeFile.filename, planeImg, fileRegion);
+        result.pasteImg(
+          planeImg,
+          ZVoxelCoordinate(0,
+                           0,
+                           checkedLeicaIndex("paste z", planeFile.z - static_cast<size_t>(rgn.start.z)),
+                           checkedLeicaIndex("paste channel", planeFile.c - static_cast<size_t>(rgn.start.c)),
+                           checkedLeicaIndex("paste time", planeFile.t - static_cast<size_t>(rgn.start.t))),
+          false);
+        planeFilled[markIndex(planeFile.z, planeFile.c, planeFile.t)] = 1;
+      }
+
+      for (size_t tIndex = 0; tIndex < resInfo.numTimes; ++tIndex) {
+        for (size_t cIndex = 0; cIndex < resInfo.numChannels; ++cIndex) {
+          for (size_t zIndex = 0; zIndex < resInfo.depth; ++zIndex) {
+            const size_t index = (tIndex * resInfo.numChannels + cIndex) * resInfo.depth + zIndex;
+            if (planeFilled[index] == 0) {
+              throw ZException("Unhandled leica image sequence, please send this file to flq@live.com");
+            }
+          }
+        }
+      }
+      result.swap(img);
     } else {
       throw ZException("Unhandled leica image sequence, please send this file to flq@live.com");
     }
@@ -329,13 +572,14 @@ void ZImgLeica::readXml(const QString& filename,
 
     XMLOrTypeContent xtc;
     readStructFromFileStream(xtc, inputFileStream);
-    if (xtc.test != 0x2A || nb.length != 5 + xtc.textLength * 2) {
+    if (xtc.test != 0x2A) {
       throw ZException("incorrect lecia xml or type content", ZException::Option::CheckErrno);
     }
     std::vector<QChar> charBuf(xtc.textLength);
     readStream(inputFileStream, charBuf.data(), xtc.textLength * 2);
     xml = QString(charBuf.data(), charBuf.size());
     bool isLOF = xml == "LMS_Object_File";
+    const size_t typeContentLength = compactSize(xtc) + xtc.textLength * sizeof(QChar);
 
     int majorVersion = 0;
     if (isLOF) {
@@ -356,6 +600,12 @@ void ZImgLeica::readXml(const QString& filename,
       if (memorySizeBlock.test != 0x2A) {
         throw ZException("incorrect lecia LOF memory size", ZException::Option::CheckErrno);
       }
+      const size_t objectFileHeaderLength = typeContentLength + compactSize(majorVersionBlock) +
+                                            compactSize(minorVersionBlock) + compactSize(memorySizeBlock);
+      if (nb.length != static_cast<int32_t>(objectFileHeaderLength) &&
+          nb.length != static_cast<int32_t>(typeContentLength)) {
+        throw ZException("incorrect lecia xml or type content", ZException::Option::CheckErrno);
+      }
       memoryOffsetNameLength.emplace_back(static_cast<size_t>(inputFileStream.tellg()),
                                           QString(""),
                                           static_cast<size_t>(memorySizeBlock.Number));
@@ -374,6 +624,9 @@ void ZImgLeica::readXml(const QString& filename,
       readStream(inputFileStream, charBuf.data(), xtc.textLength * 2);
       xml = QString(charBuf.data(), charBuf.size());
     } else { // LIF
+      if (nb.length != static_cast<int32_t>(typeContentLength)) {
+        throw ZException("incorrect lecia xml or type content", ZException::Option::CheckErrno);
+      }
       majorVersion = parseLIFVersion(xml);
       do {
         if (!readStructFromFileStreamNoThrow(nb, inputFileStream)) {
@@ -624,6 +877,10 @@ void ZImgLeica::parseElement(QXmlStreamReader& xml, const QDir& xmlDir, std::vec
                 }
               }
 
+              if (values.empty()) {
+                LOG(WARNING) << "Leica TimeStampList is empty";
+                continue;
+              }
               for (size_t i = 1; i < values.size(); ++i) {
                 values[i] -= values[0];
               }
@@ -1026,7 +1283,6 @@ void ZImgLeica::detectInfos(std::vector<ZImgInfo>& infos, const std::vector<Imag
       info.validBitCount = resl;
       info.bytesPerVoxel = (resl + 7) / 8;
     }
-    std::vector<size_t> channelOffsetOrder = argSort(channelOffsets);
     std::ranges::sort(channelOffsets);
     if (channelOffsets.size() > 1) {
       uint64_t channelStride = channelOffsets[1] - channelOffsets[0];
@@ -1042,8 +1298,10 @@ void ZImgLeica::detectInfos(std::vector<ZImgInfo>& infos, const std::vector<Imag
 
     info.createDefaultDescriptions();
 
+    const std::vector<size_t> channelFileOrder = leicaFileChannelSourceOrder(ii);
+    CHECK(channelFileOrder.size() == info.channelColors.size());
     for (size_t i = 0; i < info.channelColors.size(); ++i) {
-      const auto& cd = ii.channels[channelOffsetOrder[i]];
+      const auto& cd = ii.channels[channelFileOrder[i]];
       if (cd.channelTag == 1) {
         info.channelColors[i] = col4{255, 0, 0};
       } else if (cd.channelTag == 2) {
@@ -1066,7 +1324,7 @@ void ZImgLeica::detectInfos(std::vector<ZImgInfo>& infos, const std::vector<Imag
         } else if (cd.LUTName.compare("yellow", Qt::CaseInsensitive) == 0) {
           info.channelColors[i] = col4{255, 255, 0};
         } else if (!cd.LUTName.isEmpty()) {
-          throw ZException(fmt::format("unhandled LUT name: {}, please send this message to flq@live.com", cd.LUTName));
+          LOG(WARNING) << "Unsupported Leica LUT name '" << cd.LUTName << "'; keeping the default channel color";
         }
       } else {
         throw ZException("invalid channel tag");
