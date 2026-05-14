@@ -2,6 +2,7 @@
 
 #include "zimginterface.h"
 #include "zimgmetatag.h"
+#include "zimgregion.h"
 
 struct tiff;
 using TIFF = struct tiff;
@@ -268,6 +269,10 @@ public:
 
   void readImgFromIFD(const ZTiffIFD& ifd, ZImg& img);
 
+  // Read a region from a main IFD or SubIFD. The region is expressed in that
+  // IFD's 2D image space with z/t fixed to a single plane.
+  void readRegionFromIFD(const ZTiffIFD& ifd, ZImg& img, const ZImgRegion& region);
+
   // do not throw ioexception, instead return empty img if failed
   ZImg readThumbnailFromIFD(const ZTiffIFD& ifd);
 
@@ -286,7 +291,7 @@ public:
 protected:
   uint64_t readIFD(std::istream& fs, ZTiffIFD& ifd, uint64_t off, bool bigtiff, bool swabflag) const;
 
-  [[nodiscard]] static std::string tagToName(uint32_t tag) ;
+  [[nodiscard]] static std::string tagToName(uint32_t tag);
 
   void readIFDs(const QString& filename, std::vector<ZTiffIFD>& ifds, bool& reverseEndianness) const;
 
@@ -346,7 +351,10 @@ public:
                 size_t t,
                 index_t c = -1,
                 bool writeThumbnails = true,
-                const std::vector<ZImgMetatag>& additionalTags = std::vector<ZImgMetatag>());
+                const std::vector<ZImgMetatag>& additionalTags = std::vector<ZImgMetatag>(),
+                const std::vector<ZImg>* subIFDs = nullptr,
+                size_t tileWidth = 0,
+                size_t tileHeight = 0);
 
   // close file, destructor of ZTiffWriter will do the same thing.
   // use to clean the state when use one ZTiffWriter to write multiple tifs

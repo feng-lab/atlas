@@ -1,7 +1,7 @@
 files_to_download = [
     {
-        "expected_size": 20399409,
-        "expected_sha256": "72bf3c3dbd4f75d640f353d5f5cbfed64d2cea0f0700101cc2f5c7dcd2d4d02e",
+        "expected_size": 20399772,
+        "expected_sha256": "1c91b2a2fce8417effb34f0d7ae805756e85751589407d5f6339fb0ccf988f1a",
         "filename": "jars/atlas-bioformats-bridge.jar",
     }
 ]

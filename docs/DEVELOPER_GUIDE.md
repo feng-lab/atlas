@@ -150,6 +150,20 @@ Testing
   - It compares Atlas’ tracing outputs against a reference implementation for a set of curated fixtures in `atlas_test_data`.
   - Some tests are developer-only and auto-skip when large local datasets are not available.
 
+Native TIFF And OME-TIFF
+
+- Plain TIFF and OME-TIFF share the native `ZTiff` parser/decoder. `ZImgTiff::readInfo` detects tiled normal TIFF IFDs and creates `ZImgTileSubBlock`s that match the file's tile size; stripped TIFFs use 512x512 logical subblocks. `ZImgTiff::readImg` uses `ZTiff::readRegionFromIFD` so region requests decode only intersecting tiles or, when the file's `RowsPerStrip` permits it, only intersecting strips. One-strip-per-plane TIFFs still require libtiff to decode that strip, but Atlas no longer allocates and copies a full output plane for small region reads.
+- Native plain TIFF export writes 512x512 tiled pages by default. This keeps large Atlas-generated TIFFs pageable for interactive rendering while preserving classic TIFF/BigTIFF selection based on projected payload size.
+- OME-TIFF is a native C++ reader/writer path (`ZImgOmeTiff`), not a Java bridge feature. Keep native readers ahead of `ZImgBioFormats` in reader selection so `.ome.tif/.ome.tiff/.ome.tf2/.ome.tf8/.ome.btf` files use Atlas' TIFF stack first.
+- The native reader treats OME XML `TiffData` as authoritative for scene, Z, C, and T mapping. Do not assume physical IFD order is `ZCT`; multi-series and non-linear IFD layouts must map through the parsed plane table.
+- Some legacy writers emit explicit `TiffData IFD` values as 1-based indexes. Atlas only applies that compatibility normalization when the zero-based interpretation reaches past the last IFD; valid zero-based mappings that intentionally start at IFD 1 are left unchanged.
+- OME SubIFDs are pyramid sub-resolutions, not ordinary image planes. Reduced-resolution SubIFDs are exposed as `ZImgSubBlock`s when their dimensions form integer XY downsample ratios relative to resolution 0. Resolution 0 remains the canonical scene geometry used by `ZImgInfo`.
+- Native region reads use `ZTiff::readRegionFromIFD` so tiled and stripped TIFF pages can serve just the requested XY/C window. Keep this path free of Java/Bio-Formats dependencies.
+- Binary-only OME-TIFFs may point at a companion OME metadata file via `BinaryOnly MetadataFile`; Atlas resolves the companion metadata relative to the binary TIFF and still reads pixels natively from the referenced TIFF files.
+- Writer output uses OME 2016-06 XML with explicit one-plane `TiffData` entries matching the full-resolution IFD order written by Atlas. `ZImgOmeTiff::writeImg` writes 512x512 tiled TIFF pages and automatically attaches XY-only SubIFD pyramid levels while keeping reduced images out of OME `TiffData`, as required by the OME SubIFD pyramid contract.
+- BigTIFF output is selected automatically for `.ome.tf2/.ome.tf8/.ome.btf` filenames or when the projected full-resolution plus pyramid payload is too large for classic TIFF offsets.
+- Targeted regression coverage lives in `test/zimgtifftest.cpp`, `test/zimgometifftest.cpp`, and `test/zimgometiffpacktest.cpp`; fixtures are generated at runtime for native TIFF tiled/stripped paging, multi-series `TiffData` mapping, multi-file and binary-only metadata resolution, SubIFD pyramid reads, tiled pyramidal writes, and pack overview selection.
+
 Bio-Formats Image Bridge
 
 - Atlas reads Bio-Formats-backed image files through `ZImgBioFormats`.

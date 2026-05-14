@@ -12,6 +12,7 @@
 #include <tiffio.hxx>
 #include <QFile>
 #include <cmath>
+#include <limits>
 #include <set>
 
 namespace {
@@ -116,12 +117,12 @@ const struct tiftagname
   {TIFFTAG_YCBCRPOSITIONING,           "YCbCrPositioning"               },
   {TIFFTAG_REFERENCEBLACKWHITE,        "ReferenceBlackWhite"            },
   {TIFFTAG_XMLPACKET,                  "XMLPacket"                      },
- /* begin SGI tags */
+  /* begin SGI tags */
   {TIFFTAG_MATTEING,                   "Matteing"                       },
   {TIFFTAG_DATATYPE,                   "DataType"                       },
   {TIFFTAG_IMAGEDEPTH,                 "ImageDepth"                     },
   {TIFFTAG_TILEDEPTH,                  "TileDepth"                      },
- /* end SGI tags */
+  /* end SGI tags */
   /* begin Pixar tags */
   {TIFFTAG_PIXAR_IMAGEFULLWIDTH,       "ImageFullWidth"                 },
   {TIFFTAG_PIXAR_IMAGEFULLLENGTH,      "ImageFullLength"                },
@@ -131,7 +132,7 @@ const struct tiftagname
   {TIFFTAG_PIXAR_MATRIX_WORLDTOSCREEN, "MatrixWorldToScreen"            },
   {TIFFTAG_PIXAR_MATRIX_WORLDTOCAMERA, "MatrixWorldToCamera"            },
   {TIFFTAG_COPYRIGHT,                  "Copyright"                      },
- /* end Pixar tags */
+  /* end Pixar tags */
   {TIFFTAG_RICHTIFFIPTC,               "RichTIFFIPTC"                   },
   {TIFFTAG_PHOTOSHOP,                  "Photoshop"                      },
   {TIFFTAG_EXIFIFD,                    "ExifIFD"                        },
@@ -143,7 +144,7 @@ const struct tiftagname
   {TIFFTAG_FAXDCS,                     "FaxDcs"                         },
   {TIFFTAG_STONITS,                    "StoNits"                        },
   {TIFFTAG_INTEROPERABILITYIFD,        "InteroperabilityIFDOffset"      },
- /* begin DNG tags */
+  /* begin DNG tags */
   {TIFFTAG_DNGVERSION,                 "DNGVersion"                     },
   {TIFFTAG_DNGBACKWARDVERSION,         "DNGBackwardVersion"             },
   {TIFFTAG_UNIQUECAMERAMODEL,          "UniqueCameraModel"              },
@@ -193,7 +194,7 @@ const struct tiftagname
   {TIFFTAG_CURRENTICCPROFILE,          "CurrentICCProfile"              },
   {TIFFTAG_CURRENTPREPROFILEMATRIX,    "CurrentPreProfileMatrix"        },
   {TIFFTAG_PERSAMPLE,                  "PerSample"                      },
- /* end DNG tags */
+  /* end DNG tags */
   /* begin TIFF/FX tags */
   {TIFFTAG_INDEXED,                    "Indexed"                        },
   {TIFFTAG_GLOBALPARAMETERSIFD,        "GlobalParametersIFD"            },
@@ -207,12 +208,12 @@ const struct tiftagname
   {TIFFTAG_T82OPTIONS,                 "T82Options"                     },
   {TIFFTAG_STRIPROWCOUNTS,             "StripRowCounts"                 },
   {TIFFTAG_IMAGELAYER,                 "ImageLayer"                     },
- /* end DNG tags */
+  /* end DNG tags */
   /* begin pseudo tags */
   // Carl Zeiss LSM
   {TIFFTAG_CZ_LSMINFO,                 "CarlZeissLSMInfo"               },
 
- // GEOTIFF
+  // GEOTIFF
   {TIFFTAG_GEOPIXELSCALE,              "GeoPixelScale"                  },
   {TIFFTAG_INTERGRAPH_MATRIX,          "Intergraph TransformationMatrix"},
   {TIFFTAG_GEOTRANSMATRIX,             "GeoTransformationMatrix"        },
@@ -946,6 +947,276 @@ void ZTiff::readImgFromIFD(const ZTiffIFD& ifd, ZImg& img)
     throw ZException(fmt::format("Can not read ifd at offset {}", ifd.offset()), ZException::Option::CheckErrno);
   }
   readImg(img, ifd.extraSample() == EXTRASAMPLE_ASSOCALPHA || ifd.extraSample() == EXTRASAMPLE_UNSPECIFIED);
+}
+
+namespace {
+
+void copyOneChannelTileRegionToImg(const uint8_t* tileBuf,
+                                   size_t tileWidth,
+                                   size_t tileHeight,
+                                   size_t voxelByteNumber,
+                                   ZImg& img,
+                                   const ZImgRegion& region,
+                                   size_t tileX,
+                                   size_t tileY,
+                                   size_t dstChannel)
+{
+  const size_t x0 = std::max<size_t>(tileX, static_cast<size_t>(region.start.x));
+  const size_t y0 = std::max<size_t>(tileY, static_cast<size_t>(region.start.y));
+  const size_t x1 = std::min<size_t>(tileX + tileWidth, static_cast<size_t>(region.end.x));
+  const size_t y1 = std::min<size_t>(tileY + tileHeight, static_cast<size_t>(region.end.y));
+  if (x0 >= x1 || y0 >= y1) {
+    return;
+  }
+
+  const size_t copyBytes = (x1 - x0) * voxelByteNumber;
+  for (size_t y = y0; y < y1; ++y) {
+    const uint8_t* src = tileBuf + ((y - tileY) * tileWidth + (x0 - tileX)) * voxelByteNumber;
+    uint8_t* dst = img.data<uint8_t>(x0 - region.start.x, y - region.start.y, 0, dstChannel);
+    std::copy_n(src, copyBytes, dst);
+  }
+}
+
+void copyContiguousTileRegionToImg(const uint8_t* tileBuf,
+                                   size_t tileWidth,
+                                   size_t tileHeight,
+                                   size_t numChannels,
+                                   size_t voxelByteNumber,
+                                   ZImg& img,
+                                   const ZImgRegion& region,
+                                   size_t tileX,
+                                   size_t tileY)
+{
+  const size_t x0 = std::max<size_t>(tileX, static_cast<size_t>(region.start.x));
+  const size_t y0 = std::max<size_t>(tileY, static_cast<size_t>(region.start.y));
+  const size_t x1 = std::min<size_t>(tileX + tileWidth, static_cast<size_t>(region.end.x));
+  const size_t y1 = std::min<size_t>(tileY + tileHeight, static_cast<size_t>(region.end.y));
+  if (x0 >= x1 || y0 >= y1) {
+    return;
+  }
+
+  for (size_t c = static_cast<size_t>(region.start.c); c < static_cast<size_t>(region.end.c); ++c) {
+    for (size_t y = y0; y < y1; ++y) {
+      for (size_t x = x0; x < x1; ++x) {
+        const uint8_t* src =
+          tileBuf + ((y - tileY) * tileWidth * numChannels + (x - tileX) * numChannels + c) * voxelByteNumber;
+        uint8_t* dst = img.data<uint8_t>(x - region.start.x, y - region.start.y, 0, c - region.start.c);
+        std::copy_n(src, voxelByteNumber, dst);
+      }
+    }
+  }
+}
+
+void copyOneChannelStripRegionToImg(const uint8_t* stripBuf,
+                                    size_t sourceWidth,
+                                    size_t stripY,
+                                    size_t voxelByteNumber,
+                                    ZImg& img,
+                                    const ZImgRegion& region,
+                                    size_t rowCount,
+                                    size_t dstChannel)
+{
+  const size_t y0 = std::max<size_t>(stripY, static_cast<size_t>(region.start.y));
+  const size_t y1 = std::min<size_t>(stripY + rowCount, static_cast<size_t>(region.end.y));
+  if (y0 >= y1) {
+    return;
+  }
+
+  const size_t x0 = static_cast<size_t>(region.start.x);
+  const size_t x1 = static_cast<size_t>(region.end.x);
+  const size_t copyBytes = (x1 - x0) * voxelByteNumber;
+  for (size_t y = y0; y < y1; ++y) {
+    const uint8_t* src = stripBuf + ((y - stripY) * sourceWidth + x0) * voxelByteNumber;
+    uint8_t* dst = img.data<uint8_t>(0, y - region.start.y, 0, dstChannel);
+    std::copy_n(src, copyBytes, dst);
+  }
+}
+
+void copyContiguousStripRegionToImg(const uint8_t* stripBuf,
+                                    size_t sourceWidth,
+                                    size_t stripY,
+                                    size_t numChannels,
+                                    size_t voxelByteNumber,
+                                    ZImg& img,
+                                    const ZImgRegion& region,
+                                    size_t rowCount)
+{
+  const size_t y0 = std::max<size_t>(stripY, static_cast<size_t>(region.start.y));
+  const size_t y1 = std::min<size_t>(stripY + rowCount, static_cast<size_t>(region.end.y));
+  if (y0 >= y1) {
+    return;
+  }
+
+  for (size_t c = static_cast<size_t>(region.start.c); c < static_cast<size_t>(region.end.c); ++c) {
+    for (size_t y = y0; y < y1; ++y) {
+      for (size_t x = static_cast<size_t>(region.start.x); x < static_cast<size_t>(region.end.x); ++x) {
+        const uint8_t* src =
+          stripBuf + ((y - stripY) * sourceWidth * numChannels + x * numChannels + c) * voxelByteNumber;
+        uint8_t* dst = img.data<uint8_t>(x - region.start.x, y - region.start.y, 0, c - region.start.c);
+        std::copy_n(src, voxelByteNumber, dst);
+      }
+    }
+  }
+}
+
+} // namespace
+
+void ZTiff::readRegionFromIFD(const ZTiffIFD& ifd, ZImg& img, const ZImgRegion& region)
+{
+  ZImgInfo ifdInfo;
+  readInfoFromIFD(ifd, ifdInfo);
+  if (region.isEmpty() || !region.isValid(ifdInfo)) {
+    throw ZException(fmt::format("Invalid TIFF IFD region. IFD info: '{}', region: '{}'", ifdInfo, region));
+  }
+
+  ZImgRegion resolvedRegion = region;
+  resolvedRegion.resolveRegionEnd(ifdInfo);
+  if (resolvedRegion.start.z != 0 || resolvedRegion.end.z != 1 || resolvedRegion.start.t != 0 ||
+      resolvedRegion.end.t != 1) {
+    throw ZException(fmt::format("TIFF IFD region must address one 2D plane: {}", resolvedRegion));
+  }
+
+  if (resolvedRegion.containsWholeImg(ifdInfo)) {
+    img = ZImg(ifdInfo);
+    readImgFromIFD(ifd, img);
+    return;
+  }
+
+  const uint16_t orientation = ifd.orientation();
+  const bool unsupportedOrientation = orientation != ORIENTATION_TOPLEFT;
+  const bool readAsRgba = ifd.photometricInterpretation() != PHOTOMETRIC_MINISBLACK &&
+                          ifd.photometricInterpretation() != PHOTOMETRIC_MINISWHITE &&
+                          ifd.photometricInterpretation() != PHOTOMETRIC_RGB && m_useColormap;
+  if (unsupportedOrientation || readAsRgba) {
+    ZImg full(ifdInfo);
+    readImgFromIFD(ifd, full);
+    img = full.crop(resolvedRegion);
+    return;
+  }
+
+  if (TIFFSetSubDirectory(m_tif.get(), ifd.offset()) != 1) {
+    throw ZException(fmt::format("Can not read ifd at offset {}", ifd.offset()), ZException::Option::CheckErrno);
+  }
+
+  uint16_t planarConfig;
+  TIFFGetFieldDefaulted(m_tif.get(), TIFFTAG_PLANARCONFIG, &planarConfig);
+  const bool separatePlane = PLANARCONFIG_SEPARATE == planarConfig;
+  const bool invertWhiteBlack = ifd.photometricInterpretation() == PHOTOMETRIC_MINISWHITE;
+  if (invertWhiteBlack && (ifd.voxelFormat(0) == VoxelFormat::Signed || ifd.voxelFormat(0) == VoxelFormat::Float)) {
+    throw ZException("Don't support PHOTOMETRIC_MINISWHITE for signed or double image.");
+  }
+
+  img = ZImg(resolvedRegion.clip(ifdInfo));
+  const size_t channelBegin = static_cast<size_t>(resolvedRegion.start.c);
+  const size_t channelEnd = static_cast<size_t>(resolvedRegion.end.c);
+
+  if (TIFFIsTiled(m_tif.get())) {
+    uint32_t tileWidth;
+    uint32_t tileHeight;
+    TIFFGetField(m_tif.get(), TIFFTAG_TILEWIDTH, &tileWidth);
+    TIFFGetField(m_tif.get(), TIFFTAG_TILELENGTH, &tileHeight);
+    const size_t tilesPerRow = (ifdInfo.width + tileWidth - 1) / tileWidth;
+    const size_t firstTileCol = static_cast<size_t>(resolvedRegion.start.x) / tileWidth;
+    const size_t lastTileCol = (static_cast<size_t>(resolvedRegion.end.x) - 1) / tileWidth;
+    const size_t firstTileRow = static_cast<size_t>(resolvedRegion.start.y) / tileHeight;
+    const size_t lastTileRow = (static_cast<size_t>(resolvedRegion.end.y) - 1) / tileHeight;
+
+    if (separatePlane || ifdInfo.numChannels == 1) {
+      const uint32_t tilesPerChannel = TIFFNumberOfTiles(m_tif.get()) / ifdInfo.numChannels;
+      std::vector<uint8_t, boost::alignment::aligned_allocator<uint8_t, 64>> tileBuf(tileWidth * tileHeight *
+                                                                                     ifdInfo.voxelByteNumber());
+      for (size_t c = channelBegin; c < channelEnd; ++c) {
+        for (size_t tileRow = firstTileRow; tileRow <= lastTileRow; ++tileRow) {
+          for (size_t tileCol = firstTileCol; tileCol <= lastTileCol; ++tileCol) {
+            const uint32_t tile = static_cast<uint32_t>(c * tilesPerChannel + tileRow * tilesPerRow + tileCol);
+            readTile(tile, tileBuf.data(), tileWidth, tileHeight, 1, invertWhiteBlack);
+            copyOneChannelTileRegionToImg(tileBuf.data(),
+                                          tileWidth,
+                                          tileHeight,
+                                          ifdInfo.voxelByteNumber(),
+                                          img,
+                                          resolvedRegion,
+                                          tileCol * tileWidth,
+                                          tileRow * tileHeight,
+                                          c - channelBegin);
+          }
+        }
+      }
+    } else {
+      std::vector<uint8_t, boost::alignment::aligned_allocator<uint8_t, 64>> tileBuf(
+        tileWidth * tileHeight * ifdInfo.voxelByteNumber() * ifdInfo.numChannels);
+      for (size_t tileRow = firstTileRow; tileRow <= lastTileRow; ++tileRow) {
+        for (size_t tileCol = firstTileCol; tileCol <= lastTileCol; ++tileCol) {
+          const uint32_t tile = static_cast<uint32_t>(tileRow * tilesPerRow + tileCol);
+          readTile(tile, tileBuf.data(), tileWidth, tileHeight, ifdInfo.numChannels, invertWhiteBlack);
+          copyContiguousTileRegionToImg(tileBuf.data(),
+                                        tileWidth,
+                                        tileHeight,
+                                        ifdInfo.numChannels,
+                                        ifdInfo.voxelByteNumber(),
+                                        img,
+                                        resolvedRegion,
+                                        tileCol * tileWidth,
+                                        tileRow * tileHeight);
+        }
+      }
+    }
+  } else {
+    const size_t rowsPerStrip = std::min<size_t>(ifd.rowsPerStrip(), ifdInfo.height);
+    const size_t firstStrip = static_cast<size_t>(resolvedRegion.start.y) / rowsPerStrip;
+    const size_t lastStrip = (static_cast<size_t>(resolvedRegion.end.y) - 1) / rowsPerStrip;
+
+    if (separatePlane || ifdInfo.numChannels == 1) {
+      const uint32_t stripsPerChannel = TIFFNumberOfStrips(m_tif.get()) / ifdInfo.numChannels;
+      std::vector<uint8_t, boost::alignment::aligned_allocator<uint8_t, 64>> stripBuf(rowsPerStrip * ifdInfo.width *
+                                                                                      ifdInfo.voxelByteNumber());
+      for (size_t c = channelBegin; c < channelEnd; ++c) {
+        for (size_t strip = firstStrip; strip <= lastStrip; ++strip) {
+          const size_t stripY = strip * rowsPerStrip;
+          const size_t rowCount = std::min(rowsPerStrip, ifdInfo.height - stripY);
+          readStrip(static_cast<uint32_t>(c * stripsPerChannel + strip),
+                    stripBuf.data(),
+                    ifdInfo.width,
+                    rowCount,
+                    1,
+                    invertWhiteBlack);
+          copyOneChannelStripRegionToImg(stripBuf.data(),
+                                         ifdInfo.width,
+                                         stripY,
+                                         ifdInfo.voxelByteNumber(),
+                                         img,
+                                         resolvedRegion,
+                                         rowCount,
+                                         c - channelBegin);
+        }
+      }
+    } else {
+      std::vector<uint8_t, boost::alignment::aligned_allocator<uint8_t, 64>> stripBuf(
+        rowsPerStrip * ifdInfo.width * ifdInfo.voxelByteNumber() * ifdInfo.numChannels);
+      for (size_t strip = firstStrip; strip <= lastStrip; ++strip) {
+        const size_t stripY = strip * rowsPerStrip;
+        const size_t rowCount = std::min(rowsPerStrip, ifdInfo.height - stripY);
+        readStrip(static_cast<uint32_t>(strip),
+                  stripBuf.data(),
+                  ifdInfo.width,
+                  rowCount,
+                  ifdInfo.numChannels,
+                  invertWhiteBlack);
+        copyContiguousStripRegionToImg(stripBuf.data(),
+                                       ifdInfo.width,
+                                       stripY,
+                                       ifdInfo.numChannels,
+                                       ifdInfo.voxelByteNumber(),
+                                       img,
+                                       resolvedRegion,
+                                       rowCount);
+      }
+    }
+  }
+
+  if (ifd.extraSample() == EXTRASAMPLE_ASSOCALPHA || ifd.extraSample() == EXTRASAMPLE_UNSPECIFIED) {
+    img.correctPreMultipliedColor();
+  }
 }
 
 ZImg ZTiff::readThumbnailFromIFD(const ZTiffIFD& ifd)
@@ -1844,6 +2115,145 @@ void ZTiff::copyTileToImg(const uint8_t* tileBuf,
   }
 }
 
+namespace {
+
+void ensureTiffWriteTileBufferSize(size_t bytes)
+{
+  if (bytes > static_cast<size_t>(std::numeric_limits<tmsize_t>::max())) {
+    throw ZException(fmt::format("TIFF tile buffer is too large to write: {} bytes", bytes));
+  }
+}
+
+void copyImgChannelToTileBuffer(const ZImg& img,
+                                size_t z,
+                                size_t t,
+                                size_t c,
+                                size_t tileX,
+                                size_t tileY,
+                                size_t tileWidth,
+                                size_t tileHeight,
+                                std::vector<uint8_t>& tileBuf)
+{
+  CHECK(!tileBuf.empty());
+  std::fill(tileBuf.begin(), tileBuf.end(), uint8_t{0});
+  const size_t copyWidth = tileX >= img.width() ? 0 : std::min(tileWidth, img.width() - tileX);
+  const size_t copyHeight = tileY >= img.height() ? 0 : std::min(tileHeight, img.height() - tileY);
+  const size_t copyBytes = copyWidth * img.voxelByteNumber();
+  for (size_t y = 0; y < copyHeight; ++y) {
+    const uint8_t* src = img.data<uint8_t>(tileX, tileY + y, z, c, t);
+    uint8_t* dst = tileBuf.data() + y * tileWidth * img.voxelByteNumber();
+    std::copy_n(src, copyBytes, dst);
+  }
+}
+
+void copyImgContiguousToTileBuffer(const ZImg& img,
+                                   size_t z,
+                                   size_t t,
+                                   size_t tileX,
+                                   size_t tileY,
+                                   size_t tileWidth,
+                                   size_t tileHeight,
+                                   std::vector<uint8_t>& tileBuf)
+{
+  CHECK(!tileBuf.empty());
+  std::fill(tileBuf.begin(), tileBuf.end(), uint8_t{0});
+  const size_t copyWidth = tileX >= img.width() ? 0 : std::min(tileWidth, img.width() - tileX);
+  const size_t copyHeight = tileY >= img.height() ? 0 : std::min(tileHeight, img.height() - tileY);
+  const size_t voxelByteNumber = img.voxelByteNumber();
+  const size_t numChannels = img.numChannels();
+  for (size_t y = 0; y < copyHeight; ++y) {
+    for (size_t x = 0; x < copyWidth; ++x) {
+      for (size_t c = 0; c < numChannels; ++c) {
+        const uint8_t* src = img.data<uint8_t>(tileX + x, tileY + y, z, c, t);
+        uint8_t* dst = tileBuf.data() + ((y * tileWidth + x) * numChannels + c) * voxelByteNumber;
+        std::copy_n(src, voxelByteNumber, dst);
+      }
+    }
+  }
+}
+
+void writeTileOrThrow(TIFF* tif, uint32_t tile, std::vector<uint8_t>& tileBuf)
+{
+  ensureTiffWriteTileBufferSize(tileBuf.size());
+  if (TIFFWriteEncodedTile(tif, tile, tileBuf.data(), static_cast<tmsize_t>(tileBuf.size())) < 0) {
+    throw ZException(fmt::format("Can not write TIFF tile {}", tile), ZException::Option::CheckErrno);
+  }
+}
+
+void writeTiledIFDData(TIFF* tif,
+                       const ZImg& img,
+                       size_t z,
+                       size_t t,
+                       index_t c,
+                       bool planarconfigSeparate,
+                       size_t tileWidth,
+                       size_t tileHeight)
+{
+  CHECK(tileWidth > 0);
+  CHECK(tileHeight > 0);
+  const size_t tilesPerRow = (img.width() + tileWidth - 1) / tileWidth;
+  const size_t tilesPerCol = (img.height() + tileHeight - 1) / tileHeight;
+
+  if (c < 0) {
+    if (planarconfigSeparate || img.numChannels() == 1) {
+      std::vector<uint8_t> tileBuf(tileWidth * tileHeight * img.voxelByteNumber());
+      for (size_t ch = 0; ch < img.numChannels(); ++ch) {
+        for (size_t tileRow = 0; tileRow < tilesPerCol; ++tileRow) {
+          for (size_t tileCol = 0; tileCol < tilesPerRow; ++tileCol) {
+            const size_t tileX = tileCol * tileWidth;
+            const size_t tileY = tileRow * tileHeight;
+            copyImgChannelToTileBuffer(img, z, t, ch, tileX, tileY, tileWidth, tileHeight, tileBuf);
+            writeTileOrThrow(tif, TIFFComputeTile(tif, tileX, tileY, 0, static_cast<uint16_t>(ch)), tileBuf);
+          }
+        }
+      }
+    } else {
+      std::vector<uint8_t> tileBuf(tileWidth * tileHeight * img.voxelByteNumber() * img.numChannels());
+      for (size_t tileRow = 0; tileRow < tilesPerCol; ++tileRow) {
+        for (size_t tileCol = 0; tileCol < tilesPerRow; ++tileCol) {
+          const size_t tileX = tileCol * tileWidth;
+          const size_t tileY = tileRow * tileHeight;
+          copyImgContiguousToTileBuffer(img, z, t, tileX, tileY, tileWidth, tileHeight, tileBuf);
+          writeTileOrThrow(tif, TIFFComputeTile(tif, tileX, tileY, 0, 0), tileBuf);
+        }
+      }
+    }
+    return;
+  }
+
+  std::vector<uint8_t> tileBuf(tileWidth * tileHeight * img.voxelByteNumber());
+  for (size_t tileRow = 0; tileRow < tilesPerCol; ++tileRow) {
+    for (size_t tileCol = 0; tileCol < tilesPerRow; ++tileCol) {
+      const size_t tileX = tileCol * tileWidth;
+      const size_t tileY = tileRow * tileHeight;
+      copyImgChannelToTileBuffer(img, z, t, static_cast<size_t>(c), tileX, tileY, tileWidth, tileHeight, tileBuf);
+      writeTileOrThrow(tif, TIFFComputeTile(tif, tileX, tileY, 0, 0), tileBuf);
+    }
+  }
+}
+
+void writeStripIFDData(TIFF* tif, const ZImg& img, size_t z, size_t t, index_t c, bool planarconfigSeparate)
+{
+  if (c < 0) {
+    if (planarconfigSeparate || img.numChannels() == 1) {
+      for (size_t ch = 0; ch < img.numChannels(); ++ch) {
+        TIFFWriteEncodedStrip(tif, ch, const_cast<uint8_t*>(img.planeData(z, ch, t)), img.planeByteNumber());
+      }
+    } else {
+      CHECK(z == 0 && t == 0 && c < 0 && img.numTimes() == 1 && img.depth() == 1 &&
+            (img.numChannels() == 4 || img.numChannels() == 3));
+      ZImg tmp(img.info());
+      CHECK(tmp.channelData<uint8_t>(0) != img.channelData<uint8_t>(0)) << img.info();
+      ZImgFormat::XYZCtoCXYZ(img, tmp);
+      TIFFWriteEncodedStrip(tif, 0, tmp.planeData(0, 0, 0), tmp.byteNumber());
+    }
+  } else {
+    TIFFWriteEncodedStrip(tif, 0, const_cast<uint8_t*>(img.planeData(z, c, t)), img.planeByteNumber());
+  }
+}
+
+} // namespace
+
 ZTiffWriter::ZTiffWriter()
   : m_tif(nullptr, TIFFClose)
 {}
@@ -1883,9 +2293,19 @@ void ZTiffWriter::writeIFD(const ZImg& img,
                            size_t t,
                            index_t c,
                            bool writeThumbnails,
-                           const std::vector<ZImgMetatag>& additionalTags)
+                           const std::vector<ZImgMetatag>& additionalTags,
+                           const std::vector<ZImg>* explicitSubIFDs,
+                           size_t tileWidth,
+                           size_t tileHeight)
 {
   CHECK(m_tif);
+  if ((tileWidth == 0) != (tileHeight == 0)) {
+    throw ZException("TIFF tiled writing requires both tile width and tile height");
+  }
+  if (tileWidth > std::numeric_limits<uint32_t>::max() || tileHeight > std::numeric_limits<uint32_t>::max()) {
+    throw ZException(fmt::format("TIFF tile dimensions are too large: {}x{}", tileWidth, tileHeight));
+  }
+  const bool writeTiled = tileWidth > 0 && tileHeight > 0;
   for (const auto& atag : additionalTags) {
     if (atag.tag() > 0 && atag.tag() < 65535) {
       TIFFSetField(m_tif.get(), atag.tag(), atag.dataArray());
@@ -1929,38 +2349,47 @@ void ZTiffWriter::writeIFD(const ZImg& img,
     uint16_t extraSample = m_extraSample;
     TIFFSetField(m_tif.get(), TIFFTAG_EXTRASAMPLES, 1, &extraSample);
   }
-  TIFFSetField(m_tif.get(), TIFFTAG_ROWSPERSTRIP, img.height());
+  if (writeTiled) {
+    TIFFSetField(m_tif.get(), TIFFTAG_TILEWIDTH, static_cast<uint32_t>(tileWidth));
+    TIFFSetField(m_tif.get(), TIFFTAG_TILELENGTH, static_cast<uint32_t>(tileHeight));
+  } else {
+    TIFFSetField(m_tif.get(), TIFFTAG_ROWSPERSTRIP, img.height());
+  }
   TIFFSetField(m_tif.get(), TIFFTAG_SAMPLEFORMAT, img.voxelFormat());
   std::vector<ZImg> emptyList;
-  const std::vector<ZImg>* thumbnails = &emptyList;
-  if (writeThumbnails) {
-    thumbnails = &(img.thumbnail().planeAttachments(z, t));
-    if (!thumbnails->empty()) {
-      std::vector<toff_t> sub_IFDs_offsets(thumbnails->size());
-      TIFFSetField(m_tif.get(), TIFFTAG_SUBIFD, thumbnails->size(), sub_IFDs_offsets.data());
+  const std::vector<ZImg>* reducedIFDs = explicitSubIFDs ? explicitSubIFDs : &emptyList;
+  if (!explicitSubIFDs && writeThumbnails) {
+    reducedIFDs = &(img.thumbnail().planeAttachments(z, t));
+  }
+  if (!reducedIFDs->empty()) {
+    for (const ZImg& reducedIFD : *reducedIFDs) {
+      if (reducedIFD.depth() != 1 || reducedIFD.numTimes() != 1) {
+        throw ZException(fmt::format("TIFF SubIFD must be one 2D plane, got {}", reducedIFD.info()));
+      }
+      const size_t parentSamples = c < 0 ? img.numChannels() : 1;
+      if (reducedIFD.numChannels() != parentSamples) {
+        throw ZException(fmt::format("TIFF SubIFD channel count {} does not match parent IFD sample count {}",
+                                     reducedIFD.numChannels(),
+                                     parentSamples));
+      }
+      if (reducedIFD.voxelByteNumber() != img.voxelByteNumber() || reducedIFD.voxelFormat() != img.voxelFormat()) {
+        throw ZException(
+          fmt::format("TIFF SubIFD pixel type <{}> does not match parent image <{}>", reducedIFD.info(), img.info()));
+      }
     }
+    std::vector<toff_t> subIFDOffsets(reducedIFDs->size());
+    TIFFSetField(m_tif.get(), TIFFTAG_SUBIFD, reducedIFDs->size(), subIFDOffsets.data());
   }
 
-  if (c < 0) {
-    if (planarconfigSeparate || img.numChannels() == 1) {
-      for (size_t ch = 0; ch < img.numChannels(); ++ch) {
-        TIFFWriteEncodedStrip(m_tif.get(), ch, const_cast<uint8_t*>(img.planeData(z, ch, t)), img.planeByteNumber());
-      }
-    } else {
-      CHECK(z == 0 && t == 0 && c < 0 && img.numTimes() == 1 && img.depth() == 1 &&
-            (img.numChannels() == 4 || img.numChannels() == 3));
-      ZImg tmp(img.info());
-      CHECK(tmp.channelData<uint8_t>(0) != img.channelData<uint8_t>(0)) << img.info();
-      ZImgFormat::XYZCtoCXYZ(img, tmp);
-      TIFFWriteEncodedStrip(m_tif.get(), 0, tmp.planeData(0, 0, 0), tmp.byteNumber());
-    }
+  if (writeTiled) {
+    writeTiledIFDData(m_tif.get(), img, z, t, c, planarconfigSeparate, tileWidth, tileHeight);
   } else {
-    TIFFWriteEncodedStrip(m_tif.get(), 0, const_cast<uint8_t*>(img.planeData(z, c, t)), img.planeByteNumber());
+    writeStripIFDData(m_tif.get(), img, z, t, c, planarconfigSeparate);
   }
 
   TIFFWriteDirectory(m_tif.get());
 
-  for (const auto& thumbnail : *thumbnails) {
+  for (const auto& thumbnail : *reducedIFDs) {
     TIFFSetField(m_tif.get(), TIFFTAG_SUBFILETYPE, FILETYPE_REDUCEDIMAGE);
     TIFFSetField(m_tif.get(), TIFFTAG_IMAGEWIDTH, thumbnail.width());
     TIFFSetField(m_tif.get(), TIFFTAG_IMAGELENGTH, thumbnail.height());
@@ -1969,13 +2398,17 @@ void ZTiffWriter::writeIFD(const ZImg& img,
     TIFFSetField(m_tif.get(), TIFFTAG_COMPRESSION, getTiffCompressionTag(m_compression));
     TIFFSetField(m_tif.get(), TIFFTAG_PHOTOMETRIC, photo);
     TIFFSetField(m_tif.get(), TIFFTAG_PLANARCONFIG, PLANARCONFIG_SEPARATE);
-    TIFFSetField(m_tif.get(), TIFFTAG_ROWSPERSTRIP, thumbnail.height());
+    if (writeTiled) {
+      TIFFSetField(m_tif.get(), TIFFTAG_TILEWIDTH, static_cast<uint32_t>(tileWidth));
+      TIFFSetField(m_tif.get(), TIFFTAG_TILELENGTH, static_cast<uint32_t>(tileHeight));
+    } else {
+      TIFFSetField(m_tif.get(), TIFFTAG_ROWSPERSTRIP, thumbnail.height());
+    }
     TIFFSetField(m_tif.get(), TIFFTAG_SAMPLEFORMAT, thumbnail.voxelFormat());
-    for (size_t ch = 0; ch < thumbnail.numChannels(); ++ch) {
-      TIFFWriteEncodedStrip(m_tif.get(),
-                            ch,
-                            const_cast<uint8_t*>(thumbnail.planeData(0, ch, 0)),
-                            thumbnail.planeByteNumber());
+    if (writeTiled) {
+      writeTiledIFDData(m_tif.get(), thumbnail, 0, 0, -1, true, tileWidth, tileHeight);
+    } else {
+      writeStripIFDData(m_tif.get(), thumbnail, 0, 0, -1, true);
     }
     TIFFWriteDirectory(m_tif.get());
   }

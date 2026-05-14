@@ -93,11 +93,6 @@ protected:
                        index_t startT = 0,
                        index_t startL = 0);
 
-private:
-  // img2D contains a 2D image, use x,y,and optional c range to cut it then copy it to img at location (z,c,t)
-  // img2D contains all channel if c == -1
-  static void cpyImg(const ZImg& img2D, const ZImgRegion& region, ZImg& img, size_t z, index_t c, size_t t);
-
 protected:
   std::vector<ZImgInfo> m_imgInfo;
   QString m_dimensionOrder = "ZTL";

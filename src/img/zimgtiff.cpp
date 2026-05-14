@@ -4,9 +4,32 @@
 #include "zimgsliceprovider.h"
 #include "ztiff.h"
 #include "zstringutils.h"
+#include <algorithm>
 #include <cmath>
 
 namespace nim {
+
+namespace {
+
+constexpr size_t kTiffDefaultTileSize = 512;
+
+bool firstNormalTiffTileSize(const ZTiff& tiff, size_t& tileWidth, size_t& tileHeight)
+{
+  for (const ZTiffIFD& ifd : tiff.ifds()) {
+    if (!ifd.isNormalImage()) {
+      continue;
+    }
+    if (!ifd.isTiledImage()) {
+      return false;
+    }
+    tileWidth = static_cast<size_t>(ifd.tileWidth());
+    tileHeight = static_cast<size_t>(ifd.tileHeight());
+    return tileWidth > 0 && tileHeight > 0;
+  }
+  return false;
+}
+
+} // namespace
 
 QString ZImgTiff::shortName() const
 {
@@ -36,7 +59,10 @@ void ZImgTiff::readInfo(const QString& filename,
   detectImgInfo(tiff);
   infos = m_imgInfo;
 
-  createDefaultSubBlocks(filename, infos, subBlocks);
+  size_t tileWidth = kTiffDefaultTileSize;
+  size_t tileHeight = kTiffDefaultTileSize;
+  firstNormalTiffTileSize(tiff, tileWidth, tileHeight);
+  createTiledSubBlocks(filename, infos, subBlocks, tileWidth, tileHeight, FileFormat::Tiff);
 
   if (!m_imageDescription.empty()) {
     VLOG(1) << m_imageDescription;
@@ -104,17 +130,10 @@ void ZImgTiff::readImg(const QString& filename, ZImg& img, const ZImgRegion& reg
     throw ZException(fmt::format("Invalid image region. Image info: '{}', region: '{}'", m_imgInfo[scene], region));
   }
 
-  ZImgInfo imgInfo2D(m_imgInfo[scene]);
-  imgInfo2D.depth = 1;
-  imgInfo2D.numTimes = 1;
-  if (m_dimensionOrder.contains(QChar('C'))) {
-    imgInfo2D.numChannels = 1;
-  }
-  ZImg buf2DImg(imgInfo2D);
-  // VLOG(1) << imgInfo2D;
-
   ZImgInfo partialImgInfo = region.clip(m_imgInfo[scene]);
   ZImg imgTmp(partialImgInfo);
+  ZImgRegion resolvedRegion = region;
+  resolvedRegion.resolveRegionEnd(m_imgInfo[scene]);
   // VLOG(1) << partialImgInfo;
 
   index_t z = 0;
@@ -128,11 +147,44 @@ void ZImgTiff::readImg(const QString& filename, ZImg& img, const ZImgRegion& reg
       if (!mapIFDToImgLocation(ifdIdx, z, c, t, l)) {
         break;
       }
-      if ((region.zInRegion(z)) && (region.cInRegion(c) || c == -1) && (region.tInRegion(t)) &&
+      if ((resolvedRegion.zInRegion(z)) && (c == -1 || resolvedRegion.cInRegion(c)) && (resolvedRegion.tInRegion(t)) &&
           (scene == static_cast<size_t>(l))) {
-        tiff.readImgFromIFD(i, buf2DImg);
         // VLOG(1) << ifdIdx << " " << z << " " << c << " " << t << " " << l;
-        cpyImg(buf2DImg, region, imgTmp, z - region.start.z, c, t - region.start.t);
+        ZImg planeImg;
+        if (c < 0) {
+          tiff.readRegionFromIFD(ifds[i],
+                                 planeImg,
+                                 ZImgRegion(resolvedRegion.start.x,
+                                            resolvedRegion.end.x,
+                                            resolvedRegion.start.y,
+                                            resolvedRegion.end.y,
+                                            0,
+                                            1,
+                                            resolvedRegion.start.c,
+                                            resolvedRegion.end.c,
+                                            0,
+                                            1));
+          imgTmp.pasteImg(planeImg,
+                          ZVoxelCoordinate(0, 0, z - resolvedRegion.start.z, 0, t - resolvedRegion.start.t),
+                          false);
+        } else {
+          tiff.readRegionFromIFD(ifds[i],
+                                 planeImg,
+                                 ZImgRegion(resolvedRegion.start.x,
+                                            resolvedRegion.end.x,
+                                            resolvedRegion.start.y,
+                                            resolvedRegion.end.y,
+                                            0,
+                                            1,
+                                            0,
+                                            1,
+                                            0,
+                                            1));
+          imgTmp.pasteImg(
+            planeImg,
+            ZVoxelCoordinate(0, 0, z - resolvedRegion.start.z, c - resolvedRegion.start.c, t - resolvedRegion.start.t),
+            false);
+        }
       }
       ifdIdx++;
     }
@@ -156,7 +208,7 @@ void ZImgTiff::writeImg(const QString& filename, const ZImg& img, const ZImgWrit
   }
   for (size_t t = 0; t < img.numTimes(); ++t) {
     for (size_t z = 0; z < img.depth(); ++z) {
-      tiffWriter.writeIFD(img, z, t, -1, true);
+      tiffWriter.writeIFD(img, z, t, -1, true, {}, nullptr, kTiffDefaultTileSize, kTiffDefaultTileSize);
     }
   }
 }
@@ -176,7 +228,15 @@ void ZImgTiff::writeImg(const QString& filename,
   }
   for (size_t t = 0; t < imgSliceProvider.imgInfo().numTimes; ++t) {
     for (size_t z = 0; z < imgSliceProvider.imgInfo().depth; ++z) {
-      tiffWriter.writeIFD(imgSliceProvider.slice(z, t), 0, 0, -1, true);
+      tiffWriter.writeIFD(imgSliceProvider.slice(z, t),
+                          0,
+                          0,
+                          -1,
+                          true,
+                          {},
+                          nullptr,
+                          kTiffDefaultTileSize,
+                          kTiffDefaultTileSize);
     }
   }
 }
@@ -489,40 +549,6 @@ bool ZImgTiff::IFDToLoc(size_t ifdIdx,
   //  dimensionOrder
   //            << " " << imgInfo << " " << startZ << " " << startC << " " << startT << " " << startL;
   return true;
-}
-
-void ZImgTiff::cpyImg(const ZImg& img2D, const ZImgRegion& region, ZImg& img, size_t z, index_t c, size_t t)
-{
-  if (c < 0) {
-    auto cEnd = region.end.c == -1 ? ZImgRegion::value_type(img2D.numChannels()) : region.end.c;
-    for (auto lc = region.start.c; lc < cEnd; ++lc) {
-      if (region.containsWholeRow(img2D.info())) {
-        std::copy_n(img2D.rowData<uint8_t>(region.start.y, 0, lc, 0),
-                    img.planeByteNumber(),
-                    img.planeData<uint8_t>(z, lc - region.start.c, t));
-      } else {
-        auto yEnd = region.end.y == -1 ? ZImgRegion::value_type(img2D.height()) : region.end.y;
-        for (auto y = region.start.y; y < yEnd; ++y) {
-          std::copy_n(img2D.data<uint8_t>(region.start.x, y, 0, lc, 0),
-                      img.rowByteNumber(),
-                      img.rowData<uint8_t>(y - region.start.y, z, lc - region.start.c, t));
-        }
-      }
-    }
-  } else if (region.cInRegion(c)) {
-    if (region.containsWholeRow(img2D.info())) {
-      std::copy_n(img2D.rowData<uint8_t>(region.start.y, 0, 0, 0),
-                  img.planeByteNumber(),
-                  img.planeData<uint8_t>(z, c - region.start.c, t));
-    } else {
-      auto yEnd = region.end.y == -1 ? ZImgRegion::value_type(img2D.height()) : region.end.y;
-      for (auto y = region.start.y; y < yEnd; ++y) {
-        std::copy_n(img2D.data<uint8_t>(region.start.x, y, 0, 0, 0),
-                    img.rowByteNumber(),
-                    img.rowData<uint8_t>(y - region.start.y, z, c - region.start.c, t));
-      }
-    }
-  }
 }
 
 } // namespace nim

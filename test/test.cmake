@@ -81,6 +81,8 @@ add_gtest_executable(zimgiteratortest)
 add_gtest_executable(zimgnccmkltest)
 add_gtest_executable(zimgnccpocketffttest)
 add_gtest_executable(zimgncctest)
+add_gtest_executable(zimgometifftest)
+add_gtest_executable(zimgtifftest)
 add_gtest_executable(zimgregionalextrematest)
 add_gtest_executable(zimgsigneddistancemaptest)
 add_gtest_executable(zimgtest)
@@ -109,6 +111,7 @@ add_gtest_executable(ztupleliketest)
 # Vulkan RAII pipeline recorder debug checks (debug-only assertions in code)
 # This test only exercises header + a few .cpp symbols; there is no GPU work.
 add_atlas_gtest_executable(zvulkanpipelinecontexttest)
+add_atlas_gtest_executable(zimgometiffpacktest)
 
 # Consolidate the heaviest Atlas-linked tests into a single executable to avoid paying
 # the large atlas_lib link cost multiple times. This currently includes:

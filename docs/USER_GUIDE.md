@@ -101,19 +101,20 @@ Atlas is crafted to handle entire imaging pipelines, from loading raw data to pr
 
 ### 1.3 Supported Data Types
 
-Atlas organizes data by object type so each kind of content has the right loading, editing, and export tools.
+Atlas organizes data by object type so each kind of content has the right loading, editing, and export tools. For a
+more complete extension list, see [File Format Support at a Glance](#123-file-format-support-at-a-glance).
 
-| Object Type | Typical Extensions | Notes |
+| Object Type | Examples | Notes |
 | --- | --- | --- |
-| Images | `.tif`, `.tiff`, `.ome.tif`, `.mhd`, `.raw`, `.nii`, `.hdr`, `.png`, `.jpg`, `.bmp`, `.exr`, `.lsm`, `.v3draw`, Bio-Formats reader formats | Multi-channel, multi-timepoint volumes supported. Sequences can be imported as stacks. Bio-Formats-backed files, including multi-series and pyramidal microscopy formats, load through the bundled Java sidecar when the Bio-Formats jars are installed. Also supports Neuroglancer precomputed volumes (`raw`/`jpeg`/`png`/`compresso`/`compressed_segmentation`, sharded or unsharded) via URL. |
-| ROI Masks | `.roi`, `.mask`, `.nii`, `.mhd`, `.nrrd` | Accepts Atlas-generated ROI files or converts mask images into editable ROIs. |
-| Region Annotations | `.annotation`, `.json`, label images | Handles labeled regions and can import or export label images. |
-| Puncta Sets | `.nimp`, `.apo`, `.marker`, `.txt`, `.xyz` | Stores point-based annotations such as synaptic puncta with undo support. |
-| SWC Trees | `.swc`, `.eswc`, `.json` | Manages neuronal tree structures with per-node attributes. |
-| Meshes | `.obj`, `.ply`, `.stl`, `.off`, `.vtk`, `.gii` | Calculates common surface and volume measurements on load. |
-| SVG Overlays | `.svg` | Overlays vector graphics such as outlines and labels. |
-| 2D Animations | `.animation2d` | Timeline for 2D view parameters. |
-| 3D Animations | `.animation3d` | Timeline for 3D parameters and camera paths. |
+| Images | Microscopy volumes, image sequences, Neuroglancer volumes, general 2D images | Multi-channel, multi-timepoint volumes supported. Native TIFF and OME-TIFF support efficient large-image loading and export, including pyramidal OME-TIFF overviews. Bio-Formats-backed files outside native support load through the bundled Java sidecar when the Bio-Formats jars are installed. |
+| ROI Masks | Atlas ROI files, masks, label images | Accepts Atlas-generated ROI files or converts mask images into editable ROIs. |
+| Region Annotations | Region files, JSON, label images | Handles labeled regions and can import or export label images. |
+| Puncta Sets | Atlas puncta, marker files, point tables | Stores point-based annotations such as synaptic puncta with undo support. |
+| SWC Trees | SWC, extended SWC, JSON skeletons | Manages neuronal tree structures with per-node attributes. |
+| Meshes | OBJ, PLY, STL, OFF, VTK, GIfTI | Calculates common surface and volume measurements on load. |
+| SVG Overlays | Vector overlays | Overlays vector graphics such as outlines and labels. |
+| 2D Animations | 2D animation timelines | Timeline for 2D view parameters. |
+| 3D Animations | 3D animation timelines | Timeline for 3D parameters and camera paths. |
 
 <!-- > 📸 **Screenshot to add:** A collage showing different supported object types loaded into the Objects Manager.-->
 ![Atlas object types loaded in the Objects Manager](images/zuhe.png)
@@ -1552,7 +1553,7 @@ Use **Help → Shortcuts** in either the 2D or 3D window to open this section di
 
 ### 12.3 File Format Support at a Glance
 
-- **Images** – Native readers cover common scientific and general image formats including TIFF/OME-TIFF, LSM, V3DRAW, MHD/RAW, PNG, JPG, EXR, BMP, CZI, Leica, HDF5-backed Atlas images, and NIfTI. Formats supported by Bio-Formats are available through `bioformats_package.jar`.
+- **Images** – Native readers cover common scientific and general image formats including TIFF/OME-TIFF, LSM, V3DRAW, MHD/RAW, PNG, JPG, EXR, BMP, CZI, Leica, HDF5-backed Atlas images, and NIfTI. Native TIFF and OME-TIFF support large-image loading and export, including pyramidal OME-TIFF overviews and BigTIFF. Formats supported by Bio-Formats are available through `bioformats_package.jar` when a native reader cannot handle the file.
 - **Meshes** – OBJ, PLY, STL, OFF, VTK, GIfTI (verify on load via logs).
 - **SWC** – SWC/eSWC variations; duplicates avoided through canonical path checks.
 - **Puncta** – Atlas NIMP, Vaa3D APO/marker, and TXT/XYZ point sets.
