@@ -3088,6 +3088,67 @@ def build_libjpeg(src_dir: str, install_dir: str, nasm_dir: str):
             shutil.rmtree(build_dir, ignore_errors=False)
             rm_tree(arm64_install_dir)
 
+        build_macos_libturbojpeg_dylib(src_dir, install_dir, nasm_dir)
+
+
+def build_macos_libturbojpeg_dylib(src_dir: str, install_dir: str, nasm_dir: str):
+    assert is_mac()
+
+    def create_libturbojpeg_install_dir(arch: str) -> str:
+        path = os.path.normpath(
+            os.path.join(
+                ext_build_dir(), f"__{arch}_libturbojpeg_" + Path(src_dir).name
+            )
+        )
+        if os.path.exists(path):
+            shutil.rmtree(path, ignore_errors=False, onexc=handleRemoveReadonly)
+        os.mkdir(path)
+        return path
+
+    x86_install_dir = create_libturbojpeg_install_dir("x86_64")
+    arm64_install_dir = create_libturbojpeg_install_dir("arm64")
+
+    def build_shared(target_install_dir: str, *, arm64_only: bool):
+        build_dir = create_build_dir(src_dir)
+        try:
+            cmakecmd = get_cmake_cmd_common_part(
+                target_install_dir, arm64_only=arm64_only
+            )
+            cmakecmd.extend(
+                [
+                    "-DENABLE_SHARED:BOOL=ON",
+                    "-DENABLE_STATIC:BOOL=OFF",
+                    "-DWITH_TESTS:BOOL=OFF",
+                    "-DWITH_TOOLS:BOOL=OFF",
+                ]
+            )
+            if not arm64_only:
+                cmakecmd.append(
+                    "-DCMAKE_ASM_NASM_COMPILER:FILEPATH=" + nasm_dir + "/nasm"
+                )
+            cmakecmd.append(src_dir)
+            build_and_install_cmakecmd(cmakecmd, build_dir)
+        finally:
+            shutil.rmtree(build_dir, ignore_errors=False)
+
+    try:
+        build_shared(x86_install_dir, arm64_only=False)
+        build_shared(arm64_install_dir, arm64_only=True)
+
+        x86_dylib = os.path.join(x86_install_dir, "lib", "libturbojpeg.dylib")
+        arm64_dylib = os.path.join(arm64_install_dir, "lib", "libturbojpeg.dylib")
+        output_dir = os.path.join(install_dir, "jars")
+        os.makedirs(output_dir, exist_ok=True)
+        output_dylib = os.path.join(output_dir, "libturbojpeg.dylib")
+        subprocess.run(
+            ["lipo", "-create", x86_dylib, arm64_dylib, "-output", output_dylib],
+            shell=False,
+            check=True,
+        )
+    finally:
+        rm_tree(x86_install_dir)
+        rm_tree(arm64_install_dir)
+
 
 def build_libpng(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)

@@ -73,14 +73,7 @@ _MACOS_NESTED_BUNDLE_SUFFIXES: tuple[str, ...] = (
 
 _MACOS_MACHO_FILE_EXTENSIONS: frozenset[str] = frozenset({".dylib", ".jnilib", ".so"})
 _MACOS_DISALLOWED_MACHO_ARCHS: frozenset[str] = frozenset({"i386", "ppc", "ppc64"})
-_MACOS_JAR_ENTRY_REMOVE_LIST: frozenset[str] = frozenset(
-    {
-        # Notarytool rejects this vendored TurboJPEG build because it was built with an SDK
-        # older than macOS 10.9. We don't ship a newer build, so remove it from the jar to
-        # satisfy notarization.
-        "META-INF/lib/osx_64/libturbojpeg.dylib",
-    }
-)
+_MACOS_JAR_ENTRY_REMOVE_LIST: frozenset[str] = frozenset()
 
 _MACOS_CODESIGN_TIMESTAMP_RETRY_ATTEMPTS = 5
 _MACOS_CODESIGN_TIMESTAMP_RETRY_BASE_DELAY_SECONDS = 2.0
@@ -773,6 +766,37 @@ def _macos_strip_disallowed_macho_archs_in_place(path: str) -> None:
     os.replace(input_path, path)
 
 
+def _macos_macho_sdk_version(path: str) -> Optional[Version]:
+    try:
+        proc = subprocess.run(
+            ["vtool", "-show-build", path],
+            shell=False,
+            check=False,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+        )
+    except FileNotFoundError:
+        return None
+
+    if proc.returncode != 0:
+        logger.debug("vtool -show-build failed for %s: %s", path, proc.stdout)
+        return None
+
+    for line in (proc.stdout or "").splitlines():
+        line = line.strip()
+        if not line.startswith("sdk "):
+            continue
+        value = line.removeprefix("sdk ").strip()
+        try:
+            return Version(value)
+        except Exception:
+            logger.debug("Could not parse Mach-O SDK version for %s: %s", path, value)
+            return None
+
+    return None
+
+
 def _macos_zipinfo_clone(info: zipfile.ZipInfo) -> zipfile.ZipInfo:
     # `ZipInfo` contains read-time offsets that aren't relevant for writing. Recreate a
     # fresh object but preserve metadata so the rewritten jar stays well-formed.
@@ -832,6 +856,34 @@ def _macos_codesign_macho_files_in_jar(
                 os.makedirs(os.path.dirname(tmp_file_path), exist_ok=True)
                 with open(tmp_file_path, "wb") as f:
                     f.write(zin.read(info.filename))
+
+                if info.filename == "META-INF/lib/osx_64/libturbojpeg.dylib":
+                    sdk_version = _macos_macho_sdk_version(tmp_file_path)
+                    minimum_sdk_version = Version("10.9")
+                    if sdk_version is None or sdk_version < minimum_sdk_version:
+                        replacement_path = os.path.join(
+                            common_dirs.ext_build_dir(),
+                            "jars",
+                            "libturbojpeg.dylib",
+                        )
+                        logger.info(
+                            "Replacing %s in %s with %s (jar sdk=%s, minimum=%s)",
+                            info.filename,
+                            os.path.basename(jar_path),
+                            replacement_path,
+                            sdk_version if sdk_version is not None else "<unknown>",
+                            minimum_sdk_version,
+                        )
+                        with open(replacement_path, "rb") as replacement:
+                            with open(tmp_file_path, "wb") as f:
+                                shutil.copyfileobj(replacement, f)
+                    else:
+                        logger.info(
+                            "Keeping %s in %s (jar sdk=%s)",
+                            info.filename,
+                            os.path.basename(jar_path),
+                            sdk_version,
+                        )
 
                 desc = _macos_file_description(tmp_file_path)
                 if not desc or "Mach-O" not in desc:
