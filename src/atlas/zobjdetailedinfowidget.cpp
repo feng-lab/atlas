@@ -6,6 +6,7 @@
 #include <QVBoxLayout>
 #include <QLabel>
 #include <QScrollArea>
+#include <QShowEvent>
 
 namespace nim {
 
@@ -34,6 +35,24 @@ void ZObjDetailedInfoWidget::showDefaultWidget()
 }
 
 void ZObjDetailedInfoWidget::showWidgetOfObj(size_t id)
+{
+  m_requestedObjId = id;
+  if (!isVisible()) {
+    return;
+  }
+
+  materializeWidgetOfObj(id);
+}
+
+void ZObjDetailedInfoWidget::showEvent(QShowEvent* event)
+{
+  QWidget::showEvent(event);
+  if (m_requestedObjId > 0) {
+    materializeWidgetOfObj(m_requestedObjId);
+  }
+}
+
+void ZObjDetailedInfoWidget::materializeWidgetOfObj(size_t id)
 {
   for (size_t i = 0; i < m_subWidgets.size(); ++i) {
     if (m_subWidgets[i].id == id) {
@@ -64,6 +83,7 @@ void ZObjDetailedInfoWidget::showWidgetOfObj(size_t id)
 
 void ZObjDetailedInfoWidget::hideWidget()
 {
+  m_requestedObjId = 0;
   m_widget->setCurrentWidget(m_defaultWidget);
 }
 
@@ -79,6 +99,10 @@ void ZObjDetailedInfoWidget::setDefaultWidget(QWidget* widget)
 
 void ZObjDetailedInfoWidget::removeWidgetOfObj(size_t id)
 {
+  if (m_requestedObjId == id) {
+    m_requestedObjId = 0;
+  }
+
   for (size_t i = 0; i < m_subWidgets.size(); ++i) {
     if (m_subWidgets[i].id == id) {
       if (m_widget->currentWidget() == m_subWidgets[i].widget) {

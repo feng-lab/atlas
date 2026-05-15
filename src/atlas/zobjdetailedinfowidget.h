@@ -6,6 +6,8 @@
 #include <QLabel>
 #include <QTextEdit>
 
+class QShowEvent;
+
 namespace nim {
 
 class ZObjDetailedInfoWidget : public QWidget
@@ -24,7 +26,12 @@ public:
 
   void setDefaultWidget(QWidget* widget);
 
+protected:
+  void showEvent(QShowEvent* event) override;
+
 private:
+  void materializeWidgetOfObj(size_t id);
+
   void removeWidgetOfObj(size_t id);
 
   void updateWidgetLabelOfObj(size_t id);
@@ -33,6 +40,7 @@ protected:
   ZDoc& m_doc;
   QStackedWidget* m_widget;
   QWidget* m_defaultWidget;
+  size_t m_requestedObjId = 0;
 
   struct SubWidget
   {
