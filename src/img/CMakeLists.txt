@@ -335,10 +335,25 @@ endif ()
 set_source_files_properties(zimgjpegxr.cpp PROPERTIES INCLUDE_DIRECTORIES "${JPEGXR_INCLUDE_DIRS}")
 set_source_files_properties(zimginterpolate.cpp PROPERTIES
         INCLUDE_DIRECTORIES "${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/ITKMorphologicalContourInterpolation")
-set_source_files_properties(zbioformatsbridgeclient.cpp ${BIOFORMATS_PROTO_SRCS} ${BIOFORMATS_GRPC_SRCS}
+set(BIOFORMATS_BRIDGE_SOURCE_FILES
+        zbioformatsbridgeclient.cpp
+        ${BIOFORMATS_PROTO_SRCS}
+        ${BIOFORMATS_GRPC_SRCS})
+set_source_files_properties(${BIOFORMATS_BRIDGE_SOURCE_FILES}
         PROPERTIES
-        INCLUDE_DIRECTORIES "${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/include;${CMAKE_CURRENT_BINARY_DIR}"
-        COMPILE_OPTIONS "-iquote${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/include")
+        INCLUDE_DIRECTORIES "${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/include;${CMAKE_CURRENT_BINARY_DIR}")
+
+# The generated protobuf headers include protobuf runtime headers with quotes
+# and require an exact gencode/header version match. Keep those quote includes
+# on Atlas' bundled protobuf first: CMake's SYSTEM include for 3rdparty/build
+# becomes -isystem, which AppleClang searches after its default /usr/local/include.
+if (MSVC AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    set_property(SOURCE ${BIOFORMATS_BRIDGE_SOURCE_FILES}
+            APPEND PROPERTY COMPILE_OPTIONS "/clang:-iquote${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/include")
+elseif (CMAKE_CXX_COMPILER_ID MATCHES "Clang" OR CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    set_property(SOURCE ${BIOFORMATS_BRIDGE_SOURCE_FILES}
+            APPEND PROPERTY COMPILE_OPTIONS "-iquote${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/include")
+endif ()
 
 if (WIN32)
     target_compile_definitions(${LIBRARY_NAME} PUBLIC _CRT_SECURE_NO_WARNINGS NOMINMAX WIN32_LEAN_AND_MEAN
