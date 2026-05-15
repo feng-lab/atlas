@@ -255,10 +255,10 @@ void ZPunctaDetection::doWork()
   ZImgRegion punctaChannelRegion(0, -1, 0, -1, 0, -1, m_punctaChannel, m_punctaChannel + 1, m_t, m_t + 1);
   ZImgRegion dendriteChannelRegion(0, -1, 0, -1, 0, -1, m_dendriteChannel, m_dendriteChannel + 1, m_t, m_t + 1);
   if (ZCpuInfo::instance().nPhysicalRAM >= (1.25 * m_imgInfo.channelByteNumber())) { // enough memory
-    ZImg cimg(m_filename, punctaChannelRegion, m_scene);
+    ZImg cimg = ZImg::readImgPixelsOnly(m_filename, punctaChannelRegion, m_scene);
     cimg.computeMinMax(punctaChannelMinValue, punctaChannelMaxValue);
     if (m_dendriteChannel != -1) {
-      cimg = ZImg(m_filename, dendriteChannelRegion, m_scene);
+      cimg = ZImg::readImgPixelsOnly(m_filename, dendriteChannelRegion, m_scene);
       cimg.computeMinMax(dendriteChannelMinValue, dendriteChannelMaxValue);
     }
   } else {
@@ -266,7 +266,7 @@ void ZPunctaDetection::doWork()
     std::vector<ZImgRegion> rgns =
       ZImgRegion::splitBigImage(m_imgInfo, nonexpandRegions, 1024, 0, m_punctaChannel, m_t);
     for (const auto& rgn : rgns) {
-      ZImg cimg(m_filename, rgn, m_scene);
+      ZImg cimg = ZImg::readImgPixelsOnly(m_filename, rgn, m_scene);
       double blockmin;
       double blockmax;
       cimg.computeMinMax(blockmin, blockmax);
@@ -276,7 +276,7 @@ void ZPunctaDetection::doWork()
     if (m_dendriteChannel != -1) {
       rgns = ZImgRegion::splitBigImage(m_imgInfo, nonexpandRegions, 1024, 0, m_dendriteChannel, m_t);
       for (const auto& rgn : rgns) {
-        ZImg cimg(m_filename, rgn, m_scene);
+        ZImg cimg = ZImg::readImgPixelsOnly(m_filename, rgn, m_scene);
         double blockmin;
         double blockmax;
         cimg.computeMinMax(blockmin, blockmax);
@@ -300,7 +300,7 @@ void ZPunctaDetection::doWork()
   if (m_dendriteChannel != -1) {
     LOG(INFO) << "Start Soma Detection";
     if (!imageTooBig) { // enough memory
-      ZImg dendriteImg(m_filename, dendriteChannelRegion, m_scene);
+      ZImg dendriteImg = ZImg::readImgPixelsOnly(m_filename, dendriteChannelRegion, m_scene);
       if (!dendriteImg.isType<uint8_t>()) {
         dendriteImg = dendriteImg.convertTo<uint8_t>(dendriteChannelMinValue, dendriteChannelMaxValue);
       }
@@ -314,7 +314,7 @@ void ZPunctaDetection::doWork()
         LOG(INFO) << "Block " << rgni << "/" << rgns.size();
         const ZImgRegion& rgn = rgns[rgni];
         const ZImgRegion& validRgn = nonexpandRegions[rgni];
-        ZImg cimg(m_filename, rgn, m_scene);
+        ZImg cimg = ZImg::readImgPixelsOnly(m_filename, rgn, m_scene);
         if (!cimg.isType<uint8_t>()) {
           cimg = cimg.convertTo<uint8_t>(dendriteChannelMinValue, dendriteChannelMaxValue);
         }
@@ -367,7 +367,7 @@ void ZPunctaDetection::doWork()
   ZImg punctaImg; // only valid if image can fit into memory, while imageTooBig is false
 
   if (!imageTooBig) {
-    punctaImg = ZImg(m_filename, punctaChannelRegion, m_scene);
+    punctaImg = ZImg::readImgPixelsOnly(m_filename, punctaChannelRegion, m_scene);
     if (!punctaImg.isType<uint8_t>()) {
       punctaImg = punctaImg.convertTo<uint8_t>(punctaChannelMinValue, punctaChannelMaxValue);
     }
@@ -501,7 +501,7 @@ void ZPunctaDetection::doWork()
       LOG(INFO) << "Block " << rgni << "/" << rgns.size();
       const ZImgRegion& rgn = rgns[rgni];
       const ZImgRegion& validRgn = nonexpandRegions[rgni];
-      ZImg pimg(m_filename, rgn, m_scene);
+      ZImg pimg = ZImg::readImgPixelsOnly(m_filename, rgn, m_scene);
       if (!pimg.isType<uint8_t>()) {
         pimg = pimg.convertTo<uint8_t>(punctaChannelMinValue, punctaChannelMaxValue);
       }
@@ -684,7 +684,7 @@ void ZPunctaDetection::doWork()
 
   if (!swcTrees.empty() && m_dendriteChannel != -1) {
 #if 0
-    ZImg dendriteImg(m_filename, dendriteChannelRegion, m_scene);
+    ZImg dendriteImg = ZImg::readImgPixelsOnly(m_filename, dendriteChannelRegion, m_scene);
     if (!dendriteImg.isType<uint8_t>()) {
       dendriteImg = dendriteImg.convertTo<uint8_t>(dendriteChannelMinValue, dendriteChannelMaxValue);
     }

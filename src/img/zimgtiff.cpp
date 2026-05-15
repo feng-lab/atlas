@@ -96,7 +96,11 @@ void ZImgTiff::readThumbnail(const QString& filename,
   readThumbnailInternal(thumbnail, region, scene, tiff);
 }
 
-void ZImgTiff::readImg(const QString& filename, ZImg& img, const ZImgRegion& region, size_t scene)
+void ZImgTiff::readImg(const QString& filename,
+                       ZImg& img,
+                       const ZImgRegion& region,
+                       size_t scene,
+                       const ZImgReadOptions& readOptions)
 {
   clearInternalState();
   ZTiff tiff;
@@ -190,8 +194,12 @@ void ZImgTiff::readImg(const QString& filename, ZImg& img, const ZImgRegion& reg
     }
   }
 
-  readMetadataInternal(imgTmp.metadataRef(), scene, tiff);
-  readThumbnailInternal(imgTmp.thumbnailRef(), region, scene, tiff);
+  if (readOptions.includeMetadata) {
+    readMetadataInternal(imgTmp.metadataRef(), scene, tiff);
+  }
+  if (readOptions.includeThumbnails) {
+    readThumbnailInternal(imgTmp.thumbnailRef(), region, scene, tiff);
+  }
   imgTmp.swap(img);
 }
 

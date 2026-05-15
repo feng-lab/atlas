@@ -1,4 +1,4 @@
-Atlas Agents Guide (Unified)
+Atlas Agents Guide
 
 This guide includes:
 - System overview and concepts

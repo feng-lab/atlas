@@ -616,7 +616,11 @@ void ZImgITKImage::readThumbnail(const QString& /*filename*/,
   }
 }
 
-void ZImgITKImage::readImg(const QString& filename, ZImg& img, const ZImgRegion& region, size_t scene)
+void ZImgITKImage::readImg(const QString& filename,
+                           ZImg& img,
+                           const ZImgRegion& region,
+                           size_t scene,
+                           const ZImgReadOptions& readOptions)
 {
   if (scene != 0) {
     throw ZException("invalid scene");
@@ -795,7 +799,9 @@ void ZImgITKImage::readImg(const QString& filename, ZImg& img, const ZImgRegion&
       }
     }
 
-    parseMetadataFromImageIO(imageIO.GetPointer(), img.metadataRef());
+    if (readOptions.includeMetadata) {
+      parseMetadataFromImageIO(imageIO.GetPointer(), img.metadataRef());
+    }
   }
   catch (itk::ExceptionObject& err) {
     throw ZException(err.what(), ZException::Option::CheckErrno);

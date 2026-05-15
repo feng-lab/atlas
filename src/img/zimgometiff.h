@@ -35,7 +35,11 @@ public:
                 std::vector<ZImgInfo>& infos,
                 std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks) override;
 
-  void readImg(const QString& filename, ZImg& img, const ZImgRegion& region, size_t scene) override;
+  void readImg(const QString& filename,
+               ZImg& img,
+               const ZImgRegion& region,
+               size_t scene,
+               const ZImgReadOptions& readOptions = ZImgReadOptions::complete()) override;
 
   [[nodiscard]] bool supportRead() const override;
 

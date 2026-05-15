@@ -35,7 +35,7 @@ ZImg ZCachedImg::slice(size_t z, size_t c, size_t t) const
   ZImg res;
   ZImgSource imgSource = m_imgSource;
   imgSource.region = ZImgRegion(0, -1, 0, -1, z, z + 1, c, c + 1, t, t + 1);
-  ZImgIO::instance().readImg(imgSource, res);
+  ZImgIO::instance().readImgPixelsOnly(imgSource, res);
   if (m_sliceTransform) {
     return imgTypeDispatcher(res.info(), [&, this]<typename TVoxel>() {
       return transformSlice<TVoxel>(m_sliceTransform->at(z), res);
@@ -50,7 +50,7 @@ ZImg ZCachedImg::slice(size_t z, size_t t) const
   ZImg res;
   ZImgSource imgSource = m_imgSource;
   imgSource.region = ZImgRegion(0, -1, 0, -1, z, z + 1, 0, -1, t, t + 1);
-  ZImgIO::instance().readImg(imgSource, res);
+  ZImgIO::instance().readImgPixelsOnly(imgSource, res);
   if (m_sliceTransform) {
     return imgTypeDispatcher(res.info(), [&, this]<typename TVoxel>() {
       return transformSlice<TVoxel>(m_sliceTransform->at(z), res);

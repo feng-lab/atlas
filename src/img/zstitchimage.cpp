@@ -389,8 +389,8 @@ void ZStitchImage::set2ndInput(const QStringList& fns,
 void ZStitchImage::setTileGridFromTileSelectionImage(const QString& fn)
 {
   unsetTileConfiguration();
-  ZImg m_tileImage = ZImg(fn);
-  getTileMatrixFromConnImage(m_tileImage);
+  ZImg tileImage = ZImg::readImgPixelsOnly(fn);
+  getTileMatrixFromConnImage(tileImage);
 }
 
 void ZStitchImage::setTileGridFromMatrixFile(const QString& file)

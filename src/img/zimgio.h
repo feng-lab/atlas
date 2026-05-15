@@ -56,7 +56,9 @@ public:
                      size_t scene = 0,
                      FileFormat format = FileFormat::Unknown);
 
-  // read everything
+  // Read a complete image container by default. Use readImgPixelsOnly() or
+  // ZImgReadOptions::pixelsOnly() for display/cache paths that do not need
+  // metadata or thumbnail attachments.
   void readImg(const QString& filename,
                ZImg& img,
                const ZImgRegion& region = ZImgRegion(),
@@ -64,7 +66,17 @@ public:
                size_t xRatio = 1,
                size_t yRatio = 1,
                size_t zRatio = 1,
-               FileFormat format = FileFormat::Unknown);
+               FileFormat format = FileFormat::Unknown,
+               const ZImgReadOptions& readOptions = ZImgReadOptions::complete());
+
+  void readImgPixelsOnly(const QString& filename,
+                         ZImg& img,
+                         const ZImgRegion& region = ZImgRegion(),
+                         size_t scene = 0,
+                         size_t xRatio = 1,
+                         size_t yRatio = 1,
+                         size_t zRatio = 1,
+                         FileFormat format = FileFormat::Unknown);
 
   // read image sequence, cat these imgs along dimension "catDim"
   // imgs should have same size in other dimensions and have same type
@@ -79,7 +91,8 @@ public:
                size_t zRatio = 1,
                FileFormat format = FileFormat::Unknown,
                bool expandXY = true,
-               bool expandWithMaxValue = false);
+               bool expandWithMaxValue = false,
+               const ZImgReadOptions& readOptions = ZImgReadOptions::complete());
 
   void readImg(const QStringList& fileList,
                Dimension catDim,
@@ -92,9 +105,18 @@ public:
                size_t zRatio = 1,
                FileFormat format = FileFormat::Unknown,
                bool expandXY = true,
-               bool expandWithMaxValue = false);
+               bool expandWithMaxValue = false,
+               const ZImgReadOptions& readOptions = ZImgReadOptions::complete());
 
-  void readImg(const ZImgSource& imgSource, ZImg& img, size_t xRatio = 1, size_t yRatio = 1, size_t zRatio = 1);
+  void readImg(const ZImgSource& imgSource,
+               ZImg& img,
+               size_t xRatio = 1,
+               size_t yRatio = 1,
+               size_t zRatio = 1,
+               const ZImgReadOptions& readOptions = ZImgReadOptions::complete());
+
+  void
+  readImgPixelsOnly(const ZImgSource& imgSource, ZImg& img, size_t xRatio = 1, size_t yRatio = 1, size_t zRatio = 1);
 
   void writeImg(const QString& filename,
                 const ZImg& img,

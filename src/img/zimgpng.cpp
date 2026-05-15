@@ -362,7 +362,11 @@ void ZImgPng::readThumbnail(const QString& /*filename*/,
   // png does not have standard thumbnail chunk
 }
 
-void ZImgPng::readImg(const QString& filename, ZImg& img, const ZImgRegion& region, size_t scene)
+void ZImgPng::readImg(const QString& filename,
+                      ZImg& img,
+                      const ZImgRegion& region,
+                      size_t scene,
+                      const ZImgReadOptions& readOptions)
 {
   // ZBenchTimer bt("b");
   // bt.start();
@@ -432,7 +436,9 @@ void ZImgPng::readImg(const QString& filename, ZImg& img, const ZImgRegion& regi
   png->imgTmp = ZImg(region.clip(png->info));
   separateChannel(png->outRaw.data(), png->info, region, png->imgTmp);
 
-  readMetaDataFromState(png->png.pngPtr, png->png.infoPtr, png->png.endPtr, png->imgTmp.metadataRef());
+  if (readOptions.includeMetadata) {
+    readMetaDataFromState(png->png.pngPtr, png->png.infoPtr, png->png.endPtr, png->imgTmp.metadataRef());
+  }
   // looking for resolution at end part if we don't have it
   if (png->imgTmp.infoRef().voxelSizeUnit == VoxelSizeUnit::none &&
       png_get_x_pixels_per_meter(png->png.pngPtr, png->png.endPtr) > 0 &&

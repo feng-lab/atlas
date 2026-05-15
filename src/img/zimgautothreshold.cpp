@@ -641,7 +641,7 @@ TVoxel ZImgAutoThreshold::typedTriangleThre(const QString& filename,
   for (size_t rgni = 0; rgni < rgns.size(); ++rgni) {
     const ZImgRegion& rgn = rgns[rgni];
     const ZImgRegion& validRgn = nonexpandRegions[rgni];
-    ZImg img(filename, rgn, scene);
+    ZImg img = ZImg::readImgPixelsOnly(filename, rgn, scene);
     if (!mask.empty()) {
       ZImg tmpImg(img.info());
       for (auto coord : mask) {
@@ -778,7 +778,7 @@ uint8_t ZImgAutoThreshold::u8TriangleThre(const QString& filename,
   for (size_t rgni = 0; rgni < rgns.size(); ++rgni) {
     const ZImgRegion& rgn = rgns[rgni];
     const ZImgRegion& validRgn = nonexpandRegions[rgni];
-    ZImg img(filename, rgn, scene);
+    ZImg img = ZImg::readImgPixelsOnly(filename, rgn, scene);
     if (!img.isType<uint8_t>()) {
       img = img.convertTo<uint8_t>(minValue, maxValue);
     }

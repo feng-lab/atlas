@@ -452,8 +452,9 @@ void stnTrajectory()
       }
 
       LOG(INFO) << str;
-      ZImg mask(dir.filePath(str + "_" + resolution + "um_data_mask.nrrd"));
-      ZImg projection(dir.filePath(str + "_" + resolution + "um_projection_density.nrrd"));
+      ZImg mask = ZImg::readImgPixelsOnly(dir.filePath(str + "_" + resolution + "um_data_mask.nrrd"));
+      ZImg projection =
+        ZImg::readImgPixelsOnly(dir.filePath(str + "_" + resolution + "um_projection_density.nrrd"));
       projection *= mask;
 
       std::vector<size_t> projIdxs;
@@ -467,7 +468,8 @@ void stnTrajectory()
         continue;
       }
 
-      ZImg injection(dir.filePath(str + "_" + resolution + "um_injection_density.nrrd"));
+      ZImg injection =
+        ZImg::readImgPixelsOnly(dir.filePath(str + "_" + resolution + "um_injection_density.nrrd"));
       injection *= mask;
       // injection *= isoCortexMask;
 
@@ -483,7 +485,8 @@ void stnTrajectory()
       }
 
 #if 1
-      projection = ZImg(dir.filePath(str + "_" + resolution + "um_projection_energy.nrrd"));
+      projection =
+        ZImg::readImgPixelsOnly(dir.filePath(str + "_" + resolution + "um_projection_energy.nrrd"));
       projection *= mask;
       projection.typedUnaryOperation<float>([](float proj) {
         return std::max(255.f, proj);

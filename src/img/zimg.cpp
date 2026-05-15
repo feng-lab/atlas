@@ -206,7 +206,8 @@ ZImgTileSubBlock::ZImgTileSubBlock(ZImgSource source,
 
 std::shared_ptr<ZImg> ZImgTileSubBlock::read() const
 {
-  auto res = std::make_shared<ZImg>(m_source);
+  auto res = std::make_shared<ZImg>();
+  ZImgIO::instance().readImgPixelsOnly(m_source, *res);
   if (m_xRatio > 1 || m_yRatio > 1 || m_zRatio > 1) {
     res->blockDownsample(m_xRatio, m_yRatio, m_zRatio, m_downsampleCombineMode);
   }
@@ -475,6 +476,26 @@ ZImg ZImg::readSubBlock(const QStringList& fileList,
   auto img = subBlocks[scene][blockIndex]->read();
   ZImg res;
   img->swap(res);
+  return res;
+}
+
+ZImg ZImg::readImgPixelsOnly(const QString& filename,
+                             const ZImgRegion& region,
+                             size_t scene,
+                             size_t xRatio,
+                             size_t yRatio,
+                             size_t zRatio,
+                             FileFormat format)
+{
+  ZImg res;
+  ZImgIO::instance().readImgPixelsOnly(filename, res, region, scene, xRatio, yRatio, zRatio, format);
+  return res;
+}
+
+ZImg ZImg::readImgPixelsOnly(const ZImgSource& imgSource, size_t xRatio, size_t yRatio, size_t zRatio)
+{
+  ZImg res;
+  ZImgIO::instance().readImgPixelsOnly(imgSource, res, xRatio, yRatio, zRatio);
   return res;
 }
 

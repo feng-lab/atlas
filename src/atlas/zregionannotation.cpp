@@ -143,7 +143,7 @@ void ZRegionAnnotation::importLabelImage(const QString& fn,
     throw ZException("label image can not be time sequence or color image");
   }
 
-  ZImg origLabelImg(fn, ZImgRegion(), 0, 1, 1, 1, format);
+  ZImg origLabelImg = ZImg::readImgPixelsOnly(fn, ZImgRegion(), 0, 1, 1, 1, format);
   // VLOG(1) << origLabelImg.info();
   //  m_width = origLabelImg.width();
   //  m_height = origLabelImg.height();
@@ -466,7 +466,7 @@ void ZRegionAnnotation::importLabelImageForSlicesWithoutAnnotation(const QString
     throw ZException("label image can not be time sequence or color image");
   }
 
-  ZImg origLabelImg(fn, ZImgRegion(), 0, 1, 1, 1, format);
+  ZImg origLabelImg = ZImg::readImgPixelsOnly(fn, ZImgRegion(), 0, 1, 1, 1, format);
   // LOG(INFO) << origLabelImg.info();
   //  m_width = origLabelImg.width();
   //  m_height = origLabelImg.height();

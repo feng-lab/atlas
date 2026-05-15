@@ -221,7 +221,11 @@ void ZImgLeica::readThumbnail(const QString& /*filename*/,
                               size_t /*scene*/)
 {}
 
-void ZImgLeica::readImg(const QString& filename, ZImg& img, const ZImgRegion& region, size_t scene)
+void ZImgLeica::readImg(const QString& filename,
+                        ZImg& img,
+                        const ZImgRegion& region,
+                        size_t scene,
+                        const ZImgReadOptions& readOptions)
 {
   clearInternalState();
 
@@ -396,7 +400,7 @@ void ZImgLeica::readImg(const QString& filename, ZImg& img, const ZImgRegion& re
       std::vector<ZImgInfo> fileInfos;
       imgIO.readInfos(ii.imageMemory.fileNames[0], fileInfos);
       if (!fileInfos.empty() && fileInfos[0].isSameType(info) && fileInfos[0].isSameSize(info)) {
-        imgIO.readImg(ii.imageMemory.fileNames[0], img, rgn);
+        imgIO.readImg(ii.imageMemory.fileNames[0], img, rgn, 0, 1, 1, 1, FileFormat::Unknown, readOptions);
         img.infoRef() = resInfo;
       } else {
         throw ZException("image and metadata do not match, please send this file to flq@live.com");
@@ -405,7 +409,19 @@ void ZImgLeica::readImg(const QString& filename, ZImg& img, const ZImgRegion& re
       std::vector<ZImgInfo> fileInfos;
       imgIO.readInfos(ii.imageMemory.fileNames, Dimension::T, false, fileInfos);
       if (!fileInfos.empty() && fileInfos[0].isSameType(info) && fileInfos[0].isSameSize(info)) {
-        imgIO.readImg(ii.imageMemory.fileNames, Dimension::T, false, rgn, img);
+        imgIO.readImg(ii.imageMemory.fileNames,
+                      Dimension::T,
+                      false,
+                      rgn,
+                      img,
+                      0,
+                      1,
+                      1,
+                      1,
+                      FileFormat::Unknown,
+                      true,
+                      false,
+                      readOptions);
         img.infoRef() = resInfo;
       } else {
         throw ZException("image and metadata do not match, please send this file to flq@live.com");
@@ -414,7 +430,19 @@ void ZImgLeica::readImg(const QString& filename, ZImg& img, const ZImgRegion& re
       std::vector<ZImgInfo> fileInfos;
       imgIO.readInfos(ii.imageMemory.fileNames, Dimension::Z, false, fileInfos);
       if (!fileInfos.empty() && fileInfos[0].isSameType(info) && fileInfos[0].isSameSize(info)) {
-        imgIO.readImg(ii.imageMemory.fileNames, Dimension::Z, false, rgn, img);
+        imgIO.readImg(ii.imageMemory.fileNames,
+                      Dimension::Z,
+                      false,
+                      rgn,
+                      img,
+                      0,
+                      1,
+                      1,
+                      1,
+                      FileFormat::Unknown,
+                      true,
+                      false,
+                      readOptions);
         img.infoRef() = resInfo;
       } else {
         throw ZException("image and metadata do not match, please send this file to flq@live.com");
@@ -485,7 +513,7 @@ void ZImgLeica::readImg(const QString& filename, ZImg& img, const ZImgRegion& re
 
         ZImg planeImg;
         ZImgRegion fileRegion(rgn.start.x, rgn.end.x, rgn.start.y, rgn.end.y, 0, 1, 0, 1, 0, 1);
-        imgIO.readImg(planeFile.filename, planeImg, fileRegion);
+        imgIO.readImg(planeFile.filename, planeImg, fileRegion, 0, 1, 1, 1, FileFormat::Unknown, readOptions);
         result.pasteImg(
           planeImg,
           ZVoxelCoordinate(0,
@@ -513,8 +541,10 @@ void ZImgLeica::readImg(const QString& filename, ZImg& img, const ZImgRegion& re
     }
   }
 
-  ZImgMetatag tag("metadata", xml);
-  img.metadataRef().attachToTopLevel(tag);
+  if (readOptions.includeMetadata) {
+    ZImgMetatag tag("metadata", xml);
+    img.metadataRef().attachToTopLevel(tag);
+  }
 }
 
 void ZImgLeica::clearInternalState() {}

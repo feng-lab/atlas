@@ -50,10 +50,16 @@ public:
   virtual void
   readThumbnail(const QString& filename, ZImgThumbernail& thumbnail, const ZImgRegion& region, size_t scene) = 0;
 
-  // read everything, input can be changed even if read failed
-  virtual void readImg(const QString& filename, ZImg& img, const ZImgRegion& region, size_t scene)
+  // read image data, input can be changed even if read failed.
+  // The default options read a complete ZImg container, including descriptive
+  // metadata and thumbnails when the format supports them.
+  virtual void readImg(const QString& filename,
+                       ZImg& img,
+                       const ZImgRegion& region,
+                       size_t scene,
+                       const ZImgReadOptions& readOptions = ZImgReadOptions::complete())
   {
-    readImg(filename, img, region, scene, 1, 1, 1);
+    readImg(filename, img, region, scene, 1, 1, 1, readOptions);
   }
 
   virtual void readImg(const QString& filename,
@@ -62,10 +68,11 @@ public:
                        size_t scene,
                        size_t xRatio,
                        size_t yRatio,
-                       size_t zRatio)
+                       size_t zRatio,
+                       const ZImgReadOptions& readOptions = ZImgReadOptions::complete())
   {
     CHECK(xRatio >= 1 && yRatio >= 1 && zRatio >= 1);
-    readImg(filename, img, region, scene);
+    readImg(filename, img, region, scene, readOptions);
     if (xRatio > 1 || yRatio > 1 || zRatio > 1) {
       img.zoom(1.0 / xRatio, 1.0 / yRatio, 1.0 / zRatio);
     }

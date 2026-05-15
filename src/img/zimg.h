@@ -81,6 +81,24 @@ struct ZImgWriteParameters
   double jpegXRQuality = 0.8;
 };
 
+struct ZImgReadOptions
+{
+  // Controls auxiliary attachments stored on ZImg. Readers may still parse format
+  // metadata internally when it is required to locate, decode, or type pixels.
+  bool includeMetadata = true;
+  bool includeThumbnails = true;
+
+  [[nodiscard]] static constexpr ZImgReadOptions complete() noexcept
+  {
+    return {};
+  }
+
+  [[nodiscard]] static constexpr ZImgReadOptions pixelsOnly() noexcept
+  {
+    return {.includeMetadata = false, .includeThumbnails = false};
+  }
+};
+
 template<>
 std::string ZImgMetadataBase<ZImgMetatag>::toString() const;
 
@@ -378,6 +396,16 @@ public:
                            size_t blockIndex,
                            FileFormat format = FileFormat::Unknown,
                            bool expandXY = true);
+
+  static ZImg readImgPixelsOnly(const QString& filename,
+                                const ZImgRegion& region = ZImgRegion(),
+                                size_t scene = 0,
+                                size_t xRatio = 1,
+                                size_t yRatio = 1,
+                                size_t zRatio = 1,
+                                FileFormat format = FileFormat::Unknown);
+
+  static ZImg readImgPixelsOnly(const ZImgSource& imgSource, size_t xRatio = 1, size_t yRatio = 1, size_t zRatio = 1);
 
   static std::vector<std::vector<ZImgRegion>> getInternalSubRegions(const QString& filename,
                                                                     FileFormat format = FileFormat::Unknown);

@@ -1516,7 +1516,8 @@ void ZImgHDF5::readImg(const QString& filename,
                        size_t scene,
                        size_t xRatio,
                        size_t yRatio,
-                       size_t zRatio)
+                       size_t zRatio,
+                       const ZImgReadOptions& /*readOptions*/)
 {
   if (scene != 0) {
     throw ZException("invalid scene");

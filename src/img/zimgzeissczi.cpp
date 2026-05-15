@@ -832,7 +832,8 @@ void ZImgZeissCZI::readImg(const QString& filename,
                            size_t scene,
                            size_t xRatio,
                            size_t yRatio,
-                           size_t zRatio)
+                           size_t zRatio,
+                           const ZImgReadOptions& readOptions)
 {
   clearInternalState();
 
@@ -972,8 +973,10 @@ void ZImgZeissCZI::readImg(const QString& filename,
     //    }
   }
 
-  ZImgMetatag tag("metadata", toString(filename));
-  img.metadataRef().attachToTopLevel(tag);
+  if (readOptions.includeMetadata) {
+    ZImgMetatag tag("metadata", toString(filename));
+    img.metadataRef().attachToTopLevel(tag);
+  }
 
   if (xRatio != readRatio || yRatio != readRatio || zRatio > 1) {
     img.zoom(1.0 * readRatio / xRatio, 1.0 * readRatio / yRatio, 1.0 / zRatio);

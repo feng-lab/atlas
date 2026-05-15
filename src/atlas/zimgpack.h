@@ -445,6 +445,8 @@ protected:
 
   void updateNameTootip();
 
+  void ensureImgMetadataLoaded() const;
+
 private:
   std::array<size_t, 3> ratioForScale(double xScale, double yScale, double zScale) const;
 
@@ -452,7 +454,10 @@ private:
 
 protected:
   ZImgInfo m_imgInfo;
-  ZImgMetadata m_imgMetaData;
+  mutable ZImgMetadata m_imgMetaData;
+  mutable std::atomic_bool m_imgMetaDataLoaded{false};
+  mutable QString m_imgMetaDataLoadError;
+  mutable std::mutex m_imgMetaDataMutex;
   ZImgSource m_imgSource;
   bool m_hasUnsavedChange;
 

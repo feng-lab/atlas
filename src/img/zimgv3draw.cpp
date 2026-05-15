@@ -121,7 +121,11 @@ void ZImgV3DRaw::readThumbnail(const QString& filename,
   }
 }
 
-void ZImgV3DRaw::readImg(const QString& filename, ZImg& img, const ZImgRegion& region, size_t scene)
+void ZImgV3DRaw::readImg(const QString& filename,
+                         ZImg& img,
+                         const ZImgRegion& region,
+                         size_t scene,
+                         const ZImgReadOptions& /*readOptions*/)
 {
   if (scene != 0) {
     throw ZException("invalid scene");

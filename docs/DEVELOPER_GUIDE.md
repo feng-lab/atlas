@@ -181,7 +181,7 @@ Bio-Formats Image Bridge
 - Bio-Formats thumbnails are read through a dedicated streamed bridge command. Thumbnail support is best-effort because not every Bio-Formats reader provides useful thumbnail planes.
 - Atlas sends dataset metadata, region, and thumbnail requests through the bridge. Java bridge implementation details and optimization policy live under `src/bioformats_bridge/`.
 - C++ treats bridge transport/process failures as recoverable. When the bridge exits or the selected transport becomes unusable, Atlas starts a fresh Java bridge on demand and retries the failed request once. Bridge response status errors propagate to the caller.
-- Dataset info reads still open synchronously before returning. This preserves Atlas' existing local-file behavior, where display callers receive complete metadata instead of progressive/async placeholders.
+- Dataset info reads still open synchronously before returning. This preserves Atlas' existing local-file behavior, where callers receive complete structural information instead of progressive/async placeholders.
 - Desktop Atlas schedules a background Bio-Formats warmup after the main window is shown. Warmup starts the selected Java bridge, performs the runtime handshake, and caches the supported reader list without blocking first paint.
 
 Neuroglancer Precomputed (HTTP)

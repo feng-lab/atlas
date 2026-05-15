@@ -861,7 +861,11 @@ void ZImgOmeTiff::readInfo(const QString& filename,
   }
 }
 
-void ZImgOmeTiff::readImg(const QString& filename, ZImg& img, const ZImgRegion& region, size_t scene)
+void ZImgOmeTiff::readImg(const QString& filename,
+                          ZImg& img,
+                          const ZImgRegion& region,
+                          size_t scene,
+                          const ZImgReadOptions& readOptions)
 {
   clearInternalState();
   ZTiff tiff;
@@ -969,7 +973,7 @@ void ZImgOmeTiff::readImg(const QString& filename, ZImg& img, const ZImgRegion& 
     }
   }
 
-  if (!m_imageDescription.empty()) {
+  if (readOptions.includeMetadata && !m_imageDescription.empty()) {
     imgTmp.metadataRef().attachToTopLevel(ZImgMetatag("metadata", m_imageDescription));
   }
   imgTmp.swap(img);

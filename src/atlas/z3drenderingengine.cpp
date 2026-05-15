@@ -297,7 +297,7 @@ folly::coro::Task<void> composeAnimationFrameAsync(const QString& tempDirPath,
                                                    .arg(tileStartX)
                                                    .arg(tileStartY));
         if (QFileInfo::exists(filepath)) {
-          img.pasteImg(ZImg(filepath), ZVoxelCoordinate(tileStartX, pasteY));
+          img.pasteImg(ZImg::readImgPixelsOnly(filepath), ZVoxelCoordinate(tileStartX, pasteY));
           tileFilesToDelete.push_back(filepath);
         } else {
           LOG(ERROR) << "Could not find file: " << filepath;
@@ -311,7 +311,7 @@ folly::coro::Task<void> composeAnimationFrameAsync(const QString& tempDirPath,
                                                      .arg(tileStartX)
                                                      .arg(tileStartY));
       if (QFileInfo::exists(leftFilepath)) {
-        img.pasteImg(ZImg(leftFilepath), ZVoxelCoordinate(tileStartX, pasteY));
+        img.pasteImg(ZImg::readImgPixelsOnly(leftFilepath), ZVoxelCoordinate(tileStartX, pasteY));
         tileFilesToDelete.push_back(leftFilepath);
       } else {
         LOG(ERROR) << "Could not find left file: " << leftFilepath;
@@ -323,7 +323,7 @@ folly::coro::Task<void> composeAnimationFrameAsync(const QString& tempDirPath,
                                                       .arg(tileStartX)
                                                       .arg(tileStartY));
       if (QFileInfo::exists(rightFilepath)) {
-        rightImg.pasteImg(ZImg(rightFilepath), ZVoxelCoordinate(tileStartX, pasteY));
+        rightImg.pasteImg(ZImg::readImgPixelsOnly(rightFilepath), ZVoxelCoordinate(tileStartX, pasteY));
         tileFilesToDelete.push_back(rightFilepath);
       } else {
         LOG(ERROR) << "Could not find right file: " << rightFilepath;

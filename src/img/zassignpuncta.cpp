@@ -333,7 +333,7 @@ ZSwc::ConstSwcTreeNode ZAssignPuncta::intensityWeightedNearestNode(double x,
   if (m_img) {
     img = m_img->crop(rgn);
   } else {
-    img = ZImg(m_filename, rgn, m_scene);
+    img = ZImg::readImgPixelsOnly(m_filename, rgn, m_scene);
     if (!img.isType<uint8_t>()) {
       img = img.convertTo<uint8_t>(m_minValue, m_maxValue);
     }

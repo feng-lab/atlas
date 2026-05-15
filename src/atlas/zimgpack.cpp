@@ -508,7 +508,6 @@ ZImgPack::ZImgPack(ZImgSource imgSource, ZImgInfo* pInfo, std::vector<std::share
   } else {
     m_imgInfo = ZImg::readImgInfo(m_imgSource, &sceneSubBlock);
   }
-  m_imgMetaData = ZImg::readImgMetadata(m_imgSource);
 
   m_minMaxState = MinMaxState::Invalid;
 
@@ -537,7 +536,7 @@ ZImgPack::ZImgPack(ZImgSource imgSource, ZImgInfo* pInfo, std::vector<std::share
   if (shouldReadWholeImage) {
     VLOG(1) << "read all";
     m_diskCached = false;
-    m_img = ZImg(m_imgSource);
+    m_img = ZImg::readImgPixelsOnly(m_imgSource);
     m_img.computeMinMax(m_minIntensity, m_maxIntensity);
     m_minMaxState = MinMaxState::Complete;
     buildFastReadIndex(sceneSubBlock);
@@ -567,7 +566,7 @@ ZImgPack::ZImgPack(std::shared_ptr<ZNeuroglancerPrecomputedVolume> ngVolume)
   CHECK(m_ngVolume);
 
   m_imgInfo = m_ngVolume->baseImgInfo();
-  m_imgMetaData = ZImgMetadata{};
+  m_imgMetaDataLoaded.store(true, std::memory_order_release);
   m_minMaxState = MinMaxState::Invalid;
 
   m_imgSource = ZImgSource{};
@@ -610,6 +609,37 @@ const QString& ZImgPack::sizeInfo() const
   return m_sizeInfo;
 }
 
+void ZImgPack::ensureImgMetadataLoaded() const
+{
+  if (m_imgMetaDataLoaded.load(std::memory_order_acquire)) {
+    return;
+  }
+
+  const std::lock_guard<std::mutex> guard(m_imgMetaDataMutex);
+  if (m_imgMetaDataLoaded.load(std::memory_order_relaxed)) {
+    return;
+  }
+
+  m_imgMetaData.clear();
+  m_imgMetaDataLoadError.clear();
+
+  if (!m_ngVolume) {
+    try {
+      m_imgMetaData = ZImg::readImgMetadata(m_imgSource);
+    }
+    catch (const std::exception& e) {
+      m_imgMetaDataLoadError = QString::fromStdString(e.what());
+      LOG(WARNING) << "Failed to read image metadata for " << m_imgSource.toString() << ": " << e.what();
+    }
+    catch (...) {
+      m_imgMetaDataLoadError = QStringLiteral("unknown error");
+      LOG(WARNING) << "Failed to read image metadata for " << m_imgSource.toString() << ": unknown error";
+    }
+  }
+
+  m_imgMetaDataLoaded.store(true, std::memory_order_release);
+}
+
 const QString& ZImgPack::detailedInfo() const
 {
   if (m_detailedInfo.isEmpty()) {
@@ -634,9 +664,14 @@ const QString& ZImgPack::detailedInfo() const
     m_detailedInfo = info.join("\n");
     m_detailedInfo += "\n\n";
 
+    ensureImgMetadataLoaded();
+    const std::lock_guard<std::mutex> guard(m_imgMetaDataMutex);
     for (const auto& meta : m_imgMetaData.topLevelAttachments()) {
       m_detailedInfo += meta.toQString();
       m_detailedInfo += "\n";
+    }
+    if (!m_imgMetaDataLoadError.isEmpty()) {
+      m_detailedInfo += QString("Metadata read failed: %1\n").arg(m_imgMetaDataLoadError);
     }
   }
   return m_detailedInfo;
@@ -1026,7 +1061,12 @@ void ZImgPack::save(const QString& fileName, FileFormat format, const ZImgWriteP
   std::vector<ZImgInfo> infos = ZImg::readImgInfos(m_imgSource.filenames[0], &subBlocks, m_imgSource.format);
   CHECK(!infos.empty() && !subBlocks.empty());
   m_imgInfo = infos[0];
-  m_imgMetaData = ZImg::readImgMetadata(m_imgSource);
+  {
+    const std::lock_guard<std::mutex> guard(m_imgMetaDataMutex);
+    m_imgMetaData.clear();
+    m_imgMetaDataLoaded.store(false, std::memory_order_release);
+    m_imgMetaDataLoadError.clear();
+  }
   buildFastReadIndex(subBlocks[0]);
 
   updateDerivedData();

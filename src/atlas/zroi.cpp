@@ -701,10 +701,10 @@ void ZROI::importMaskImage(const QString& fn, FileFormat format)
   }
 
   if (info.isType<uint8_t>()) {
-    ZImg binaryImg(fn, ZImgRegion(), 0, 1, 1, 1, format);
+    ZImg binaryImg = ZImg::readImgPixelsOnly(fn, ZImgRegion(), 0, 1, 1, 1, format);
     binaryImgToROI(binaryImg, *this);
   } else {
-    ZImg origMaskImg(fn, ZImgRegion(), 0, 1, 1, 1, format);
+    ZImg origMaskImg = ZImg::readImgPixelsOnly(fn, ZImgRegion(), 0, 1, 1, 1, format);
     binaryImgToROI(origMaskImg.binarized(), *this);
   }
 

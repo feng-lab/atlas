@@ -294,7 +294,11 @@ void ZImgFreeImage::readThumbnail(const QString& /*filename*/,
                                   size_t /*scene*/)
 {}
 
-void ZImgFreeImage::readImg(const QString& filename, ZImg& img, const ZImgRegion& region, size_t scene)
+void ZImgFreeImage::readImg(const QString& filename,
+                            ZImg& img,
+                            const ZImgRegion& region,
+                            size_t scene,
+                            const ZImgReadOptions& /*readOptions*/)
 {
   std::vector<ZImgInfo> infos;
   readInfo(filename, infos, nullptr);

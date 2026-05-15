@@ -36,7 +36,11 @@ public:
   void
   readThumbnail(const QString& filename, ZImgThumbernail& thumbnail, const ZImgRegion& region, size_t scene) override;
 
-  void readImg(const QString& filename, ZImg& img, const ZImgRegion& region, size_t scene) override;
+  void readImg(const QString& filename,
+               ZImg& img,
+               const ZImgRegion& region,
+               size_t scene,
+               const ZImgReadOptions& readOptions = ZImgReadOptions::complete()) override;
 
   void checkImgBeforeWriting(const QString& filename, const ZImgInfo& info, const ZImgWriteParameters& paras) override;
 

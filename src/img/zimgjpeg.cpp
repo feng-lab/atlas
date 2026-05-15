@@ -495,7 +495,11 @@ void ZImgJpeg::readThumbnail(const QString& filename,
   }
 }
 
-void ZImgJpeg::readImg(const QString& filename, ZImg& img, const ZImgRegion& region, size_t scene)
+void ZImgJpeg::readImg(const QString& filename,
+                       ZImg& img,
+                       const ZImgRegion& region,
+                       size_t scene,
+                       const ZImgReadOptions& readOptions)
 {
   if (scene != 0) {
     throw ZException("invalid scene");
@@ -516,8 +520,12 @@ void ZImgJpeg::readImg(const QString& filename, ZImg& img, const ZImgRegion& reg
 
   readImgFromJpeg(cinfo, img, region, getOrientation(cinfo));
 
-  readThumbnail(filename, img.thumbnailRef(), region, scene);
-  readMetadata(filename, img.metadataRef(), scene);
+  if (readOptions.includeThumbnails) {
+    readThumbnail(filename, img.thumbnailRef(), region, scene);
+  }
+  if (readOptions.includeMetadata) {
+    readMetadata(filename, img.metadataRef(), scene);
+  }
 }
 
 void ZImgJpeg::checkImgBeforeWriting(const QString& filename, const ZImgInfo& info, const ZImgWriteParameters& paras)

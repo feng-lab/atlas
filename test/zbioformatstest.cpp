@@ -1903,6 +1903,39 @@ TEST(ZBioFormatsTest, FakeReaderMetadataCreatesDeterministicInfoAndSubBlocks)
   });
 }
 
+TEST(ZBioFormatsTest, CompleteReadImgAttachesMetadataAndPixelsOnlySkipsIt)
+{
+  runWithBioFormatsBridge([]() {
+    QTemporaryDir dir;
+    ASSERT_TRUE(dir.isValid());
+    const QString path =
+      createFakeReaderFile(dir, QStringLiteral("read-policy&sizeX=9&sizeY=7&sizeZ=1&sizeC=1&sizeT=1&pixelType=uint8"));
+
+    ZImgMetadata explicitMetadata = ZImg::readImgMetadata(ZImgSource(path, ZImgRegion(), 0, FileFormat::BioFormats));
+
+    ZImg completeImg;
+    ZImgIO::instance().readImg(path, completeImg, ZImgRegion(), 0, 1, 1, 1, FileFormat::BioFormats);
+    ASSERT_TRUE(completeImg.metadata().hasTopLevelAttachment());
+    ASSERT_TRUE(explicitMetadata.hasTopLevelAttachment());
+
+    auto metadataNames = [](const ZImgMetadata& metadata) {
+      std::vector<std::string> names;
+      for (const ZImgMetatag& tag : metadata.topLevelAttachments()) {
+        names.push_back(tag.name());
+      }
+      std::sort(names.begin(), names.end());
+      return names;
+    };
+    EXPECT_EQ(metadataNames(explicitMetadata), metadataNames(completeImg.metadata()));
+
+    ZImg pixelsOnlyImg = ZImg::readImgPixelsOnly(path, ZImgRegion(), 0, 1, 1, 1, FileFormat::BioFormats);
+    EXPECT_TRUE(pixelsOnlyImg.metadata().isEmpty());
+    EXPECT_FALSE(pixelsOnlyImg.hasThumbnail());
+    EXPECT_TRUE(pixelsOnlyImg.info().isSameSize(completeImg.info()));
+    EXPECT_TRUE(pixelsOnlyImg.info().isSameType(completeImg.info()));
+  });
+}
+
 TEST(ZBioFormatsTest, IndexedFalseColorDataStaysSingleChannel)
 {
   runWithBioFormatsBridge([]() {

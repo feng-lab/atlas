@@ -742,7 +742,7 @@ See also
 - __init__(ndarray, info=..., copy_if_needed=True, layout='CZYX')
 - __init__(list[ndarray], info=..., copy_if_needed=True, layout='CZYX')
 - data, to_arrays(framework='auto')
-- readImgInfos(), readImgInfo(), readSubBlockLists(), readSubBlock(), save(), writeImg()
+- readImgInfos(), readImgInfo(), readImgPixelsOnly(), readSubBlockLists(), readSubBlock(), save(), writeImg()
 )doc")
     .def(nb::init<>())
     .def(nb::init<const ZImgInfo&>())
@@ -935,6 +935,37 @@ See also
         return ZImg::readImgInfo(imgSource);
       },
       "Read image info from a ZImgSource descriptor.")
+    .def_static(
+      "readImgPixelsOnly",
+      [](const QString& filename,
+         const ZImgRegion& region,
+         size_t scene,
+         size_t xRatio,
+         size_t yRatio,
+         size_t zRatio,
+         FileFormat format) {
+        return ZImg::readImgPixelsOnly(filename, region, scene, xRatio, yRatio, zRatio, format);
+      },
+      "filename"_a,
+      "region"_a = ZImgRegion(),
+      "scene"_a = 0,
+      "xRatio"_a = 1,
+      "yRatio"_a = 1,
+      "zRatio"_a = 1,
+      "format"_a = FileFormat::Unknown,
+      nb::call_guard<nb::gil_scoped_release>(),
+      "Read image pixels without attaching descriptive metadata or thumbnails.")
+    .def_static(
+      "readImgPixelsOnly",
+      [](const ZImgSource& imgSource, size_t xRatio, size_t yRatio, size_t zRatio) {
+        return ZImg::readImgPixelsOnly(imgSource, xRatio, yRatio, zRatio);
+      },
+      "imgSource"_a,
+      "xRatio"_a = 1,
+      "yRatio"_a = 1,
+      "zRatio"_a = 1,
+      nb::call_guard<nb::gil_scoped_release>(),
+      "Read image pixels without attaching descriptive metadata or thumbnails.")
     .def_static(
       "readSubBlockLists",
       [](const QString& filename, FileFormat format) {

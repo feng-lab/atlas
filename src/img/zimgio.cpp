@@ -594,7 +594,8 @@ void ZImgIO::readImg(const QString& filename,
                      size_t xRatio,
                      size_t yRatio,
                      size_t zRatio,
-                     FileFormat format)
+                     FileFormat format,
+                     const ZImgReadOptions& readOptions)
 {
   img.clear();
 
@@ -607,7 +608,7 @@ void ZImgIO::readImg(const QString& filename,
       for (auto reader : readers) {
         try {
           ZImg tmpImg;
-          reader->readImg(filename, tmpImg, region, scene, xRatio, yRatio, zRatio);
+          reader->readImg(filename, tmpImg, region, scene, xRatio, yRatio, zRatio, readOptions);
           tmpImg.swap(img);
           return;
         }
@@ -632,7 +633,7 @@ void ZImgIO::readImg(const QString& filename,
     }
     try {
       ZImg tmpImg;
-      it->second->readImg(filename, tmpImg, region, scene, xRatio, yRatio, zRatio);
+      it->second->readImg(filename, tmpImg, region, scene, xRatio, yRatio, zRatio, readOptions);
       tmpImg.swap(img);
       return;
     }
@@ -641,6 +642,18 @@ void ZImgIO::readImg(const QString& filename,
         fmt::format("Try read file {} as '{}' format, failed: {}", filename, it->second->fullName(), e.what()));
     }
   }
+}
+
+void ZImgIO::readImgPixelsOnly(const QString& filename,
+                               ZImg& img,
+                               const ZImgRegion& region,
+                               size_t scene,
+                               size_t xRatio,
+                               size_t yRatio,
+                               size_t zRatio,
+                               FileFormat format)
+{
+  readImg(filename, img, region, scene, xRatio, yRatio, zRatio, format, ZImgReadOptions::pixelsOnly());
 }
 
 void ZImgIO::readImg(const QStringList& fileList,
@@ -653,10 +666,11 @@ void ZImgIO::readImg(const QStringList& fileList,
                      size_t zRatio,
                      FileFormat format,
                      bool expandXY,
-                     bool expandWithMaxValue)
+                     bool expandWithMaxValue,
+                     const ZImgReadOptions& readOptions)
 {
   if (fileList.size() == 1 && !catScenes) {
-    readImg(fileList[0], img, ZImgRegion(), scene, xRatio, yRatio, zRatio, format);
+    readImg(fileList[0], img, ZImgRegion(), scene, xRatio, yRatio, zRatio, format, readOptions);
     return;
   }
 
@@ -684,8 +698,9 @@ void ZImgIO::readImg(const QStringList& fileList,
   }
 
   imgs.resize(imgSources.size());
+  const ZImgReadOptions intermediateReadOptions = ZImgReadOptions::pixelsOnly();
   for (size_t i = 0; i < imgs.size(); ++i) {
-    readImg(imgSources[i], imgs[i]);
+    readImg(imgSources[i], imgs[i], 1, 1, 1, intermediateReadOptions);
     if (expandXY && (imgs[i].width() < info.width || imgs[i].height() < info.height)) {
       auto widthPadBefore = (info.sWidth() - imgs[i].sWidth()) / 2;
       auto widthPadAfter = (info.sWidth() - imgs[i].sWidth()) - widthPadBefore;
@@ -743,15 +758,27 @@ void ZImgIO::readImg(const QStringList& fileList,
                      size_t zRatio,
                      FileFormat format,
                      bool expandXY,
-                     bool expandWithMaxValue)
+                     bool expandWithMaxValue,
+                     const ZImgReadOptions& readOptions)
 {
   if (fileList.size() == 1 && !catScenes) {
-    readImg(fileList[0], img, regionIn, scene, xRatio, yRatio, zRatio, format);
+    readImg(fileList[0], img, regionIn, scene, xRatio, yRatio, zRatio, format, readOptions);
     return;
   }
 
   if (regionIn.isDefault()) {
-    readImg(fileList, catDim, catScenes, img, scene, xRatio, yRatio, zRatio, format, expandXY, expandWithMaxValue);
+    readImg(fileList,
+            catDim,
+            catScenes,
+            img,
+            scene,
+            xRatio,
+            yRatio,
+            zRatio,
+            format,
+            expandXY,
+            expandWithMaxValue,
+            readOptions);
     return;
   }
 
@@ -789,6 +816,7 @@ void ZImgIO::readImg(const QStringList& fileList,
   }
   imgs.resize(imgSources.size());
 
+  const ZImgReadOptions intermediateReadOptions = ZImgReadOptions::pixelsOnly();
   index_t sliceCatDimStart = 0;
   index_t sliceCatDimEnd = 0;
   for (size_t i = 0; i < imgs.size(); ++i) {
@@ -822,7 +850,7 @@ void ZImgIO::readImg(const QStringList& fileList,
       sliceRegionFullXY.end.y = -1;
       auto imgSource = imgSources[i];
       imgSource.region = sliceRegionFullXY;
-      readImg(imgSource, imgs[i]);
+      readImg(imgSource, imgs[i], 1, 1, 1, intermediateReadOptions);
       if (info.voxelFormat == VoxelFormat::Float) {
         double min;
         double max;
@@ -851,7 +879,7 @@ void ZImgIO::readImg(const QStringList& fileList,
     } else {
       auto imgSource = imgSources[i];
       imgSource.region = sliceRegion;
-      readImg(imgSource, imgs[i]);
+      readImg(imgSource, imgs[i], 1, 1, 1, intermediateReadOptions);
     }
   }
 
@@ -869,10 +897,23 @@ void ZImgIO::readImg(const QStringList& fileList,
   }
 }
 
-void ZImgIO::readImg(const ZImgSource& imgSource, ZImg& img, size_t xRatio, size_t yRatio, size_t zRatio)
+void ZImgIO::readImg(const ZImgSource& imgSource,
+                     ZImg& img,
+                     size_t xRatio,
+                     size_t yRatio,
+                     size_t zRatio,
+                     const ZImgReadOptions& readOptions)
 {
   if (imgSource.filenames.size() == 1 && !imgSource.catScenes) {
-    readImg(imgSource.filenames[0], img, imgSource.region, imgSource.scene, xRatio, yRatio, zRatio, imgSource.format);
+    readImg(imgSource.filenames[0],
+            img,
+            imgSource.region,
+            imgSource.scene,
+            xRatio,
+            yRatio,
+            zRatio,
+            imgSource.format,
+            readOptions);
   } else if (!imgSource.filenames.empty()) {
     readImg(imgSource.filenames,
             imgSource.catDim,
@@ -885,10 +926,16 @@ void ZImgIO::readImg(const ZImgSource& imgSource, ZImg& img, size_t xRatio, size
             zRatio,
             imgSource.format,
             imgSource.expandXY,
-            imgSource.expandWithMaxValue);
+            imgSource.expandWithMaxValue,
+            readOptions);
   } else {
     throw ZException("invalid image source");
   }
+}
+
+void ZImgIO::readImgPixelsOnly(const ZImgSource& imgSource, ZImg& img, size_t xRatio, size_t yRatio, size_t zRatio)
+{
+  readImg(imgSource, img, xRatio, yRatio, zRatio, ZImgReadOptions::pixelsOnly());
 }
 
 void ZImgIO::writeImg(const QString& filename, const ZImg& img, FileFormat format, const ZImgWriteParameters& paras)

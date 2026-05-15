@@ -165,10 +165,7 @@ ZImgInfo toImgInfo(const ZBioFormatsSeriesInfo& series)
   return info;
 }
 
-void attachBioFormatsMetadata(const ZBioFormatsDatasetInfo& dataset,
-                              ZImgMetadata& meta,
-                              size_t scene,
-                              bool includeOriginalMetadata)
+void attachBioFormatsMetadata(const ZBioFormatsDatasetInfo& dataset, ZImgMetadata& meta, size_t scene)
 {
   CHECK(scene < dataset.series.size());
   const auto& series = dataset.series[scene];
@@ -178,10 +175,8 @@ void attachBioFormatsMetadata(const ZBioFormatsDatasetInfo& dataset,
   for (const QString& usedFile : usedFiles) {
     meta.attachToTopLevel(ZImgMetatag("Bio-Formats Used File", usedFile.toStdString()));
   }
-  if (includeOriginalMetadata) {
-    for (const auto& entry : series.metadata) {
-      meta.attachToTopLevel(ZImgMetatag(entry.key, entry.value));
-    }
+  for (const auto& entry : series.metadata) {
+    meta.attachToTopLevel(ZImgMetatag(entry.key, entry.value));
   }
   for (const auto& resolution : series.resolutions) {
     meta.attachToTopLevel(ZImgMetatag("Bio-Formats Resolution",
@@ -194,6 +189,59 @@ void attachBioFormatsMetadata(const ZBioFormatsDatasetInfo& dataset,
                                                   resolution.sizeT,
                                                   resolution.optimalTileWidth,
                                                   resolution.optimalTileHeight)));
+  }
+}
+
+void attachBioFormatsThumbnails(const QString& filename,
+                                const ZBioFormatsDatasetInfo& dataset,
+                                ZImgThumbernail& thumbnail,
+                                const ZImgRegion& region,
+                                size_t scene)
+{
+  thumbnail.clear();
+  CHECK(scene < dataset.series.size());
+
+  const ZImgInfo imgInfo = toImgInfo(dataset.series[scene]);
+  if (region.isEmpty() || !region.isValid(imgInfo)) {
+    throw ZException(fmt::format("Invalid image region. Image info: '{}', region: '{}'", imgInfo, region));
+  }
+
+  ZImgRegion resolvedRegion = region;
+  resolvedRegion.resolveRegionEnd(imgInfo);
+  for (index_t t = resolvedRegion.start.t; t < resolvedRegion.end.t; ++t) {
+    for (index_t z = resolvedRegion.start.z; z < resolvedRegion.end.z; ++z) {
+      try {
+        ZBioFormatsThumbnail thumbnailPixels =
+          ZBioFormatsBridgeClient::instance().readThumbnail(filename,
+                                                            scene,
+                                                            static_cast<size_t>(z),
+                                                            static_cast<size_t>(t));
+        ZBioFormatsSeriesInfo thumbnailSeries = dataset.series[scene];
+        thumbnailSeries.sizeX = thumbnailPixels.width;
+        thumbnailSeries.sizeY = thumbnailPixels.height;
+        thumbnailSeries.sizeZ = 1;
+        thumbnailSeries.effectiveSizeC = thumbnailPixels.channelCount;
+        thumbnailSeries.rgbChannelCount = 1;
+        thumbnailSeries.sizeT = 1;
+        thumbnailSeries.bytesPerPixel = thumbnailPixels.bytesPerPixel;
+        thumbnailSeries.pixelType = thumbnailPixels.pixelType;
+        ZImgInfo thumbnailInfo = toImgInfo(thumbnailSeries);
+        ZImg thumbImg(thumbnailInfo);
+        if (thumbnailPixels.pixels.size() != thumbImg.byteNumber()) {
+          throw ZException(fmt::format("Bio-Formats bridge returned {} thumbnail bytes, expected {} for image '{}'",
+                                       thumbnailPixels.pixels.size(),
+                                       thumbImg.byteNumber(),
+                                       thumbnailInfo));
+        }
+        std::copy_n(thumbnailPixels.pixels.data(), thumbImg.byteNumber(), thumbImg.timeData<uint8_t>(0));
+        thumbnail.attachToPlane(thumbImg,
+                                static_cast<size_t>(z - resolvedRegion.start.z),
+                                static_cast<size_t>(t - resolvedRegion.start.t));
+      }
+      catch (const ZException& e) {
+        VLOG(1) << "Bio-Formats thumbnail read failed for " << filename << ": " << e.what();
+      }
+    }
   }
 }
 
@@ -560,7 +608,7 @@ void ZImgBioFormats::readMetadata(const QString& filename, ZImgMetadata& meta, s
   if (scene >= dataset.series.size()) {
     throw ZException(fmt::format("Bio-Formats scene {} is out of range for {}", scene, filename));
   }
-  attachBioFormatsMetadata(dataset, meta, scene, true);
+  attachBioFormatsMetadata(dataset, meta, scene);
 }
 
 void ZImgBioFormats::readThumbnail(const QString& filename,
@@ -568,59 +616,20 @@ void ZImgBioFormats::readThumbnail(const QString& filename,
                                    const ZImgRegion& region,
                                    size_t scene)
 {
-  thumbnail.clear();
   const auto dataset = ZBioFormatsBridgeClient::instance().readDatasetInfo(filename, true);
   if (scene >= dataset.series.size()) {
     throw ZException(fmt::format("Bio-Formats scene {} is out of range for {}", scene, filename));
   }
-
-  const ZImgInfo imgInfo = toImgInfo(dataset.series[scene]);
-  if (region.isEmpty() || !region.isValid(imgInfo)) {
-    throw ZException(fmt::format("Invalid image region. Image info: '{}', region: '{}'", imgInfo, region));
-  }
-
-  ZImgRegion resolvedRegion = region;
-  resolvedRegion.resolveRegionEnd(imgInfo);
-  for (index_t t = resolvedRegion.start.t; t < resolvedRegion.end.t; ++t) {
-    for (index_t z = resolvedRegion.start.z; z < resolvedRegion.end.z; ++z) {
-      try {
-        ZBioFormatsThumbnail thumbnailPixels =
-          ZBioFormatsBridgeClient::instance().readThumbnail(filename,
-                                                            scene,
-                                                            static_cast<size_t>(z),
-                                                            static_cast<size_t>(t));
-        ZBioFormatsSeriesInfo thumbnailSeries = dataset.series[scene];
-        thumbnailSeries.sizeX = thumbnailPixels.width;
-        thumbnailSeries.sizeY = thumbnailPixels.height;
-        thumbnailSeries.sizeZ = 1;
-        thumbnailSeries.effectiveSizeC = thumbnailPixels.channelCount;
-        thumbnailSeries.rgbChannelCount = 1;
-        thumbnailSeries.sizeT = 1;
-        thumbnailSeries.bytesPerPixel = thumbnailPixels.bytesPerPixel;
-        thumbnailSeries.pixelType = thumbnailPixels.pixelType;
-        ZImgInfo thumbnailInfo = toImgInfo(thumbnailSeries);
-        ZImg thumbImg(thumbnailInfo);
-        if (thumbnailPixels.pixels.size() != thumbImg.byteNumber()) {
-          throw ZException(fmt::format("Bio-Formats bridge returned {} thumbnail bytes, expected {} for image '{}'",
-                                       thumbnailPixels.pixels.size(),
-                                       thumbImg.byteNumber(),
-                                       thumbnailInfo));
-        }
-        std::copy_n(thumbnailPixels.pixels.data(), thumbImg.byteNumber(), thumbImg.timeData<uint8_t>(0));
-        thumbnail.attachToPlane(thumbImg,
-                                static_cast<size_t>(z - resolvedRegion.start.z),
-                                static_cast<size_t>(t - resolvedRegion.start.t));
-      }
-      catch (const ZException& e) {
-        VLOG(1) << "Bio-Formats thumbnail read failed for " << filename << ": " << e.what();
-      }
-    }
-  }
+  attachBioFormatsThumbnails(filename, dataset, thumbnail, region, scene);
 }
 
-void ZImgBioFormats::readImg(const QString& filename, ZImg& img, const ZImgRegion& region, size_t scene)
+void ZImgBioFormats::readImg(const QString& filename,
+                             ZImg& img,
+                             const ZImgRegion& region,
+                             size_t scene,
+                             const ZImgReadOptions& readOptions)
 {
-  const auto dataset = ZBioFormatsBridgeClient::instance().readDatasetInfo(filename, true);
+  const auto dataset = ZBioFormatsBridgeClient::instance().readDatasetInfo(filename, !readOptions.includeMetadata);
   if (scene >= dataset.series.size()) {
     throw ZException(fmt::format("Bio-Formats scene {} is out of range for {}", scene, filename));
   }
@@ -649,10 +658,12 @@ void ZImgBioFormats::readImg(const QString& filename, ZImg& img, const ZImgRegio
     offset += img.timeByteNumber();
   }
 
-  // Full original metadata can be very large for formats such as Micro-Manager.
-  // Pixel reads attach lightweight provenance metadata; callers that need the full
-  // original table should use readMetadata explicitly.
-  attachBioFormatsMetadata(dataset, img.metadataRef(), scene, false);
+  if (readOptions.includeMetadata) {
+    attachBioFormatsMetadata(dataset, img.metadataRef(), scene);
+  }
+  if (readOptions.includeThumbnails) {
+    attachBioFormatsThumbnails(filename, dataset, img.thumbnailRef(), region, scene);
+  }
 }
 
 } // namespace nim

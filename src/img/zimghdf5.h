@@ -84,7 +84,8 @@ public:
                size_t scene,
                size_t xRatio,
                size_t yRatio,
-               size_t zRatio) override;
+               size_t zRatio,
+               const ZImgReadOptions& readOptions = ZImgReadOptions::complete()) override;
 
   void writeImg(const QString& filename, const ZImg& img, const ZImgWriteParameters& paras) override;
 

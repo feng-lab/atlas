@@ -51,7 +51,11 @@ void ZImgMetaImage::readThumbnail(const QString& /*filename*/,
                                   size_t /*scene*/)
 {}
 
-void ZImgMetaImage::readImg(const QString& filename, ZImg& img, const ZImgRegion& region, size_t scene)
+void ZImgMetaImage::readImg(const QString& filename,
+                            ZImg& img,
+                            const ZImgRegion& region,
+                            size_t scene,
+                            const ZImgReadOptions& /*readOptions*/)
 {
   if (scene != 0) {
     throw ZException("invalid scene");
