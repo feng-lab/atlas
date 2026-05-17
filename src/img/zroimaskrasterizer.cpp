@@ -1,8 +1,8 @@
 #include "zroimaskrasterizer.h"
 
 #include "zlog.h"
+#include "znaturalcubicspline2d.h"
 
-#include <NaturalSplineCurve.h>
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
@@ -363,58 +363,10 @@ void flattenCubicBezier(const glm::dvec2& p0,
   }
 }
 
-std::vector<std::array<glm::dvec2, 4>> splineToCubicBeziers(const std::vector<glm::dvec2>& points)
-{
-  std::vector<std::array<glm::dvec2, 4>> beziers;
-  if (points.size() < 2) {
-    return beziers;
-  }
-  const bool isClosed = (points.front() == points.back());
-  if ((isClosed && points.size() < 4) || (!isClosed && points.size() < 3)) {
-    return beziers;
-  }
-
-  const size_t numSegments = points.size() - 1;
-  std::vector<double> times(points.size(), 0.0);
-  for (size_t i = 1; i < points.size(); ++i) {
-    times[i] = times[i - 1] + glm::length(points[i] - points[i - 1]);
-  }
-
-  std::vector<gte::Vector<2, double>> gtePoints(points.size());
-  for (size_t i = 0; i < points.size(); ++i) {
-    gtePoints[i][0] = points[i].x;
-    gtePoints[i][1] = points[i].y;
-  }
-
-  gte::NaturalSplineCurve<2, double> curve(!isClosed, points.size(), gtePoints.data(), times.data());
-
-  for (size_t i = 0; i < numSegments; ++i) {
-    gte::Vector<2, double> values0[4];
-    gte::Vector<2, double> values1[4];
-    curve.Evaluate(times[i], 1, values0);
-    curve.Evaluate(times[i + 1], 1, values1);
-
-    gte::Vector<2, double> m0 = values0[1];
-    gte::Vector<2, double> m1 = values1[1];
-
-    const double dt = times[i + 1] - times[i];
-    m0 *= dt;
-    m1 *= dt;
-
-    const glm::dvec2 p0 = points[i];
-    const glm::dvec2 p3 = points[i + 1];
-    const glm::dvec2 p1 = glm::dvec2(points[i].x + (1.0 / 3.0) * m0[0], points[i].y + (1.0 / 3.0) * m0[1]);
-    const glm::dvec2 p2 = glm::dvec2(points[i + 1].x - (1.0 / 3.0) * m1[0], points[i + 1].y - (1.0 / 3.0) * m1[1]);
-
-    beziers.push_back({p0, p1, p2, p3});
-  }
-
-  return beziers;
-}
-
-std::vector<glm::dvec2> splineToPolyline(const std::vector<glm::dvec2>& points, double tol)
+std::vector<glm::dvec2> splineToPolyline(std::vector<glm::dvec2> points, double tol)
 {
   std::vector<glm::dvec2> res;
+  ZNaturalCubicSpline2D::compactConsecutiveDuplicatePointsInPlace(points);
   if (points.size() < 2) {
     return res;
   }
@@ -426,16 +378,18 @@ std::vector<glm::dvec2> splineToPolyline(const std::vector<glm::dvec2>& points, 
     return res;
   }
 
-  const auto beziers = splineToCubicBeziers(points);
+  const glm::dvec2 fallback0 = points[0];
+  const glm::dvec2 fallback1 = points[1];
+  const auto beziers = ZNaturalCubicSpline2D::fitChordLength(std::move(points));
   if (beziers.empty()) {
-    res.push_back(points[0]);
-    res.push_back(points[1]);
+    res.push_back(fallback0);
+    res.push_back(fallback1);
     return res;
   }
 
-  res.push_back(beziers.front()[0]);
+  res.push_back(beziers.front().p0);
   for (const auto& b : beziers) {
-    flattenCubicBezier(b[0], b[1], b[2], b[3], tol, res);
+    flattenCubicBezier(b.p0, b.p1, b.p2, b.p3, tol, res);
   }
   return res;
 }
@@ -660,6 +614,10 @@ void rasterizeLineStroke(const std::vector<glm::dvec2>& polyline, double strokeW
       }
       scaled.push_back(sp);
     }
+    ZNaturalCubicSpline2D::compactConsecutiveDuplicatePointsInPlace(scaled);
+    if (scaled.size() < 2) {
+      return b;
+    }
     const bool isClosed = !scaled.empty() && (scaled.front() == scaled.back());
     if ((isClosed && scaled.size() < 4) || (!isClosed && scaled.size() < 3)) {
       for (const auto& p : scaled) {
@@ -672,9 +630,16 @@ void rasterizeLineStroke(const std::vector<glm::dvec2>& polyline, double strokeW
     // property) but can be catastrophically loose for degenerate splines (large tangents), which
     // can lead to enormous masks/allocations. Instead compute the actual cubic-Bezier bounds via
     // derivative roots (interior extrema) per segment.
-    const auto beziers = splineToCubicBeziers(scaled);
+    const glm::dvec2 fallback0 = scaled[0];
+    const glm::dvec2 fallback1 = scaled[1];
+    const auto beziers = ZNaturalCubicSpline2D::fitChordLength(std::move(scaled));
+    if (beziers.empty()) {
+      b.expand(fallback0);
+      b.expand(fallback1);
+      return b;
+    }
     for (const auto& bez : beziers) {
-      const ZROIBounds2D seg = cubicBezierBounds(bez[0], bez[1], bez[2], bez[3]);
+      const ZROIBounds2D seg = cubicBezierBounds(bez.p0, bez.p1, bez.p2, bez.p3);
       if (!seg.isEmpty()) {
         b.expand(seg);
       }
@@ -974,7 +939,7 @@ std::tuple<ZImg, index_t, index_t> ZROIMaskRasterizer::shapeToMask(const std::ve
       for (const auto& p : op.poly) {
         scaled.push_back(applyScale(p, settings.scaleX, settings.scaleY));
       }
-      auto polyline = splineToPolyline(scaled, tol / static_cast<double>(settings.supersample));
+      auto polyline = splineToPolyline(std::move(scaled), tol / static_cast<double>(settings.supersample));
       auto hrPolyline = toHiResPolyAlreadyScaled(polyline, origin, settings.supersample);
       if (hrPolyline.size() >= 2 && hrPolyline.front() == hrPolyline.back()) {
         hrPolyline.pop_back();

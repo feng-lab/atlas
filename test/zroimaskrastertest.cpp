@@ -2,12 +2,16 @@
 
 #include "zroi.h"
 #include "zroiutils.h"
+#include "znaturalcubicspline2d.h"
 #include "zrandom.h"
 #include "ztest.h"
 
+#include <Mathematics/NaturalSplineCurve.h>
 #include <QFileInfo>
+#include <QPainterPath>
 #include <QPointF>
 #include <array>
+#include <cmath>
 #include <random>
 #include <string>
 #include <vector>
@@ -43,6 +47,118 @@ std::vector<int> chooseSlicesToTest(const ZROI& roi)
   slices.resize(static_cast<size_t>(targetCount));
   std::sort(slices.begin(), slices.end());
   return slices;
+}
+
+void expectPathElementNear(const QPainterPath& path, int index, QPainterPath::ElementType type, double x, double y)
+{
+  ASSERT_LT(index, path.elementCount());
+  const auto element = path.elementAt(index);
+  EXPECT_EQ(element.type, type);
+  EXPECT_NEAR(element.x, x, 1e-9);
+  EXPECT_NEAR(element.y, y, 1e-9);
+}
+
+void expectVecNear(const glm::dvec2& actual, const glm::dvec2& expected, double tolerance)
+{
+  EXPECT_NEAR(actual.x, expected.x, tolerance);
+  EXPECT_NEAR(actual.y, expected.y, tolerance);
+}
+
+std::vector<double> chordLengthTimes(const std::vector<glm::dvec2>& points)
+{
+  return ZNaturalCubicSpline2D::chordLengthTimes(points);
+}
+
+std::vector<glm::dvec2> toPoints(const QPolygonF& poly)
+{
+  std::vector<glm::dvec2> points;
+  points.reserve(static_cast<size_t>(poly.size()));
+  for (const auto& p : poly) {
+    points.emplace_back(p.x(), p.y());
+  }
+  return points;
+}
+
+std::vector<gte::Vector<2, double>> toGtePoints(const std::vector<glm::dvec2>& points)
+{
+  std::vector<gte::Vector<2, double>> gtePoints(points.size());
+  for (size_t i = 0; i < points.size(); ++i) {
+    gtePoints[i][0] = points[i].x;
+    gtePoints[i][1] = points[i].y;
+  }
+  return gtePoints;
+}
+
+std::vector<ZNaturalCubicSpline2D::CubicBezier> geometricToolsBeziers(const std::vector<glm::dvec2>& points)
+{
+  const bool isClosed = points.front() == points.back();
+  const std::vector<double> times = chordLengthTimes(points);
+  auto gtePoints = toGtePoints(points);
+  gte::NaturalSplineCurve<2, double> curve(!isClosed,
+                                           static_cast<int32_t>(gtePoints.size()),
+                                           gtePoints.data(),
+                                           times.data());
+
+  std::vector<ZNaturalCubicSpline2D::CubicBezier> beziers;
+  beziers.reserve(points.size() - 1);
+  for (size_t i = 0; i + 1 < points.size(); ++i) {
+    gte::Vector<2, double> values0[4];
+    gte::Vector<2, double> values1[4];
+    curve.Evaluate(times[i], 1, values0);
+    curve.Evaluate(times[i + 1], 1, values1);
+
+    const double dt = times[i + 1] - times[i];
+    const glm::dvec2 m0(dt * values0[1][0], dt * values0[1][1]);
+    const glm::dvec2 m1(dt * values1[1][0], dt * values1[1][1]);
+    beziers.push_back(ZNaturalCubicSpline2D::CubicBezier{
+      points[i],
+      points[i] + m0 / 3.0,
+      points[i + 1] - m1 / 3.0,
+      points[i + 1],
+    });
+  }
+  return beziers;
+}
+
+void expectSplineMatchesGeometricTools(const std::vector<glm::dvec2>& rawPoints, double tolerance)
+{
+  const std::vector<glm::dvec2> points = ZNaturalCubicSpline2D::compactConsecutiveDuplicatePoints(rawPoints);
+  ASSERT_GE(points.size(), 3_uz);
+  const bool isClosed = points.front() == points.back();
+  ASSERT_TRUE((isClosed && points.size() >= 4_uz) || (!isClosed && points.size() >= 3_uz));
+
+  std::vector<double> times = chordLengthTimes(points);
+  ASSERT_TRUE(ZNaturalCubicSpline2D::hasStrictlyIncreasingTimes(times));
+
+  auto gtePoints = toGtePoints(points);
+  gte::NaturalSplineCurve<2, double> reference(!isClosed,
+                                               static_cast<int32_t>(gtePoints.size()),
+                                               gtePoints.data(),
+                                               times.data());
+  ZNaturalCubicSpline2D actual(!isClosed, points, times);
+
+  constexpr std::array<double, 7> kSamples = {0.0, 0.1, 0.25, 0.5, 0.75, 0.9, 1.0};
+  for (size_t segment = 0; segment + 1 < points.size(); ++segment) {
+    const double t0 = times[segment];
+    const double dt = times[segment + 1] - t0;
+    for (double u : kSamples) {
+      const double t = t0 + u * dt;
+      gte::Vector<2, double> jet[4];
+      reference.Evaluate(t, 1, jet);
+      expectVecNear(actual.position(t), glm::dvec2(jet[0][0], jet[0][1]), tolerance);
+      expectVecNear(actual.derivative(t), glm::dvec2(jet[1][0], jet[1][1]), tolerance);
+    }
+  }
+
+  const auto actualBeziers = ZNaturalCubicSpline2D::fitChordLength(rawPoints);
+  const auto referenceBeziers = geometricToolsBeziers(points);
+  ASSERT_EQ(actualBeziers.size(), referenceBeziers.size());
+  for (size_t i = 0; i < actualBeziers.size(); ++i) {
+    expectVecNear(actualBeziers[i].p0, referenceBeziers[i].p0, tolerance);
+    expectVecNear(actualBeziers[i].p1, referenceBeziers[i].p1, tolerance);
+    expectVecNear(actualBeziers[i].p2, referenceBeziers[i].p2, tolerance);
+    expectVecNear(actualBeziers[i].p3, referenceBeziers[i].p3, tolerance);
+  }
 }
 
 void pasteOr(ZImg& dst, const ZImg& src, index_t startX, index_t startY)
@@ -297,6 +413,128 @@ TEST(ZROIMaskRasterizer, SplineScaleAppliedExactlyOnce)
     computeStatsWithOffset(qtMask, qtXStart, qtYStart, qtOnPixels, newMask, newXStart, newYStart, newOnPixels);
   EXPECT_GE(stats.iou, 0.999) << "Unexpectedly low IoU for scaled spline (diffPixels=" << stats.diffPixels
                               << ", union=" << stats.unionPixels << ")";
+}
+
+TEST(ZNaturalCubicSpline2D, MatchesGeometricToolsForRepresentativeSplines)
+{
+  expectSplineMatchesGeometricTools({glm::dvec2(0.0, 0.0),
+                                     glm::dvec2(125.0, 40.0),
+                                     glm::dvec2(260.0, -15.0),
+                                     glm::dvec2(390.0, 95.0),
+                                     glm::dvec2(520.0, 75.0)},
+                                    1e-8);
+
+  expectSplineMatchesGeometricTools({glm::dvec2(0.0, 0.0),
+                                     glm::dvec2(400.0, 0.0),
+                                     glm::dvec2(400.0, 400.0),
+                                     glm::dvec2(0.0, 400.0),
+                                     glm::dvec2(0.0, 0.0)},
+                                    1e-8);
+
+  expectSplineMatchesGeometricTools({glm::dvec2(10.0, 15.0),
+                                     glm::dvec2(190.0, -25.0),
+                                     glm::dvec2(360.0, 80.0),
+                                     glm::dvec2(325.0, 240.0),
+                                     glm::dvec2(120.0, 260.0),
+                                     glm::dvec2(10.0, 15.0)},
+                                    1e-8);
+
+  expectSplineMatchesGeometricTools({glm::dvec2(0.0, 0.0),
+                                     glm::dvec2(400.0, 0.0),
+                                     glm::dvec2(400.0, 0.0),
+                                     glm::dvec2(400.0, 400.0),
+                                     glm::dvec2(0.0, 400.0),
+                                     glm::dvec2(0.0, 0.0)},
+                                    1e-8);
+}
+
+TEST(ZNaturalCubicSpline2D, MatchesGeometricToolsForNimroiSplineFixtures)
+{
+  const QDir testDataDir = getTestDataDir();
+  ASSERT_TRUE(testDataDir.exists()) << "ATLAS test data dir not found: " << testDataDir.absolutePath().toStdString();
+
+  size_t numSplines = 0;
+  for (const char* fileName : kNimroiTestFiles) {
+    const QString filePath = testDataDir.filePath(fileName);
+    ASSERT_TRUE(QFileInfo::exists(filePath)) << "Missing test nimroi file: " << filePath.toStdString();
+
+    ZROI roi;
+    roi.load(filePath);
+
+    for (auto it = roi.cbegin(); it != roi.cend(); ++it) {
+      const int slice = it->first;
+      for (const size_t shapeID : roi.sliceShapeIDs(slice)) {
+        const auto& ops = roi.shapeOperations(slice, shapeID);
+        for (size_t opIndex = 0; opIndex < ops.size(); ++opIndex) {
+          const auto& op = ops[opIndex];
+          if (op.type != ROIType::Spline) {
+            continue;
+          }
+
+          SCOPED_TRACE(fmt::format("file={} slice={} shapeID={} opIndex={}", fileName, slice, shapeID, opIndex));
+          ++numSplines;
+          expectSplineMatchesGeometricTools(toPoints(op.poly), 1e-8);
+        }
+      }
+    }
+  }
+
+  EXPECT_GT(numSplines, 0_uz);
+}
+
+TEST(ZNaturalCubicSpline2D, MatchesGeometricToolsForRandomChordLengthSplines)
+{
+  constexpr double kPi = 3.141592653589793238462643383279502884;
+  std::mt19937_64 rng(0x41544c41535f524f);
+  std::uniform_real_distribution<double> stepDist(5.0, 75.0);
+  std::uniform_real_distribution<double> yDist(-120.0, 120.0);
+  std::uniform_real_distribution<double> radiusDist(60.0, 180.0);
+  std::uniform_real_distribution<double> jitterDist(-0.18, 0.18);
+
+  for (int numPoints = 3; numPoints <= 24; ++numPoints) {
+    for (int rep = 0; rep < 12; ++rep) {
+      std::vector<glm::dvec2> points;
+      points.reserve(static_cast<size_t>(numPoints));
+      double x = 0.0;
+      for (int i = 0; i < numPoints; ++i) {
+        x += stepDist(rng);
+        points.emplace_back(x, yDist(rng));
+      }
+      expectSplineMatchesGeometricTools(points, 1e-7);
+    }
+  }
+
+  for (int numUniquePoints = 3; numUniquePoints <= 24; ++numUniquePoints) {
+    for (int rep = 0; rep < 12; ++rep) {
+      std::vector<glm::dvec2> points;
+      points.reserve(static_cast<size_t>(numUniquePoints) + 1);
+      for (int i = 0; i < numUniquePoints; ++i) {
+        const double angle = 2.0 * kPi * static_cast<double>(i) / static_cast<double>(numUniquePoints);
+        const double radius = radiusDist(rng) * (1.0 + jitterDist(rng));
+        points.emplace_back(radius * std::cos(angle), 0.7 * radius * std::sin(angle));
+      }
+      points.push_back(points.front());
+      expectSplineMatchesGeometricTools(points, 1e-7);
+    }
+  }
+}
+
+TEST(ZROIMaskRasterizer, ClosedSplineUsesStablePeriodicSolve)
+{
+  QPolygonF qpoly;
+  qpoly << QPointF(0.0, 0.0) << QPointF(400.0, 0.0) << QPointF(400.0, 400.0) << QPointF(0.0, 400.0)
+        << QPointF(0.0, 0.0);
+
+  const QPainterPath path = ZROIUtils::splineToQPainterPath(qpoly);
+  ASSERT_EQ(path.elementCount(), 13);
+
+  expectPathElementNear(path, 0, QPainterPath::MoveToElement, 0.0, 0.0);
+  expectPathElementNear(path, 1, QPainterPath::CurveToElement, 100.0, -100.0);
+  expectPathElementNear(path, 2, QPainterPath::CurveToDataElement, 300.0, -100.0);
+  expectPathElementNear(path, 3, QPainterPath::CurveToDataElement, 400.0, 0.0);
+  expectPathElementNear(path, 10, QPainterPath::CurveToElement, -100.0, 300.0);
+  expectPathElementNear(path, 11, QPainterPath::CurveToDataElement, -100.0, 100.0);
+  expectPathElementNear(path, 12, QPainterPath::CurveToDataElement, 0.0, 0.0);
 }
 
 TEST(ZROIMaskRasterizer, MatchesQtMaskForNimroiFixtures)

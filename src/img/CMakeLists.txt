@@ -187,6 +187,7 @@ set(IMG_SOURCES
         zstitchimage.cpp zstitchimage.h
         zimginit.h zimginit.cpp
         zjson.h zjson.cpp
+        znaturalcubicspline2d.h znaturalcubicspline2d.cpp
         zroimaskrasterizer.cpp zroimaskrasterizer.h
         zminimumspanningtree.cpp zminimumspanningtree.h
         zmkl.h

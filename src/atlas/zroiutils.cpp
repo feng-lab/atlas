@@ -2,10 +2,10 @@
 
 #include "zglobal.h"
 #include "zroimaskrasterizer.h"
-#include <NaturalSplineCurve.h>
+#include "znaturalcubicspline2d.h"
 #include <QImage>
 #include <QPainter>
-#include <cmath>
+#include <utility>
 
 namespace nim {
 namespace {
@@ -55,36 +55,24 @@ QPainterPath ZROIUtils::splineToQPainterPath(const QPolygonF& spline, bool showL
     return res;
   }
 
-  auto numSegments = spline.size() - 1;
-  std::vector<double> times(spline.size());
-  times[0] = 0;
-  for (size_t i = 1; i < times.size(); ++i) {
-    times[i] = times[i - 1] + std::sqrt(QPointF::dotProduct(spline[i] - spline[i - 1], spline[i] - spline[i - 1]));
+  std::vector<glm::dvec2> points;
+  points.reserve(static_cast<size_t>(spline.size()));
+  for (const auto& p : spline) {
+    points.emplace_back(p.x(), p.y());
   }
 
-  gte::NaturalSplineCurve<2, double> splineCurve(!isClosed,
-                                                 spline.size(),
-                                                 (const gte::Vector<2, double>*)spline.data(),
-                                                 times.data());
+  const auto beziers = ZNaturalCubicSpline2D::fitChordLength(std::move(points));
+  if (beziers.empty()) {
+    res.moveTo(spline[0]);
+    res.lineTo(spline[1]);
+    return res;
+  }
+
   res.moveTo(spline[0]);
-  auto endSeg = showLastSeg ? numSegments : numSegments - 1;
-  for (index_t i = 0; i < endSeg; ++i) {
-    gte::Vector<2, double> values0[4];
-    gte::Vector<2, double> values1[4];
-    splineCurve.Evaluate(times[i], 1, values0);
-    splineCurve.Evaluate(times[i + 1], 1, values1);
-    gte::Vector<2, double>& m0 = values0[1];
-    gte::Vector<2, double>& m1 = values1[1];
-    m0 *= times[i + 1] - times[i];
-    m1 *= times[i + 1] - times[i];
-    // VLOG(1) << m0.X() << " " << m0.Y() << " " << m1.X() << " " << m1.Y() << " " << cspline[i] << " " <<
-    // cspline[i+1];
-    res.cubicTo(spline[i].x() + 1. / 3. * m0[0],
-                spline[i].y() + 1. / 3. * m0[1],
-                spline[i + 1].x() - 1. / 3. * m1[0],
-                spline[i + 1].y() - 1. / 3. * m1[1],
-                spline[i + 1].x(),
-                spline[i + 1].y());
+  const size_t endSeg = showLastSeg ? beziers.size() : beziers.size() - 1;
+  for (size_t i = 0; i < endSeg; ++i) {
+    const auto& b = beziers[i];
+    res.cubicTo(b.p1.x, b.p1.y, b.p2.x, b.p2.y, b.p3.x, b.p3.y);
   }
 
   return res;
