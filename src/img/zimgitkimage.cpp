@@ -31,6 +31,21 @@ namespace {
 void parseInfoFromImageIO(const itk::ImageIOBase* imageIO, ZImgInfo& info, bool isNd2);
 void parseMetadataFromImageIO(const itk::ImageIOBase* imageIO, ZImgMetadata& meta);
 
+void appendNormalizedItkExtensions(QStringList& extensions, const std::vector<std::string>& itkExtensions)
+{
+  for (const auto& itkExt : itkExtensions) {
+    for (QString ext : QString::fromStdString(itkExt).split(',', Qt::SkipEmptyParts)) {
+      ext = ext.trimmed();
+      if (ext.startsWith('.')) {
+        ext.remove(0, 1);
+      }
+      if (!ext.isEmpty()) {
+        extensions.push_back(ext);
+      }
+    }
+  }
+}
+
 struct NrrdRawSpec
 {
   QString dataFilePath;
@@ -520,10 +535,7 @@ QStringList ZImgITKImage::extensions() const
     for (const auto& pt : itk::ObjectFactoryBase::CreateAllInstance("itkImageIOBase")) {
       if (auto io = dynamic_cast<const itk::ImageIOBase*>(pt.GetPointer())) {
         // VLOG(1) << "ImageIO: " << io->GetNameOfClass();
-        for (const auto& ext : io->GetSupportedReadExtensions()) {
-          res.push_back(QString::fromStdString(ext));
-          res.last().remove(0, 1); // remove '.'
-        }
+        appendNormalizedItkExtensions(res, io->GetSupportedReadExtensions());
       }
     }
 #ifdef ATLAS_SUPPORT_DICOM

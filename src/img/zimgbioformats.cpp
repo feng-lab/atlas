@@ -250,19 +250,24 @@ QStringList uniqueSortedExtensions(const std::vector<ZBioFormatsReaderFormat>& f
   QStringList extensions;
   for (const auto& format : formats) {
     for (const QString& suffix : format.suffixes) {
-      const QString trimmed = suffix.trimmed();
-      if (trimmed.isEmpty()) {
-        continue;
-      }
-      bool exists = false;
-      for (const auto& existing : extensions) {
-        if (existing.compare(trimmed, Qt::CaseInsensitive) == 0) {
-          exists = true;
-          break;
+      for (QString trimmed : suffix.split(',', Qt::SkipEmptyParts)) {
+        trimmed = trimmed.trimmed();
+        if (trimmed.startsWith('.')) {
+          trimmed.remove(0, 1);
         }
-      }
-      if (!exists) {
-        extensions.push_back(trimmed);
+        if (trimmed.isEmpty()) {
+          continue;
+        }
+        bool exists = false;
+        for (const auto& existing : extensions) {
+          if (existing.compare(trimmed, Qt::CaseInsensitive) == 0) {
+            exists = true;
+            break;
+          }
+        }
+        if (!exists) {
+          extensions.push_back(trimmed);
+        }
       }
     }
   }

@@ -748,6 +748,11 @@ int ZRunDumpAnimation3DSchema::run()
                       "ROI / Region annotations",
                       QStringList({"nimroi", "reganno"}),
                       "Atlas ROI packs and region annotations");
+    addFormatCategory(categories,
+                      "scenes",
+                      "Scenes",
+                      QStringList({"scene"}),
+                      "Atlas workspace files containing object references plus 2D/3D view state");
     addFormatCategory(categories, "svg", "SVG Overlays", QStringList({"svg"}));
     addFormatCategory(categories,
                       "animations",
