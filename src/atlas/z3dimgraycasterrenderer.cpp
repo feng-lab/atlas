@@ -1,4 +1,5 @@
 #include "z3dimgraycasterrenderer.h"
+#include "zcommandlineflags.h"
 
 #include "z3dtexture.h"
 #include "z3drendertarget.h"
@@ -26,37 +27,42 @@
 #include <span>
 #include <vector>
 
-DEFINE_uint32(atlas_volume_rendering_maximum_round,
-              100,
-              "Maximum number of rounds for volume rendering, default is 100");
+ABSL_FLAG(uint32_t,
+          atlas_volume_rendering_maximum_round,
+          100,
+          "Maximum number of rounds for volume rendering, default is 100");
 
-DEFINE_uint32(atlas_volume_rendering_progressive_blockid_effective_attachments,
-              2,
-              "Caps how many Block-ID attachments are processed per progressive 3D volume rendering round. "
-              "Lower values reduce per-round latency (more frequent refinement updates) but may require more rounds "
-              "to converge. Set to 0 to disable the cap and use all available attachments.");
+ABSL_FLAG(uint32_t,
+          atlas_volume_rendering_progressive_blockid_effective_attachments,
+          2,
+          "Caps how many Block-ID attachments are processed per progressive 3D volume rendering round. "
+          "Lower values reduce per-round latency (more frequent refinement updates) but may require more rounds "
+          "to converge. Set to 0 to disable the cap and use all available attachments.");
 
-DEFINE_bool(atlas_volume_rendering_analytic_ray_setup,
-            false,
-            "Use analytic per-pixel volume ray setup instead of the legacy clipped-mesh entry/exit path. "
-            "Disabled by default so the legacy entry/exit workflow remains the baseline until the analytic path is "
-            "fully validated.");
+ABSL_FLAG(bool,
+          atlas_volume_rendering_analytic_ray_setup,
+          false,
+          "Use analytic per-pixel volume ray setup instead of the legacy clipped-mesh entry/exit path. "
+          "Disabled by default so the legacy entry/exit workflow remains the baseline until the analytic path is "
+          "fully validated.");
 
-DEFINE_bool(atlas_enable_benchmark_raw_mip_export,
-            false,
-            "Enable benchmark-only raw MIP export support. Disabled by default so the normal rendering path "
-            "does not compile or use the benchmark export shaders.");
+ABSL_FLAG(bool,
+          atlas_enable_benchmark_raw_mip_export,
+          false,
+          "Enable benchmark-only raw MIP export support. Disabled by default so the normal rendering path "
+          "does not compile or use the benchmark export shaders.");
 
-DEFINE_bool(atlas_enable_benchmark_screen_space_sufficiency_audit,
-            false,
-            "Enable benchmark-only screen-space sufficiency audit support. Disabled by default so the normal "
-            "rendering path does not compile or use the benchmark audit shaders.");
+ABSL_FLAG(bool,
+          atlas_enable_benchmark_screen_space_sufficiency_audit,
+          false,
+          "Enable benchmark-only screen-space sufficiency audit support. Disabled by default so the normal "
+          "rendering path does not compile or use the benchmark audit shaders.");
 
-DECLARE_bool(atlas_log_3d_paging_frame_stats);
-DECLARE_bool(atlas_log_3d_paging_round_stats);
+ABSL_DECLARE_FLAG(bool, atlas_log_3d_paging_frame_stats);
+ABSL_DECLARE_FLAG(bool, atlas_log_3d_paging_round_stats);
 
 #if defined(__linux__)
-DEFINE_bool(atlas_debug_texture_output, false, "produce debug intermediate texture to /data/testoutput");
+ABSL_FLAG(bool, atlas_debug_texture_output, false, "produce debug intermediate texture to /data/testoutput");
 #endif
 
 namespace nim {
@@ -93,12 +99,12 @@ namespace {
 
 [[nodiscard]] bool benchmarkRawMIPExportEnabled()
 {
-  return FLAGS_atlas_enable_benchmark_raw_mip_export;
+  return absl::GetFlag(FLAGS_atlas_enable_benchmark_raw_mip_export);
 }
 
 [[nodiscard]] bool benchmarkScreenSpaceAuditEnabled()
 {
-  return FLAGS_atlas_enable_benchmark_screen_space_sufficiency_audit;
+  return absl::GetFlag(FLAGS_atlas_enable_benchmark_screen_space_sufficiency_audit);
 }
 
 void appendAnalyticRaySetupHeader(std::string& header)
@@ -275,7 +281,8 @@ std::vector<ImgRaycasterPayload> Z3DImgRaycasterRenderer::buildVulkanStagePayloa
   common.fastPathOnly = m_fastRendering || !m_img->isVolumeDownsampled();
   common.visibleChannels = visibleChannels;
   common.transferFunctions = &m_transferFunctions;
-  common.roundsRemaining = FLAGS_atlas_volume_rendering_maximum_round;
+  const uint32_t maxRounds = absl::GetFlag(FLAGS_atlas_volume_rendering_maximum_round);
+  common.roundsRemaining = maxRounds;
   common.channelIndexRaw = m_channelIdx[eye];
   common.roundIndexRaw = m_round[eye];
   common.interactiveProgressivePaging = interactiveProgressivePaging;
@@ -291,7 +298,7 @@ std::vector<ImgRaycasterPayload> Z3DImgRaycasterRenderer::buildVulkanStagePayloa
   }
   common.progressiveGeneration = m_progressiveGeneration[eye];
 
-  if (FLAGS_atlas_log_3d_paging_frame_stats) {
+  if (absl::GetFlag(FLAGS_atlas_log_3d_paging_frame_stats)) {
     if (!common.fastPathOnly && m_img) {
       const uint32_t gen = common.progressiveGeneration;
       auto& statsPtr = m_pagingFrameStats[eye];
@@ -300,7 +307,7 @@ std::vector<ImgRaycasterPayload> Z3DImgRaycasterRenderer::buildVulkanStagePayloa
         Z3DImgPagingFrameStats::CreateInfo info;
         info.label = m_img->imgPack().name().toStdString();
         info.numChannels = m_img->numChannels();
-        info.maxRounds = FLAGS_atlas_volume_rendering_maximum_round;
+        info.maxRounds = maxRounds;
         info.streamKey = common.streamKey;
         info.progressiveGeneration = gen;
         statsPtr = std::make_shared<Z3DImgPagingFrameStats>(std::move(info));
@@ -563,8 +570,9 @@ std::vector<ImgRaycasterPayload> Z3DImgRaycasterRenderer::buildVulkanStagePayloa
         pool.acquireBlockIdRenderTarget(m_outputSize, -1, -1.0, std::optional<RenderBackend>(RenderBackend::Vulkan));
       common.blockIdAttachmentCount = blockLease.attachments;
       common.blockIdEffectiveAttachmentCount =
-        common.interactiveProgressivePaging ? FLAGS_atlas_volume_rendering_progressive_blockid_effective_attachments
-                                            : 0u;
+        common.interactiveProgressivePaging
+          ? absl::GetFlag(FLAGS_atlas_volume_rendering_progressive_blockid_effective_attachments)
+          : 0u;
       common.blockIdLease = std::make_shared<Z3DScratchResourcePool::RenderTargetLease>(std::move(blockLease));
 
       ImgRaycasterPayload blockId = common;
@@ -1082,10 +1090,10 @@ void Z3DImgRaycasterRenderer::finalizeProgressiveRound(Z3DEye eye, bool lastRoun
       m_round[eye] = 0;
       m_vulkanProgressivePhase[eye] = VulkanProgressivePhase::BlockIdDiscovery;
 
-      if (FLAGS_atlas_log_3d_paging_frame_stats) {
+      if (absl::GetFlag(FLAGS_atlas_log_3d_paging_frame_stats)) {
         auto& stats = m_pagingFrameStats[eye];
         if (stats && stats->hasActivity()) {
-          LOG(INFO) << stats->formatSummary(FLAGS_atlas_log_3d_paging_round_stats);
+          LOG(INFO) << stats->formatSummary(absl::GetFlag(FLAGS_atlas_log_3d_paging_round_stats));
         }
       }
       if (m_img) {
@@ -1444,7 +1452,7 @@ std::string Z3DImgRaycasterRenderer::generateHeader()
     absl::StrAppend(&header, "#define MAX_PROJ_MERGE\n");
   }
 
-  if (FLAGS_atlas_volume_rendering_analytic_ray_setup) {
+  if (absl::GetFlag(FLAGS_atlas_volume_rendering_analytic_ray_setup)) {
     absl::StrAppend(&header, "#define ATLAS_ANALYTIC_RAY_SETUP\n");
     appendAnalyticRaySetupHeader(header);
   }
@@ -1456,7 +1464,7 @@ void Z3DImgRaycasterRenderer::bindAnalyticRaySetupGL(Z3DShaderProgram& shader) c
 {
   const bool prevLogSetting = shader.logUniformLocationError();
   shader.setLogUniformLocationError(false);
-  if (!FLAGS_atlas_volume_rendering_analytic_ray_setup) {
+  if (!absl::GetFlag(FLAGS_atlas_volume_rendering_analytic_ray_setup)) {
     shader.setLogUniformLocationError(prevLogSetting);
     return;
   }
@@ -1650,14 +1658,15 @@ double Z3DImgRaycasterRenderer::progressiveProgress(Z3DEye eye) const
     return 1.0;
   }
   // Derive progress from current channel/round state, matching GL semantics
-  const int totalRound = static_cast<int>(visible) * static_cast<int>(FLAGS_atlas_volume_rendering_maximum_round);
+  const uint32_t maxRounds = absl::GetFlag(FLAGS_atlas_volume_rendering_maximum_round);
+  const int totalRound = static_cast<int>(visible) * static_cast<int>(maxRounds);
   const int chan = m_channelIdx[eye];
   const int round = m_round[eye];
   // If chan < 0, rendering has completed for this eye
   if (chan < 0) {
     return 1.0;
   }
-  const int currentRound = chan * static_cast<int>(FLAGS_atlas_volume_rendering_maximum_round) + round;
+  const int currentRound = chan * static_cast<int>(maxRounds) + round;
   if (currentRound >= totalRound) {
     return 1.0;
   }
@@ -1666,7 +1675,7 @@ double Z3DImgRaycasterRenderer::progressiveProgress(Z3DEye eye) const
 
 void Z3DImgRaycasterRenderer::finalizePagingStatsIfDone(Z3DEye eye)
 {
-  if (!FLAGS_atlas_log_3d_paging_frame_stats) {
+  if (!absl::GetFlag(FLAGS_atlas_log_3d_paging_frame_stats)) {
     return;
   }
 
@@ -1684,7 +1693,7 @@ void Z3DImgRaycasterRenderer::finalizePagingStatsIfDone(Z3DEye eye)
   }
 
   if (stats->hasActivity()) {
-    LOG(INFO) << stats->formatSummary(FLAGS_atlas_log_3d_paging_round_stats);
+    LOG(INFO) << stats->formatSummary(absl::GetFlag(FLAGS_atlas_log_3d_paging_round_stats));
   }
 
   if (m_img) {
@@ -1935,6 +1944,12 @@ double Z3DImgRaycasterRenderer::render3DImage(Z3DEye eye, const std::vector<size
   const auto& sceneState = m_rendererBase.sceneState();
   const auto& viewState = m_rendererBase.viewState();
   const auto& monoEyeState = viewState.eyes[MonoEye];
+  const uint32_t maxRounds = absl::GetFlag(FLAGS_atlas_volume_rendering_maximum_round);
+  const bool logPagingFrameStats = absl::GetFlag(FLAGS_atlas_log_3d_paging_frame_stats);
+  const bool logPagingRoundStats = logPagingFrameStats && absl::GetFlag(FLAGS_atlas_log_3d_paging_round_stats);
+#if defined(__linux__)
+  const bool debugTextureOutput = absl::GetFlag(FLAGS_atlas_debug_texture_output);
+#endif
 
   std::shared_ptr<Z3DImgPagingFrameStats> localStats;
 
@@ -1952,11 +1967,11 @@ double Z3DImgRaycasterRenderer::render3DImage(Z3DEye eye, const std::vector<size
     m_channelIdx[eye] = 0;
     ++m_progressiveGeneration[eye];
 
-    if (FLAGS_atlas_log_3d_paging_frame_stats && m_img) {
+    if (logPagingFrameStats && m_img) {
       Z3DImgPagingFrameStats::CreateInfo info;
       info.label = m_img->imgPack().name().toStdString();
       info.numChannels = m_img->numChannels();
-      info.maxRounds = FLAGS_atlas_volume_rendering_maximum_round;
+      info.maxRounds = maxRounds;
       info.streamKey = static_cast<uint64_t>(reinterpret_cast<uintptr_t>(this));
       info.progressiveGeneration = m_progressiveGeneration[eye];
       m_pagingFrameStats[eye] = std::make_shared<Z3DImgPagingFrameStats>(std::move(info));
@@ -2051,7 +2066,7 @@ double Z3DImgRaycasterRenderer::render3DImage(Z3DEye eye, const std::vector<size
 
 #if defined(__linux__)
   static int dummyidx = -1;
-  if (FLAGS_atlas_debug_texture_output) {
+  if (debugTextureOutput) {
     ++dummyidx;
   }
 #endif
@@ -2061,7 +2076,7 @@ double Z3DImgRaycasterRenderer::render3DImage(Z3DEye eye, const std::vector<size
     CHECK(m_channelIdx[eye] >= 0 && m_channelIdx[eye] < static_cast<int>(visibleIdxs.size()))
       << m_channelIdx[eye] << " " << visibleIdxs.size();
 
-    if (FLAGS_atlas_log_3d_paging_frame_stats && m_img) {
+    if (logPagingFrameStats && m_img) {
       const uint32_t gen = m_progressiveGeneration[eye];
       auto& statsPtr = m_pagingFrameStats[eye];
       auto& statsGen = m_pagingFrameStatsGeneration[eye];
@@ -2069,7 +2084,7 @@ double Z3DImgRaycasterRenderer::render3DImage(Z3DEye eye, const std::vector<size
         Z3DImgPagingFrameStats::CreateInfo info;
         info.label = m_img->imgPack().name().toStdString();
         info.numChannels = m_img->numChannels();
-        info.maxRounds = FLAGS_atlas_volume_rendering_maximum_round;
+        info.maxRounds = maxRounds;
         info.streamKey = static_cast<uint64_t>(reinterpret_cast<uintptr_t>(this));
         info.progressiveGeneration = gen;
         statsPtr = std::make_shared<Z3DImgPagingFrameStats>(std::move(info));
@@ -2120,8 +2135,8 @@ double Z3DImgRaycasterRenderer::render3DImage(Z3DEye eye, const std::vector<size
     } else {
       ++m_round[eye];
     }
-    int totalRound = visibleIdxs.size() * FLAGS_atlas_volume_rendering_maximum_round;
-    int currentRound = m_channelIdx[eye] * FLAGS_atlas_volume_rendering_maximum_round + m_round[eye];
+    int totalRound = static_cast<int>(visibleIdxs.size()) * static_cast<int>(maxRounds);
+    int currentRound = m_channelIdx[eye] * static_cast<int>(maxRounds) + m_round[eye];
     progress = currentRound >= totalRound ? 1 : (static_cast<double>(currentRound) / totalRound * 0.5 + 0.5);
     if (progress == 1) {
       m_channelIdx[eye] = -1;
@@ -2136,11 +2151,11 @@ double Z3DImgRaycasterRenderer::render3DImage(Z3DEye eye, const std::vector<size
       }
     });
 
-    if (FLAGS_atlas_log_3d_paging_frame_stats && m_img) {
+    if (logPagingFrameStats && m_img) {
       Z3DImgPagingFrameStats::CreateInfo info;
       info.label = m_img->imgPack().name().toStdString();
       info.numChannels = m_img->numChannels();
-      info.maxRounds = FLAGS_atlas_volume_rendering_maximum_round;
+      info.maxRounds = maxRounds;
       info.streamKey = static_cast<uint64_t>(reinterpret_cast<uintptr_t>(this));
       info.progressiveGeneration = 0;
       localStats = std::make_shared<Z3DImgPagingFrameStats>(std::move(info));
@@ -2156,7 +2171,7 @@ double Z3DImgRaycasterRenderer::render3DImage(Z3DEye eye, const std::vector<size
     // VLOG(1) << "lease acquired";
     for (size_t channelIdx = 0; channelIdx < visibleIdxs.size(); ++channelIdx) {
       auto c = visibleIdxs[channelIdx];
-      for (uint32_t round = 0; round < FLAGS_atlas_volume_rendering_maximum_round; ++round) {
+      for (uint32_t round = 0; round < maxRounds; ++round) {
         bool lastRound = render3DImageForOneRound(eye,
                                                   c,
                                                   round,
@@ -2168,7 +2183,7 @@ double Z3DImgRaycasterRenderer::render3DImage(Z3DEye eye, const std::vector<size
                                                   *m_image3DRaycasterShader,
                                                   RaycastExportMode::Display);
 #if defined(__linux__)
-        if (FLAGS_atlas_debug_texture_output) {
+        if (debugTextureOutput) {
           auto* debugTarget = m_lastRaycastAccum[eye].renderTarget;
           if (debugTarget) {
             auto filen =
@@ -2248,11 +2263,11 @@ double Z3DImgRaycasterRenderer::render3DImage(Z3DEye eye, const std::vector<size
     LOG(INFO) << "image cache size: " << ZImgCache::instance().size();
     LOG(INFO) << "image block cache size: " << ZImgRegionCache::instance().size();
 
-    if (FLAGS_atlas_log_3d_paging_frame_stats) {
+    if (logPagingFrameStats) {
       if (progressive) {
         auto& stats = m_pagingFrameStats[eye];
         if (stats && stats->hasActivity()) {
-          LOG(INFO) << stats->formatSummary(FLAGS_atlas_log_3d_paging_round_stats);
+          LOG(INFO) << stats->formatSummary(logPagingRoundStats);
         }
         if (m_img) {
           m_img->setReadStatsSink(nullptr);
@@ -2260,7 +2275,7 @@ double Z3DImgRaycasterRenderer::render3DImage(Z3DEye eye, const std::vector<size
         m_pagingFrameStats[eye].reset();
         m_pagingFrameStatsGeneration[eye] = 0;
       } else if (localStats && localStats->hasActivity()) {
-        LOG(INFO) << localStats->formatSummary(FLAGS_atlas_log_3d_paging_round_stats);
+        LOG(INFO) << localStats->formatSummary(logPagingRoundStats);
       }
     }
   }
@@ -2342,7 +2357,7 @@ bool Z3DImgRaycasterRenderer::render3DImageForOneRound(Z3DEye eye,
   auto blockLease = scratchPool.acquireBlockIdRenderTarget(lastTarget->size());
   uint32_t effectiveAttachments = blockLease.attachments;
   if (progressive) {
-    const uint32_t cap = FLAGS_atlas_volume_rendering_progressive_blockid_effective_attachments;
+    const uint32_t cap = absl::GetFlag(FLAGS_atlas_volume_rendering_progressive_blockid_effective_attachments);
     if (cap != 0u) {
       effectiveAttachments = std::min(effectiveAttachments, cap);
     }
@@ -2855,7 +2870,8 @@ bool Z3DImgRaycasterRenderer::saveRawMIPImage(Z3DEye eye, const QString& path, s
     -std::min(pixelEyeSpaceSize.x, pixelEyeSpaceSize.y) / n * sceneState.devicePixelRatio;
 
   ensureRaycastAccumulators(eye);
-  for (uint32_t round = 0; round < FLAGS_atlas_volume_rendering_maximum_round; ++round) {
+  const uint32_t maxRounds = absl::GetFlag(FLAGS_atlas_volume_rendering_maximum_round);
+  for (uint32_t round = 0; round < maxRounds; ++round) {
     const bool lastRound = render3DImageForOneRound(eye,
                                                     visibleIdxs[0],
                                                     round,

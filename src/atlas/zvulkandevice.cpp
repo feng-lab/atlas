@@ -8,7 +8,7 @@
 #include "zvulkandescriptorset.h"
 #include "zvulkancontext.h"
 #include "zvulkanframeexecutor.h"
-#include <gflags/gflags.h>
+#include "zcommandlineflags.h"
 #include "zexception.h"
 #include "zlog.h"
 
@@ -18,9 +18,9 @@
 #include <string_view>
 #include <utility>
 
-namespace nim {
+ABSL_FLAG(int32_t, atlas_vk_frames_in_flight, 2, "Max Vulkan frames in flight (debug: set to 1 to serialize submits)");
 
-DEFINE_int32(atlas_vk_frames_in_flight, 2, "Max Vulkan frames in flight (debug: set to 1 to serialize submits)");
+namespace nim {
 
 namespace {
 
@@ -306,7 +306,7 @@ ZVulkanDevice::ZVulkanDevice(ZVulkanContext& context)
 {
   // Capture once at startup. Atlas assumes this remains stable for the lifetime
   // of the Vulkan device.
-  m_framesInFlight = static_cast<uint32_t>(std::max<int32_t>(1, FLAGS_atlas_vk_frames_in_flight));
+  m_framesInFlight = static_cast<uint32_t>(std::max<int32_t>(1, absl::GetFlag(FLAGS_atlas_vk_frames_in_flight)));
 
   LOG(INFO) << "Vulkan device created";
   // Do not require VK_EXT_vertex_input_dynamic_state (MoltenVK lacks it).
@@ -572,11 +572,11 @@ ZVulkanFrameExecutor& ZVulkanDevice::frameExecutor()
   if (!m_frameExecutor) {
     m_frameExecutor = std::make_unique<ZVulkanFrameExecutor>(*this, m_framesInFlight);
   } else {
-    // Ensure nobody mutates the debug gflag at runtime; changing frames-in-flight
+    // Ensure nobody mutates the debug flag at runtime; changing frames-in-flight
     // mid-run invalidates executor slot identities and can strand fence-gated
     // callbacks (residency unpins, retained UBO lifetimes, etc.).
-    const uint32_t fif = static_cast<uint32_t>(std::max<int32_t>(1, FLAGS_atlas_vk_frames_in_flight));
-    CHECK(fif == m_framesInFlight) << "FLAGS_atlas_vk_frames_in_flight changed at runtime; this is unsupported";
+    const uint32_t fif = static_cast<uint32_t>(std::max<int32_t>(1, absl::GetFlag(FLAGS_atlas_vk_frames_in_flight)));
+    CHECK(fif == m_framesInFlight) << "atlas_vk_frames_in_flight changed at runtime; this is unsupported";
     CHECK(m_frameExecutor->maxFramesInFlight() == m_framesInFlight)
       << "Vulkan frame executor frames-in-flight changed unexpectedly";
   }

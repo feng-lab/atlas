@@ -4,7 +4,7 @@
 #include "zlog.h"
 #include "zsysteminfo.h"
 
-#include <gflags/gflags.h>
+#include "zcommandlineflags.h"
 
 #include <QByteArray>
 #include <QCoreApplication>
@@ -33,14 +33,14 @@
 #include <openssl/x509.h>
 #endif
 
-DECLARE_string(atlas_http_ca_bundle);
+ABSL_DECLARE_FLAG(std::string, atlas_http_ca_bundle);
 
-DEFINE_string(
-  atlas_http_windows_trust_source,
-  "auto",
-  "Windows HTTPS trust source for remote datasets. Values: auto (prefer exported Windows system trust store, "
-  "fall back to PEM bundle), windows_store (export Windows ROOT/CA stores to PEM and use that for all HTTP "
-  "backends), bundled_pem (use PEM bundle discovery such as curl-ca-bundle.crt).");
+ABSL_FLAG(std::string,
+          atlas_http_windows_trust_source,
+          "auto",
+          "Windows HTTPS trust source for remote datasets. Values: auto (prefer exported Windows system trust store, "
+          "fall back to PEM bundle), windows_store (export Windows ROOT/CA stores to PEM and use that for all HTTP "
+          "backends), bundled_pem (use PEM bundle discovery such as curl-ca-bundle.crt).");
 
 namespace nim {
 namespace {
@@ -223,17 +223,18 @@ ZHttpWindowsTrustSource windowsTrustSourceFromString(std::string_view value)
 
 ZHttpTrustStoreConfig resolveHttpTrustStoreConfig(ZHttpTrustBackend backend)
 {
-  if (!FLAGS_atlas_http_ca_bundle.empty()) {
-    if (!isReadableFile(FLAGS_atlas_http_ca_bundle)) {
-      throw ZException(
-        fmt::format("--atlas_http_ca_bundle points to an unreadable file: '{}'", FLAGS_atlas_http_ca_bundle));
+  const std::string caBundle = absl::GetFlag(FLAGS_atlas_http_ca_bundle);
+  if (!caBundle.empty()) {
+    if (!isReadableFile(caBundle)) {
+      throw ZException(fmt::format("--atlas_http_ca_bundle points to an unreadable file: '{}'", caBundle));
     }
-    return ZHttpTrustStoreConfig{FLAGS_atlas_http_ca_bundle, "flag:atlas_http_ca_bundle"};
+    return ZHttpTrustStoreConfig{caBundle, "flag:atlas_http_ca_bundle"};
   }
 
 #if defined(_WIN32)
   (void)backend;
-  const ZHttpWindowsTrustSource trustSource = windowsTrustSourceFromString(FLAGS_atlas_http_windows_trust_source);
+  const ZHttpWindowsTrustSource trustSource =
+    windowsTrustSourceFromString(absl::GetFlag(FLAGS_atlas_http_windows_trust_source));
   if (trustSource == ZHttpWindowsTrustSource::WindowsStore) {
     return exportWindowsSystemTrustStoreToPemOrThrow();
   }

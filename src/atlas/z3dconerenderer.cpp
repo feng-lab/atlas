@@ -4,15 +4,16 @@
 #include "z3dgpuinfo.h"
 #include "z3dshaderprogram.h"
 
-#include <gflags/gflags.h>
+#include "zcommandlineflags.h"
 #include <limits>
 
-namespace nim {
+ABSL_FLAG(uint64_t,
+          atlas_cone_preferred_instance_budget_per_segment,
+          1000000,
+          "Preferred cone instance budget for one renderer-owned segment. This is the normal packing target; "
+          "backends still enforce maxMonolithicGeometryStreamBytes as a hard safety guard.");
 
-DEFINE_uint64(atlas_cone_preferred_instance_budget_per_segment,
-              1000000,
-              "Preferred cone instance budget for one renderer-owned segment. This is the normal packing target; "
-              "backends still enforce maxMonolithicGeometryStreamBytes as a hard safety guard.");
+namespace nim {
 
 Z3DConeRenderer::Z3DConeRenderer(Z3DRendererBase& rendererBase)
   : Z3DPrimitiveRenderer(rendererBase)
@@ -334,7 +335,7 @@ void Z3DConeRenderer::render(Z3DEye eye)
   setShaderParameters(shader);
 
   const size_t preferredInstanceBudget =
-    std::max<size_t>(1, static_cast<size_t>(FLAGS_atlas_cone_preferred_instance_budget_per_segment));
+    std::max<size_t>(1, static_cast<size_t>(absl::GetFlag(FLAGS_atlas_cone_preferred_instance_budget_per_segment)));
   const size_t verticesPerInstance = m_useConeShader2 ? 4u : 8u;
   const size_t indicesPerInstance = m_useConeShader2 ? 6u : 36u;
   const size_t totalInstanceCount = m_baseAndBaseRadius.size() / verticesPerInstance;
@@ -542,7 +543,7 @@ void Z3DConeRenderer::renderPicking(Z3DEye eye)
   setPickingShaderParameters(shader);
 
   const size_t preferredInstanceBudget =
-    std::max<size_t>(1, static_cast<size_t>(FLAGS_atlas_cone_preferred_instance_budget_per_segment));
+    std::max<size_t>(1, static_cast<size_t>(absl::GetFlag(FLAGS_atlas_cone_preferred_instance_budget_per_segment)));
   const size_t verticesPerInstance = m_useConeShader2 ? 4u : 8u;
   const size_t indicesPerInstance = m_useConeShader2 ? 6u : 36u;
   const size_t totalInstanceCount = m_baseAndBaseRadius.size() / verticesPerInstance;
@@ -771,7 +772,7 @@ void Z3DConeRenderer::enqueueRenderBatches(Z3DEye eye, RenderBackend backend, bo
   CHECK(renderBackend != nullptr) << "Cone segmentation requires an active backend";
   const size_t maxStreamBytes = renderBackend->maxMonolithicGeometryStreamBytes();
   const size_t preferredInstanceBudget =
-    std::max<size_t>(1, static_cast<size_t>(FLAGS_atlas_cone_preferred_instance_budget_per_segment));
+    std::max<size_t>(1, static_cast<size_t>(absl::GetFlag(FLAGS_atlas_cone_preferred_instance_budget_per_segment)));
   const size_t verticesPerInstance = m_useConeShader2 ? 4u : 8u;
   const size_t indicesPerInstance = m_useConeShader2 ? 6u : 36u;
   const size_t totalInstanceCount = m_baseAndBaseRadius.size() / verticesPerInstance;

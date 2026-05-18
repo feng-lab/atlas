@@ -6,7 +6,6 @@
 #include "zlog.h"
 
 #include <QByteArray>
-#include <QCoreApplication>
 #include <QDir>
 #include <QElapsedTimer>
 #include <QFile>
@@ -19,7 +18,7 @@
 #include <atomic>
 #include <chrono>
 #include <exception>
-#include <gflags/gflags.h>
+#include "zcommandlineflags.h"
 #include <limits>
 #include <memory>
 #include <mutex>
@@ -28,16 +27,18 @@
 #include <utility>
 #include <vector>
 
-DEFINE_string(
-  atlas_bioformats_java_xmx,
-  "",
-  "Optional maximum Java heap for the persistent Bio-Formats bridge process. Empty means no -Xmx argument.");
-DEFINE_int32(atlas_bioformats_bridge_io_timeout_ms,
-             0,
-             "Timeout for Bio-Formats bridge operations in milliseconds. 0 means wait indefinitely.");
-DEFINE_bool(atlas_bioformats_bridge_diagnostics,
-            false,
-            "Write structured Java-side Bio-Formats bridge diagnostics to a temporary log file.");
+ABSL_FLAG(std::string,
+          atlas_bioformats_java_xmx,
+          "",
+          "Optional maximum Java heap for the persistent Bio-Formats bridge process. Empty means no -Xmx argument.");
+ABSL_FLAG(int32_t,
+          atlas_bioformats_bridge_io_timeout_ms,
+          0,
+          "Timeout for Bio-Formats bridge operations in milliseconds. 0 means wait indefinitely.");
+ABSL_FLAG(bool,
+          atlas_bioformats_bridge_diagnostics,
+          false,
+          "Write structured Java-side Bio-Formats bridge diagnostics to a temporary log file.");
 
 namespace nim {
 
@@ -82,7 +83,7 @@ public:
 
 bool bioFormatsBridgeDiagnosticsEnabled()
 {
-  return FLAGS_atlas_bioformats_bridge_diagnostics;
+  return absl::GetFlag(FLAGS_atlas_bioformats_bridge_diagnostics);
 }
 
 std::atomic<uint64_t>& bioFormatsDiagnosticsFileCounter()
@@ -94,8 +95,7 @@ std::atomic<uint64_t>& bioFormatsDiagnosticsFileCounter()
 QString createBioFormatsDiagnosticsFilePath()
 {
   const uint64_t id = bioFormatsDiagnosticsFileCounter().fetch_add(1, std::memory_order_relaxed);
-  return QDir::temp().filePath(
-    QStringLiteral("atlas-bioformats-bridge-%1-%2.diag").arg(QCoreApplication::applicationPid()).arg(id));
+  return QDir::temp().filePath(QStringLiteral("atlas-bioformats-bridge-%1.diag").arg(id));
 }
 
 QString prepareBioFormatsDiagnosticsFile()
@@ -432,7 +432,7 @@ public:
   ZBioFormatsGrpcBridgeProcess()
   {
     LOG(INFO) << "Bio-Formats bridge gRPC backend enabled with one stateless Java bridge process"
-              << " (--atlas_bioformats_java_xmx=" << FLAGS_atlas_bioformats_java_xmx << ")";
+              << " (--atlas_bioformats_java_xmx=" << absl::GetFlag(FLAGS_atlas_bioformats_java_xmx) << ")";
   }
 
   ~ZBioFormatsGrpcBridgeProcess()
@@ -712,8 +712,9 @@ private:
     startupTimer.start();
 
     QStringList args;
-    if (!FLAGS_atlas_bioformats_java_xmx.empty()) {
-      args.push_back(QString("-Xmx%1").arg(QString::fromStdString(FLAGS_atlas_bioformats_java_xmx)));
+    const std::string javaXmx = absl::GetFlag(FLAGS_atlas_bioformats_java_xmx);
+    if (!javaXmx.empty()) {
+      args.push_back(QString("-Xmx%1").arg(QString::fromStdString(javaXmx)));
     }
     args << "-Djava.awt.headless=true"
          << "-Dorg.slf4j.simpleLogger.logFile=System.err"
@@ -937,11 +938,11 @@ private:
 
   void applyDeadline(grpc::ClientContext& context) const
   {
-    if (FLAGS_atlas_bioformats_bridge_io_timeout_ms <= 0) {
+    const int32_t ioTimeoutMs = absl::GetFlag(FLAGS_atlas_bioformats_bridge_io_timeout_ms);
+    if (ioTimeoutMs <= 0) {
       return;
     }
-    context.set_deadline(std::chrono::system_clock::now() +
-                         std::chrono::milliseconds(FLAGS_atlas_bioformats_bridge_io_timeout_ms));
+    context.set_deadline(std::chrono::system_clock::now() + std::chrono::milliseconds(ioTimeoutMs));
   }
 
   void requireOk(const proto::Response& response, std::string_view operation) const

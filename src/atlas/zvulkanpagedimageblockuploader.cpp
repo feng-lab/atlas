@@ -1,4 +1,5 @@
 #include "zvulkanpagedimageblockuploader.h"
+#include "zcommandlineflags.h"
 
 #include "z3drenderervulkanbackend.h"
 #include "z3dimg.h"
@@ -23,8 +24,8 @@
 #include <limits>
 #include <optional>
 
-DECLARE_uint32(atlas_log_folly_global_executor_status_interval_in_seconds);
-DECLARE_uint32(atlas_3d_paging_queue_poll_interval_ms);
+ABSL_DECLARE_FLAG(uint32_t, atlas_log_folly_global_executor_status_interval_in_seconds);
+ABSL_DECLARE_FLAG(uint32_t, atlas_3d_paging_queue_poll_interval_ms);
 
 namespace nim {
 
@@ -310,9 +311,10 @@ size_t ZVulkanPagedImageBlockUploader::readAndUploadImageBlocks(
   while (processedReads < sourcePendingTasks.size()) {
     maybeCancel(cancellationToken);
 
-    if (imgQueue.try_dequeue_until(elem,
-                                   std::chrono::steady_clock::now() +
-                                     std::chrono::milliseconds(FLAGS_atlas_3d_paging_queue_poll_interval_ms))) {
+    if (imgQueue.try_dequeue_until(
+          elem,
+          std::chrono::steady_clock::now() +
+            std::chrono::milliseconds(absl::GetFlag(FLAGS_atlas_3d_paging_queue_poll_interval_ms)))) {
       const auto taskIndex = std::get<0>(elem);
       CHECK_LT(taskIndex, sourcePendingTasks.size()) << "Vulkan block reader returned an out-of-range task index";
       CHECK(!readyResults[taskIndex].has_value()) << "Vulkan block reader returned a duplicate task index";
@@ -327,7 +329,7 @@ size_t ZVulkanPagedImageBlockUploader::readAndUploadImageBlocks(
     }
 
     if (std::chrono::steady_clock::now() - lastLog >=
-        std::chrono::seconds(FLAGS_atlas_log_folly_global_executor_status_interval_in_seconds)) {
+        std::chrono::seconds(absl::GetFlag(FLAGS_atlas_log_folly_global_executor_status_interval_in_seconds))) {
       auto stats = threadPool->getPoolStats();
       LOG(INFO) << fmt::format(
         "pending/total task count: {}/{}, active/idle thread count: {}/{}, ready/remaining blocks: {}/{}",

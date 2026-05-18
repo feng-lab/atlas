@@ -16,17 +16,18 @@
 #include "zlog.h"
 #include "zswcops.h"
 
-#include <gflags/gflags.h>
+#include "zcommandlineflags.h"
 
 #include <array>
 #include <cmath>
 #include <utility>
 #include <vector>
 
-DEFINE_bool(atlas_trace_use_swc_geometry_mask,
-            true,
-            "Use a continuous-geometry SWC spatial index for host-SWC mask queries when available. "
-            "Disable to force legacy voxel-mask semantics (useful for parity tests).");
+ABSL_FLAG(bool,
+          atlas_trace_use_swc_geometry_mask,
+          true,
+          "Use a continuous-geometry SWC spatial index for host-SWC mask queries when available. "
+          "Disable to force legacy voxel-mask semantics (useful for parity tests).");
 
 namespace nim {
 
@@ -269,7 +270,7 @@ template<typename TSignal>
     tr.tw.minScore = cfg.minManualScore;
   }
 
-  if (FLAGS_atlas_trace_use_swc_geometry_mask) {
+  if (absl::GetFlag(FLAGS_atlas_trace_use_swc_geometry_mask)) {
     auto idx = std::make_shared<ZSwcSpatialIndex>();
     idx->setZToXYRatio(zToXYRatio);
     idx->rebuild(*outSwc);

@@ -36,7 +36,7 @@
 #include "zdiskcacheutils.h"
 #include "zflagsettingsdialog.h"
 
-#include <gflags/gflags.h>
+#include "zcommandlineflags.h"
 
 #include <QFileDialog>
 #include <QMessageBox>
@@ -67,9 +67,10 @@
 #include <utility>
 #include <memory>
 
-DEFINE_bool(atlas_block_scene_3d_apply,
-            false,
-            "If true, block scene loading until all 3D settings have been applied by the rendering engine");
+ABSL_FLAG(bool,
+          atlas_block_scene_3d_apply,
+          false,
+          "If true, block scene loading until all 3D settings have been applied by the rendering engine");
 
 namespace nim {
 
@@ -1137,7 +1138,7 @@ bool ZMainWindow::loadJsonSceneImpl(const QString& fn, QString& err)
       }
     }
     // Optionally wait until all 3D settings have been applied
-    if (m_3dWindow && (has3DGeneral || numView3DPerObject > 0) && FLAGS_atlas_block_scene_3d_apply) {
+    if (m_3dWindow && (has3DGeneral || numView3DPerObject > 0) && absl::GetFlag(FLAGS_atlas_block_scene_3d_apply)) {
       while (sceneApplySpy && sceneApplySpy->count() == 0 && !sceneApplySpy->wait(5000)) {
         LOG(INFO) << "waiting for 3D scene apply to finish";
       }

@@ -3,7 +3,7 @@
 #include "zsysteminfo.h"
 #include "zlog.h"
 
-#include <gflags/gflags.h>
+#include "zcommandlineflags.h"
 
 namespace nim {
 namespace {
@@ -27,9 +27,8 @@ ZFlagSettingSpec makeSpec(QString name,
 
 bool flagExistsInCurrentBuild(const QString& name)
 {
-  gflags::CommandLineFlagInfo info;
   const QByteArray flagName = name.toUtf8();
-  return gflags::GetCommandLineFlagInfo(flagName.constData(), &info);
+  return commandLineFlagExists(flagName.constData());
 }
 
 } // namespace
@@ -292,14 +291,14 @@ std::vector<ZManagedFlagfileEntry> atlasDefaultFlagfileEntries()
 
   for (const auto& spec : specs) {
     const QByteArray flagName = spec.name.toUtf8();
-    const auto info = gflags::GetCommandLineFlagInfoOrDie(flagName.constData());
+    const auto info = getCommandLineFlagInfoOrDie(flagName.constData());
 
     ZManagedFlagfileEntry entry;
     entry.category = spec.category;
     entry.label = spec.label;
     entry.name = spec.name;
     entry.description = QString::fromStdString(info.description);
-    entry.value = QString::fromStdString(info.default_value);
+    entry.value = QString::fromStdString(info.defaultValue);
     entries.push_back(std::move(entry));
   }
 

@@ -1,4 +1,5 @@
 #include "z3dimg.h"
+#include "zcommandlineflags.h"
 
 #include "z3dshaderprogram.h"
 #include "z3dgpuinfo.h"
@@ -26,40 +27,49 @@
 #include <memory>
 #include <utility>
 
-DEFINE_uint32(atlas_log_folly_global_executor_status_interval_in_seconds,
-              5,
-              "Interval in seconds for logging folly global executor status during waiting, default is 5");
+ABSL_FLAG(uint32_t,
+          atlas_log_folly_global_executor_status_interval_in_seconds,
+          5,
+          "Interval in seconds for logging folly global executor status during waiting, default is 5");
 
-DEFINE_uint32(atlas_3d_paging_queue_poll_interval_ms,
-              50,
-              "Polling interval in milliseconds while waiting for 3D paging block reads (lower improves cancellation responsiveness), default is 50ms");
+ABSL_FLAG(
+  uint32_t,
+  atlas_3d_paging_queue_poll_interval_ms,
+  50,
+  "Polling interval in milliseconds while waiting for 3D paging block reads (lower improves cancellation responsiveness), default is 50ms");
 
-DEFINE_uint32(atlas_ng_precomputed_3d_max_concurrent_block_reads,
-              256,
-              "Maximum number of concurrent Neuroglancer block read tasks during 3D paging (limits network pressure and speeds up cancellation), default is 256");
+ABSL_FLAG(
+  uint32_t,
+  atlas_ng_precomputed_3d_max_concurrent_block_reads,
+  256,
+  "Maximum number of concurrent Neuroglancer block read tasks during 3D paging (limits network pressure and speeds up cancellation), default is 256");
 
-DEFINE_uint32(atlas_3d_paging_lod_stats_log_interval_ms,
-              500,
-              "Minimum interval in milliseconds between rate-limited per-LOD paging statistics logs, default is 500ms");
+ABSL_FLAG(uint32_t,
+          atlas_3d_paging_lod_stats_log_interval_ms,
+          500,
+          "Minimum interval in milliseconds between rate-limited per-LOD paging statistics logs, default is 500ms");
 
-DEFINE_uint32(atlas_number_of_blocks_to_use_PBO_threashold,
-              0,
-              "Use PBO when number of blocks to upload is larger than this threshold, default is 0");
+ABSL_FLAG(uint32_t,
+          atlas_number_of_blocks_to_use_PBO_threashold,
+          0,
+          "Use PBO when number of blocks to upload is larger than this threshold, default is 0");
 
-DEFINE_uint32(atlas_3d_preview_max_dimension,
-              512,
-              "Maximum per-axis dimension of the preloaded 3D preview volume when paging is active. "
-              "This does not affect whether a volume is considered GPU-fit; that decision still uses "
-              "getDataScaleForTexture().");
+ABSL_FLAG(uint32_t,
+          atlas_3d_preview_max_dimension,
+          512,
+          "Maximum per-axis dimension of the preloaded 3D preview volume when paging is active. "
+          "This does not affect whether a volume is considered GPU-fit; that decision still uses "
+          "getDataScaleForTexture().");
 
-DEFINE_uint32(
+ABSL_FLAG(
+  uint32_t,
   atlas_image_block_size,
   64,
   "define the width, height, and depth of image blocks in the 3D image cache system, can be 64 (default), 128, 256 or 512");
 
-DECLARE_double(atlas_image_cache_memory_proportion);
-DECLARE_double(atlas_image_region_cache_memory_proportion);
-DECLARE_uint64(atlas_vk_residency_budget_bytes);
+ABSL_DECLARE_FLAG(double, atlas_image_cache_memory_proportion);
+ABSL_DECLARE_FLAG(double, atlas_image_region_cache_memory_proportion);
+ABSL_DECLARE_FLAG(uint64_t, atlas_vk_residency_budget_bytes);
 
 namespace nim {
 
@@ -131,9 +141,10 @@ double cappedAxisScale(size_t dim, uint32_t maxDim)
 size_t pagedImageCacheSizingMemoryMB()
 {
   uint64_t memoryMB = Z3DGpuInfo::instance().dedicatedVideoMemoryMB();
-  if (FLAGS_atlas_vk_residency_budget_bytes > 0u) {
+  const uint64_t residencyBudgetBytes = absl::GetFlag(FLAGS_atlas_vk_residency_budget_bytes);
+  if (residencyBudgetBytes > 0u) {
     constexpr uint64_t bytesPerMiB = 1024ull * 1024ull;
-    memoryMB = std::min<uint64_t>(memoryMB, FLAGS_atlas_vk_residency_budget_bytes / bytesPerMiB);
+    memoryMB = std::min<uint64_t>(memoryMB, residencyBudgetBytes / bytesPerMiB);
   }
   return static_cast<size_t>(memoryMB);
 }
@@ -164,9 +175,10 @@ Z3DImg::Z3DImg(const ZImgPack& imgPack, const glm::vec3& scale, const std::vecto
     // The fit scales answer "does the full volume fit the GPU natively?".
     // The preview scales answer "how large should the fast preview volume be?".
     // Reusing fitScale for preview can make extreme-aspect volumes unnecessarily tiny.
-    m_widthScale = cappedAxisScale(info.width, FLAGS_atlas_3d_preview_max_dimension);
-    m_heightScale = cappedAxisScale(info.height, FLAGS_atlas_3d_preview_max_dimension);
-    m_depthScale = cappedAxisScale(info.depth, FLAGS_atlas_3d_preview_max_dimension);
+    const uint32_t previewMaxDimension = absl::GetFlag(FLAGS_atlas_3d_preview_max_dimension);
+    m_widthScale = cappedAxisScale(info.width, previewMaxDimension);
+    m_heightScale = cappedAxisScale(info.height, previewMaxDimension);
+    m_depthScale = cappedAxisScale(info.depth, previewMaxDimension);
   }
 
   VLOG(1) << "3D image fit scales: (" << fitWidthScale << ", " << fitHeightScale << ", " << fitDepthScale
@@ -197,13 +209,13 @@ Z3DImg::Z3DImg(const ZImgPack& imgPack, const glm::vec3& scale, const std::vecto
   }
 
   if (m_isVolumeDownsampled) {
-    if (FLAGS_atlas_image_block_size == 64 || FLAGS_atlas_image_block_size == 128 ||
-        FLAGS_atlas_image_block_size == 256 || FLAGS_atlas_image_block_size == 512) {
-      m_imageBlockSize = glm::uvec3(FLAGS_atlas_image_block_size) - m_imageBlockSizePad;
+    const uint32_t imageBlockSize = absl::GetFlag(FLAGS_atlas_image_block_size);
+    if (imageBlockSize == 64 || imageBlockSize == 128 || imageBlockSize == 256 || imageBlockSize == 512) {
+      m_imageBlockSize = glm::uvec3(imageBlockSize) - m_imageBlockSizePad;
     } else {
       constexpr uint32_t defaultImageBlockSize = 64;
       LOG(INFO) << fmt::format("atlas_image_block_size {} is not supported, use {}",
-                               FLAGS_atlas_image_block_size,
+                               imageBlockSize,
                                defaultImageBlockSize);
       m_imageBlockSize = glm::uvec3(defaultImageBlockSize) - m_imageBlockSizePad;
     }
@@ -245,11 +257,12 @@ Z3DImg::Z3DImg(const ZImgPack& imgPack, const glm::vec3& scale, const std::vecto
     setScale(scale);
     // setScale(glm::vec3(1,1,5));
 
-    auto calculatedBlockUploadingBatchSize = std::round(ZCpuInfo::instance().nPhysicalRAM *
-                                                        (1.0 - 0.1 - FLAGS_atlas_image_cache_memory_proportion -
-                                                         FLAGS_atlas_image_region_cache_memory_proportion) /
-                                                        (1.9 * 1024 * 1024 * 1024)) * // (2.56 * 1024 * 1024 * 1024))
-                                             100.;
+    auto calculatedBlockUploadingBatchSize =
+      std::round(ZCpuInfo::instance().nPhysicalRAM *
+                 (1.0 - 0.1 - absl::GetFlag(FLAGS_atlas_image_cache_memory_proportion) -
+                  absl::GetFlag(FLAGS_atlas_image_region_cache_memory_proportion)) /
+                 (1.9 * 1024 * 1024 * 1024)) * // (2.56 * 1024 * 1024 * 1024))
+      100.;
     m_blockUploadingBatchSize = static_cast<size_t>(std::clamp(calculatedBlockUploadingBatchSize, 100., 32768.));
     LOG(INFO) << fmt::format("use block uploading batch size: {}", m_blockUploadingBatchSize);
   }
@@ -800,7 +813,7 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
 
   if (VLOG_IS_ON(1) && c < m_lastPagingLodStatsLogTimes.size()) {
     const auto now = std::chrono::steady_clock::now();
-    const auto interval = std::chrono::milliseconds(FLAGS_atlas_3d_paging_lod_stats_log_interval_ms);
+    const auto interval = std::chrono::milliseconds(absl::GetFlag(FLAGS_atlas_3d_paging_lod_stats_log_interval_ms));
     if (now - m_lastPagingLodStatsLogTimes[c] >= interval) {
       m_lastPagingLodStatsLogTimes[c] = now;
 
@@ -1431,7 +1444,9 @@ Z3DImg::readImageBlocksToBufferAsync(size_t c,
 
   size_t effectiveBatchSize = m_blockUploadingBatchSize;
   if (m_imgPack.isNeuroglancerPrecomputed()) {
-    effectiveBatchSize = std::min(effectiveBatchSize, static_cast<size_t>(FLAGS_atlas_ng_precomputed_3d_max_concurrent_block_reads));
+    effectiveBatchSize =
+      std::min(effectiveBatchSize,
+               static_cast<size_t>(absl::GetFlag(FLAGS_atlas_ng_precomputed_3d_max_concurrent_block_reads)));
   }
   CHECK(effectiveBatchSize > 0);
 
@@ -1512,7 +1527,9 @@ Z3DImg::readImageBlocksToQueueAsync(size_t c,
 
   size_t effectiveBatchSize = m_blockUploadingBatchSize;
   if (m_imgPack.isNeuroglancerPrecomputed()) {
-    effectiveBatchSize = std::min(effectiveBatchSize, static_cast<size_t>(FLAGS_atlas_ng_precomputed_3d_max_concurrent_block_reads));
+    effectiveBatchSize =
+      std::min(effectiveBatchSize,
+               static_cast<size_t>(absl::GetFlag(FLAGS_atlas_ng_precomputed_3d_max_concurrent_block_reads)));
   }
   CHECK(effectiveBatchSize > 0);
 
@@ -1639,7 +1656,7 @@ size_t Z3DImg::readAndUploadImageBlocks(size_t c,
 
   uint8_t* pboPtr = nullptr;
   std::vector<uint8_t> pboLocalBuffer;
-  if (pendingTasks.size() >= FLAGS_atlas_number_of_blocks_to_use_PBO_threashold) {
+  if (pendingTasks.size() >= absl::GetFlag(FLAGS_atlas_number_of_blocks_to_use_PBO_threashold)) {
     if (!m_PBO) {
       m_PBO = std::make_unique<Z3DVertexBufferObject>();
     }
@@ -1724,13 +1741,15 @@ size_t Z3DImg::readAndUploadImageBlocks(size_t c,
 
     std::tuple<size_t, std::shared_ptr<ZImg>, std::optional<std::string>> elem;
     auto lastLogTime = std::chrono::steady_clock::now();
+    const auto queuePollInterval =
+      std::chrono::milliseconds(absl::GetFlag(FLAGS_atlas_3d_paging_queue_poll_interval_ms));
+    const auto executorStatusLogInterval =
+      std::chrono::seconds(absl::GetFlag(FLAGS_atlas_log_folly_global_executor_status_interval_in_seconds));
     int remainingBlocksToUpload = static_cast<int>(pendingTasks.size());
     while (remainingBlocksToUpload > 0) {
       maybeCancel(cancellationToken);
 
-      if (imgQueue.try_dequeue_until(
-            elem,
-            std::chrono::steady_clock::now() + std::chrono::milliseconds(FLAGS_atlas_3d_paging_queue_poll_interval_ms))) {
+      if (imgQueue.try_dequeue_until(elem, std::chrono::steady_clock::now() + queuePollInterval)) {
         const auto& [pageTableEntryKey, pageTableEntryPtr] = pendingTasks[std::get<0>(elem)];
         if (std::get<2>(elem).has_value()) {
           recordPagingFailure(pageTableEntryKey, *std::get<2>(elem));
@@ -1750,8 +1769,7 @@ size_t Z3DImg::readAndUploadImageBlocks(size_t c,
         // (or crash if it finished "successfully" but failed to enqueue all blocks).
         break;
       }
-      if (std::chrono::steady_clock::now() - lastLogTime >=
-          std::chrono::seconds(FLAGS_atlas_log_folly_global_executor_status_interval_in_seconds)) {
+      if (std::chrono::steady_clock::now() - lastLogTime >= executorStatusLogInterval) {
         auto poolStats = p->getPoolStats();
         LOG(INFO) << fmt::format(
           "pending/total task count: {}/{}, active/idle thread count: {}/{}, ready/remaining blocks: {}/{}",
@@ -1839,8 +1857,9 @@ size_t Z3DImg::readAndUploadImageBlocks(size_t c,
           LOG(INFO) << fmt::format("finish block {}", taskIdx);
         });
 
-        while (
-          !f.wait(std::chrono::seconds(FLAGS_atlas_log_folly_global_executor_status_interval_in_seconds)).isReady()) {
+        const auto executorStatusLogInterval =
+          std::chrono::seconds(absl::GetFlag(FLAGS_atlas_log_folly_global_executor_status_interval_in_seconds));
+        while (!f.wait(executorStatusLogInterval).isReady()) {
           maybeCancel(cancellationToken);
 
           auto poolStats = p->getPoolStats();

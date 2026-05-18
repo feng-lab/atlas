@@ -1,15 +1,16 @@
 #include "zmemorymappedfile.h"
+#include "zcommandlineflags.h"
 
 #include <QFileInfo>
 #include <QDir>
 
-DEFINE_string(
-  zimg_llfio_mapped_file_handle_flags,
-  "multiplexable",
-  "comma-separated list of flags for llfio mapped file handle, default is multiplexable, possible values are: "
-  "none,unlink_on_first_close,disable_safety_barriers,disable_safety_unlinks,disable_prefetching,"
-  "maximum_prefetching,win_disable_unlink_emulation,win_disable_sparse_file_creation,disable_parallelism,"
-  "win_create_case_sensitive_directory,multiplexable,byte_lock_insanity,anonymous_inode");
+ABSL_FLAG(std::string,
+          zimg_llfio_mapped_file_handle_flags,
+          "multiplexable",
+          "comma-separated list of flags for llfio mapped file handle, default is multiplexable, possible values are: "
+          "none,unlink_on_first_close,disable_safety_barriers,disable_safety_unlinks,disable_prefetching,"
+          "maximum_prefetching,win_disable_unlink_emulation,win_disable_sparse_file_creation,disable_parallelism,"
+          "win_create_case_sensitive_directory,multiplexable,byte_lock_insanity,anonymous_inode");
 
 #ifdef ZIMG_USE_LLFIO
 
@@ -17,9 +18,9 @@ namespace nim {
 
 ZMemoryMappedFile::ZMemoryMappedFile(const QString& filename)
 {
-  LOG(INFO) << "mapped file handle flags: " << FLAGS_zimg_llfio_mapped_file_handle_flags;
+  LOG(INFO) << "mapped file handle flags: " << absl::GetFlag(FLAGS_zimg_llfio_mapped_file_handle_flags);
   llfio::mapped_file_handle::flag flag = llfio::mapped_file_handle::flag::none;
-  if (QString flagString = QString::fromStdString(FLAGS_zimg_llfio_mapped_file_handle_flags);
+  if (QString flagString = QString::fromStdString(absl::GetFlag(FLAGS_zimg_llfio_mapped_file_handle_flags));
       flagString.contains("unlink_on_first_close")) {
     flag |= llfio::mapped_file_handle::flag::unlink_on_first_close;
   } else if (flagString.contains("disable_safety_barriers")) {

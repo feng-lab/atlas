@@ -8,7 +8,7 @@
 #include "zvulkanframeexecutor.h"
 #include "zvulkantexture.h"
 
-#include <gflags/gflags.h>
+#include "zcommandlineflags.h"
 
 #include <algorithm>
 #include <chrono>
@@ -18,19 +18,22 @@
 #include <map>
 #include <utility>
 
-DEFINE_uint64(atlas_vk_residency_budget_bytes,
-              0,
-              "Strict upper bound (bytes) for Atlas-owned device-local Vulkan residency. "
-              "0 uses the device-reported budget for broker reclaim only.");
+ABSL_FLAG(uint64_t,
+          atlas_vk_residency_budget_bytes,
+          0,
+          "Strict upper bound (bytes) for Atlas-owned device-local Vulkan residency. "
+          "0 uses the device-reported budget for broker reclaim only.");
 
-DEFINE_double(atlas_vk_residency_budget_ratio,
-              1.0,
-              "Multiplier applied to the effective device-local budget for the Vulkan residency broker. "
-              "Use <1.0 to make the resulting device-local residency budget strict.");
+ABSL_FLAG(double,
+          atlas_vk_residency_budget_ratio,
+          1.0,
+          "Multiplier applied to the effective device-local budget for the Vulkan residency broker. "
+          "Use <1.0 to make the resulting device-local residency budget strict.");
 
-DEFINE_uint64(atlas_vk_residency_budget_reserve_bytes,
-              0,
-              "Reserve this many device-local bytes by subtracting them from the strict Vulkan residency budget.");
+ABSL_FLAG(uint64_t,
+          atlas_vk_residency_budget_reserve_bytes,
+          0,
+          "Reserve this many device-local bytes by subtracting them from the strict Vulkan residency budget.");
 
 namespace nim {
 
@@ -211,20 +214,20 @@ uint64_t saturatingAdd(uint64_t lhs, uint64_t rhs)
 
 uint64_t applyResidencyBudgetFlags(uint64_t budget)
 {
-  if (FLAGS_atlas_vk_residency_budget_bytes > 0) {
-    budget = budget == 0 ? FLAGS_atlas_vk_residency_budget_bytes
-                         : std::min<uint64_t>(budget, FLAGS_atlas_vk_residency_budget_bytes);
+  const uint64_t flagBudget = absl::GetFlag(FLAGS_atlas_vk_residency_budget_bytes);
+  if (flagBudget > 0) {
+    budget = budget == 0 ? flagBudget : std::min<uint64_t>(budget, flagBudget);
   }
 
   if (budget == 0) {
     return 0;
   }
 
-  const double ratioRaw = FLAGS_atlas_vk_residency_budget_ratio;
+  const double ratioRaw = absl::GetFlag(FLAGS_atlas_vk_residency_budget_ratio);
   const double ratio = std::isfinite(ratioRaw) ? std::clamp(ratioRaw, 0.0, 1.0) : 1.0;
   budget = static_cast<uint64_t>(static_cast<double>(budget) * ratio);
 
-  const uint64_t reserve = FLAGS_atlas_vk_residency_budget_reserve_bytes;
+  const uint64_t reserve = absl::GetFlag(FLAGS_atlas_vk_residency_budget_reserve_bytes);
   if (reserve >= budget) {
     return 0;
   }
@@ -233,10 +236,10 @@ uint64_t applyResidencyBudgetFlags(uint64_t budget)
 
 bool strictResidencyBudgetActive()
 {
-  const double ratioRaw = FLAGS_atlas_vk_residency_budget_ratio;
+  const double ratioRaw = absl::GetFlag(FLAGS_atlas_vk_residency_budget_ratio);
   const bool reducedRatio = std::isfinite(ratioRaw) && ratioRaw < 1.0;
-  return FLAGS_atlas_vk_residency_budget_bytes > 0u || FLAGS_atlas_vk_residency_budget_reserve_bytes > 0u ||
-         reducedRatio;
+  return absl::GetFlag(FLAGS_atlas_vk_residency_budget_bytes) > 0u ||
+         absl::GetFlag(FLAGS_atlas_vk_residency_budget_reserve_bytes) > 0u || reducedRatio;
 }
 
 uint64_t reclaimHysteresisBytes(uint64_t allocationBytes, uint64_t effectiveBudget)

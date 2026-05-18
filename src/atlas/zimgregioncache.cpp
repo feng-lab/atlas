@@ -8,7 +8,7 @@
 #include "zsqlitediskcachebucket.h"
 #include "zstructutils.h"
 
-#include <gflags/gflags.h>
+#include "zcommandlineflags.h"
 
 #include <boost/hash2/sha2.hpp>
 
@@ -21,12 +21,13 @@
 #include <span>
 #include <vector>
 
-DEFINE_double(atlas_image_region_cache_memory_proportion,
-              0.3,
-              "Proportion of RAM that will be used for image region cache, default is 0.3");
+ABSL_FLAG(double,
+          atlas_image_region_cache_memory_proportion,
+          0.3,
+          "Proportion of RAM that will be used for image region cache, default is 0.3");
 
-DECLARE_uint64(atlas_disk_cache_imgregion_max_bytes);
-DECLARE_uint64(atlas_disk_cache_imgregion_async_max_pending_bytes);
+ABSL_DECLARE_FLAG(uint64_t, atlas_disk_cache_imgregion_max_bytes);
+ABSL_DECLARE_FLAG(uint64_t, atlas_disk_cache_imgregion_async_max_pending_bytes);
 
 namespace nim {
 
@@ -174,11 +175,12 @@ public:
       return;
     }
 
-    m_bucket = std::make_unique<ZSqliteDiskCacheBucket>(m_rootDir,
-                                                        QString::fromLatin1(kImgRegionDiskCacheDbName),
-                                                        m_maxBytes,
-                                                        FLAGS_atlas_disk_cache_imgregion_async_max_pending_bytes,
-                                                        QStringLiteral("imgregion_disk_cache"));
+    m_bucket =
+      std::make_unique<ZSqliteDiskCacheBucket>(m_rootDir,
+                                               QString::fromLatin1(kImgRegionDiskCacheDbName),
+                                               m_maxBytes,
+                                               absl::GetFlag(FLAGS_atlas_disk_cache_imgregion_async_max_pending_bytes),
+                                               QStringLiteral("imgregion_disk_cache"));
     if (isEnabled()) {
       LOG(INFO) << "Image-region disk cache enabled: root='" << m_rootDir << "' maxBytes=" << m_maxBytes;
     }
@@ -283,16 +285,18 @@ ZImgRegionCache& ZImgRegionCache::instance()
 }
 
 ZImgRegionCache::ZImgRegionCache(bool canSkipDestructor)
-  : ZParentImgRegionCache(ZCpuInfo::instance().nPhysicalRAM * FLAGS_atlas_image_region_cache_memory_proportion,
+  : ZParentImgRegionCache(ZCpuInfo::instance().nPhysicalRAM *
+                            absl::GetFlag(FLAGS_atlas_image_region_cache_memory_proportion),
                           ZCpuInfo::instance().nLogicalCores * 2,
                           canSkipDestructor)
 {
-  if (FLAGS_atlas_disk_cache_imgregion_max_bytes == 0) {
+  if (absl::GetFlag(FLAGS_atlas_disk_cache_imgregion_max_bytes) == 0) {
     return;
   }
 
   const QString rootDir = atlasDiskCacheRootDirFromFlags();
-  setDiskBackend(std::make_unique<ImgRegionDiskBackend>(rootDir, FLAGS_atlas_disk_cache_imgregion_max_bytes));
+  setDiskBackend(
+    std::make_unique<ImgRegionDiskBackend>(rootDir, absl::GetFlag(FLAGS_atlas_disk_cache_imgregion_max_bytes)));
 }
 
 } // namespace nim

@@ -1,4 +1,5 @@
 #include "zrpcuidispatcher.h"
+#include "zcommandlineflags.h"
 
 #include "z3danimation.h"
 #include "z3danimationdoc.h"
@@ -32,8 +33,8 @@
 #include <cmath>
 #include <sstream>
 
-DECLARE_bool(atlas_enable_benchmark_raw_mip_export);
-DECLARE_bool(atlas_enable_benchmark_screen_space_sufficiency_audit);
+ABSL_DECLARE_FLAG(bool, atlas_enable_benchmark_raw_mip_export);
+ABSL_DECLARE_FLAG(bool, atlas_enable_benchmark_screen_space_sufficiency_audit);
 
 namespace nim {
 
@@ -856,7 +857,7 @@ ZRpcUiDispatcher::RawMIPResult ZRpcUiDispatcher::exportRawMIP3D(const RawMIPRequ
 {
   RawMIPResult out;
 
-  if (!FLAGS_atlas_enable_benchmark_raw_mip_export) {
+  if (!absl::GetFlag(FLAGS_atlas_enable_benchmark_raw_mip_export)) {
     out.ok = false;
     out.error = "export_raw_mip_3d is disabled; relaunch Atlas with --atlas_enable_benchmark_raw_mip_export";
     return out;
@@ -975,7 +976,7 @@ ZRpcUiDispatcher::ScreenSpaceSufficiencyAuditResult ZRpcUiDispatcher::exportScre
 {
   ScreenSpaceSufficiencyAuditResult out;
 
-  if (!FLAGS_atlas_enable_benchmark_screen_space_sufficiency_audit) {
+  if (!absl::GetFlag(FLAGS_atlas_enable_benchmark_screen_space_sufficiency_audit)) {
     out.ok = false;
     out.error = "export_screen_space_sufficiency_audit_3d is disabled; relaunch Atlas with "
                 "--atlas_enable_benchmark_screen_space_sufficiency_audit";

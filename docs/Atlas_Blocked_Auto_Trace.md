@@ -37,7 +37,7 @@ We need a blocked/paged approach that preserves tracing continuity and supports 
        if it were the whole image.
    - The policy is block-invariant (the same rule is applied to every block), even though the auto mode can produce
      different background values per block depending on local intensity distributions.
-   - Runtime controls (gflags):
+   - Runtime controls (Abseil flags):
      - `--atlas_autotrace_block_threshold_mode=auto|fixed` (default: `auto`)
      - `--atlas_autotrace_block_subtract_constant=<double>` (default: `0`; used only when mode is `fixed`)
 
@@ -175,7 +175,7 @@ This avoids allocating a global dense or sparse voxel mask for huge datasets.
 ### 3.1 Parity Guard
 
 Continuous-geometry hit tests can differ from legacy voxel-label semantics.
-We keep legacy behavior available behind gflags so parity tests (and any regression comparisons) can force the old
+We keep legacy behavior available behind Abseil flags so parity tests (and any regression comparisons) can force the old
 paths.
 
 Policy:

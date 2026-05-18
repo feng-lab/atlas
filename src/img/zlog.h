@@ -8,14 +8,23 @@
 #undef ERROR
 #endif
 
-#include <glog/logging.h>
+#include <absl/base/log_severity.h>
+#include <absl/log/check.h>
+#include <absl/log/log.h>
+#include <absl/log/log_entry.h>
+#include <absl/log/log_sink.h>
+#include <absl/log/log_sink_registry.h>
+#include <absl/log/vlog_is_on.h>
+#include <absl/strings/string_view.h>
 #include <fmt/format.h>
 #include <fmt/ranges.h>
 #include <fmt/chrono.h>
 #include <fmt/std.h>
 #include <fmt/compile.h>
 #include <QDebug>
+#include <QList>
 #include <QRect>
+#include <QStringList>
 
 #ifndef Q_MOC_RUN
 #define NTEST
@@ -24,80 +33,67 @@
 
 #include <functional>
 #include <iosfwd>
-#include <ostream>
 #include <iterator>
+#include <memory>
+#include <ostream>
+#include <string>
+#include <string_view>
 #include <type_traits>
+#include <vector>
 
 namespace nim {
 
 class ZLogInit
 {
 public:
-  static const ZLogInit& instance(const std::string& appName, const QString& filename = "");
+  static const ZLogInit& instance(std::string programNameOrPath, const QString& filename = "");
+  static bool isInitialized();
 
 private:
-  ZLogInit(const std::string& appName, const QString& filename);
+  ZLogInit(std::string programNameOrPath, const QString& filename);
 
   ~ZLogInit();
+
+  std::vector<std::shared_ptr<absl::LogSink>> m_logSinks;
 };
 
 struct LogData
 {
-  LogData(google::LogSeverity severity, const google::LogMessageTime& logmsgtime, std::string formatted_msg)
-    : level(severity)
-    , time(logmsgtime.when())
-    , formatted(std::move(formatted_msg))
-  {}
+  explicit LogData(const absl::LogEntry& entry);
 
-  google::LogSeverity level;
+  absl::LogSeverity level;
   std::chrono::system_clock::time_point time;
-  std::string formatted; // formatted log message with level, time, threadid, filename, line, and message
+  std::string formatted; // Abseil-formatted log message including the active prefix, without trailing newline
 };
 
-__forceinline std::string formatLogMessage(google::LogSeverity severity,
-                                           const char* file,
-                                           int line,
-                                           const google::LogMessageTime& time,
-                                           const char* message,
-                                           size_t message_len)
-{
-  return fmt::format(FMT_COMPILE("{}{:%Y%m%d %H:%M:%S} {} {}:{}] {}"),
-                     google::GetLogSeverityName(severity)[0],
-                     time.when(),
-                     std::this_thread::get_id(),
-                     file,
-                     line,
-                     fmt::string_view(message, message_len));
-}
-
 // might return nullptr
-std::shared_ptr<google::LogSink> createFileLogSink(const QString& filename);
+std::shared_ptr<absl::LogSink> createFileLogSink(const QString& filename);
 
-inline void addLogSink(google::LogSink* sink)
+inline void addLogSink(absl::LogSink* sink)
 {
   if (sink) {
-    google::AddLogSink(sink);
+    absl::AddLogSink(sink);
   }
 }
 
-inline void addLogSink(const std::shared_ptr<google::LogSink>& sink)
+inline void addLogSink(const std::shared_ptr<absl::LogSink>& sink)
 {
   if (sink) {
-    google::AddLogSink(sink.get());
+    absl::AddLogSink(sink.get());
   }
 }
 
-inline void removeLogSink(google::LogSink* sink)
+inline void removeLogSink(absl::LogSink* sink)
 {
   if (sink) {
-    google::RemoveLogSink(sink);
+    absl::RemoveLogSink(sink);
   }
 }
 
-inline void removeLogSink(const std::shared_ptr<google::LogSink>& sink)
+inline void removeLogSink(const std::shared_ptr<absl::LogSink>& sink)
 {
   if (sink) {
-    google::RemoveLogSink(sink.get());
+    absl::RemoveLogSink(sink.get());
   }
 }
 
@@ -312,8 +308,8 @@ concept IsSupportedQtTypeForPrint =
 
 inline void logLongString(const std::string& q)
 {
-  static const size_t maxLogLength = google::LogMessage::kMaxLogMessageLen - 500;
-  for (size_t i = 0; i < q.size(); i += maxLogLength) { // glog limit is 30000
+  static constexpr size_t maxLogLength = 30000;
+  for (size_t i = 0; i < q.size(); i += maxLogLength) {
     LOG(INFO) << std::string_view(q.data() + i, std::min(maxLogLength, q.size() - i));
   }
 }
@@ -457,3 +453,14 @@ std::ostream& operator<<(std::ostream& s, const T& v)
   auto u8 = nim::qtTypeToQString(v).toUtf8();
   return (s << std::string_view(u8.data(), u8.size()));
 }
+
+template<typename T>
+  requires fmt::is_formattable<QList<T>>::value
+std::ostream& operator<<(std::ostream& s, const QList<T>& v)
+{
+  return (s << fmt::format("{}", v));
+}
+
+static_assert(
+  requires(std::ostream& s, const QList<QString>& v) { s << v; },
+  "QList<QString> should be streamable from non-nim logging contexts");

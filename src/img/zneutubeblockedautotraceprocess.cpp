@@ -30,7 +30,7 @@
 #include "zexception.h"
 #include "zlog.h"
 
-#include <gflags/gflags.h>
+#include "zcommandlineflags.h"
 
 #include <QDir>
 #include <QFile>
@@ -49,28 +49,32 @@
 #include <unordered_set>
 #include <utility>
 
-DECLARE_bool(atlas_trace_use_swc_geometry_mask);
-DECLARE_bool(atlas_autotrace_use_swc_geometry_mask);
-DECLARE_double(atlas_trace_mask_exclusion_swell_ratio);
-DECLARE_double(atlas_trace_mask_exclusion_swell_diff);
-DECLARE_double(atlas_trace_mask_exclusion_swell_limit);
+ABSL_DECLARE_FLAG(bool, atlas_trace_use_swc_geometry_mask);
+ABSL_DECLARE_FLAG(bool, atlas_autotrace_use_swc_geometry_mask);
+ABSL_DECLARE_FLAG(double, atlas_trace_mask_exclusion_swell_ratio);
+ABSL_DECLARE_FLAG(double, atlas_trace_mask_exclusion_swell_diff);
+ABSL_DECLARE_FLAG(double, atlas_trace_mask_exclusion_swell_limit);
 
-DEFINE_uint32(atlas_autotrace_block_core_x, 1024, "Blocked auto trace: core block size in X (voxels).");
-DEFINE_uint32(atlas_autotrace_block_core_y, 1024, "Blocked auto trace: core block size in Y (voxels).");
-DEFINE_uint32(atlas_autotrace_block_core_z, 1024, "Blocked auto trace: core block size in Z (voxels).");
-DEFINE_uint32(atlas_autotrace_block_halo, 128, "Blocked auto trace: halo/padding size added on each side (voxels).");
+ABSL_FLAG(uint32_t, atlas_autotrace_block_core_x, 1024, "Blocked auto trace: core block size in X (voxels).");
+ABSL_FLAG(uint32_t, atlas_autotrace_block_core_y, 1024, "Blocked auto trace: core block size in Y (voxels).");
+ABSL_FLAG(uint32_t, atlas_autotrace_block_core_z, 1024, "Blocked auto trace: core block size in Z (voxels).");
+ABSL_FLAG(uint32_t,
+          atlas_autotrace_block_halo,
+          128,
+          "Blocked auto trace: halo/padding size added on each side (voxels).");
 
-DEFINE_string(atlas_autotrace_block_threshold_mode,
-              "auto",
-              "Blocked auto trace: signal preprocessing threshold mode. "
-              "Supported: 'auto' (subtract background per ROI using the legacy neuTube algorithm) or "
-              "'fixed' (subtract atlas_autotrace_block_subtract_constant).");
+ABSL_FLAG(std::string,
+          atlas_autotrace_block_threshold_mode,
+          "auto",
+          "Blocked auto trace: signal preprocessing threshold mode. "
+          "Supported: 'auto' (subtract background per ROI using the legacy neuTube algorithm) or "
+          "'fixed' (subtract atlas_autotrace_block_subtract_constant).");
 
-DEFINE_double(
-  atlas_autotrace_block_subtract_constant,
-  0.0,
-  "Blocked auto trace: fixed threshold/background value to subtract from the signal in each ROI before "
-  "mask/seed detection. 0 means no subtraction. Used only when atlas_autotrace_block_threshold_mode='fixed'.");
+ABSL_FLAG(double,
+          atlas_autotrace_block_subtract_constant,
+          0.0,
+          "Blocked auto trace: fixed threshold/background value to subtract from the signal in each ROI before "
+          "mask/seed detection. 0 means no subtraction. Used only when atlas_autotrace_block_threshold_mode='fixed'.");
 
 namespace nim {
 
@@ -392,9 +396,9 @@ postProcessBlockedRecoverySeedsLegacyLike(Geo3dScalarField seeds,
     return 0.0;
   }
 
-  const double ratio = FLAGS_atlas_trace_mask_exclusion_swell_ratio;
-  const double diff = FLAGS_atlas_trace_mask_exclusion_swell_diff;
-  const double limit = FLAGS_atlas_trace_mask_exclusion_swell_limit;
+  const double ratio = absl::GetFlag(FLAGS_atlas_trace_mask_exclusion_swell_ratio);
+  const double diff = absl::GetFlag(FLAGS_atlas_trace_mask_exclusion_swell_diff);
+  const double limit = absl::GetFlag(FLAGS_atlas_trace_mask_exclusion_swell_limit);
   CHECK(std::isfinite(ratio));
   CHECK(std::isfinite(diff));
   CHECK(std::isfinite(limit));
@@ -456,9 +460,9 @@ void labelSwcIndexIntoRoiDenseTraceMaskForRecoveryLegacyLike(const ZSwcSpatialIn
   labelWs.option = 1;
   labelWs.value = kMaskValue;
   labelWs.flag = 0;
-  labelWs.sratio = FLAGS_atlas_trace_mask_exclusion_swell_ratio;
-  labelWs.sdiff = FLAGS_atlas_trace_mask_exclusion_swell_diff;
-  labelWs.slimit = FLAGS_atlas_trace_mask_exclusion_swell_limit;
+  labelWs.sratio = absl::GetFlag(FLAGS_atlas_trace_mask_exclusion_swell_ratio);
+  labelWs.sdiff = absl::GetFlag(FLAGS_atlas_trace_mask_exclusion_swell_diff);
+  labelWs.slimit = absl::GetFlag(FLAGS_atlas_trace_mask_exclusion_swell_limit);
 
   const double roiMinX = static_cast<double>(roi.minX);
   const double roiMinY = static_cast<double>(roi.minY);
@@ -957,10 +961,13 @@ void ZNeutubeBlockedAutoTraceProcess::doWork()
     .depth = traceD,
   };
 
-  const int64_t reqCoreX = m_blockCoreX.value_or(static_cast<int64_t>(FLAGS_atlas_autotrace_block_core_x));
-  const int64_t reqCoreY = m_blockCoreY.value_or(static_cast<int64_t>(FLAGS_atlas_autotrace_block_core_y));
-  const int64_t reqCoreZ = m_blockCoreZ.value_or(static_cast<int64_t>(FLAGS_atlas_autotrace_block_core_z));
-  const int64_t reqHalo = m_blockHalo.value_or(static_cast<int64_t>(FLAGS_atlas_autotrace_block_halo));
+  const int64_t reqCoreX =
+    m_blockCoreX.value_or(static_cast<int64_t>(absl::GetFlag(FLAGS_atlas_autotrace_block_core_x)));
+  const int64_t reqCoreY =
+    m_blockCoreY.value_or(static_cast<int64_t>(absl::GetFlag(FLAGS_atlas_autotrace_block_core_y)));
+  const int64_t reqCoreZ =
+    m_blockCoreZ.value_or(static_cast<int64_t>(absl::GetFlag(FLAGS_atlas_autotrace_block_core_z)));
+  const int64_t reqHalo = m_blockHalo.value_or(static_cast<int64_t>(absl::GetFlag(FLAGS_atlas_autotrace_block_halo)));
 
   manifest.block = {
     .coreX = reqCoreX,
@@ -968,14 +975,15 @@ void ZNeutubeBlockedAutoTraceProcess::doWork()
     .coreZ = reqCoreZ,
     .halo = reqHalo,
   };
-  manifest.thresholdMode = normalizeThresholdModeOrThrow(FLAGS_atlas_autotrace_block_threshold_mode);
+  manifest.thresholdMode = normalizeThresholdModeOrThrow(absl::GetFlag(FLAGS_atlas_autotrace_block_threshold_mode));
+  const double subtractConstant = absl::GetFlag(FLAGS_atlas_autotrace_block_subtract_constant);
   if (manifest.thresholdMode == "fixed") {
-    manifest.subtractConstant = FLAGS_atlas_autotrace_block_subtract_constant;
+    manifest.subtractConstant = subtractConstant;
   } else if (manifest.thresholdMode == "auto") {
-    if (FLAGS_atlas_autotrace_block_subtract_constant != 0.0) {
+    if (subtractConstant != 0.0) {
       LOG(WARNING) << fmt::format(
         "Blocked auto trace: atlas_autotrace_block_subtract_constant={} is ignored because threshold_mode='auto'.",
-        FLAGS_atlas_autotrace_block_subtract_constant);
+        subtractConstant);
     }
     manifest.subtractConstant = 0.0;
   } else {
@@ -1011,7 +1019,7 @@ void ZNeutubeBlockedAutoTraceProcess::doWork()
   ZBlockedAutoTraceSession session(m_outputSessionDir);
 
   // If resuming an existing session, treat the persisted manifest as source-of-truth for preprocessing policy so the
-  // GUI can resume without requiring users to re-pass gflags.
+  // GUI can resume without requiring users to re-pass command-line flags.
   const QString existingManifestPath = QDir(session.sessionDir()).absoluteFilePath(QStringLiteral("manifest.json"));
   if (QFileInfo::exists(existingManifestPath)) {
     const ZBlockedAutoTraceManifest existing = session.loadManifestOrThrow();
@@ -1069,8 +1077,11 @@ void ZNeutubeBlockedAutoTraceProcess::doWork()
   swcIndex->setZToXYRatio(state.manifest.zToXYRatio);
   swcIndex->rebuild(state.swc);
 
-  const bool useGeometryTraceMask =
-    FLAGS_atlas_trace_use_swc_geometry_mask && FLAGS_atlas_autotrace_use_swc_geometry_mask;
+  const bool useGeometryTraceMask = absl::GetFlag(FLAGS_atlas_trace_use_swc_geometry_mask) &&
+                                    absl::GetFlag(FLAGS_atlas_autotrace_use_swc_geometry_mask);
+  const double maskExclusionSwellRatio = absl::GetFlag(FLAGS_atlas_trace_mask_exclusion_swell_ratio);
+  const double maskExclusionSwellDiff = absl::GetFlag(FLAGS_atlas_trace_mask_exclusion_swell_diff);
+  const double maskExclusionSwellLimit = absl::GetFlag(FLAGS_atlas_trace_mask_exclusion_swell_limit);
   std::shared_ptr<ZSwcSpatialIndex> traceMaskIndex;
   if (useGeometryTraceMask) {
     traceMaskIndex = std::make_shared<ZSwcSpatialIndex>();
@@ -1861,9 +1872,9 @@ void ZNeutubeBlockedAutoTraceProcess::doWork()
 
               LocsegLabelWorkspaceLegacyLike labelWs;
               labelWs.signal = &signal;
-              labelWs.sratio = FLAGS_atlas_trace_mask_exclusion_swell_ratio;
-              labelWs.sdiff = FLAGS_atlas_trace_mask_exclusion_swell_diff;
-              labelWs.slimit = FLAGS_atlas_trace_mask_exclusion_swell_limit;
+              labelWs.sratio = maskExclusionSwellRatio;
+              labelWs.sdiff = maskExclusionSwellDiff;
+              labelWs.slimit = maskExclusionSwellLimit;
               labelWs.option = 1;
               labelWs.value = 1;
               labelWs.flag = 0;

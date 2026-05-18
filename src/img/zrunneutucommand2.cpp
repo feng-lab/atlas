@@ -12,15 +12,13 @@
 
 #include "zjson.h"
 
-#include <gflags/gflags.h>
+#include "zcommandlineflags.h"
 
 #include <charconv>
 #include <cmath>
 #include <optional>
 #include <string>
 #include <vector>
-
-DECLARE_int32(v);
 
 namespace nim {
 
@@ -216,7 +214,7 @@ extractIncludePath(const json::object& root, const QString& baseConfigFilePath, 
 
     if (arg == "--verbose") {
       out->isVerbose = true;
-      FLAGS_v = 1;
+      CHECK(setCommandLineOption("v", "1")) << "Abseil logging flag --v is unavailable";
       continue;
     }
 

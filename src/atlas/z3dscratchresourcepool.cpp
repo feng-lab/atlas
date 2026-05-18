@@ -1,4 +1,5 @@
 #include "z3dscratchresourcepool.h"
+#include "zcommandlineflags.h"
 
 #include "z3dgl.h"
 #include "z3drendertarget.h"
@@ -454,8 +455,8 @@ Z3DScratchResourcePool::RenderTargetLease makeLeaseFromSlot(Slot* slot, uint32_t
 
 namespace nim {} // namespace nim
 
-DEFINE_uint32(atlas_blockid_rt_max_attachments, 8, "Max color attachments for block-id FBO");
-DEFINE_double(atlas_blockid_rt_scale, 1.0, "Scale factor for block-id FBO size (relative to viewport)");
+ABSL_FLAG(uint32_t, atlas_blockid_rt_max_attachments, 8, "Max color attachments for block-id FBO");
+ABSL_FLAG(double, atlas_blockid_rt_scale, 1.0, "Scale factor for block-id FBO size (relative to viewport)");
 
 namespace nim {
 
@@ -846,12 +847,12 @@ Z3DScratchResourcePool::~Z3DScratchResourcePool() = default;
 
 uint32_t Z3DScratchResourcePool::blockIdMaxAttachments() const
 {
-  return std::max<uint32_t>(1, FLAGS_atlas_blockid_rt_max_attachments);
+  return std::max<uint32_t>(1, absl::GetFlag(FLAGS_atlas_blockid_rt_max_attachments));
 }
 
 double Z3DScratchResourcePool::blockIdScale() const
 {
-  return std::max(0.0, FLAGS_atlas_blockid_rt_scale);
+  return std::max(0.0, absl::GetFlag(FLAGS_atlas_blockid_rt_scale));
 }
 
 static inline uint64_t bytesPerPixelFromInternal(GLint internal)

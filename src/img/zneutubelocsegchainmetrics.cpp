@@ -5,11 +5,11 @@
 
 #include "zlog.h"
 
-#include <gflags/gflags.h>
+#include "zcommandlineflags.h"
 
 #include <limits>
 
-DECLARE_bool(atlas_trace_enable_legacy_isotropic_chain_canonicalization_for_parity);
+ABSL_DECLARE_FLAG(bool, atlas_trace_enable_legacy_isotropic_chain_canonicalization_for_parity);
 
 namespace nim {
 
@@ -100,7 +100,8 @@ double locsegChainDistUpperBoundLegacyLike(const LocsegChain& chain, double zToX
 
   for (const auto& node : chain) {
     locseg2 = node.locseg;
-    if (FLAGS_atlas_trace_enable_legacy_isotropic_chain_canonicalization_for_parity && zToXYRatio == 1.0) {
+    if (absl::GetFlag(FLAGS_atlas_trace_enable_legacy_isotropic_chain_canonicalization_for_parity) &&
+        zToXYRatio == 1.0) {
       localNeurosegScaleZLegacyLike(locseg2, 1.0);
     }
     const std::array<double, 3> target = localNeurosegCenterLegacyLike(locseg2);

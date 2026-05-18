@@ -1,21 +1,21 @@
 #include "zhttpretrypolicy.h"
 
-#include <gflags/gflags.h>
+#include "zcommandlineflags.h"
 
 #include <folly/String.h>
 
 #include <algorithm>
 #include <string>
 
-DECLARE_uint32(atlas_http_retry_backoff_initial_ms);
-DECLARE_uint32(atlas_http_retry_backoff_max_ms);
+ABSL_DECLARE_FLAG(uint32_t, atlas_http_retry_backoff_initial_ms);
+ABSL_DECLARE_FLAG(uint32_t, atlas_http_retry_backoff_max_ms);
 
 namespace nim {
 
 std::chrono::milliseconds httpRetryBackoffForAttempt(uint32_t attempt)
 {
-  const uint32_t initial = FLAGS_atlas_http_retry_backoff_initial_ms;
-  const uint32_t maxDelay = std::max<uint32_t>(initial, FLAGS_atlas_http_retry_backoff_max_ms);
+  const uint32_t initial = absl::GetFlag(FLAGS_atlas_http_retry_backoff_initial_ms);
+  const uint32_t maxDelay = std::max<uint32_t>(initial, absl::GetFlag(FLAGS_atlas_http_retry_backoff_max_ms));
   uint64_t delay = initial;
   delay <<= std::min<uint32_t>(attempt, 20u);
   if (delay > maxDelay) {

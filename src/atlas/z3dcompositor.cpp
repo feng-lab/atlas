@@ -1,4 +1,5 @@
 #include "z3dcompositor.h"
+#include "zcommandlineflags.h"
 
 #include "z3dgl.h"
 #include "z3drendertarget.h"
@@ -29,14 +30,15 @@
 #include <unordered_set>
 #include <optional>
 
-DEFINE_bool(atlas_vk_copy_yflip_in_shader, true, "Use y-flip in Vulkan final copy shader instead of UI flip");
-DECLARE_bool(atlas_vk_ddp_indirect_count);
-DEFINE_int32(atlas_ddp_max_passes, 100, "Maximum dual-depth peeling peel passes (applies to GL and Vulkan)");
-DEFINE_int32(atlas_vk_ddp_cpu_chunk_passes,
-             4,
-             "Vulkan DDP: number of peel passes per submission for chunked early-stop. "
-             "drawIndirectCount, when available, gates draws after each chunk's first peel pass. "
-             "Use <=0 to record the full loop in one submission.");
+ABSL_FLAG(bool, atlas_vk_copy_yflip_in_shader, true, "Use y-flip in Vulkan final copy shader instead of UI flip");
+ABSL_DECLARE_FLAG(bool, atlas_vk_ddp_indirect_count);
+ABSL_FLAG(int32_t, atlas_ddp_max_passes, 100, "Maximum dual-depth peeling peel passes (applies to GL and Vulkan)");
+ABSL_FLAG(int32_t,
+          atlas_vk_ddp_cpu_chunk_passes,
+          4,
+          "Vulkan DDP: number of peel passes per submission for chunked early-stop. "
+          "drawIndirectCount, when available, gates draws after each chunk's first peel pass. "
+          "Use <=0 to record the full loop in one submission.");
 
 namespace {
 using namespace nim;
@@ -3212,7 +3214,7 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
           auto copyDepthGuard = folly::makeGuard([&]() {
             m_textureCopyRenderer.setCopyDepth(true);
           });
-          m_textureCopyRenderer.setFlipY(FLAGS_atlas_vk_copy_yflip_in_shader);
+          m_textureCopyRenderer.setFlipY(absl::GetFlag(FLAGS_atlas_vk_copy_yflip_in_shader));
           m_textureCopyRenderer.setSourceAttachments(srcColor, srcDepth);
           m_rendererBase.renderVulkan(eye, m_textureCopyRenderer);
         });
@@ -4053,7 +4055,7 @@ void Z3DCompositor::renderTransparentDDP(const std::vector<Z3DBoundedFilter*>& f
   const GLenum g_db[] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT7};
 
   bool g_useOQ = true;
-  size_t g_numPasses = static_cast<size_t>(std::max(1, FLAGS_atlas_ddp_max_passes));
+  size_t g_numPasses = static_cast<size_t>(std::max(1, absl::GetFlag(FLAGS_atlas_ddp_max_passes)));
 
 #define MAX_DEPTH 1.0
 
@@ -4734,7 +4736,7 @@ void Z3DCompositor::renderTransparentDDPVulkan(const std::vector<Z3DBoundedFilte
 
   resetHooks();
 
-  const size_t kMaxPasses = static_cast<size_t>(std::max(1, FLAGS_atlas_ddp_max_passes));
+  const size_t kMaxPasses = static_cast<size_t>(std::max(1, absl::GetFlag(FLAGS_atlas_ddp_max_passes)));
   // Track the last ping buffer written by the orchestrated peel to feed the
   // final composite pass. Initialize to the same parity as the first peel
   // (pass=1 -> currId=1), and update inside the drawPass.
@@ -4918,7 +4920,8 @@ void Z3DCompositor::renderTransparentDDPVulkan(const std::vector<Z3DBoundedFilte
                                        });
   };
 
-  if (FLAGS_atlas_vk_ddp_cpu_chunk_passes <= 0) {
+  const int32_t ddpCpuChunkPasses = absl::GetFlag(FLAGS_atlas_vk_ddp_cpu_chunk_passes);
+  if (ddpCpuChunkPasses <= 0) {
     // Compatibility/debug path: record the whole peel loop in one submission.
     // The scoped group prevents strict-residency mode from splitting the
     // reset/peel/count nodes that share DDP state.
@@ -4935,7 +4938,7 @@ void Z3DCompositor::renderTransparentDDPVulkan(const std::vector<Z3DBoundedFilte
     // flag between chunks so later chunks are not recorded after convergence.
     // When indirect count is enabled, the first peel pass in each chunk prepares
     // per-submission indirect draw args for later passes in that same chunk.
-    const uint32_t chunkPasses = static_cast<uint32_t>(std::max<int32_t>(1, FLAGS_atlas_vk_ddp_cpu_chunk_passes));
+    const uint32_t chunkPasses = static_cast<uint32_t>(std::max<int32_t>(1, ddpCpuChunkPasses));
     uint32_t passBase = 0;
     while (passBase < totalOrchestratedPasses) {
       const uint32_t remaining = totalOrchestratedPasses - passBase;

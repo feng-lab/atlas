@@ -1,4 +1,5 @@
 #include "z3dimgfilter.h"
+#include "zcommandlineflags.h"
 
 #include "z3dgpuinfo.h"
 #include "zbenchtimer.h"
@@ -24,9 +25,9 @@
 #include <optional>
 #include <utility>
 
-DECLARE_bool(atlas_enable_benchmark_raw_mip_export);
-DECLARE_bool(atlas_enable_benchmark_screen_space_sufficiency_audit);
-DECLARE_bool(atlas_volume_rendering_analytic_ray_setup);
+ABSL_DECLARE_FLAG(bool, atlas_enable_benchmark_raw_mip_export);
+ABSL_DECLARE_FLAG(bool, atlas_enable_benchmark_screen_space_sufficiency_audit);
+ABSL_DECLARE_FLAG(bool, atlas_volume_rendering_analytic_ray_setup);
 
 namespace nim {
 
@@ -1556,7 +1557,7 @@ bool Z3DImgFilter::hasImage() const
 
 bool Z3DImgFilter::saveRawMIPImage(const QString& path, std::string& error)
 {
-  if (!FLAGS_atlas_enable_benchmark_raw_mip_export) {
+  if (!absl::GetFlag(FLAGS_atlas_enable_benchmark_raw_mip_export)) {
     error = "raw MIP export is disabled; relaunch Atlas with --atlas_enable_benchmark_raw_mip_export";
     return false;
   }
@@ -1583,7 +1584,7 @@ bool Z3DImgFilter::saveRawMIPImage(const QString& path, std::string& error)
 
 bool Z3DImgFilter::screenSpaceSufficiencyAudit(ScreenSpaceSufficiencyAudit& audit, std::string& error)
 {
-  if (!FLAGS_atlas_enable_benchmark_screen_space_sufficiency_audit) {
+  if (!absl::GetFlag(FLAGS_atlas_enable_benchmark_screen_space_sufficiency_audit)) {
     error = "screen-space audit is disabled; relaunch Atlas with "
             "--atlas_enable_benchmark_screen_space_sufficiency_audit";
     return false;
@@ -1708,7 +1709,7 @@ void Z3DImgFilter::prepareRaycasterInputs(Z3DEye eye, const glm::uvec2& outputSi
 
   m_imgRaycasterRenderer.clearQuads();
 
-  if (FLAGS_atlas_volume_rendering_analytic_ray_setup) {
+  if (absl::GetFlag(FLAGS_atlas_volume_rendering_analytic_ray_setup)) {
     const float coordDeterminant = glm::determinant(glm::mat3(coordTransform));
     CHECK(std::abs(coordDeterminant) > 1e-8f) << "Analytic ray setup requires an invertible coordTransform";
 

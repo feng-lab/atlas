@@ -1,4 +1,5 @@
 #include "zimgpack.h"
+#include "zcommandlineflags.h"
 
 #include "zcpuinfo.h"
 #include "zlog.h"
@@ -33,33 +34,34 @@
 #include <mutex>
 #include <zbenchtimer.h>
 
-DEFINE_bool(atlas_readRegionToImg_use_multithreaded_resize,
-            false,
-            "Whether readRegionToImg uses multithreaded resize, default is false");
+ABSL_FLAG(bool,
+          atlas_readRegionToImg_use_multithreaded_resize,
+          false,
+          "Whether readRegionToImg uses multithreaded resize, default is false");
 
 // When true, large non-pyramidal sources avoid eager downsampled image generation at open,
 // and instead precompute only tile descriptors (index) without I/O.
-DEFINE_bool(atlas_imgpack_defer_pyramidal,
-            true,
-            "Defer pyramid building for large non-pyramidal images (index only, no image reads)");
+ABSL_FLAG(bool,
+          atlas_imgpack_defer_pyramidal,
+          true,
+          "Defer pyramid building for large non-pyramidal images (index only, no image reads)");
 
 // Quick window estimation flags
-DEFINE_bool(atlas_imgpack_quick_window_enable,
-            true,
-            "Enable percentile-based quick window for float data");
-DEFINE_double(atlas_imgpack_quick_window_lower_p, 0.01, "Lower percentile for quick window [0,1]");
-DEFINE_double(atlas_imgpack_quick_window_upper_p, 0.99, "Upper percentile for quick window [0,1]");
-DEFINE_uint32(atlas_imgpack_quick_window_tiles_per_axis, 2, "Tile samples per axis for quick window (>=1)");
-DEFINE_uint32(atlas_imgpack_quick_window_sample_step, 8, "Pixel stride inside tile for sampling (>=1)");
-DEFINE_uint32(atlas_imgpack_quick_window_max_samples,
-              500000,
-              "Max total samples across all tiles/channels for quick window");
+ABSL_FLAG(bool, atlas_imgpack_quick_window_enable, true, "Enable percentile-based quick window for float data");
+ABSL_FLAG(double, atlas_imgpack_quick_window_lower_p, 0.01, "Lower percentile for quick window [0,1]");
+ABSL_FLAG(double, atlas_imgpack_quick_window_upper_p, 0.99, "Upper percentile for quick window [0,1]");
+ABSL_FLAG(uint32_t, atlas_imgpack_quick_window_tiles_per_axis, 2, "Tile samples per axis for quick window (>=1)");
+ABSL_FLAG(uint32_t, atlas_imgpack_quick_window_sample_step, 8, "Pixel stride inside tile for sampling (>=1)");
+ABSL_FLAG(uint32_t,
+          atlas_imgpack_quick_window_max_samples,
+          500000,
+          "Max total samples across all tiles/channels for quick window");
 
 // Defined in z3dimg.cpp; shared here so 3D preview assembly can reuse the same concurrency limit.
-DECLARE_uint32(atlas_ng_precomputed_3d_max_concurrent_block_reads);
+ABSL_DECLARE_FLAG(uint32_t, atlas_ng_precomputed_3d_max_concurrent_block_reads);
 
 #if 0
-DEFINE_uint32(atlas_readRegionToImg_version,
+ABSL_FLAG(uint32_t, atlas_readRegionToImg_version,
               1,
               "Which version of readRegionToImg to use, value can be 0-1, default is 1");
 #endif
@@ -544,7 +546,7 @@ ZImgPack::ZImgPack(ZImgSource imgSource, ZImgInfo* pInfo, std::vector<std::share
     VLOG(1) << fmt::format("has pyramidal: {}", hasPyramidal);
     buildFastReadIndex(sceneSubBlock);
   } else {
-    if (FLAGS_atlas_imgpack_defer_pyramidal) {
+    if (absl::GetFlag(FLAGS_atlas_imgpack_defer_pyramidal)) {
       VLOG(1) << "building pyramidal index only (no I/O)";
       buildPyramidalIndexOnly(sceneSubBlock);
     } else {
@@ -1730,7 +1732,13 @@ ZImg ZImgPack::resizedImg(size_t width, size_t height, size_t depth, size_t t) c
   res = assembleImg(ratio, t);
   if (res.width() != width || res.height() != height || res.depth() != depth) {
     if (m_ngSegmentationRgbFor3D) {
-      res.resize(width, height, depth, Interpolant::Nearest, false, false, FLAGS_atlas_readRegionToImg_use_multithreaded_resize);
+      res.resize(width,
+                 height,
+                 depth,
+                 Interpolant::Nearest,
+                 false,
+                 false,
+                 absl::GetFlag(FLAGS_atlas_readRegionToImg_use_multithreaded_resize));
     } else {
       res.resize(width, height, depth);
     }
@@ -1921,7 +1929,7 @@ ZImgPack::resizedImgCachedAsync(size_t width, size_t height, size_t depth, size_
     // Read chunks in batches so we don't keep shared_ptr references to *all* chunks alive at once; this avoids
     // defeating LRU eviction in the Neuroglancer chunk cache under memory pressure.
     const size_t maxConcurrent =
-      std::max<size_t>(1, static_cast<size_t>(FLAGS_atlas_ng_precomputed_3d_max_concurrent_block_reads));
+      std::max<size_t>(1, static_cast<size_t>(absl::GetFlag(FLAGS_atlas_ng_precomputed_3d_max_concurrent_block_reads)));
 
     for (size_t batchStart = 0; batchStart < chunks.size(); batchStart += maxConcurrent) {
       maybeCancel(cancellationToken);
@@ -1949,7 +1957,13 @@ ZImgPack::resizedImgCachedAsync(size_t width, size_t height, size_t depth, size_
 
   if (res.width() != width || res.height() != height || res.depth() != depth) {
     if (m_ngSegmentationRgbFor3D) {
-      res.resize(width, height, depth, Interpolant::Nearest, false, false, FLAGS_atlas_readRegionToImg_use_multithreaded_resize);
+      res.resize(width,
+                 height,
+                 depth,
+                 Interpolant::Nearest,
+                 false,
+                 false,
+                 absl::GetFlag(FLAGS_atlas_readRegionToImg_use_multithreaded_resize));
     } else {
       res.resize(width, height, depth);
     }
@@ -1979,7 +1993,7 @@ folly::Future<std::shared_ptr<ZImg>> ZImgPack::readRegionToImg(index_t xyRatio,
 {
   CHECK(xyRatio >= 1 && zRatio >= 1);
   auto cpuExecutor = folly::getGlobalCPUExecutor();
-  if (FLAGS_atlas_readRegionToImg_version == 0) {
+  if (absl::GetFlag(FLAGS_atlas_readRegionToImg_version) == 0) {
     return folly::via(cpuExecutor, [=, this, &resInfo]() {
       maybeCancel(cancellationToken);
 
@@ -2099,7 +2113,7 @@ folly::Future<std::shared_ptr<ZImg>> ZImgPack::readRegionToImg(index_t xyRatio,
                       Interpolant::Cubic,
                       true,
                       false,
-                      FLAGS_atlas_readRegionToImg_use_multithreaded_resize);
+                      absl::GetFlag(FLAGS_atlas_readRegionToImg_use_multithreaded_resize));
         }
 
         maybeCancel(cancellationToken);
@@ -2251,7 +2265,7 @@ folly::Future<std::shared_ptr<ZImg>> ZImgPack::readRegionToImg(index_t xyRatio,
                       Interpolant::Cubic,
                       true,
                       false,
-                      FLAGS_atlas_readRegionToImg_use_multithreaded_resize);
+                      absl::GetFlag(FLAGS_atlas_readRegionToImg_use_multithreaded_resize));
         }
 
         maybeCancel(cancellationToken);
@@ -2544,7 +2558,7 @@ folly::coro::Task<std::shared_ptr<ZImg>> ZImgPack::readRegionToImgAsync(index_t 
                   interpolant,
                   antialiasing,
                   false,
-                  FLAGS_atlas_readRegionToImg_use_multithreaded_resize);
+                  absl::GetFlag(FLAGS_atlas_readRegionToImg_use_multithreaded_resize));
     }
 
     maybeCancel(cancellationToken);
@@ -2639,7 +2653,7 @@ folly::coro::Task<std::shared_ptr<ZImg>> ZImgPack::readRegionToImgAsync(index_t 
                 Interpolant::Cubic,
                 true,
                 false,
-                FLAGS_atlas_readRegionToImg_use_multithreaded_resize);
+                absl::GetFlag(FLAGS_atlas_readRegionToImg_use_multithreaded_resize));
   }
 
   maybeCancel(cancellationToken);
@@ -2752,7 +2766,7 @@ ZImg ZImgPack::assembleChannelTime(std::array<size_t, 3> ratio, size_t c, size_t
                interpolant,
                antialiasing,
                false,
-               FLAGS_atlas_readRegionToImg_use_multithreaded_resize);
+               absl::GetFlag(FLAGS_atlas_readRegionToImg_use_multithreaded_resize));
   }
 
   return res;
@@ -2987,7 +3001,7 @@ void ZImgPack::buildPyramidalIndexOnly(const std::vector<std::shared_ptr<ZImgSub
 
 void ZImgPack::computeQuickWindowIfNeeded()
 {
-  if (!FLAGS_atlas_imgpack_quick_window_enable) {
+  if (!absl::GetFlag(FLAGS_atlas_imgpack_quick_window_enable)) {
     return;
   }
   // Only for disk-cached float images without full min/max
@@ -2999,11 +3013,11 @@ void ZImgPack::computeQuickWindowIfNeeded()
     return;
   }
 
-  const uint32_t K = std::max<uint32_t>(1, FLAGS_atlas_imgpack_quick_window_tiles_per_axis);
-  const uint32_t step = std::max<uint32_t>(1, FLAGS_atlas_imgpack_quick_window_sample_step);
-  const uint32_t maxSamples = std::max<uint32_t>(1, FLAGS_atlas_imgpack_quick_window_max_samples);
-  const double lp = std::clamp(FLAGS_atlas_imgpack_quick_window_lower_p, 0.0, 1.0);
-  const double up = std::clamp(FLAGS_atlas_imgpack_quick_window_upper_p, 0.0, 1.0);
+  const uint32_t K = std::max<uint32_t>(1, absl::GetFlag(FLAGS_atlas_imgpack_quick_window_tiles_per_axis));
+  const uint32_t step = std::max<uint32_t>(1, absl::GetFlag(FLAGS_atlas_imgpack_quick_window_sample_step));
+  const uint32_t maxSamples = std::max<uint32_t>(1, absl::GetFlag(FLAGS_atlas_imgpack_quick_window_max_samples));
+  const double lp = std::clamp(absl::GetFlag(FLAGS_atlas_imgpack_quick_window_lower_p), 0.0, 1.0);
+  const double up = std::clamp(absl::GetFlag(FLAGS_atlas_imgpack_quick_window_upper_p), 0.0, 1.0);
   if (!(lp < up)) {
     return;
   }

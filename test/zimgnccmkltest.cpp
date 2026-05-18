@@ -1,10 +1,11 @@
 #include "zimgncc.h"
+#include "zcommandlineflags.h"
 #include "zfft.h"
 #include "ztest.h"
 #include <folly/ScopeGuard.h>
 
-DECLARE_bool(zimg_use_mkl_for_fft_if_available);
-DECLARE_uint32(zimg_global_fft_number_of_threads);
+ABSL_DECLARE_FLAG(bool, zimg_use_mkl_for_fft_if_available);
+ABSL_DECLARE_FLAG(uint32_t, zimg_global_fft_number_of_threads);
 
 #if defined(ZIMG_USE_MKL) && (defined(__x86_64__) || defined(_M_X64) || defined(__amd64__))
 
@@ -12,14 +13,14 @@ TEST(ZImgNCC, normXCorr_S_mkl)
 {
   using namespace nim;
 
-  auto oldValue = FLAGS_zimg_use_mkl_for_fft_if_available;
+  auto oldValue = absl::GetFlag(FLAGS_zimg_use_mkl_for_fft_if_available);
   auto guard = folly::makeGuard([=]() {
-    FLAGS_zimg_use_mkl_for_fft_if_available = oldValue;
+    absl::SetFlag(&FLAGS_zimg_use_mkl_for_fft_if_available, oldValue);
   });
 
-  auto oldValue1 = FLAGS_zimg_global_fft_number_of_threads;
+  auto oldValue1 = absl::GetFlag(FLAGS_zimg_global_fft_number_of_threads);
   auto guard1 = folly::makeGuard([=]() {
-    FLAGS_zimg_global_fft_number_of_threads = oldValue1;
+    absl::SetFlag(&FLAGS_zimg_global_fft_number_of_threads, oldValue1);
   });
 
   try {
@@ -33,28 +34,28 @@ TEST(ZImgNCC, normXCorr_S_mkl)
     ZImg nccImg;
     ZImg numberOfOverlapVoxelsImg;
 
-    FLAGS_zimg_global_fft_number_of_threads = 1;
-    FLAGS_zimg_use_mkl_for_fft_if_available = false;
+    absl::SetFlag(&FLAGS_zimg_global_fft_number_of_threads, 1);
+    absl::SetFlag(&FLAGS_zimg_use_mkl_for_fft_if_available, false);
     ZBenchTimer bt("normXCorr_S_pocketfft_one_thread");
     normXCorr_S(fixedImgView, movingImgView, nccImg, numberOfOverlapVoxelsImg);
     STOP_AND_LOG(bt)
 
-    FLAGS_zimg_use_mkl_for_fft_if_available = true;
+    absl::SetFlag(&FLAGS_zimg_use_mkl_for_fft_if_available, true);
     fixedImgView = fixedImg.createView();
     movingImgView = movingImg.createView();
     bt.resetAndStart("normXCorr_S_mkl_one_thread");
     normXCorr_S(fixedImgView, movingImgView, nccImg, numberOfOverlapVoxelsImg);
     STOP_AND_LOG(bt)
 
-    FLAGS_zimg_global_fft_number_of_threads = 0;
-    FLAGS_zimg_use_mkl_for_fft_if_available = false;
+    absl::SetFlag(&FLAGS_zimg_global_fft_number_of_threads, 0);
+    absl::SetFlag(&FLAGS_zimg_use_mkl_for_fft_if_available, false);
     fixedImgView = fixedImg.createView();
     movingImgView = movingImg.createView();
     bt.resetAndStart("normXCorr_S_pocketfft");
     normXCorr_S(fixedImgView, movingImgView, nccImg, numberOfOverlapVoxelsImg);
     STOP_AND_LOG(bt)
 
-    FLAGS_zimg_use_mkl_for_fft_if_available = true;
+    absl::SetFlag(&FLAGS_zimg_use_mkl_for_fft_if_available, true);
     fixedImgView = fixedImg.createView();
     movingImgView = movingImg.createView();
     bt.resetAndStart("normXCorr_S_mkl");
@@ -87,14 +88,14 @@ TEST(ZImgNCC, normXCorr_mkl)
 {
   using namespace nim;
 
-  auto oldValue = FLAGS_zimg_use_mkl_for_fft_if_available;
+  auto oldValue = absl::GetFlag(FLAGS_zimg_use_mkl_for_fft_if_available);
   auto guard = folly::makeGuard([=]() {
-    FLAGS_zimg_use_mkl_for_fft_if_available = oldValue;
+    absl::SetFlag(&FLAGS_zimg_use_mkl_for_fft_if_available, oldValue);
   });
 
-  auto oldValue1 = FLAGS_zimg_global_fft_number_of_threads;
+  auto oldValue1 = absl::GetFlag(FLAGS_zimg_global_fft_number_of_threads);
   auto guard1 = folly::makeGuard([=]() {
-    FLAGS_zimg_global_fft_number_of_threads = oldValue1;
+    absl::SetFlag(&FLAGS_zimg_global_fft_number_of_threads, oldValue1);
   });
 
   try {
@@ -108,28 +109,28 @@ TEST(ZImgNCC, normXCorr_mkl)
     ZImg nccImg;
     ZImg numberOfOverlapVoxelsImg;
 
-    FLAGS_zimg_global_fft_number_of_threads = 1;
-    FLAGS_zimg_use_mkl_for_fft_if_available = false;
+    absl::SetFlag(&FLAGS_zimg_global_fft_number_of_threads, 1);
+    absl::SetFlag(&FLAGS_zimg_use_mkl_for_fft_if_available, false);
     ZBenchTimer bt("normXCorr_pocketfft_one_thread");
     normXCorr(fixedImgView, movingImgView, nccImg, numberOfOverlapVoxelsImg);
     STOP_AND_LOG(bt)
 
-    FLAGS_zimg_use_mkl_for_fft_if_available = true;
+    absl::SetFlag(&FLAGS_zimg_use_mkl_for_fft_if_available, true);
     fixedImgView = fixedImg.createView();
     movingImgView = movingImg.createView();
     bt.resetAndStart("normXCorr_mkl_one_thread");
     normXCorr(fixedImgView, movingImgView, nccImg, numberOfOverlapVoxelsImg);
     STOP_AND_LOG(bt)
 
-    FLAGS_zimg_global_fft_number_of_threads = 0;
-    FLAGS_zimg_use_mkl_for_fft_if_available = false;
+    absl::SetFlag(&FLAGS_zimg_global_fft_number_of_threads, 0);
+    absl::SetFlag(&FLAGS_zimg_use_mkl_for_fft_if_available, false);
     fixedImgView = fixedImg.createView();
     movingImgView = movingImg.createView();
     bt.resetAndStart("normXCorr_pocketfft");
     normXCorr(fixedImgView, movingImgView, nccImg, numberOfOverlapVoxelsImg);
     STOP_AND_LOG(bt)
 
-    FLAGS_zimg_use_mkl_for_fft_if_available = true;
+    absl::SetFlag(&FLAGS_zimg_use_mkl_for_fft_if_available, true);
     fixedImgView = fixedImg.createView();
     movingImgView = movingImg.createView();
     bt.resetAndStart("normXCorr_mkl");
@@ -156,18 +157,18 @@ TEST(ZImgNCC, fft_mkl_pocketfft)
 {
   using namespace nim;
 
-  auto oldValue = FLAGS_zimg_use_mkl_for_fft_if_available;
+  auto oldValue = absl::GetFlag(FLAGS_zimg_use_mkl_for_fft_if_available);
   auto guard = folly::makeGuard([=]() {
-    FLAGS_zimg_use_mkl_for_fft_if_available = oldValue;
+    absl::SetFlag(&FLAGS_zimg_use_mkl_for_fft_if_available, oldValue);
   });
 
   try {
     ZImg fixedImg(ZImgInfo(512, 427, 20));
     fixedImg.fillRandom();
 
-    FLAGS_zimg_use_mkl_for_fft_if_available = true;
+    absl::SetFlag(&FLAGS_zimg_use_mkl_for_fft_if_available, true);
     auto cimg_mkl = fft(fixedImg, 512, 427, 20);
-    FLAGS_zimg_use_mkl_for_fft_if_available = false;
+    absl::SetFlag(&FLAGS_zimg_use_mkl_for_fft_if_available, false);
     auto cimg_pocketfft = fft(fixedImg, 512, 427, 20);
 
     for (size_t i = 0; i < 1000; ++i) {

@@ -198,7 +198,7 @@ Below is an expanded description of each menu. Some menu items appear only when 
 
 1. **Undo / Redo** – applies to the active editor or selected object when that content supports undo history.
 2. **Copy / Paste** – operate on 2D selections, ROI shapes, or annotation data depending on current tool.
-3. **Settings...** – opens the structured runtime-settings editor for the curated gflags subset. On macOS, this may appear in the standard application menu instead of Edit.
+3. **Settings...** – opens the structured runtime-settings editor for the curated Abseil flag subset. On macOS, this may appear in the standard application menu instead of Edit.
 
 #### View
 
@@ -1458,7 +1458,7 @@ Tips
 ### 10.2 Log Files and Diagnostics
 
 1. **Open log folder**: **Help → Open Log Folder**. Each run generates timestamped logs.
-2. **Increase verbosity**: launch Atlas with `--v=1` or set environment variable `GLOG_v=1` for detailed logging.
+2. **Increase verbosity**: launch Atlas with `--v=1` for detailed logging.
 3. **Debug-oriented builds** may provide additional diagnostic lines beyond the standard release logs.
 
 ### 10.3 Updating and Multiple Instances

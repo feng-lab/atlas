@@ -1,4 +1,5 @@
 #include "zstitchimage.h"
+#include "zcommandlineflags.h"
 
 #include "zlog.h"
 #include "zimgnccmatch.h"
@@ -15,7 +16,7 @@
 #include <algorithm>
 #include <limits>
 
-DECLARE_uint32(zimg_global_fft_number_of_threads);
+ABSL_DECLARE_FLAG(uint32_t, zimg_global_fft_number_of_threads);
 
 namespace {
 
@@ -713,9 +714,9 @@ void ZStitchImage::doWork()
     };
 
     if (m_useMultithreading) {
-      FLAGS_zimg_global_fft_number_of_threads = 1;
+      absl::SetFlag(&FLAGS_zimg_global_fft_number_of_threads, 1);
       auto guard = folly::makeGuard([]() {
-        FLAGS_zimg_global_fft_number_of_threads = 0;
+        absl::SetFlag(&FLAGS_zimg_global_fft_number_of_threads, 0);
       });
       //      int nthread =
       //        std::min<int>(tbb::task_scheduler_init::default_num_threads(),
@@ -1067,9 +1068,9 @@ void ZStitchImage::doRestitch()
     };
 
     if (m_useMultithreading) {
-      FLAGS_zimg_global_fft_number_of_threads = 1;
+      absl::SetFlag(&FLAGS_zimg_global_fft_number_of_threads, 1);
       auto guard = folly::makeGuard([]() {
-        FLAGS_zimg_global_fft_number_of_threads = 0;
+        absl::SetFlag(&FLAGS_zimg_global_fft_number_of_threads, 0);
       });
       //      int nthread =
       //        std::min<int>(tbb::task_scheduler_init::default_num_threads(),

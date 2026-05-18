@@ -9,7 +9,7 @@
 #include "zfolly.h"
 #include "zlog.h"
 
-#include <gflags/gflags.h>
+#include "zcommandlineflags.h"
 
 #include <curl/curl.h>
 
@@ -30,10 +30,10 @@
 #include <stdexcept>
 #include <string_view>
 
-DECLARE_string(atlas_http_proxy_strategy);
-DECLARE_uint32(atlas_http_max_redirect_hops);
-DECLARE_uint32(atlas_http_max_retries);
-DECLARE_uint64(atlas_disk_cache_http_max_bytes);
+ABSL_DECLARE_FLAG(std::string, atlas_http_proxy_strategy);
+ABSL_DECLARE_FLAG(uint32_t, atlas_http_max_redirect_hops);
+ABSL_DECLARE_FLAG(uint32_t, atlas_http_max_retries);
+ABSL_DECLARE_FLAG(uint64_t, atlas_disk_cache_http_max_bytes);
 
 namespace nim {
 namespace {
@@ -216,7 +216,8 @@ std::string proxyDescription(const ZHttpProxyEndpoint& proxy)
 
 ProxyStrategy proxyStrategyFromFlag()
 {
-  std::string s = FLAGS_atlas_http_proxy_strategy;
+  std::string s = absl::GetFlag(FLAGS_atlas_http_proxy_strategy);
+  const std::string flagValue = s;
   folly::toLowerAscii(s);
   if (s.empty() || s == "auto" || s == "automatic") {
     return ProxyStrategy::Auto;
@@ -228,8 +229,7 @@ ProxyStrategy proxyStrategyFromFlag()
     return ProxyStrategy::ProxyIfAvailable;
   }
   throw ZException(
-    fmt::format("Invalid --atlas_http_proxy_strategy='{}' (expected: auto, no_proxy, proxy_if_available)",
-                FLAGS_atlas_http_proxy_strategy));
+    fmt::format("Invalid --atlas_http_proxy_strategy='{}' (expected: auto, no_proxy, proxy_if_available)", flagValue));
 }
 
 bool looksLikeTlsTrustStoreError(std::string_view message)
@@ -434,7 +434,9 @@ ZHttpGetBytesResult performCurlRequestBlocking(const ZHttpGetRequest& request,
   curl_easy_setopt(handle.get(), CURLOPT_URL, request.url.c_str());
   curl_easy_setopt(handle.get(), CURLOPT_NOSIGNAL, 1L);
   curl_easy_setopt(handle.get(), CURLOPT_FOLLOWLOCATION, 1L);
-  curl_easy_setopt(handle.get(), CURLOPT_MAXREDIRS, static_cast<long>(FLAGS_atlas_http_max_redirect_hops));
+  curl_easy_setopt(handle.get(),
+                   CURLOPT_MAXREDIRS,
+                   static_cast<long>(absl::GetFlag(FLAGS_atlas_http_max_redirect_hops)));
   curl_easy_setopt(handle.get(), CURLOPT_PROTOCOLS, CURLPROTO_HTTP | CURLPROTO_HTTPS);
   curl_easy_setopt(handle.get(), CURLOPT_REDIR_PROTOCOLS, CURLPROTO_HTTP | CURLPROTO_HTTPS);
   curl_easy_setopt(handle.get(), CURLOPT_TIMEOUT_MS, static_cast<long>(request.timeout.count()));
@@ -538,14 +540,14 @@ ZCurlHttpClient::ZCurlHttpClient()
     m_trustSourceDescription,
     m_caBundlePath.empty() ? "<default trust store>" : m_caBundlePath);
 
-  if (FLAGS_atlas_disk_cache_http_max_bytes > 0) {
+  const uint64_t diskCacheMaxBytes = absl::GetFlag(FLAGS_atlas_disk_cache_http_max_bytes);
+  if (diskCacheMaxBytes > 0) {
     const QString rootDir = atlasDiskCacheRootDirFromFlags();
-    m_diskCache = std::make_unique<ZHttpDiskCache>(rootDir, FLAGS_atlas_disk_cache_http_max_bytes);
+    m_diskCache = std::make_unique<ZHttpDiskCache>(rootDir, diskCacheMaxBytes);
     if (!m_diskCache->isEnabled()) {
       m_diskCache.reset();
     } else {
-      LOG(INFO) << "HTTP disk cache enabled: root='" << rootDir
-                << "' maxBytes=" << FLAGS_atlas_disk_cache_http_max_bytes;
+      LOG(INFO) << "HTTP disk cache enabled: root='" << rootDir << "' maxBytes=" << diskCacheMaxBytes;
     }
   }
 }
@@ -587,7 +589,7 @@ folly::coro::Task<std::optional<ZHttpGetBytesResult>> ZCurlHttpClient::getBytes(
     systemProxy = proxyResolution.endpoint;
   }
 
-  const uint32_t maxRetries = FLAGS_atlas_http_max_retries;
+  const uint32_t maxRetries = absl::GetFlag(FLAGS_atlas_http_max_retries);
   for (uint32_t attempt = 0; attempt <= maxRetries; ++attempt) {
     maybeCancel(cancellationToken);
 

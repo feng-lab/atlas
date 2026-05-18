@@ -1,9 +1,9 @@
-#include <gflags/gflags.h>
+#include "zcommandlineflags.h"
 #include <gtest/gtest.h>
 
 int main(int argc, char** argv)
 {
   ::testing::InitGoogleTest(&argc, argv);
-  gflags::ParseCommandLineFlags(&argc, &argv, true);
+  nim::parseCommandLine(argc, argv);
   return RUN_ALL_TESTS();
 }

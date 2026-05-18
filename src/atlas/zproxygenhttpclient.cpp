@@ -24,7 +24,7 @@
 #include <proxygen/lib/http/coro/client/HTTPClient.h>
 #include <proxygen/lib/utils/URL.h>
 
-#include <gflags/gflags.h>
+#include "zcommandlineflags.h"
 
 #include <QHostAddress>
 #include <QHostInfo>
@@ -38,31 +38,36 @@
 #include <memory>
 #include <stdexcept>
 
-DECLARE_uint64(atlas_disk_cache_http_max_bytes);
+ABSL_DECLARE_FLAG(uint64_t, atlas_disk_cache_http_max_bytes);
 
-DEFINE_string(atlas_http_ca_bundle, "", "Path to a PEM CA bundle for HTTPS requests (overrides auto-detect).");
+ABSL_FLAG(std::string, atlas_http_ca_bundle, "", "Path to a PEM CA bundle for HTTPS requests (overrides auto-detect).");
 
-DEFINE_string(atlas_http_proxy_strategy,
-              "auto",
-              "Outbound HTTP proxy strategy using OS system proxy settings only (no proxy URL flags). "
-              "Values: auto (alternate direct/proxy between retries), no_proxy (always direct), "
-              "proxy_if_available (always use system proxy if one exists for the URL).");
+ABSL_FLAG(std::string,
+          atlas_http_proxy_strategy,
+          "auto",
+          "Outbound HTTP proxy strategy using OS system proxy settings only (no proxy URL flags). "
+          "Values: auto (alternate direct/proxy between retries), no_proxy (always direct), "
+          "proxy_if_available (always use system proxy if one exists for the URL).");
 
-DEFINE_uint32(atlas_http_max_redirect_hops,
-              5,
-              "Maximum number of HTTP redirects to follow for a single GET request (default 5).");
+ABSL_FLAG(uint32_t,
+          atlas_http_max_redirect_hops,
+          5,
+          "Maximum number of HTTP redirects to follow for a single GET request (default 5).");
 
-DEFINE_uint32(atlas_http_max_retries,
-              7,
-              "Maximum number of retries for transient network/handshake errors in HTTP GET (default 7).");
+ABSL_FLAG(uint32_t,
+          atlas_http_max_retries,
+          7,
+          "Maximum number of retries for transient network/handshake errors in HTTP GET (default 7).");
 
-DEFINE_uint32(atlas_http_retry_backoff_initial_ms,
-              200,
-              "Initial backoff delay in milliseconds before retrying transient HTTP errors (default 200ms).");
+ABSL_FLAG(uint32_t,
+          atlas_http_retry_backoff_initial_ms,
+          200,
+          "Initial backoff delay in milliseconds before retrying transient HTTP errors (default 200ms).");
 
-DEFINE_uint32(atlas_http_retry_backoff_max_ms,
-              2000,
-              "Maximum backoff delay in milliseconds for transient HTTP error retries (default 2000ms).");
+ABSL_FLAG(uint32_t,
+          atlas_http_retry_backoff_max_ms,
+          2000,
+          "Maximum backoff delay in milliseconds for transient HTTP error retries (default 2000ms).");
 
 namespace nim {
 namespace {
@@ -311,7 +316,8 @@ constexpr ZHttpProxySupport kProxygenProxySupport{
 
 ProxyStrategy proxyStrategyFromFlag()
 {
-  std::string s = FLAGS_atlas_http_proxy_strategy;
+  std::string s = absl::GetFlag(FLAGS_atlas_http_proxy_strategy);
+  const std::string flagValue = s;
   folly::toLowerAscii(s);
   if (s.empty() || s == "auto" || s == "automatic") {
     return ProxyStrategy::Auto;
@@ -322,9 +328,8 @@ ProxyStrategy proxyStrategyFromFlag()
   if (s == "proxy_if_available" || s == "proxyifavailable" || s == "use_proxy_if_available" || s == "proxy") {
     return ProxyStrategy::ProxyIfAvailable;
   }
-  throw ZException(fmt::format(
-    "Invalid --atlas_http_proxy_strategy='{}' (expected: auto, no_proxy, proxy_if_available)",
-    FLAGS_atlas_http_proxy_strategy));
+  throw ZException(
+    fmt::format("Invalid --atlas_http_proxy_strategy='{}' (expected: auto, no_proxy, proxy_if_available)", flagValue));
 }
 
 bool isRedirectStatus(uint16_t status)
@@ -446,14 +451,14 @@ ZProxygenHttpClient::ZProxygenHttpClient()
   folly::EventBase* evb = m_eventBaseThread.getEventBase();
   CHECK(evb);
 
-  if (FLAGS_atlas_disk_cache_http_max_bytes > 0) {
+  const uint64_t diskCacheMaxBytes = absl::GetFlag(FLAGS_atlas_disk_cache_http_max_bytes);
+  if (diskCacheMaxBytes > 0) {
     const QString rootDir = atlasDiskCacheRootDirFromFlags();
-    m_diskCache = std::make_unique<ZHttpDiskCache>(rootDir, FLAGS_atlas_disk_cache_http_max_bytes);
+    m_diskCache = std::make_unique<ZHttpDiskCache>(rootDir, diskCacheMaxBytes);
     if (!m_diskCache->isEnabled()) {
       m_diskCache.reset();
     } else {
-      LOG(INFO) << "HTTP disk cache enabled: root='" << rootDir
-                << "' maxBytes=" << FLAGS_atlas_disk_cache_http_max_bytes;
+      LOG(INFO) << "HTTP disk cache enabled: root='" << rootDir << "' maxBytes=" << diskCacheMaxBytes;
     }
   }
 
@@ -556,7 +561,7 @@ folly::coro::Task<std::optional<ZHttpGetBytesResult>> ZProxygenHttpClient::getBy
     }
   }
 
-  const uint32_t maxRetries = FLAGS_atlas_http_max_retries;
+  const uint32_t maxRetries = absl::GetFlag(FLAGS_atlas_http_max_retries);
   for (uint32_t attempt = 0; attempt <= maxRetries; ++attempt) {
     maybeCancel(cancellationToken);
 
@@ -586,7 +591,7 @@ folly::coro::Task<std::optional<ZHttpGetBytesResult>> ZProxygenHttpClient::getBy
       maybeCancel(cancellationToken);
 
       std::string currentUrl = request.url;
-      const uint32_t maxRedirectHops = FLAGS_atlas_http_max_redirect_hops;
+      const uint32_t maxRedirectHops = absl::GetFlag(FLAGS_atlas_http_max_redirect_hops);
       for (uint32_t hop = 0; hop <= maxRedirectHops; ++hop) {
         maybeCancel(cancellationToken);
 

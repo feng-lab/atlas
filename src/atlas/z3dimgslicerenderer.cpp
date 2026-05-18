@@ -1,4 +1,5 @@
 #include "z3dimgslicerenderer.h"
+#include "zcommandlineflags.h"
 
 #include "z3dtexture.h"
 #include "z3drendertarget.h"
@@ -17,8 +18,8 @@
 #include <tbb/parallel_for.h>
 #include <tbb/concurrent_unordered_set.h>
 
-DECLARE_uint32(atlas_volume_rendering_maximum_round);
-DECLARE_string(atlas_vk_blockid_compaction_source);
+ABSL_DECLARE_FLAG(uint32_t, atlas_volume_rendering_maximum_round);
+ABSL_DECLARE_FLAG(std::string, atlas_vk_blockid_compaction_source);
 
 namespace nim {
 
@@ -384,7 +385,7 @@ Z3DImgSliceRenderer::recordVulkanStagesToScript(ZVulkanLinearScript& script,
   };
 
   auto blockIdExternalKind = []() -> ExternalImageUseKind {
-    const std::string v = FLAGS_atlas_vk_blockid_compaction_source;
+    const std::string v = absl::GetFlag(FLAGS_atlas_vk_blockid_compaction_source);
     if (v.empty() || v == "buffer" || v == "Buffer" || v == "BUFFER") {
       return ExternalImageUseKind::TransferSrc;
     }
@@ -588,8 +589,9 @@ double Z3DImgSliceRenderer::progressiveProgress(Z3DEye eye) const
   if (chan < 0) {
     return 1.0;
   }
-  const int totalRound = static_cast<int>(channelCount) * static_cast<int>(FLAGS_atlas_volume_rendering_maximum_round);
-  const int currentRound = chan * static_cast<int>(FLAGS_atlas_volume_rendering_maximum_round) + round;
+  const int totalRound =
+    static_cast<int>(channelCount) * static_cast<int>(absl::GetFlag(FLAGS_atlas_volume_rendering_maximum_round));
+  const int currentRound = chan * static_cast<int>(absl::GetFlag(FLAGS_atlas_volume_rendering_maximum_round)) + round;
   if (totalRound <= 0 || currentRound >= totalRound) {
     return 1.0;
   }

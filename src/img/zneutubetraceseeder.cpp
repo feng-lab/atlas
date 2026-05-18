@@ -1,4 +1,5 @@
 #include "zneutubetraceseeder.h"
+#include "zcommandlineflags.h"
 
 #include "zneutubestackfitoptions.h"
 #include "zneutubetracelocseglabel.h"
@@ -21,13 +22,15 @@
 #include <numeric>
 #include <thread>
 
-DEFINE_bool(
+ABSL_FLAG(
+  bool,
   atlas_autotrace_seed_sort_commit_by_score,
   true,
   "Whether auto-trace seed sort commits prepared seeds in descending score order. Disable to preserve the legacy "
   "original-order base-mask commit semantics for parity tests.");
 
-DEFINE_uint32(
+ABSL_FLAG(
+  uint32_t,
   atlas_autotrace_seed_sort_precompute_window_size,
   0,
   "Maximum number of seed-sort fit tasks kept in flight while preparing scores on folly's global CPU executor. "
@@ -35,10 +38,11 @@ DEFINE_uint32(
   "Higher values can improve throughput when individual seeds have uneven runtimes, but also increase queued work "
   "that may still finish after cancellation is requested.");
 
-DEFINE_bool(atlas_autotrace_seed_sort_log_cpu_executor_pool_stats,
-            true,
-            "Log folly global CPU executor pool stats during seed sort prepare progress reports. Useful for diagnosing "
-            "whether the executor is idle, saturated, or queueing work.");
+ABSL_FLAG(bool,
+          atlas_autotrace_seed_sort_log_cpu_executor_pool_stats,
+          true,
+          "Log folly global CPU executor pool stats during seed sort prepare progress reports. Useful for diagnosing "
+          "whether the executor is idle, saturated, or queueing work.");
 
 namespace nim {
 
@@ -91,10 +95,9 @@ void configureSeedSortFitWorkspace(TraceWorkspace& tw)
   return std::max<size_t>(1, fallback);
 }
 
-[[nodiscard]] size_t seedSortMaxInFlight()
+[[nodiscard]] size_t seedSortMaxInFlight(size_t requested)
 {
   const size_t concurrencyFloor = globalCpuExecutorThreadCountOrFallback() * 8;
-  const size_t requested = static_cast<size_t>(FLAGS_atlas_autotrace_seed_sort_precompute_window_size);
   if (requested == 0) {
     return concurrencyFloor;
   }
@@ -122,6 +125,7 @@ prepareSeedSortEntryAsync(const Geo3dScalarField& seeds,
                           size_t depth,
                           size_t plane,
                           folly::ThreadPoolExecutor* cpuThreadPool,
+                          bool logCpuExecutorPoolStats,
                           std::atomic<size_t>& preparedCount)
 {
   const folly::CancellationToken cancellationToken = co_await folly::coro::co_current_cancellation_token;
@@ -130,7 +134,7 @@ prepareSeedSortEntryAsync(const Geo3dScalarField& seeds,
   auto progressGuard = folly::makeGuard([&]() {
     const size_t done = preparedCount.fetch_add(1, std::memory_order_relaxed) + 1;
     if (VLOG_IS_ON(1) && (((done % SeedSortProgressReportEvery) == 0) || done == seeds.size())) {
-      if (FLAGS_atlas_autotrace_seed_sort_log_cpu_executor_pool_stats && cpuThreadPool != nullptr) {
+      if (logCpuExecutorPoolStats && cpuThreadPool != nullptr) {
         const auto poolStats = cpuThreadPool->getPoolStats();
         VLOG(1) << fmt::format("Seed sort prepare: {}/{} (pending/total tasks={}/{}, active/idle threads={}/{})",
                                done,
@@ -208,14 +212,16 @@ sortSeedsLegacyLike(const Geo3dScalarField& seeds, const ZImg& signal, double zT
   configureSeedSortFitWorkspace(tw);
   maybeCancel(tw.cancellationToken);
 
+  const uint32_t requestedPrecomputeWindow = absl::GetFlag(FLAGS_atlas_autotrace_seed_sort_precompute_window_size);
+  const bool commitByScore = absl::GetFlag(FLAGS_atlas_autotrace_seed_sort_commit_by_score);
   VLOG(1) << fmt::format("Seed sort: start (seeds={}, minScore={})", seeds.size(), tw.minScore);
   VLOG(1) << fmt::format(
     "Seed sort: global CPU executor threads={}, requested prepare window={}, max in-flight prepare "
     "tasks={}, commit order={}",
     globalCpuExecutorThreadCountOrFallback(),
-    FLAGS_atlas_autotrace_seed_sort_precompute_window_size,
-    seedSortMaxInFlight(),
-    FLAGS_atlas_autotrace_seed_sort_commit_by_score ? "score" : "legacy");
+    requestedPrecomputeWindow,
+    seedSortMaxInFlight(requestedPrecomputeWindow),
+    commitByScore ? "score" : "legacy");
 
   SeedSortResultLegacyLike out;
   out.locsegArray.resize(seeds.size());
@@ -229,13 +235,13 @@ sortSeedsLegacyLike(const Geo3dScalarField& seeds, const ZImg& signal, double zT
 
   auto* baseMaskData = out.baseMask.timeData<uint8_t>(0);
 
-  const bool commitByScore = FLAGS_atlas_autotrace_seed_sort_commit_by_score;
   bool haveLastCommittedFitWorkspace = false;
   LocsegFitWorkspace lastCommittedFitWorkspace = tw.fitWorkspace;
 
   auto cpuExecutor = folly::getGlobalCPUExecutor();
   auto* cpuThreadPool = dynamic_cast<folly::ThreadPoolExecutor*>(cpuExecutor.get());
-  const size_t maxInFlight = seedSortMaxInFlight();
+  const size_t maxInFlight = seedSortMaxInFlight(requestedPrecomputeWindow);
+  const bool logCpuExecutorPoolStats = absl::GetFlag(FLAGS_atlas_autotrace_seed_sort_log_cpu_executor_pool_stats);
   std::atomic<size_t> preparedCount{0};
 
   std::vector<folly::coro::TaskWithExecutor<PreparedSeedSortEntry>> prepareTasks;
@@ -253,6 +259,7 @@ sortSeedsLegacyLike(const Geo3dScalarField& seeds, const ZImg& signal, double zT
                                                                                   depth,
                                                                                   plane,
                                                                                   cpuThreadPool,
+                                                                                  logCpuExecutorPoolStats,
                                                                                   preparedCount)));
   }
 

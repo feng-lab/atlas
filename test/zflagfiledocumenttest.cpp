@@ -2,7 +2,7 @@
 
 #include "zlog.h"
 
-#include <gflags/gflags.h>
+#include "zcommandlineflags.h"
 #include <gtest/gtest.h>
 
 #include <QDir>
@@ -135,13 +135,13 @@ TEST(ZFlagSettingsRegistry, ExposesOnlyAvailableFlagsForThisBuild)
   EXPECT_EQ(atlasFindFlagSettingSpec(QStringLiteral("zimg_use_fftw_for_fft_if_available")), nullptr);
   EXPECT_FALSE(atlasManagedFlagNames().contains(QStringLiteral("zimg_use_fftw_for_fft_if_available")));
 
-  gflags::CommandLineFlagInfo info;
+  ZCommandLineFlagInfo info;
   for (const auto& spec : atlasFlagSettingSpecs()) {
     const QByteArray flagName = spec.name.toUtf8();
-    EXPECT_TRUE(gflags::GetCommandLineFlagInfo(flagName.constData(), &info)) << flagName.constData();
+    EXPECT_TRUE(getCommandLineFlagInfo(flagName.constData(), &info)) << flagName.constData();
   }
 
-  const bool hasLlfioFlag = gflags::GetCommandLineFlagInfo("zimg_llfio_mapped_file_handle_flags", &info);
+  const bool hasLlfioFlag = commandLineFlagExists("zimg_llfio_mapped_file_handle_flags");
   EXPECT_EQ(atlasManagedFlagNames().contains(QStringLiteral("zimg_llfio_mapped_file_handle_flags")), hasLlfioFlag);
 }
 

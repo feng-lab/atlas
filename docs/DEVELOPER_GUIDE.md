@@ -126,9 +126,8 @@ Background Tasks and Cancellation
     background-task prompt, and shutdown drain so the main window does not need direct
     task-manager logic.
 - Atlas-owned user-facing background jobs default to `nim::getAtlasBackgroundExecutor()`, a dedicated `folly::CPUThreadPoolExecutor`
-  that uses the same thread-count policy as Folly's immutable global CPU executor (`FLAGS_folly_global_cpu_executor_threads`,
-  else `folly::hardware_concurrency()`), but keeps Atlas background work isolated from unrelated uses of
-  `folly::getGlobalCPUExecutor()`.
+  sized from `folly::available_concurrency()` with a one-worker minimum, keeping Atlas background work isolated from unrelated
+  uses of `folly::getGlobalCPUExecutor()`.
   - Trade-off: this isolation means Atlas' background pool can coexist with Folly's immutable global CPU executor, so CPU-bound workloads may run with more total worker threads in the process than before. Use the Atlas pool for user-facing/background-job isolation.
 - Cancellation is threaded through tracing code using `folly::CancellationToken` and checked at safe points (see `maybeCancel(...)` in
   `src/img/zcancellation.*` and the tracing loops in `src/img/zneutubetrace*.cpp`).
@@ -305,7 +304,7 @@ Testing (Linking Atlas Code)
 - GPU/UI-heavy tests should be gated/opt-in and prefer offscreen surfaces or SwiftShader where available.
 - Neuroglancer precomputed E2E tests:
   - `test/zneuroglancerprecomputede2etest.cpp` is a networked smoke test (public GCS URLs) gated by `ATLAS_ENABLE_NETWORK_TESTS=1`.
-  - The same test file exercises both HTTP backends. Atlas test binaries use `GTest::gtest_main` rather than the app main, so backend selection is set inside the test with gflags instead of relying on test-binary command-line flag parsing.
+  - The same test file exercises both HTTP backends. Atlas test binaries use `GTest::gtest_main` rather than the app main, so backend selection is set inside the test with Abseil flags instead of relying on test-binary command-line flag parsing.
 Agents: Preview Screenshots
 
 - The Python agent tools expose a headless preview renderer for 3D animation verification.
@@ -596,7 +595,7 @@ Vulkan Notes
   - By default, the broker budget comes from `VK_EXT_memory_budget` (queried via VMA) when available; otherwise eviction is driven by allocation failures. Pre-allocation reclaim targets the projected over-budget bytes plus a small bounded hysteresis margin. Managed textures only pre-reclaim when a residency transition will actually allocate/recreate a `VkImage`; lookup of an already-resident texture must not perturb the broker. Host-visible readback/staging and transient-upload allocations remain broker-accounted and reclaimable, but normal pre-allocation budget walks skip them so small transfer buffers do not evict sampled images before every upload/download; allocation-failure retry still invokes the broker.
   - Upload and readback staging use separate VMA pools because their CPU access patterns differ. Upload staging uses host-visible coherent memory for CPU writes into GPU transfer sources. Readback staging prefers host-visible coherent cached memory for CPU reads after the submission fence signals, and falls back to coherent-only memory on devices that do not expose a cached coherent host type.
   - Immediate texture uploads reuse a device-owned upload staging buffer. `executeImmediate()` waits for its transfer fence before returning, so dense texture restores can copy through one grow-only staging allocation instead of creating a large VMA buffer for every restored channel.
-  - Budget controls (gflags): `--atlas_vk_residency_budget_bytes`, `--atlas_vk_residency_budget_ratio`, and `--atlas_vk_residency_budget_reserve_bytes`. Leaving all three at defaults keeps the device-reported budget as a reclaim signal. Setting any explicit cap/reserve/reduced ratio turns the effective budget into a strict limit for Atlas-owned explicit device-local VMA allocations. Under Vulkan, paged-image cache sizing uses `min(physical_vram, effective_broker_budget)` so the cache texture tier is chosen from the usable device-local budget, but backend-neutral image fit/downsampling decisions still use the physical device limit. Allocation and re-residency paths reclaim first; if VMA device-local usage would still exceed the effective budget, Atlas throws a clear `ZException` with memory-by-class and memory-by-label diagnostics instead of allocating past the cap. Strict mode also checks the scratch pass working set before recording; if a single pass hot set (for example one full-resolution DDP bundle) is larger than `--atlas_vk_residency_budget_bytes=1GiB`, the export must fail just like it would on a real 1 GiB VRAM device unless the render plan is changed to use less simultaneous device-local memory. Driver/internal Vulkan allocations outside VMA are not directly controllable by Atlas, so the cap is a hard limit for Atlas-owned device-local resources rather than a promise about every byte the driver may reserve internally. Optional Vulkan GPU timestamp writes are disabled in strict mode because they are instrumentation and may allocate driver-private query backing outside the residency broker.
+  - Budget controls (Abseil flags): `--atlas_vk_residency_budget_bytes`, `--atlas_vk_residency_budget_ratio`, and `--atlas_vk_residency_budget_reserve_bytes`. Leaving all three at defaults keeps the device-reported budget as a reclaim signal. Setting any explicit cap/reserve/reduced ratio turns the effective budget into a strict limit for Atlas-owned explicit device-local VMA allocations. Under Vulkan, paged-image cache sizing uses `min(physical_vram, effective_broker_budget)` so the cache texture tier is chosen from the usable device-local budget, but backend-neutral image fit/downsampling decisions still use the physical device limit. Allocation and re-residency paths reclaim first; if VMA device-local usage would still exceed the effective budget, Atlas throws a clear `ZException` with memory-by-class and memory-by-label diagnostics instead of allocating past the cap. Strict mode also checks the scratch pass working set before recording; if a single pass hot set (for example one full-resolution DDP bundle) is larger than `--atlas_vk_residency_budget_bytes=1GiB`, the export must fail just like it would on a real 1 GiB VRAM device unless the render plan is changed to use less simultaneous device-local memory. Driver/internal Vulkan allocations outside VMA are not directly controllable by Atlas, so the cap is a hard limit for Atlas-owned device-local resources rather than a promise about every byte the driver may reserve internally. Optional Vulkan GPU timestamp writes are disabled in strict mode because they are instrumentation and may allocate driver-private query backing outside the residency broker.
   - Allocation-failure logs include the request class, requested bytes, VMA usage/budget, broker memory grouped by class, and provider/managed-resource labels. Keep new large Vulkan allocation owners behind broker providers instead of adding one-off local retry loops.
 
 Vulkan Pipeline Invariants
@@ -618,7 +617,7 @@ Vulkan Pipeline Invariants
   - Renderers should own a lazy segmentation plan per active backend capability set. The canonical source data stays untouched; backend switch invalidates only the derived plan and rebuilds it on first use for the new backend.
   - The common case must stay on a pass-through fast path: if no physical split is required and the full payload already fits one batch, renderers should keep using the original source vectors directly and emit exactly one segment with ordinal `0`.
   - Physical mesh splitting and batch packing are one renderer-owned policy. The normal mesh target is a preferred triangle budget chosen for throughput/UX; if a single mesh unit is too large, split it once into preferred mesh units first, then pack those units into one or more `RenderBatch` segments toward that preferred budget.
-  - Preferred segment budgets are user-tunable gflags/settings. Current knobs are:
+  - Preferred segment budgets are user-tunable Abseil flags/settings. Current knobs are:
     - `--atlas_mesh_preferred_triangle_budget_per_segment`
     - `--atlas_sphere_preferred_instance_budget_per_segment`
     - `--atlas_cone_preferred_instance_budget_per_segment`
@@ -650,7 +649,7 @@ Performance Instrumentation
 
 - Aggregated frame timing: the rendering engine emits a monotonically increasing token per user‑visible frame (one engine‑driven filter pipeline evaluation). The Vulkan backend tags each submission with this token and a submission index.
 - Per‑submission CPU and GPU scopes are ingested and a single summary is logged once a token is safe to flush (typically on the next submission, after fences signal). Summaries appear at `VLOG(1)`.
-- Modes (gflags):
+- Modes (Abseil flags):
   - `--atlas_perf_mode=off|light|full` (default `light`). `full` adds nested per‑filter GPU scopes inside compositor passes.
   - `--atlas_perf_trace=/path/to/trace.json` writes a Chrome trace file for each flushed frame (overwrites).
 
@@ -952,7 +951,7 @@ Canvas and Lifecycle
 
 Logging
 
-- Uses glog: `LOG`, `VLOG`, `LOG_FIRST_N`, `LOG_EVERY_N`.
+- Uses Abseil logging: `LOG`, `VLOG`, and `CHECK`.
 - Notable info logs:
   - “3D scene parameters applied” — deferred scene apply queue drained.
   - “3D animation parameters bound” — first animation binding completed.
@@ -978,7 +977,7 @@ Renderer Base surface logs (vlog(1))
 
 Runtime Flags and Config Flagfile
 
-- Atlas supports runtime configuration via a gflags-compatible flagfile. At startup, if present in the user config directory, Atlas reads `user_settings_flagfile.txt` and applies the flags for that session.
+- Atlas supports runtime configuration via an Abseil flagfile. At startup, if present in the user config directory, Atlas reads `user_settings_flagfile.txt` and applies the flags for that session.
 - Atlas now generates and edits that file through the UI instead of shipping a static template:
   - Edit → Settings... opens the structured editor for the curated user-facing flag subset.
     On macOS, the action uses Qt's preferences role and may be moved into the standard application menu.
@@ -990,7 +989,7 @@ Runtime Flags and Config Flagfile
   - `src/atlas/zflagsettingsregistry.cpp` defines the curated GUI-visible subset of flags, category ordering, and editor choices.
   - `src/atlas/zflagfiledocument.cpp` loads the current flagfile, tracks duplicate managed flags, preserves the manual block, and writes the normalized managed section back atomically.
   - `src/atlas/zflagsettingsdialog.cpp` builds the GUI. It uses `ZBoolParameter` and `ZStringParameter` for ordinary checkbox/text fields, and custom combo boxes for finite-choice flags so invalid saved values can still be surfaced to the user instead of silently normalized.
-- File format is standard gflags:
+- File format is standard Abseil flagfile syntax:
   - One flag per line, `--name=value`.
   - `#` begins a comment; blank lines are allowed.
   - Booleans use `true/false`; numeric flags use integers or decimals as appropriate.
@@ -1000,9 +999,9 @@ Runtime Flags and Config Flagfile
 Adding or updating flags for users
 
 - Prefer exposing options that are safe to tweak without recompiling: performance limits, memory sizing, debug toggles, rendering heuristics that don’t alter file formats or scene serialization.
-- When you add a new gflag intended for users:
+- When you add a new Abseil flag intended for users:
   - Define the flag in code with a sensible default and a clear description.
-  - Add a curated entry to `src/atlas/zflagsettingsregistry.cpp` with a clear label, category, and editor type. The GUI uses gflags reflection for compiled defaults and descriptions, so do not duplicate those values elsewhere.
+  - Add a curated entry to `src/atlas/zflagsettingsregistry.cpp` with a clear label, category, and editor type. The GUI uses Abseil flag reflection for compiled defaults and descriptions, so do not duplicate those values elsewhere.
   - Keep naming consistent with existing prefixes: `atlas_*` for app/platform/runtime behavior, `zimg_*` for image/FFT stack, `atlas_debug_vulkan` for Vulkan.
   - Group related flags and avoid leaking internal or unsafe toggles (e.g., experimental invariants, crash-on-warning). If a flag is debug-only, make that clear in its comment.
   - Update documentation: briefly mention new user-togglable flags in `docs/USER_GUIDE.md` (configuration section) if they are likely useful to end users.
@@ -1028,7 +1027,7 @@ Render Batch Contract
 Debug/Release Builds
 
 - Define `ATLAS_DEBUG_VERSION` at compile time to enable extra diagnostics for invalidation attribution.
-- Run with `--v=1` (or set env `GLOG_v=1`) to see `VLOG` output.
+- Run with `--v=1` to see `VLOG` output.
 
 Adding a New 3D Object View
 

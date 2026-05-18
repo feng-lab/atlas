@@ -3,7 +3,7 @@
 #include "zdiskcacheutils.h"
 #include "zlog.h"
 
-#include <gflags/gflags.h>
+#include "zcommandlineflags.h"
 
 #include <QDir>
 #include <QFile>
@@ -18,11 +18,11 @@
 #include <string_view>
 #include <vector>
 
-DECLARE_uint64(atlas_disk_cache_sqlite_reader_cache_bytes);
-DECLARE_uint64(atlas_disk_cache_sqlite_writer_cache_bytes);
-DECLARE_uint64(atlas_disk_cache_sqlite_mmap_bytes);
-DECLARE_int64(atlas_disk_cache_sqlite_journal_size_limit_bytes);
-DECLARE_uint64(atlas_disk_cache_sqlite_page_size);
+ABSL_DECLARE_FLAG(uint64_t, atlas_disk_cache_sqlite_reader_cache_bytes);
+ABSL_DECLARE_FLAG(uint64_t, atlas_disk_cache_sqlite_writer_cache_bytes);
+ABSL_DECLARE_FLAG(uint64_t, atlas_disk_cache_sqlite_mmap_bytes);
+ABSL_DECLARE_FLAG(int64_t, atlas_disk_cache_sqlite_journal_size_limit_bytes);
+ABSL_DECLARE_FLAG(uint64_t, atlas_disk_cache_sqlite_page_size);
 
 namespace nim {
 
@@ -72,7 +72,7 @@ void resetStmt(sqlite3_stmt* stmt)
 
 [[nodiscard]] std::optional<int64_t> sqliteMmapBytes()
 {
-  const uint64_t mmapBytes = FLAGS_atlas_disk_cache_sqlite_mmap_bytes;
+  const uint64_t mmapBytes = absl::GetFlag(FLAGS_atlas_disk_cache_sqlite_mmap_bytes);
   if (mmapBytes > static_cast<uint64_t>(std::numeric_limits<int64_t>::max())) {
     LOG(WARNING) << "Ignoring atlas_disk_cache_sqlite_mmap_bytes=" << mmapBytes
                  << " because it exceeds SQLite's signed 64-bit PRAGMA range";
@@ -83,7 +83,7 @@ void resetStmt(sqlite3_stmt* stmt)
 
 [[nodiscard]] std::optional<int64_t> sqliteJournalSizeLimitBytes()
 {
-  const int64_t limitBytes = FLAGS_atlas_disk_cache_sqlite_journal_size_limit_bytes;
+  const int64_t limitBytes = absl::GetFlag(FLAGS_atlas_disk_cache_sqlite_journal_size_limit_bytes);
   if (limitBytes < -1) {
     LOG(WARNING) << "Ignoring atlas_disk_cache_sqlite_journal_size_limit_bytes=" << limitBytes
                  << " because valid values are -1 or >= 0";
@@ -94,7 +94,7 @@ void resetStmt(sqlite3_stmt* stmt)
 
 [[nodiscard]] std::optional<int64_t> sqliteFreshDbPageSizeBytes()
 {
-  const uint64_t pageSizeBytes = FLAGS_atlas_disk_cache_sqlite_page_size;
+  const uint64_t pageSizeBytes = absl::GetFlag(FLAGS_atlas_disk_cache_sqlite_page_size);
   if (pageSizeBytes == 0) {
     return std::nullopt;
   }
@@ -522,7 +522,8 @@ bool ZSqliteLRUCache::initDbLocked()
   if (m_readOnly) {
     // Read connections must not attempt schema creation, but can still apply
     // connection-local read tuning.
-    if (const auto cacheKiB = sqliteCacheSizeKiBFromBytes(FLAGS_atlas_disk_cache_sqlite_reader_cache_bytes);
+    if (const auto cacheKiB =
+          sqliteCacheSizeKiBFromBytes(absl::GetFlag(FLAGS_atlas_disk_cache_sqlite_reader_cache_bytes));
         cacheKiB.has_value()) {
       (void)execLocked(fmt::format("PRAGMA cache_size=-{}", *cacheKiB).c_str());
     }
@@ -552,7 +553,8 @@ bool ZSqliteLRUCache::initDbLocked()
   (void)execLocked("PRAGMA journal_mode=WAL");
   (void)execLocked("PRAGMA synchronous=NORMAL");
   (void)execLocked("PRAGMA temp_store=MEMORY");
-  if (const auto cacheKiB = sqliteCacheSizeKiBFromBytes(FLAGS_atlas_disk_cache_sqlite_writer_cache_bytes);
+  if (const auto cacheKiB =
+        sqliteCacheSizeKiBFromBytes(absl::GetFlag(FLAGS_atlas_disk_cache_sqlite_writer_cache_bytes));
       cacheKiB.has_value()) {
     (void)execLocked(fmt::format("PRAGMA cache_size=-{}", *cacheKiB).c_str());
   }

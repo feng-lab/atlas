@@ -7,7 +7,7 @@
 #include "zsqlitediskcachebucket.h"
 #include "zstructutils.h"
 
-#include <gflags/gflags.h>
+#include "zcommandlineflags.h"
 
 #include <boost/hash2/sha2.hpp>
 
@@ -22,8 +22,8 @@
 #include <span>
 #include <utility>
 
-DECLARE_uint64(atlas_disk_cache_imgpreview_max_bytes);
-DECLARE_uint64(atlas_disk_cache_imgpreview_async_max_pending_bytes);
+ABSL_DECLARE_FLAG(uint64_t, atlas_disk_cache_imgpreview_max_bytes);
+ABSL_DECLARE_FLAG(uint64_t, atlas_disk_cache_imgpreview_async_max_pending_bytes);
 
 namespace nim {
 
@@ -129,7 +129,7 @@ ZImgPreviewDiskCache& ZImgPreviewDiskCache::instance()
 ZImgPreviewDiskCache::ZImgPreviewDiskCache()
   : m_impl(std::make_unique<Impl>())
 {
-  const uint64_t maxBytes = FLAGS_atlas_disk_cache_imgpreview_max_bytes;
+  const uint64_t maxBytes = absl::GetFlag(FLAGS_atlas_disk_cache_imgpreview_max_bytes);
   if (maxBytes == 0) {
     return;
   }
@@ -140,11 +140,12 @@ ZImgPreviewDiskCache::ZImgPreviewDiskCache()
     return;
   }
 
-  auto bucket = std::make_unique<ZSqliteDiskCacheBucket>(rootDir,
-                                                         QString::fromLatin1(kImgPreviewDiskCacheDbName),
-                                                         maxBytes,
-                                                         FLAGS_atlas_disk_cache_imgpreview_async_max_pending_bytes,
-                                                         QStringLiteral("imgpreview_disk_cache"));
+  auto bucket =
+    std::make_unique<ZSqliteDiskCacheBucket>(rootDir,
+                                             QString::fromLatin1(kImgPreviewDiskCacheDbName),
+                                             maxBytes,
+                                             absl::GetFlag(FLAGS_atlas_disk_cache_imgpreview_async_max_pending_bytes),
+                                             QStringLiteral("imgpreview_disk_cache"));
   if (!bucket || !bucket->isEnabled()) {
     return;
   }

@@ -13,30 +13,32 @@
 #include "zcancellation.h"
 #include "zlog.h"
 
-#include <gflags/gflags.h>
+#include "zcommandlineflags.h"
 
 #include <array>
 #include <cmath>
 
-DECLARE_bool(atlas_trace_use_swc_geometry_mask);
-DECLARE_bool(atlas_autotrace_use_swc_geometry_mask);
+ABSL_DECLARE_FLAG(bool, atlas_trace_use_swc_geometry_mask);
+ABSL_DECLARE_FLAG(bool, atlas_autotrace_use_swc_geometry_mask);
 
-DEFINE_double(atlas_trace_mask_exclusion_swell_ratio,
-              1.5,
-              "Trace-mask exclusion envelope swelling ratio applied when updating the traced-region mask during "
-              "seeded/auto tracing. This affects both dense trace-mask labeling and the SWC-geometry mask index. "
-              "Increase to be more aggressive (fewer redundant traces, potentially less complete tracing).");
+ABSL_FLAG(double,
+          atlas_trace_mask_exclusion_swell_ratio,
+          1.5,
+          "Trace-mask exclusion envelope swelling ratio applied when updating the traced-region mask during "
+          "seeded/auto tracing. This affects both dense trace-mask labeling and the SWC-geometry mask index. "
+          "Increase to be more aggressive (fewer redundant traces, potentially less complete tracing).");
 
-DEFINE_double(
-  atlas_trace_mask_exclusion_swell_diff,
-  0.0,
-  "Trace-mask exclusion envelope swelling additive term applied when updating the traced-region mask during "
-  "seeded/auto tracing. This affects both dense trace-mask labeling and the SWC-geometry mask index.");
+ABSL_FLAG(double,
+          atlas_trace_mask_exclusion_swell_diff,
+          0.0,
+          "Trace-mask exclusion envelope swelling additive term applied when updating the traced-region mask during "
+          "seeded/auto tracing. This affects both dense trace-mask labeling and the SWC-geometry mask index.");
 
-DEFINE_double(atlas_trace_mask_exclusion_swell_limit,
-              3.0,
-              "Trace-mask exclusion envelope swelling limit (cap) applied when updating the traced-region mask during "
-              "seeded/auto tracing. This affects both dense trace-mask labeling and the SWC-geometry mask index.");
+ABSL_FLAG(double,
+          atlas_trace_mask_exclusion_swell_limit,
+          3.0,
+          "Trace-mask exclusion envelope swelling limit (cap) applied when updating the traced-region mask during "
+          "seeded/auto tracing. This affects both dense trace-mask labeling and the SWC-geometry mask index.");
 
 namespace nim {
 
@@ -71,9 +73,9 @@ ensureSpatialTraceMaskVolumeLegacyLike(TraceWorkspace& tw, const ZImg& signal, d
 
 void insertChainIntoSpatialIndexLegacyLike(const LocsegChain& chain, ZSwcSpatialIndex& index, double zToXYRatio)
 {
-  const double swellRatio = FLAGS_atlas_trace_mask_exclusion_swell_ratio;
-  const double swellDiff = FLAGS_atlas_trace_mask_exclusion_swell_diff;
-  const double swellLimit = FLAGS_atlas_trace_mask_exclusion_swell_limit;
+  const double swellRatio = absl::GetFlag(FLAGS_atlas_trace_mask_exclusion_swell_ratio);
+  const double swellDiff = absl::GetFlag(FLAGS_atlas_trace_mask_exclusion_swell_diff);
+  const double swellLimit = absl::GetFlag(FLAGS_atlas_trace_mask_exclusion_swell_limit);
   CHECK(std::isfinite(swellRatio));
   CHECK(std::isfinite(swellDiff));
   CHECK(std::isfinite(swellLimit));
@@ -132,8 +134,8 @@ traceAllSeedsLegacyLike(const ZImg& signal,
 
   // Ensure trace mask exists if we're updating it (legacy allocates it lazily here).
   if (tw.traceMaskUpdating) {
-    const bool useGeometryTraceMask =
-      FLAGS_atlas_trace_use_swc_geometry_mask && FLAGS_atlas_autotrace_use_swc_geometry_mask;
+    const bool useGeometryTraceMask = absl::GetFlag(FLAGS_atlas_trace_use_swc_geometry_mask) &&
+                                      absl::GetFlag(FLAGS_atlas_autotrace_use_swc_geometry_mask);
     if (useGeometryTraceMask) {
       spatialTraceMaskIndex = ensureSpatialTraceMaskVolumeLegacyLike(tw, signal, zToXYRatio);
     } else {
@@ -165,6 +167,9 @@ traceAllSeedsLegacyLike(const ZImg& signal,
   };
 
   TraceAllSeedsStats stats;
+  const double maskExclusionSwellRatio = absl::GetFlag(FLAGS_atlas_trace_mask_exclusion_swell_ratio);
+  const double maskExclusionSwellDiff = absl::GetFlag(FLAGS_atlas_trace_mask_exclusion_swell_diff);
+  const double maskExclusionSwellLimit = absl::GetFlag(FLAGS_atlas_trace_mask_exclusion_swell_limit);
 
   for (int i = nseed - 1; i >= 0; --i) {
     maybeCancel(tw.cancellationToken);
@@ -261,9 +266,9 @@ traceAllSeedsLegacyLike(const ZImg& signal,
       }
 
       if (tw.traceMask) {
-        labelWs.sratio = FLAGS_atlas_trace_mask_exclusion_swell_ratio;
-        labelWs.sdiff = FLAGS_atlas_trace_mask_exclusion_swell_diff;
-        labelWs.slimit = FLAGS_atlas_trace_mask_exclusion_swell_limit;
+        labelWs.sratio = maskExclusionSwellRatio;
+        labelWs.sdiff = maskExclusionSwellDiff;
+        labelWs.slimit = maskExclusionSwellLimit;
         labelWs.option = 1;
         // Atlas uses a binary "already traced" mask (0/1). The migrated algorithm only checks mask voxels as
         // a boolean (>0), so a constant value is sufficient and avoids uint8 overflow edge cases.

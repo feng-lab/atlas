@@ -6,9 +6,17 @@
 #include "z3dtexture.h"
 #include "zlog.h"
 
-#include <gflags/gflags.h>
+#include "zcommandlineflags.h"
 
 #include <utility>
+
+ABSL_FLAG(
+  uint64_t,
+  atlas_line_preferred_segment_budget_per_segment,
+  1000000,
+  "Preferred logical line-segment budget for one renderer-owned segment. The default matches the historical "
+  "wide-line batching policy of 4,000,000 expanded vertices (1,000,000 actual segments); backends still enforce "
+  "maxMonolithicGeometryStreamBytes as a hard safety guard.");
 
 namespace nim {
 
@@ -18,13 +26,6 @@ constexpr size_t kWideLineVerticesPerSegment = 4;
 constexpr size_t kWideLineIndicesPerSegment = 6;
 
 } // namespace
-
-DEFINE_uint64(
-  atlas_line_preferred_segment_budget_per_segment,
-  1000000,
-  "Preferred logical line-segment budget for one renderer-owned segment. The default matches the historical "
-  "wide-line batching policy of 4,000,000 expanded vertices (1,000,000 actual segments); backends still enforce "
-  "maxMonolithicGeometryStreamBytes as a hard safety guard.");
 
 Z3DLineRenderer::Z3DLineRenderer(Z3DRendererBase& rendererBase)
   : Z3DPrimitiveRenderer(rendererBase)
@@ -937,7 +938,7 @@ void Z3DLineRenderer::enqueueRenderBatches(Z3DEye eye, RenderBackend backend, bo
   CHECK(renderBackend != nullptr) << "Line segmentation requires an active backend";
   const size_t maxStreamBytes = renderBackend->maxMonolithicGeometryStreamBytes();
   const size_t preferredSegmentBudget =
-    std::max<size_t>(1, static_cast<size_t>(FLAGS_atlas_line_preferred_segment_budget_per_segment));
+    std::max<size_t>(1, static_cast<size_t>(absl::GetFlag(FLAGS_atlas_line_preferred_segment_budget_per_segment)));
   const size_t totalSegmentCount =
     m_isLineStrip ? (m_linePositions.size() > 1 ? (m_linePositions.size() - 1) : 0u) : (m_linePositions.size() / 2);
 
@@ -992,7 +993,7 @@ void Z3DLineRenderer::enqueueRenderBatches(Z3DEye eye, RenderBackend backend, bo
 void Z3DLineRenderer::renderSmooth(Z3DEye eye)
 {
   const size_t batchVertexBudget =
-    std::max<size_t>(1, static_cast<size_t>(FLAGS_atlas_line_preferred_segment_budget_per_segment)) *
+    std::max<size_t>(1, static_cast<size_t>(absl::GetFlag(FLAGS_atlas_line_preferred_segment_budget_per_segment))) *
     kWideLineVerticesPerSegment;
   updateLineWidth();
 
@@ -1186,7 +1187,7 @@ void Z3DLineRenderer::renderSmooth(Z3DEye eye)
 void Z3DLineRenderer::renderSmoothPicking(Z3DEye eye)
 {
   const size_t batchVertexBudget =
-    std::max<size_t>(1, static_cast<size_t>(FLAGS_atlas_line_preferred_segment_budget_per_segment)) *
+    std::max<size_t>(1, static_cast<size_t>(absl::GetFlag(FLAGS_atlas_line_preferred_segment_budget_per_segment))) *
     kWideLineVerticesPerSegment;
   updateLineWidth();
 

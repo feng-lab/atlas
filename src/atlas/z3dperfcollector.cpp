@@ -1,7 +1,7 @@
 ﻿#include "z3dperfcollector.h"
 
 #include "zlog.h"
-#include <gflags/gflags.h>
+#include "zcommandlineflags.h"
 
 #include <algorithm>
 #include <fstream>
@@ -10,19 +10,23 @@
 #include <unordered_map>
 #include "zjson.h"
 
-DEFINE_string(atlas_perf_mode, "light", "Perf mode: off|light|full");
-DEFINE_string(atlas_perf_trace,
-              "",
-              "If non-empty, write Chrome trace JSON for each flushed frame to this path (overwrites)");
-DEFINE_string(atlas_perf_trace_append,
-              "",
-              "If non-empty, append this frame's Chrome trace events into the given file (accumulates frames)");
-DEFINE_string(atlas_perf_summary,
-              "",
-              "Summary export. Format 'csv:path' or 'json:path'. Appends per-frame totals, top labels, and stats");
-DEFINE_bool(atlas_perf_trace_calibrated,
-            false,
-            "If true and supported, align GPU events to CPU time axis in trace output (best-effort)");
+ABSL_FLAG(std::string, atlas_perf_mode, "light", "Perf mode: off|light|full");
+ABSL_FLAG(std::string,
+          atlas_perf_trace,
+          "",
+          "If non-empty, write Chrome trace JSON for each flushed frame to this path (overwrites)");
+ABSL_FLAG(std::string,
+          atlas_perf_trace_append,
+          "",
+          "If non-empty, append this frame's Chrome trace events into the given file (accumulates frames)");
+ABSL_FLAG(std::string,
+          atlas_perf_summary,
+          "",
+          "Summary export. Format 'csv:path' or 'json:path'. Appends per-frame totals, top labels, and stats");
+ABSL_FLAG(bool,
+          atlas_perf_trace_calibrated,
+          false,
+          "If true and supported, align GPU events to CPU time axis in trace output (best-effort)");
 
 namespace nim {
 
@@ -343,7 +347,9 @@ void Z3DPerfCollector::flush(uint64_t token)
   }
 
   // Optional: emit a Chrome trace JSON for this frame
-  if (!FLAGS_atlas_perf_trace.empty()) {
+  const bool traceCalibrated = absl::GetFlag(FLAGS_atlas_perf_trace_calibrated);
+  const std::string tracePath = absl::GetFlag(FLAGS_atlas_perf_trace);
+  if (!tracePath.empty()) {
     struct Ev
     {
       std::string name;
@@ -353,7 +359,7 @@ void Z3DPerfCollector::flush(uint64_t token)
     };
 
     std::vector<Ev> events;
-    bool calibrated = FLAGS_atlas_perf_trace_calibrated;
+    bool calibrated = traceCalibrated;
     double minGpuTs = std::numeric_limits<double>::infinity();
     if (calibrated) {
       for (const auto& sub : td.submissions) {
@@ -400,7 +406,7 @@ void Z3DPerfCollector::flush(uint64_t token)
     }
 
     try {
-      std::ofstream ofs(FLAGS_atlas_perf_trace, std::ios::out | std::ios::trunc);
+      std::ofstream ofs(tracePath, std::ios::out | std::ios::trunc);
       ofs << "{\n\"traceEvents\":[\n";
       for (size_t i = 0; i < events.size(); ++i) {
         const auto& e = events[i];
@@ -413,7 +419,7 @@ void Z3DPerfCollector::flush(uint64_t token)
       }
       ofs << "]\n}\n";
       ofs.close();
-      VLOG(1) << "Wrote Chrome trace to " << FLAGS_atlas_perf_trace;
+      VLOG(1) << "Wrote Chrome trace to " << tracePath;
     }
     catch (const std::exception& ex) {
       LOG(ERROR) << "Failed to write perf trace: " << ex.what();
@@ -421,7 +427,8 @@ void Z3DPerfCollector::flush(uint64_t token)
   }
 
   // Optional: append this frame's trace events to a multi-frame Chrome trace file
-  if (!FLAGS_atlas_perf_trace_append.empty()) {
+  const std::string traceAppendPath = absl::GetFlag(FLAGS_atlas_perf_trace_append);
+  if (!traceAppendPath.empty()) {
     // Build events as above
     struct Ev
     {
@@ -431,7 +438,7 @@ void Z3DPerfCollector::flush(uint64_t token)
       double durUs;
     };
     std::vector<Ev> events;
-    bool calibrated2 = FLAGS_atlas_perf_trace_calibrated;
+    bool calibrated2 = traceCalibrated;
     double minGpuTs2 = std::numeric_limits<double>::infinity();
     if (calibrated2) {
       for (const auto& sub : td.submissions) {
@@ -480,14 +487,14 @@ void Z3DPerfCollector::flush(uint64_t token)
 
     try {
       // Append by reopening and inserting before closing ]}
-      std::ifstream ifs(FLAGS_atlas_perf_trace_append);
+      std::ifstream ifs(traceAppendPath);
       std::string existing;
       if (ifs.good()) {
         existing.assign(std::istreambuf_iterator<char>(ifs), std::istreambuf_iterator<char>());
       }
       ifs.close();
 
-      std::ofstream ofs(FLAGS_atlas_perf_trace_append, std::ios::out | std::ios::trunc);
+      std::ofstream ofs(traceAppendPath, std::ios::out | std::ios::trunc);
       if (!ofs.good()) {
         throw std::runtime_error("Cannot open trace append file for write");
       }
@@ -556,7 +563,7 @@ void Z3DPerfCollector::flush(uint64_t token)
         }
       }
       ofs.close();
-      VLOG(1) << "Appended Chrome trace events to " << FLAGS_atlas_perf_trace_append;
+      VLOG(1) << "Appended Chrome trace events to " << traceAppendPath;
     }
     catch (const std::exception& ex) {
       LOG(ERROR) << "Failed to append perf trace: " << ex.what();
@@ -564,15 +571,16 @@ void Z3DPerfCollector::flush(uint64_t token)
   }
 
   // Optional: per-frame summary export (CSV/JSON)
-  if (!FLAGS_atlas_perf_summary.empty()) {
+  const std::string perfSummary = absl::GetFlag(FLAGS_atlas_perf_summary);
+  if (!perfSummary.empty()) {
     try {
       // parse format:path
-      const auto sep = FLAGS_atlas_perf_summary.find(":");
+      const auto sep = perfSummary.find(":");
       if (sep == std::string::npos) {
         throw std::runtime_error("atlas_perf_summary must be 'csv:path' or 'json:path'");
       }
-      const std::string fmtKind = FLAGS_atlas_perf_summary.substr(0, sep);
-      const std::string outPath = FLAGS_atlas_perf_summary.substr(sep + 1);
+      const std::string fmtKind = perfSummary.substr(0, sep);
+      const std::string outPath = perfSummary.substr(sep + 1);
       if (fmtKind == "csv") {
         // Append CSV with header if file new. Top5 labels for stable columns.
         std::ifstream ifs(outPath);

@@ -1,10 +1,18 @@
 #include "zvulkanpipelinecontext_raii.h"
+#include "zcommandlineflags.h"
 
 #include "zvulkantexture.h"
 #include "zvulkanlayoutstate.h"
 #include "z3drenderervulkanbackend.h"
 #include "zvulkancontext.h"
 #include <cstdint>
+
+ABSL_FLAG(bool,
+          atlas_vk_enforce_pipeline_context,
+          true,
+          "Enable Vulkan pipeline context debug enforcement (requires debug build)");
+
+ABSL_FLAG(bool, atlas_vk_label_draws, false, "Enable per-draw/dispatch Vulkan debug-utils labels (debug tools aid)");
 
 namespace nim {
 
@@ -194,16 +202,10 @@ void transitionToFinal(vk::raii::CommandBuffer& cmd,
 }
 } // namespace
 
-DEFINE_bool(atlas_vk_enforce_pipeline_context,
-            true,
-            "Enable Vulkan pipeline context debug enforcement (requires debug build)");
-
-DEFINE_bool(atlas_vk_label_draws, false, "Enable per-draw/dispatch Vulkan debug-utils labels (debug tools aid)");
-
 #ifndef NDEBUG
 bool atlasVulkanPipelineContextEnforcementEnabled()
 {
-  return FLAGS_atlas_vk_enforce_pipeline_context;
+  return absl::GetFlag(FLAGS_atlas_vk_enforce_pipeline_context);
 }
 #else
 bool atlasVulkanPipelineContextEnforcementEnabled()
@@ -669,7 +671,8 @@ void ZVulkanPipelineCommandRecorder::recordComputePass(const ZVulkanComputePassS
 #endif
 
   CHECK(spec.groupX > 0 && spec.groupY > 0 && spec.groupZ > 0) << "Compute dispatch groups must be non-zero";
-  if (FLAGS_atlas_vk_label_draws) {
+  const bool labelDraws = absl::GetFlag(FLAGS_atlas_vk_label_draws);
+  if (labelDraws) {
     const std::string label =
       g_currentTransitionLabel.empty() ? std::string("dispatch") : (g_currentTransitionLabel + ":dispatch");
     cmdBeginDebugLabel(m_commandBuffer, label);
@@ -1016,7 +1019,8 @@ void ZVulkanPipelineCommandRecorder::recordGraphicsDraw(const ZVulkanGraphicsDra
   m_debug.assertGraphicsPreDraw(spec);
 #endif
 
-  if (FLAGS_atlas_vk_label_draws) {
+  const bool labelDraws = absl::GetFlag(FLAGS_atlas_vk_label_draws);
+  if (labelDraws) {
     const std::string label =
       g_currentTransitionLabel.empty() ? std::string("draw") : (g_currentTransitionLabel + ":draw");
     cmdBeginDebugLabel(m_commandBuffer, label);
@@ -1035,7 +1039,7 @@ void ZVulkanPipelineCommandRecorder::recordGraphicsDraw(const ZVulkanGraphicsDra
       m_commandBuffer.draw(spec.vertexCount, spec.instanceCount, spec.firstVertex, spec.firstInstance);
     }
   }
-  if (FLAGS_atlas_vk_label_draws) {
+  if (labelDraws) {
     cmdEndDebugLabel(m_commandBuffer);
   }
   if (auto* be = Z3DRendererVulkanBackend::current()) {

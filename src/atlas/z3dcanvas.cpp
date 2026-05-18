@@ -1,4 +1,5 @@
 #include "z3dcanvas.h"
+#include "zcommandlineflags.h"
 
 #include "zdoc.h"
 #include "zimgdoc.h"
@@ -33,7 +34,7 @@
 #include <limits>
 #include <unordered_map>
 
-DECLARE_bool(atlas_vk_copy_yflip_in_shader);
+ABSL_DECLARE_FLAG(bool, atlas_vk_copy_yflip_in_shader);
 
 namespace nim {
 
@@ -243,8 +244,8 @@ void Z3DCanvas::renderingFinished()
                      QImage::Format_ARGB32_Premultiplied);
     }
     // If shader y-flip is enabled for Vulkan path, present directly; otherwise flip vertically.
-    auto pixmap =
-      QPixmap::fromImage((vulkanZeroCopy && FLAGS_atlas_vk_copy_yflip_in_shader) ? image : image.flipped(Qt::Vertical));
+    auto pixmap = QPixmap::fromImage(
+      (vulkanZeroCopy && absl::GetFlag(FLAGS_atlas_vk_copy_yflip_in_shader)) ? image : image.flipped(Qt::Vertical));
     pixmap.setDevicePixelRatio(devicePixelRatio());
     m_pixmapItem->setPixmap(pixmap);
     if (m_engine) {

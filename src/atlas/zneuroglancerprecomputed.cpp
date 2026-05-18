@@ -1,4 +1,5 @@
 #include "zneuroglancerprecomputed.h"
+#include "zcommandlineflags.h"
 
 #include "zcancellation.h"
 #include "zcpuinfo.h"
@@ -35,13 +36,16 @@
 #include <tuple>
 #include <utility>
 
-DEFINE_double(atlas_ng_precomputed_chunk_cache_memory_proportion,
-              0.3,
-              "Proportion of RAM that will be used for Neuroglancer precomputed chunk cache, default is 0.3");
+ABSL_FLAG(double,
+          atlas_ng_precomputed_chunk_cache_memory_proportion,
+          0.3,
+          "Proportion of RAM that will be used for Neuroglancer precomputed chunk cache, default is 0.3");
 
-DEFINE_double(atlas_ng_precomputed_minishard_index_cache_memory_proportion,
-              0.05,
-              "Proportion of RAM that will be used for Neuroglancer precomputed sharded minishard index cache, default is 0.05");
+ABSL_FLAG(
+  double,
+  atlas_ng_precomputed_minishard_index_cache_memory_proportion,
+  0.05,
+  "Proportion of RAM that will be used for Neuroglancer precomputed sharded minishard index cache, default is 0.05");
 
 namespace nim {
 namespace json = boost::json;
@@ -799,13 +803,13 @@ ZNeuroglancerPrecomputedVolume::open(QString url,
     }
   };
 
-  validateCacheProportion(FLAGS_atlas_ng_precomputed_chunk_cache_memory_proportion,
+  validateCacheProportion(absl::GetFlag(FLAGS_atlas_ng_precomputed_chunk_cache_memory_proportion),
                           "atlas_ng_precomputed_chunk_cache_memory_proportion");
-  validateCacheProportion(FLAGS_atlas_ng_precomputed_minishard_index_cache_memory_proportion,
+  validateCacheProportion(absl::GetFlag(FLAGS_atlas_ng_precomputed_minishard_index_cache_memory_proportion),
                           "atlas_ng_precomputed_minishard_index_cache_memory_proportion");
 
-  const double totalProp = FLAGS_atlas_ng_precomputed_chunk_cache_memory_proportion +
-                           FLAGS_atlas_ng_precomputed_minishard_index_cache_memory_proportion;
+  const double totalProp = absl::GetFlag(FLAGS_atlas_ng_precomputed_chunk_cache_memory_proportion) +
+                           absl::GetFlag(FLAGS_atlas_ng_precomputed_minishard_index_cache_memory_proportion);
   if (totalProp > 0.85) {
     LOG(WARNING) << "Neuroglancer precomputed caches are configured to use "
                  << static_cast<int>(std::lround(totalProp * 100.0))
@@ -813,9 +817,11 @@ ZNeuroglancerPrecomputedVolume::open(QString url,
   }
 
   const size_t chunkCacheBytes =
-    static_cast<size_t>(static_cast<double>(ZCpuInfo::instance().nPhysicalRAM) * FLAGS_atlas_ng_precomputed_chunk_cache_memory_proportion);
+    static_cast<size_t>(static_cast<double>(ZCpuInfo::instance().nPhysicalRAM) *
+                        absl::GetFlag(FLAGS_atlas_ng_precomputed_chunk_cache_memory_proportion));
   const size_t minishardIndexCacheBytes =
-    static_cast<size_t>(static_cast<double>(ZCpuInfo::instance().nPhysicalRAM) * FLAGS_atlas_ng_precomputed_minishard_index_cache_memory_proportion);
+    static_cast<size_t>(static_cast<double>(ZCpuInfo::instance().nPhysicalRAM) *
+                        absl::GetFlag(FLAGS_atlas_ng_precomputed_minishard_index_cache_memory_proportion));
   vol->m_chunkCache = std::make_unique<ChunkCache>(chunkCacheBytes, minishardIndexCacheBytes);
   return vol;
 }

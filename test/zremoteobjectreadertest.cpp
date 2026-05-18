@@ -14,7 +14,7 @@
 #include <folly/coro/ViaIfAsync.h>
 #include <folly/executors/CPUThreadPoolExecutor.h>
 #include <folly/ScopeGuard.h>
-#include <gflags/gflags.h>
+#include "zcommandlineflags.h"
 #include <gtest/gtest.h>
 
 #include <deque>
@@ -23,9 +23,9 @@
 #include <stdexcept>
 #include <utility>
 
-DECLARE_uint32(atlas_http_max_retries);
-DECLARE_uint32(atlas_http_retry_backoff_initial_ms);
-DECLARE_uint32(atlas_http_retry_backoff_max_ms);
+ABSL_DECLARE_FLAG(uint32_t, atlas_http_max_retries);
+ABSL_DECLARE_FLAG(uint32_t, atlas_http_retry_backoff_initial_ms);
+ABSL_DECLARE_FLAG(uint32_t, atlas_http_retry_backoff_max_ms);
 
 namespace nim {
 namespace {
@@ -160,17 +160,17 @@ TEST(ZRemoteObjectReader, RemoteContextRetriesRangeSizeMismatch)
   goodResponse.source = ZHttpGetBytesSource::Network;
   store->responses.push_back(goodResponse);
 
-  const uint32_t prevRetries = FLAGS_atlas_http_max_retries;
-  const uint32_t prevInitialBackoff = FLAGS_atlas_http_retry_backoff_initial_ms;
-  const uint32_t prevMaxBackoff = FLAGS_atlas_http_retry_backoff_max_ms;
+  const uint32_t prevRetries = absl::GetFlag(FLAGS_atlas_http_max_retries);
+  const uint32_t prevInitialBackoff = absl::GetFlag(FLAGS_atlas_http_retry_backoff_initial_ms);
+  const uint32_t prevMaxBackoff = absl::GetFlag(FLAGS_atlas_http_retry_backoff_max_ms);
   auto restoreFlags = folly::makeGuard([&]() {
-    FLAGS_atlas_http_max_retries = prevRetries;
-    FLAGS_atlas_http_retry_backoff_initial_ms = prevInitialBackoff;
-    FLAGS_atlas_http_retry_backoff_max_ms = prevMaxBackoff;
+    absl::SetFlag(&FLAGS_atlas_http_max_retries, prevRetries);
+    absl::SetFlag(&FLAGS_atlas_http_retry_backoff_initial_ms, prevInitialBackoff);
+    absl::SetFlag(&FLAGS_atlas_http_retry_backoff_max_ms, prevMaxBackoff);
   });
-  FLAGS_atlas_http_max_retries = 1;
-  FLAGS_atlas_http_retry_backoff_initial_ms = 0;
-  FLAGS_atlas_http_retry_backoff_max_ms = 0;
+  absl::SetFlag(&FLAGS_atlas_http_max_retries, 1);
+  absl::SetFlag(&FLAGS_atlas_http_retry_backoff_initial_ms, 0);
+  absl::SetFlag(&FLAGS_atlas_http_retry_backoff_max_ms, 0);
 
   const auto remoteContext = ZNeuroglancerRemoteContext::create(std::chrono::milliseconds{222}, store);
 
@@ -256,17 +256,17 @@ TEST(ZRemoteObjectReader, RemoteContextExhaustsRangeSizeMismatchRetries)
   store->responses.push_back(shortResponse);
   store->responses.push_back(shortResponse);
 
-  const uint32_t prevRetries = FLAGS_atlas_http_max_retries;
-  const uint32_t prevInitialBackoff = FLAGS_atlas_http_retry_backoff_initial_ms;
-  const uint32_t prevMaxBackoff = FLAGS_atlas_http_retry_backoff_max_ms;
+  const uint32_t prevRetries = absl::GetFlag(FLAGS_atlas_http_max_retries);
+  const uint32_t prevInitialBackoff = absl::GetFlag(FLAGS_atlas_http_retry_backoff_initial_ms);
+  const uint32_t prevMaxBackoff = absl::GetFlag(FLAGS_atlas_http_retry_backoff_max_ms);
   auto restoreFlags = folly::makeGuard([&]() {
-    FLAGS_atlas_http_max_retries = prevRetries;
-    FLAGS_atlas_http_retry_backoff_initial_ms = prevInitialBackoff;
-    FLAGS_atlas_http_retry_backoff_max_ms = prevMaxBackoff;
+    absl::SetFlag(&FLAGS_atlas_http_max_retries, prevRetries);
+    absl::SetFlag(&FLAGS_atlas_http_retry_backoff_initial_ms, prevInitialBackoff);
+    absl::SetFlag(&FLAGS_atlas_http_retry_backoff_max_ms, prevMaxBackoff);
   });
-  FLAGS_atlas_http_max_retries = 1;
-  FLAGS_atlas_http_retry_backoff_initial_ms = 0;
-  FLAGS_atlas_http_retry_backoff_max_ms = 0;
+  absl::SetFlag(&FLAGS_atlas_http_max_retries, 1);
+  absl::SetFlag(&FLAGS_atlas_http_retry_backoff_initial_ms, 0);
+  absl::SetFlag(&FLAGS_atlas_http_retry_backoff_max_ms, 0);
 
   const auto remoteContext = ZNeuroglancerRemoteContext::create(std::chrono::milliseconds{222}, store);
 
@@ -524,11 +524,11 @@ TEST(ZRemoteObjectReader, MeshSourceOpenScopesInfoMetadataByStore)
 
 TEST(ZRemoteObjectReader, ConcurrentChunkReadFailureIsPropagatedToBothCallers)
 {
-  const uint32_t prevRetries = FLAGS_atlas_http_max_retries;
+  const uint32_t prevRetries = absl::GetFlag(FLAGS_atlas_http_max_retries);
   auto restoreRetries = folly::makeGuard([prevRetries]() {
-    FLAGS_atlas_http_max_retries = prevRetries;
+    absl::SetFlag(&FLAGS_atlas_http_max_retries, prevRetries);
   });
-  FLAGS_atlas_http_max_retries = 0;
+  absl::SetFlag(&FLAGS_atlas_http_max_retries, 0);
 
   auto store = std::make_shared<FakeRemoteObjectStore>();
   store->yieldBeforeResponding = true;
@@ -613,11 +613,11 @@ TEST(ZRemoteObjectReader, ConcurrentChunkReadFailureIsPropagatedToBothCallers)
 
 TEST(ZRemoteObjectReader, ConcurrentShardedMinishardFailureIsPropagatedToBothCallers)
 {
-  const uint32_t prevRetries = FLAGS_atlas_http_max_retries;
+  const uint32_t prevRetries = absl::GetFlag(FLAGS_atlas_http_max_retries);
   auto restoreRetries = folly::makeGuard([prevRetries]() {
-    FLAGS_atlas_http_max_retries = prevRetries;
+    absl::SetFlag(&FLAGS_atlas_http_max_retries, prevRetries);
   });
-  FLAGS_atlas_http_max_retries = 0;
+  absl::SetFlag(&FLAGS_atlas_http_max_retries, 0);
 
   auto store = std::make_shared<FakeRemoteObjectStore>();
   store->yieldBeforeResponding = true;

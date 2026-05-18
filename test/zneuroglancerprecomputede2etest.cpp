@@ -3,7 +3,7 @@
 #include <QCoreApplication>
 
 #include <folly/coro/BlockingWait.h>
-#include <gflags/gflags.h>
+#include "zcommandlineflags.h"
 #include <gtest/gtest.h>
 
 #include <array>
@@ -11,8 +11,8 @@
 #include <cstdlib>
 #include <string>
 
-DECLARE_string(atlas_http_backend);
-DECLARE_uint64(atlas_disk_cache_http_max_bytes);
+ABSL_DECLARE_FLAG(std::string, atlas_http_backend);
+ABSL_DECLARE_FLAG(uint64_t, atlas_disk_cache_http_max_bytes);
 
 namespace nim {
 namespace {
@@ -53,9 +53,9 @@ void runPublicDatasetSmokeTest(const char* backend)
   }
 
   ScopedQtCoreApplication qtApp;
-  gflags::FlagSaver flagSaver;
-  FLAGS_atlas_http_backend = backend;
-  FLAGS_atlas_disk_cache_http_max_bytes = 0;
+  absl::FlagSaver flagSaver;
+  absl::SetFlag(&FLAGS_atlas_http_backend, backend);
+  absl::SetFlag(&FLAGS_atlas_disk_cache_http_max_bytes, 0);
 
   using namespace std::chrono_literals;
   constexpr auto timeout = 30s;

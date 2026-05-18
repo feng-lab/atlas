@@ -19,23 +19,24 @@
 
 #include "zlog.h"
 
-#include <gflags/gflags.h>
+#include "zcommandlineflags.h"
 
 #include <algorithm>
 #include <optional>
 #include <utility>
 #include <vector>
 
-DECLARE_bool(atlas_trace_use_swc_geometry_mask);
-DEFINE_bool(atlas_autotrace_use_swc_geometry_mask,
-            false,
-            "In-memory auto tracing: allow using the SWC-geometry trace mask (spatial index) when available. "
-            "This is gated by --atlas_trace_use_swc_geometry_mask (shared across tracing modes) but defaults to "
-            "false because it is currently slower in whole-volume auto trace. "
-            "Interactive tracing remains controlled by --atlas_trace_use_swc_geometry_mask.");
-DECLARE_double(atlas_trace_mask_exclusion_swell_ratio);
-DECLARE_double(atlas_trace_mask_exclusion_swell_diff);
-DECLARE_double(atlas_trace_mask_exclusion_swell_limit);
+ABSL_DECLARE_FLAG(bool, atlas_trace_use_swc_geometry_mask);
+ABSL_FLAG(bool,
+          atlas_autotrace_use_swc_geometry_mask,
+          false,
+          "In-memory auto tracing: allow using the SWC-geometry trace mask (spatial index) when available. "
+          "This is gated by --atlas_trace_use_swc_geometry_mask (shared across tracing modes) but defaults to "
+          "false because it is currently slower in whole-volume auto trace. "
+          "Interactive tracing remains controlled by --atlas_trace_use_swc_geometry_mask.");
+ABSL_DECLARE_FLAG(double, atlas_trace_mask_exclusion_swell_ratio);
+ABSL_DECLARE_FLAG(double, atlas_trace_mask_exclusion_swell_diff);
+ABSL_DECLARE_FLAG(double, atlas_trace_mask_exclusion_swell_limit);
 
 namespace nim {
 
@@ -66,9 +67,9 @@ void materializeTraceMaskFromChainsLegacyLike(const ZImg& signal,
 
   LocsegLabelWorkspaceLegacyLike labelWs;
   labelWs.signal = &signal;
-  labelWs.sratio = FLAGS_atlas_trace_mask_exclusion_swell_ratio;
-  labelWs.sdiff = FLAGS_atlas_trace_mask_exclusion_swell_diff;
-  labelWs.slimit = FLAGS_atlas_trace_mask_exclusion_swell_limit;
+  labelWs.sratio = absl::GetFlag(FLAGS_atlas_trace_mask_exclusion_swell_ratio);
+  labelWs.sdiff = absl::GetFlag(FLAGS_atlas_trace_mask_exclusion_swell_diff);
+  labelWs.slimit = absl::GetFlag(FLAGS_atlas_trace_mask_exclusion_swell_limit);
   labelWs.option = 1;
   labelWs.value = 1;
   labelWs.flag = 0;
@@ -185,8 +186,8 @@ std::unique_ptr<ZSwc> traceNeuronAutoLegacyLike(ZImg signal,
   LOG(INFO) << fmt::format("Auto trace: trace all seeds done (chains={}).", chains.size());
 
   if (cfg.recover > 0) {
-    const bool useGeometryTraceMask =
-      FLAGS_atlas_trace_use_swc_geometry_mask && FLAGS_atlas_autotrace_use_swc_geometry_mask;
+    const bool useGeometryTraceMask = absl::GetFlag(FLAGS_atlas_trace_use_swc_geometry_mask) &&
+                                      absl::GetFlag(FLAGS_atlas_autotrace_use_swc_geometry_mask);
     if (useGeometryTraceMask && !ctx.tw.traceMask && ctx.tw.traceMaskVolume) {
       LOG(INFO) << "Auto trace: materialize dense trace mask for legacy recovery ...";
       materializeTraceMaskFromChainsLegacyLike(ctx.signal, chains, zToXYRatio, ctx.tw);

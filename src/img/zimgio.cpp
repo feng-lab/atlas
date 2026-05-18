@@ -1,4 +1,5 @@
 #include "zimgio.h"
+#include "zcommandlineflags.h"
 
 #include "zimgsliceprovider.h"
 #include "zimgblockprovider.h"
@@ -25,9 +26,10 @@
 #include <folly/coro/Collect.h>
 #include <folly/coro/BlockingWait.h>
 
-DEFINE_bool(zimg_use_multithreaded_image_sequence_reading,
-            true,
-            "Use multithreading for image sequence reading, default is true");
+ABSL_FLAG(bool,
+          zimg_use_multithreaded_image_sequence_reading,
+          true,
+          "Use multithreading for image sequence reading, default is true");
 
 namespace nim {
 
@@ -372,7 +374,7 @@ void ZImgIO::readInfos(const QStringList& fileList,
     }
   }
 
-  if (FLAGS_zimg_use_multithreaded_image_sequence_reading) {
+  if (absl::GetFlag(FLAGS_zimg_use_multithreaded_image_sequence_reading)) {
     std::vector<folly::coro::TaskWithExecutor<
       std::tuple<std::vector<ZImgInfo>, std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>>>>
       tasks;

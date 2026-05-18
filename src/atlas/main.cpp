@@ -26,18 +26,15 @@
 #include <QTimer>
 #include <QUrl>
 #include <folly/ScopeGuard.h>
-#include <gflags/gflags.h>
+#include "zcommandlineflags.h"
 
-DECLARE_string(flagfile);
-DECLARE_bool(run_export_3d_animation);
-DECLARE_bool(run_export_3d_scene);
-DECLARE_bool(run_dump_animation3d_schema);
+ABSL_DECLARE_FLAG(bool, run_export_3d_animation);
+ABSL_DECLARE_FLAG(bool, run_export_3d_scene);
+ABSL_DECLARE_FLAG(bool, run_dump_animation3d_schema);
 // Linux EGL headless switch for OpenGL context
 #if defined(__linux__)
-DECLARE_bool(__use_EGL);
+ABSL_DECLARE_FLAG(bool, __use_EGL);
 #endif
-DECLARE_bool(run_scene_server);
-
 #ifdef _WIN32
 extern "C" {
 // force NVidia Optimus to used dedicated graphics
@@ -125,7 +122,7 @@ int main(int argc, char* argv[])
   QCoreApplication::setApplicationName("Atlas");
 
   if (argc > 1 && strcmp(argv[1], "--command") == 0) {
-    ZLogInit::instance("Atlas"s);
+    ZLogInit::instance(argv[0]);
 
     LOG(INFO) << "Version: " << GIT_VERSION;
 
@@ -169,23 +166,31 @@ int main(int argc, char* argv[])
 
   ZApplication app(argc, argv);
 
+  std::string defaultFlagfilePath;
   if (QString setting_filename = "user_settings_flagfile.txt"; ZSystemInfo::configDir().exists(setting_filename)) {
-    FLAGS_flagfile = QFile::encodeName(ZSystemInfo::configDir().absoluteFilePath(setting_filename)).constData();
+    defaultFlagfilePath = QFile::encodeName(ZSystemInfo::configDir().absoluteFilePath(setting_filename)).constData();
   }
   std::string usage("Atlas is a brain mapping platform.  Usage:\n");
   usage += std::string(argv[0]) + "";
-  gflags::SetUsageMessage(usage);
-  gflags::SetVersionString(GIT_VERSION);
-  gflags::ParseCommandLineFlags(&argc, &argv, false);
+  setCommandLineUsageMessage(usage);
+  parseCommandLine(argc, argv, defaultFlagfilePath);
 
-  bool isGUIMode = !(FLAGS_run_export_3d_animation || FLAGS_run_export_3d_scene || FLAGS_run_dump_animation3d_schema);
+  bool isGUIMode = !(absl::GetFlag(FLAGS_run_export_3d_animation) || absl::GetFlag(FLAGS_run_export_3d_scene) ||
+                     absl::GetFlag(FLAGS_run_dump_animation3d_schema));
 
   // init the logging mechanism
   QDir logDir = ZSystemInfo::logDir();
   ZSystemInfo::removeOldLogs();
-  ZLogInit::instance("Atlas"s, logDir.filePath("atlas"));
+  ZLogInit::instance(argv[0], logDir.filePath("atlas"));
+  bool guiLogCacheSinkAdded = false;
+  auto removeGuiLogCacheSink = folly::makeGuard([&guiLogCacheSinkAdded]() {
+    if (guiLogCacheSinkAdded) {
+      removeLogSink(&ZLogCache::instance());
+    }
+  });
   if (isGUIMode) {
     addLogSink(&ZLogCache::instance());
+    guiLogCacheSinkAdded = true;
   }
 
   try {
@@ -198,12 +203,12 @@ int main(int argc, char* argv[])
 #endif
     LOG(INFO) << "ASAN_OPTIONS: " << __asan_default_options();
 
-    if (!FLAGS_flagfile.empty()) {
-      LOG(INFO) << "user setting file loaded: " << FLAGS_flagfile;
+    if (!defaultFlagfilePath.empty()) {
+      LOG(INFO) << "user setting file loaded: " << defaultFlagfilePath;
     } else {
       LOG(INFO) << "no user setting file";
     }
-    LOG(INFO) << "current settings: \n" << gflags::CommandlineFlagsIntoString();
+    LOG(INFO) << "current settings: \n" << commandLineFlagsToString();
 
     ZImgInit::instance(ZSystemInfo::resourcesDirPath(),
                        ZCpuInfo::instance().isX86_64 ? ZSystemInfo::jreDirPath() : ZSystemInfo::jreArmDirPath(),
@@ -213,13 +218,13 @@ int main(int argc, char* argv[])
     if (!isGUIMode) {
       // start non-GUI version...
       LOG(INFO) << "console mode";
-      if (FLAGS_run_export_3d_animation) {
+      if (absl::GetFlag(FLAGS_run_export_3d_animation)) {
         ZRunExport3DAnimation rea;
         return rea.run();
-      } else if (FLAGS_run_export_3d_scene) {
+      } else if (absl::GetFlag(FLAGS_run_export_3d_scene)) {
         ZRunExport3DScene res;
         return res.run();
-      } else if (FLAGS_run_dump_animation3d_schema) {
+      } else if (absl::GetFlag(FLAGS_run_dump_animation3d_schema)) {
         nim::ZRunDumpAnimation3DSchema dumper;
         return dumper.run();
       }

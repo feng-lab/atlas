@@ -10,14 +10,14 @@
 
 #include "zlog.h"
 
-#include <gflags/gflags.h>
+#include "zcommandlineflags.h"
 
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <limits>
 
-DECLARE_bool(atlas_trace_enable_legacy_isotropic_chain_canonicalization_for_parity);
+ABSL_DECLARE_FLAG(bool, atlas_trace_enable_legacy_isotropic_chain_canonicalization_for_parity);
 
 namespace nim {
 
@@ -76,7 +76,8 @@ locsegChainDistUpperBoundLegacyLike(const LocsegChain& chain, double zToXYRatio,
   double minDist = std::numeric_limits<double>::infinity();
   for (const auto& node : chain) {
     LocalNeuroseg locseg2 = node.locseg;
-    if (FLAGS_atlas_trace_enable_legacy_isotropic_chain_canonicalization_for_parity && zToXYRatio == 1.0) {
+    if (absl::GetFlag(FLAGS_atlas_trace_enable_legacy_isotropic_chain_canonicalization_for_parity) &&
+        zToXYRatio == 1.0) {
       localNeurosegScaleZLegacyLike(locseg2, 1.0);
     }
     const std::array<double, 3> target = localNeurosegCenterLegacyLike(locseg2);
@@ -120,7 +121,7 @@ bool locsegChainConnectionTestLegacyLike(const LocsegChain& chain1,
     head.seg.h = 2.0;
     tail.seg.h = 2.0;
   }
-  if (FLAGS_atlas_trace_enable_legacy_isotropic_chain_canonicalization_for_parity && zToXYRatio == 1.0) {
+  if (absl::GetFlag(FLAGS_atlas_trace_enable_legacy_isotropic_chain_canonicalization_for_parity) && zToXYRatio == 1.0) {
     localNeurosegScaleZLegacyLike(head, 1.0);
     localNeurosegScaleZLegacyLike(tail, 1.0);
   }
@@ -147,7 +148,8 @@ bool locsegChainConnectionTestLegacyLike(const LocsegChain& chain1,
   // Calculate the distance from the hook end(s) to the loop chain surface.
   for (const auto& node : chain2) {
     LocalNeuroseg locseg2 = node.locseg;
-    if (FLAGS_atlas_trace_enable_legacy_isotropic_chain_canonicalization_for_parity && zToXYRatio == 1.0) {
+    if (absl::GetFlag(FLAGS_atlas_trace_enable_legacy_isotropic_chain_canonicalization_for_parity) &&
+        zToXYRatio == 1.0) {
       localNeurosegScaleZLegacyLike(locseg2, 1.0);
     }
     localNeurosegBallBoundLegacyLike(locseg2, range1);

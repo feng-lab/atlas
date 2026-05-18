@@ -4,10 +4,16 @@
 #include "z3dgpuinfo.h"
 #include "z3dshaderprogram.h"
 
-#include <gflags/gflags.h>
+#include "zcommandlineflags.h"
 
 #include <limits>
 #include <utility>
+
+ABSL_FLAG(uint64_t,
+          atlas_ellipsoid_preferred_instance_budget_per_segment,
+          1000000,
+          "Preferred ellipsoid instance budget for one renderer-owned segment. This is the normal packing target; "
+          "backends still enforce maxMonolithicGeometryStreamBytes as a hard safety guard.");
 
 namespace nim {
 
@@ -17,11 +23,6 @@ constexpr size_t kEllipsoidVerticesPerInstance = 4;
 constexpr size_t kEllipsoidIndicesPerInstance = 6;
 
 } // namespace
-
-DEFINE_uint64(atlas_ellipsoid_preferred_instance_budget_per_segment,
-              1000000,
-              "Preferred ellipsoid instance budget for one renderer-owned segment. This is the normal packing target; "
-              "backends still enforce maxMonolithicGeometryStreamBytes as a hard safety guard.");
 
 Z3DEllipsoidRenderer::Z3DEllipsoidRenderer(Z3DRendererBase& rendererBase)
   : Z3DPrimitiveRenderer(rendererBase)
@@ -236,7 +237,8 @@ void Z3DEllipsoidRenderer::render(Z3DEye eye)
   setShaderParameters(shader);
 
   const size_t preferredInstanceBudget =
-    std::max<size_t>(1, static_cast<size_t>(FLAGS_atlas_ellipsoid_preferred_instance_budget_per_segment));
+    std::max<size_t>(1,
+                     static_cast<size_t>(absl::GetFlag(FLAGS_atlas_ellipsoid_preferred_instance_budget_per_segment)));
   const size_t totalInstanceCount = m_centers.size() / kEllipsoidVerticesPerInstance;
   const size_t numBatch = (totalInstanceCount + preferredInstanceBudget - 1) / preferredInstanceBudget;
   const bool rebuildNormalBatches = m_dataChanged || (m_VBOs.size() != numBatch);
@@ -454,7 +456,8 @@ void Z3DEllipsoidRenderer::renderPicking(Z3DEye eye)
   setPickingShaderParameters(shader);
 
   const size_t preferredInstanceBudget =
-    std::max<size_t>(1, static_cast<size_t>(FLAGS_atlas_ellipsoid_preferred_instance_budget_per_segment));
+    std::max<size_t>(1,
+                     static_cast<size_t>(absl::GetFlag(FLAGS_atlas_ellipsoid_preferred_instance_budget_per_segment)));
   const size_t totalInstanceCount = m_centers.size() / kEllipsoidVerticesPerInstance;
   const size_t numBatch = (totalInstanceCount + preferredInstanceBudget - 1) / preferredInstanceBudget;
   const bool rebuildNormalBatches = m_dataChanged || (m_VBOs.size() != numBatch);
@@ -679,7 +682,8 @@ void Z3DEllipsoidRenderer::enqueueRenderBatches(Z3DEye eye, RenderBackend backen
   CHECK(renderBackend != nullptr) << "Ellipsoid segmentation requires an active backend";
   const size_t maxStreamBytes = renderBackend->maxMonolithicGeometryStreamBytes();
   const size_t preferredInstanceBudget =
-    std::max<size_t>(1, static_cast<size_t>(FLAGS_atlas_ellipsoid_preferred_instance_budget_per_segment));
+    std::max<size_t>(1,
+                     static_cast<size_t>(absl::GetFlag(FLAGS_atlas_ellipsoid_preferred_instance_budget_per_segment)));
   const size_t totalInstanceCount = m_centers.size() / kEllipsoidVerticesPerInstance;
 
   auto rangeFitsHardLimit = [&](size_t instanceCount) {

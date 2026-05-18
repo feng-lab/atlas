@@ -4,13 +4,13 @@
 #include "zhttpretrypolicy.h"
 #include "zlog.h"
 
-#include <gflags/gflags.h>
+#include "zcommandlineflags.h"
 
 #include <folly/coro/Sleep.h>
 
 #include <cstring>
 
-DECLARE_uint32(atlas_http_max_retries);
+ABSL_DECLARE_FLAG(uint32_t, atlas_http_max_retries);
 
 namespace nim {
 namespace {
@@ -138,7 +138,7 @@ getRemoteObjectRangeBytesAsync(const ZRemoteObjectStore& objectStore,
     .exactByteRange = ZHttpByteRange{.offset = offset, .length = length},
   };
 
-  const uint32_t maxRetries = FLAGS_atlas_http_max_retries;
+  const uint32_t maxRetries = absl::GetFlag(FLAGS_atlas_http_max_retries);
   for (uint32_t attempt = 0; attempt <= maxRetries; ++attempt) {
     auto resOpt = co_await getRemoteObjectResponseAsync(objectStore, request, statsSink, statsContext);
     if (!resOpt) {

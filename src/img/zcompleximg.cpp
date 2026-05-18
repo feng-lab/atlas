@@ -1,11 +1,12 @@
 #include "zcompleximg.h"
+#include "zcommandlineflags.h"
 
 #include "zlog.h"
 #include "zmkl.h"
 #include <algorithm>
 #include <functional>
 
-DECLARE_bool(zimg_use_mkl_for_fft_if_available);
+ABSL_DECLARE_FLAG(bool, zimg_use_mkl_for_fft_if_available);
 
 namespace nim {
 
@@ -50,7 +51,7 @@ std::string ZComplexImg::toString() const
 ZComplexImg& ZComplexImg::conj()
 {
 #if ZIMG_MKL_ENABLED
-  if (FLAGS_zimg_use_mkl_for_fft_if_available) {
+  if (absl::GetFlag(FLAGS_zimg_use_mkl_for_fft_if_available)) {
     vzConj(m_data.size(), m_data.data(), m_data.data());
     return *this;
   }
@@ -82,7 +83,7 @@ ZComplexImg& ZComplexImg::operator+=(const ZComplexImg& rhs)
       fmt::format("complex img addition requires same size img as input: this <{}>, other <{}>", *this, rhs));
   }
 #if ZIMG_MKL_ENABLED
-  if (FLAGS_zimg_use_mkl_for_fft_if_available) {
+  if (absl::GetFlag(FLAGS_zimg_use_mkl_for_fft_if_available)) {
     vzAdd(m_data.size(), m_data.data(), rhs.m_data.data(), m_data.data());
     return *this;
   }
@@ -120,7 +121,7 @@ ZComplexImg& ZComplexImg::operator-=(const ZComplexImg& rhs)
       fmt::format("complex img subtraction requires same size img as input: this <{}>, other <{}>", *this, rhs));
   }
 #if ZIMG_MKL_ENABLED
-  if (FLAGS_zimg_use_mkl_for_fft_if_available) {
+  if (absl::GetFlag(FLAGS_zimg_use_mkl_for_fft_if_available)) {
     vzSub(m_data.size(), m_data.data(), rhs.m_data.data(), m_data.data());
     return *this;
   }
@@ -165,7 +166,7 @@ ZComplexImg& ZComplexImg::operator*=(const ZComplexImg& rhs)
       fmt::format("complex img multiplies requires same size img as input: this <{}>, other <{}>", *this, rhs));
   }
 #if ZIMG_MKL_ENABLED
-  if (FLAGS_zimg_use_mkl_for_fft_if_available) {
+  if (absl::GetFlag(FLAGS_zimg_use_mkl_for_fft_if_available)) {
     vzMul(m_data.size(), m_data.data(), rhs.m_data.data(), m_data.data());
     return *this;
   }
@@ -203,7 +204,7 @@ ZComplexImg& ZComplexImg::operator/=(const ZComplexImg& rhs)
       fmt::format("complex img divides requires same size img as input: this <{}>, other <{}>", *this, rhs));
   }
 #if ZIMG_MKL_ENABLED
-  if (FLAGS_zimg_use_mkl_for_fft_if_available) {
+  if (absl::GetFlag(FLAGS_zimg_use_mkl_for_fft_if_available)) {
     vzDiv(m_data.size(), m_data.data(), rhs.m_data.data(), m_data.data());
     return *this;
   }

@@ -13,7 +13,7 @@ namespace nim {
 
 class ZLogCache
   : public QObject
-  , public google::LogSink
+  , public absl::LogSink
 {
   Q_OBJECT
 
@@ -27,13 +27,7 @@ public:
   ZLogCache& operator=(ZLogCache&&) = delete; // Move assign
 
   // LogSink interface
-  void send(google::LogSeverity severity,
-            const char* full_filename,
-            const char* base_filename,
-            int line,
-            const google::LogMessageTime& logmsgtime,
-            const char* message,
-            size_t message_len) override;
+  void Send(const absl::LogEntry& entry) override;
 
   // receiver must be in ZLogCache's thread, which is the main gui thread
   template<typename Func1>

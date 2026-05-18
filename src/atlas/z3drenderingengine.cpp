@@ -1,4 +1,5 @@
 #include "z3drenderingengine.h"
+#include "zcommandlineflags.h"
 
 #include "z3dcanvas.h"
 #include "z3dcompositor.h"
@@ -44,8 +45,8 @@
 #include <QOffscreenSurface>
 #include <QCoreApplication>
 
-DECLARE_bool(atlas_enable_benchmark_raw_mip_export);
-DECLARE_bool(atlas_enable_benchmark_screen_space_sufficiency_audit);
+ABSL_DECLARE_FLAG(bool, atlas_enable_benchmark_raw_mip_export);
+ABSL_DECLARE_FLAG(bool, atlas_enable_benchmark_screen_space_sufficiency_audit);
 #include <QMetaObject>
 #include <QTimer>
 #include <QThread>
@@ -53,29 +54,35 @@ DECLARE_bool(atlas_enable_benchmark_screen_space_sufficiency_audit);
 #include <cstdint>
 #include <memory>
 
-DEFINE_bool(atlas_debug_opengl,
-            false,
-            "Whether to check openGL error aggressively, default is false, can set to true for debugging");
+ABSL_FLAG(bool,
+          atlas_debug_opengl,
+          false,
+          "Whether to check openGL error aggressively, default is false, can set to true for debugging");
 
-DEFINE_bool(atlas_log_glbinding_context_switch, false, "Whether to log openGL context switch event, default is false");
+ABSL_FLAG(bool,
+          atlas_log_glbinding_context_switch,
+          false,
+          "Whether to log openGL context switch event, default is false");
 
-DEFINE_string(atlas_default_render_backend,
-              "opengl",
-              "Default 3D rendering backend at startup. Values: opengl, vulkan. "
-              "This sets the initial value of the 'Render Backend' global parameter; it can be changed in the UI.");
+ABSL_FLAG(std::string,
+          atlas_default_render_backend,
+          "opengl",
+          "Default 3D rendering backend at startup. Values: opengl, vulkan. "
+          "This sets the initial value of the 'Render Backend' global parameter; it can be changed in the UI.");
 
-DEFINE_bool(atlas_log_benchmark_render_timings,
-            false,
-            "Log simple deterministic benchmark timings at fast-preview and final-render completion.");
+ABSL_FLAG(bool,
+          atlas_log_benchmark_render_timings,
+          false,
+          "Log simple deterministic benchmark timings at fast-preview and final-render completion.");
 
-DECLARE_string(output_image_name_prefix);
-DECLARE_int32(output_image_name_field_width);
-DECLARE_int32(maximum_output_width);
-DECLARE_int32(maximum_output_height);
-DECLARE_bool(atlas_vk_copy_yflip_in_shader);
+ABSL_DECLARE_FLAG(std::string, output_image_name_prefix);
+ABSL_DECLARE_FLAG(int32_t, output_image_name_field_width);
+ABSL_DECLARE_FLAG(int32_t, maximum_output_width);
+ABSL_DECLARE_FLAG(int32_t, maximum_output_height);
+ABSL_DECLARE_FLAG(bool, atlas_vk_copy_yflip_in_shader);
 
 #if defined(__linux__)
-DECLARE_bool(__use_EGL);
+ABSL_DECLARE_FLAG(bool, __use_EGL);
 #endif
 
 namespace {
@@ -238,7 +245,7 @@ bool shouldFlipYWhenSaving(RenderBackend backend)
     // When the compositor does *not* apply the flip in the final copy shader,
     // the host buffer effectively matches OpenGL's bottom-origin convention and
     // must be flipped before saving to a top-origin image file.
-    return !FLAGS_atlas_vk_copy_yflip_in_shader;
+    return !absl::GetFlag(FLAGS_atlas_vk_copy_yflip_in_shader);
   }
   return false;
 }
@@ -527,7 +534,7 @@ Z3DRenderingEngine::Z3DRenderingEngine(ZDoc& doc, QObject* parent)
   m_renderThreadExecutor = std::make_unique<ZQtExecutor>(this, "Z3DRenderingEngine");
 
 #if defined(__linux__)
-  if (FLAGS___use_EGL) {
+  if (absl::GetFlag(FLAGS___use_EGL)) {
     return;
   }
 #endif
@@ -841,10 +848,11 @@ void Z3DRenderingEngine::exportFixedSize3DAnimation(const ZAnimation* animation,
     reportRenderingError(fmt::format("Invalid width {} or height {}", width, height));
     return;
   }
-  if (width > FLAGS_maximum_output_width || height > FLAGS_maximum_output_height) {
-    reportRenderingError(fmt::format("Does not support output size larger than  {} x {}",
-                                     FLAGS_maximum_output_width,
-                                     FLAGS_maximum_output_height));
+  const int maximumOutputWidth = absl::GetFlag(FLAGS_maximum_output_width);
+  const int maximumOutputHeight = absl::GetFlag(FLAGS_maximum_output_height);
+  if (width > maximumOutputWidth || height > maximumOutputHeight) {
+    reportRenderingError(
+      fmt::format("Does not support output size larger than  {} x {}", maximumOutputWidth, maximumOutputHeight));
     return;
   }
   CHECK(tileSize >= 0 && tileBorder >= 0);
@@ -931,8 +939,8 @@ void Z3DRenderingEngine::exportFixedSize3DAnimation(const ZAnimation* animation,
     m_doc.deselectAllObjs();
 
     int numFrame = endFrame - startFrame;
-    int fieldWidth = std::max(FLAGS_output_image_name_field_width, numDigits(totalNumFrames - 1));
-    QString namePrefix = QString::fromStdString(FLAGS_output_image_name_prefix);
+    int fieldWidth = std::max(absl::GetFlag(FLAGS_output_image_name_field_width), numDigits(totalNumFrames - 1));
+    QString namePrefix = QString::fromStdString(absl::GetFlag(FLAGS_output_image_name_prefix));
     auto tempdir = std::make_shared<QTemporaryDir>();
     QDir tmpdir(imageOuputFolder ? *imageOuputFolder : tempdir->path());
     if (tileSize == 0 || (tileSize >= width && tileSize >= height)) {
@@ -1148,9 +1156,10 @@ void Z3DRenderingEngine::init()
   Q_EMIT progressChanged(10);
 
   RenderBackend startupBackend = RenderBackend::OpenGL;
-  if (!parseRenderBackendFlagValue(FLAGS_atlas_default_render_backend, startupBackend)) {
+  const std::string defaultRenderBackend = absl::GetFlag(FLAGS_atlas_default_render_backend);
+  if (!parseRenderBackendFlagValue(defaultRenderBackend, startupBackend)) {
     LOG(ERROR) << fmt::format("Ignoring invalid --atlas_default_render_backend='{}' (expected 'opengl' or 'vulkan')",
-                              FLAGS_atlas_default_render_backend);
+                              defaultRenderBackend);
     startupBackend = RenderBackend::OpenGL;
   }
 
@@ -1516,7 +1525,7 @@ void Z3DRenderingEngine::setSeedTraceUiState(bool enabled,
 
 bool Z3DRenderingEngine::saveRawMIPImageForObject(size_t id, const QString& path, std::string& error)
 {
-  if (!FLAGS_atlas_enable_benchmark_raw_mip_export) {
+  if (!absl::GetFlag(FLAGS_atlas_enable_benchmark_raw_mip_export)) {
     error = "raw MIP export is disabled; relaunch Atlas with --atlas_enable_benchmark_raw_mip_export";
     return false;
   }
@@ -1540,7 +1549,7 @@ bool Z3DRenderingEngine::screenSpaceSufficiencyAuditForObject(size_t id,
                                                               ScreenSpaceSufficiencyAudit& audit,
                                                               std::string& error)
 {
-  if (!FLAGS_atlas_enable_benchmark_screen_space_sufficiency_audit) {
+  if (!absl::GetFlag(FLAGS_atlas_enable_benchmark_screen_space_sufficiency_audit)) {
     error = "screen-space audit is disabled; relaunch Atlas with "
             "--atlas_enable_benchmark_screen_space_sufficiency_audit";
     return false;
@@ -1969,7 +1978,7 @@ void Z3DRenderingEngine::ensureGLContext()
 #endif
   } else {
 #if defined(__linux__)
-    if (FLAGS___use_EGL) {
+    if (absl::GetFlag(FLAGS___use_EGL)) {
       try {
         m_context = std::make_unique<Z3DContext>();
       }
@@ -1997,7 +2006,7 @@ void Z3DRenderingEngine::ensureGLContext()
   Z3DGpuInfo::instance().initializeFromOpenGL();
   Z3DGpuInfo::instance().logGpuInfo();
 
-  if (FLAGS_atlas_debug_opengl) {
+  if (absl::GetFlag(FLAGS_atlas_debug_opengl)) {
     glbinding::setCallbackMaskExcept(glbinding::CallbackMask::After |
                                        glbinding::CallbackMask::ParametersAndReturnValue |
                                        glbinding::CallbackMask::Unresolved,
@@ -2032,7 +2041,7 @@ void Z3DRenderingEngine::ensureGLContext()
   });
 
   static bool contextSwitchCallbackRegistered = false;
-  if (FLAGS_atlas_log_glbinding_context_switch && !contextSwitchCallbackRegistered) {
+  if (absl::GetFlag(FLAGS_atlas_log_glbinding_context_switch) && !contextSwitchCallbackRegistered) {
     glbinding::addContextSwitchCallback([](glbinding::ContextHandle handle) {
       LOG(INFO) << "Switching to OpenGL context " << handle;
     });
@@ -2184,7 +2193,7 @@ void Z3DRenderingEngine::renderFast(bool stereo)
     LOG(INFO) << e.what();
   }
 
-  if (FLAGS_atlas_log_benchmark_render_timings) {
+  if (absl::GetFlag(FLAGS_atlas_log_benchmark_render_timings)) {
     const double elapsedMs =
       std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - benchmarkStart).count();
     LOG(INFO) << "ATLAS_BENCHMARK_FAST_PREVIEW_DONE"
@@ -2242,7 +2251,7 @@ void Z3DRenderingEngine::render(bool stereo)
   catch (const ZException& e) {
     LOG(INFO) << e.what();
   }
-  if (FLAGS_atlas_log_benchmark_render_timings && m_progress >= 1.0) {
+  if (absl::GetFlag(FLAGS_atlas_log_benchmark_render_timings) && m_progress >= 1.0) {
     const double elapsedMs =
       std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - benchmarkStart).count();
     LOG(INFO) << "ATLAS_BENCHMARK_RENDER_FINISHED"

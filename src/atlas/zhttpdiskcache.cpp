@@ -6,7 +6,7 @@
 #include "zsqlitediskcachebucket.h"
 #include "zstructutils.h"
 
-#include <gflags/gflags.h>
+#include "zcommandlineflags.h"
 
 #include <boost/hash2/sha2.hpp>
 
@@ -21,7 +21,7 @@
 #include <string>
 #include <string_view>
 
-DECLARE_uint64(atlas_disk_cache_http_async_max_pending_bytes);
+ABSL_DECLARE_FLAG(uint64_t, atlas_disk_cache_http_async_max_pending_bytes);
 
 namespace nim {
 
@@ -124,11 +124,12 @@ ZHttpDiskCache::ZHttpDiskCache(QString rootDir, uint64_t maxBytes)
     return;
   }
 
-  m_bucket = std::make_unique<ZSqliteDiskCacheBucket>(m_rootDir,
-                                                      QStringLiteral("http.sqlite"),
-                                                      m_maxBytes,
-                                                      FLAGS_atlas_disk_cache_http_async_max_pending_bytes,
-                                                      QStringLiteral("http_disk_cache"));
+  m_bucket =
+    std::make_unique<ZSqliteDiskCacheBucket>(m_rootDir,
+                                             QStringLiteral("http.sqlite"),
+                                             m_maxBytes,
+                                             absl::GetFlag(FLAGS_atlas_disk_cache_http_async_max_pending_bytes),
+                                             QStringLiteral("http_disk_cache"));
 }
 
 ZHttpDiskCache::~ZHttpDiskCache() = default;

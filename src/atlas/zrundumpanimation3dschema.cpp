@@ -23,18 +23,19 @@
 #include <QCoreApplication>
 #include <QFileInfo>
 #include <QDir>
-#include <gflags/gflags.h>
+#include "zcommandlineflags.h"
 #include <cctype>
 #include <set>
 
-DEFINE_bool(run_dump_animation3d_schema, false, "Dump Animation3D JSON Schema + capabilities and exit");
-DEFINE_string(dump_output_dir,
-              "",
-              "Output directory for dumping schema/capabilities (files: animation3d.schema.json, capabilities.json). "
-              "Default: current directory");
+ABSL_FLAG(bool, run_dump_animation3d_schema, false, "Dump Animation3D JSON Schema + capabilities and exit");
+ABSL_FLAG(std::string,
+          dump_output_dir,
+          "",
+          "Output directory for dumping schema/capabilities (files: animation3d.schema.json, capabilities.json). "
+          "Default: current directory");
 
 #if defined(__linux__)
-DECLARE_bool(__use_EGL);
+ABSL_DECLARE_FLAG(bool, __use_EGL);
 #endif
 
 namespace nim {
@@ -486,10 +487,10 @@ int ZRunDumpAnimation3DSchema::run()
     // Match the setup used by ZRunExport3DAnimation to avoid QOffscreenSurface failures
     // and prefer an EGL-based context when running without a GUI.
 #if defined(__linux__)
-    FLAGS___use_EGL = true;
+    absl::SetFlag(&FLAGS___use_EGL, true);
 #endif
     // Resolve output directory
-    QDir outDir(QString::fromStdString(FLAGS_dump_output_dir).trimmed());
+    QDir outDir(QString::fromStdString(absl::GetFlag(FLAGS_dump_output_dir)).trimmed());
     if (outDir.path().isEmpty()) {
       outDir = QDir::current();
     }

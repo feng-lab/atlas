@@ -19,7 +19,7 @@
 #include <cstdint>
 #include <cstring>
 #include <future>
-#include <gflags/gflags.h>
+#include "zcommandlineflags.h"
 #include <limits>
 #include <map>
 #include <mutex>
@@ -30,7 +30,7 @@
 #include <utility>
 #include <vector>
 
-DECLARE_int32(atlas_bioformats_bridge_io_timeout_ms);
+ABSL_DECLARE_FLAG(int32_t, atlas_bioformats_bridge_io_timeout_ms);
 
 namespace nim {
 
@@ -58,7 +58,7 @@ void configureBioFormatsTestBridge()
     if (!ok || value < 0 || value > std::numeric_limits<int32_t>::max()) {
       throw std::runtime_error("ATLAS_BIOFORMATS_TEST_IO_TIMEOUT_MS must be an integer from 0 to INT32_MAX");
     }
-    ::FLAGS_atlas_bioformats_bridge_io_timeout_ms = static_cast<int32_t>(value);
+    absl::SetFlag(&FLAGS_atlas_bioformats_bridge_io_timeout_ms, static_cast<int32_t>(value));
     return;
   }
 
@@ -66,8 +66,8 @@ void configureBioFormatsTestBridge()
   // reads may legitimately be long-running. Tests should fail before CTest's
   // broad per-case timeout so the error path includes bridge diagnostics. Keep
   // enough headroom for slower CI runners that may start the JVM cold.
-  if (::FLAGS_atlas_bioformats_bridge_io_timeout_ms <= 0) {
-    ::FLAGS_atlas_bioformats_bridge_io_timeout_ms = kBioFormatsBridgeTestIoTimeoutMs;
+  if (absl::GetFlag(FLAGS_atlas_bioformats_bridge_io_timeout_ms) <= 0) {
+    absl::SetFlag(&FLAGS_atlas_bioformats_bridge_io_timeout_ms, kBioFormatsBridgeTestIoTimeoutMs);
   }
 }
 
@@ -195,7 +195,7 @@ QString canonicalExistingPath(const QString& path)
   return canonicalPath.isEmpty() ? fi.absoluteFilePath() : canonicalPath;
 }
 
-class WarningLogCapture final : public google::LogSink
+class WarningLogCapture final : public absl::LogSink
 {
 public:
   void clear()
@@ -210,19 +210,13 @@ public:
     return m_messages;
   }
 
-  void send(google::LogSeverity severity,
-            const char*,
-            const char* baseFilename,
-            int line,
-            const google::LogMessageTime& time,
-            const char* message,
-            size_t messageLen) override
+  void Send(const absl::LogEntry& entry) override
   {
-    if (severity < google::GLOG_WARNING) {
+    if (entry.log_severity() < absl::LogSeverity::kWarning) {
       return;
     }
     std::lock_guard<std::mutex> lock(m_mutex);
-    m_messages.push_back(formatLogMessage(severity, baseFilename, line, time, message, messageLen));
+    m_messages.push_back(std::string(entry.text_message_with_prefix()));
   }
 
 private:
@@ -2656,7 +2650,7 @@ TEST(ZBioFormatsTest, PublicCorpusReadsMetadataAndSmallRegions)
                 compareMetadataLevels ? "true" : "false",
                 corpusScenePolicyName(scenePolicy),
                 sceneSampleLimit,
-                ::FLAGS_atlas_bioformats_bridge_io_timeout_ms));
+                absl::GetFlag(FLAGS_atlas_bioformats_bridge_io_timeout_ms)));
   if (!unmatchedExcludedFormats.empty()) {
     emitCorpusProgress(fmt::format("requested excluded formats not found in manifest: {}",
                                    corpusFormatSetToString(unmatchedExcludedFormats)));

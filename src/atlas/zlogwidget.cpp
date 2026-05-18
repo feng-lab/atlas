@@ -23,7 +23,7 @@ void ZLogWidget::writeLogData(const std::vector<LogData>* messages, size_t start
 {
   if (end - start == 1) {
     const auto& logData = (*messages)[start];
-    if (logData.level <= google::GLOG_INFO) {
+    if (logData.level <= absl::LogSeverity::kInfo) {
       appendPlainText(QString::fromStdString(logData.formatted));
     } else {
       setCurrentCharFormat(m_errorFormat);
@@ -32,14 +32,14 @@ void ZLogWidget::writeLogData(const std::vector<LogData>* messages, size_t start
     }
   } else {
     const auto& logData = (*messages)[start];
-    bool firstFormat = logData.level <= google::GLOG_INFO;
+    bool firstFormat = logData.level <= absl::LogSeverity::kInfo;
     bool lastFormat = firstFormat;
     std::vector<QStringList> textList;
     textList.emplace_back();
     textList.back().push_back(QString::fromStdString(logData.formatted));
     for (auto i = start + 1; i < end; ++i) {
       const auto& logD = (*messages)[i];
-      if ((logD.level <= google::GLOG_INFO) != lastFormat) {
+      if ((logD.level <= absl::LogSeverity::kInfo) != lastFormat) {
         lastFormat = !lastFormat;
         textList.emplace_back();
       }

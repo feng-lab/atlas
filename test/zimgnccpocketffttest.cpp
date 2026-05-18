@@ -1,17 +1,18 @@
 #include "zimgncc.h"
+#include "zcommandlineflags.h"
 #include "ztest.h"
 #include <folly/ScopeGuard.h>
 
-DECLARE_bool(zimg_use_mkl_for_fft_if_available);
+ABSL_DECLARE_FLAG(bool, zimg_use_mkl_for_fft_if_available);
 
 TEST(ZImgNCC, normXCorr_S_pocketfft)
 {
   using namespace nim;
 
-  auto oldValue = FLAGS_zimg_use_mkl_for_fft_if_available;
-  FLAGS_zimg_use_mkl_for_fft_if_available = false;
+  auto oldValue = absl::GetFlag(FLAGS_zimg_use_mkl_for_fft_if_available);
+  absl::SetFlag(&FLAGS_zimg_use_mkl_for_fft_if_available, false);
   auto guard = folly::makeGuard([=]() {
-    FLAGS_zimg_use_mkl_for_fft_if_available = oldValue;
+    absl::SetFlag(&FLAGS_zimg_use_mkl_for_fft_if_available, oldValue);
   });
 
   try {
@@ -52,10 +53,10 @@ TEST(ZImgNCC, normXCorr_pocketfft)
 {
   using namespace nim;
 
-  auto oldValue = FLAGS_zimg_use_mkl_for_fft_if_available;
-  FLAGS_zimg_use_mkl_for_fft_if_available = false;
+  auto oldValue = absl::GetFlag(FLAGS_zimg_use_mkl_for_fft_if_available);
+  absl::SetFlag(&FLAGS_zimg_use_mkl_for_fft_if_available, false);
   auto guard = folly::makeGuard([=]() {
-    FLAGS_zimg_use_mkl_for_fft_if_available = oldValue;
+    absl::SetFlag(&FLAGS_zimg_use_mkl_for_fft_if_available, oldValue);
   });
 
   try {

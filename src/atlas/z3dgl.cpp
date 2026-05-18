@@ -1,11 +1,12 @@
 #include "z3dgl.h"
+#include "zcommandlineflags.h"
 
 #include "zlog.h"
 #include <glbinding-aux/ContextInfo.h>
 #include <glbinding/Version.h>
 #include <glbinding-aux/Meta.h>
 
-DECLARE_bool(atlas_debug_opengl);
+ABSL_DECLARE_FLAG(bool, atlas_debug_opengl);
 
 namespace nim {
 
@@ -20,15 +21,14 @@ bool GLVersionGE(int majorVersion, int minorVersion)
 
 void CheckGLError_Impl(const char* file, int line)
 {
-  if (FLAGS_atlas_debug_opengl) {
+  if (absl::GetFlag(FLAGS_atlas_debug_opengl)) {
     return;
   }
 
   GLenum err = glGetError();
 
   if (err != GL_NO_ERROR) {
-    google::LogMessage(file, line, google::GLOG_ERROR).stream()
-      << "OpenGL error: " << glbinding::aux::Meta::getString(err);
+    LOG(ERROR).AtLocation(file, line) << "OpenGL error: " << glbinding::aux::Meta::getString(err);
   }
 }
 

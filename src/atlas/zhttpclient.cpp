@@ -4,7 +4,7 @@
 #include "zproxygenhttpclient.h"
 #include "zlog.h"
 
-#include <gflags/gflags.h>
+#include "zcommandlineflags.h"
 
 #include <folly/String.h>
 
@@ -20,9 +20,10 @@ constexpr const char* kDefaultAtlasHttpBackend = "proxygen";
 
 } // namespace
 
-DEFINE_string(atlas_http_backend,
-              kDefaultAtlasHttpBackend,
-              "HTTP backend for remote datasets. Values: proxygen, curl.");
+ABSL_FLAG(std::string,
+          atlas_http_backend,
+          kDefaultAtlasHttpBackend,
+          "HTTP backend for remote datasets. Values: proxygen, curl.");
 
 namespace nim {
 namespace {
@@ -49,7 +50,7 @@ enum class HttpBackendKind
 
 HttpBackendKind backendKindFromFlag()
 {
-  std::string backend = FLAGS_atlas_http_backend;
+  std::string backend = absl::GetFlag(FLAGS_atlas_http_backend);
   folly::toLowerAscii(backend);
   if (backend.empty() || backend == "proxygen") {
     return HttpBackendKind::Proxygen;
@@ -57,8 +58,8 @@ HttpBackendKind backendKindFromFlag()
   if (backend == "curl") {
     return HttpBackendKind::Curl;
   }
-  throw ZException(
-    fmt::format("Invalid --atlas_http_backend='{}' (expected: proxygen or curl)", FLAGS_atlas_http_backend));
+  throw ZException(fmt::format("Invalid --atlas_http_backend='{}' (expected: proxygen or curl)",
+                               absl::GetFlag(FLAGS_atlas_http_backend)));
 }
 
 } // namespace

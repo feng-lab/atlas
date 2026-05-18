@@ -33,6 +33,7 @@
 #include <glm/gtx/rotate_vector.hpp>
 #include <glm/gtx/matrix_transform_2d.hpp>
 #include <glm/ext/matrix_clip_space.hpp>
+#include <ostream>
 #include <tuple>
 #include <utility>
 #include <type_traits>
@@ -151,6 +152,24 @@ constexpr decltype(auto) get(T&& v) noexcept
 {
   static_assert(Index < std::tuple_size<std::remove_cvref_t<T>>::value, "Index out of bounds for tuple_like");
   return std::forward_like<decltype(v)>(v[Index]);
+}
+
+template<length_t L, typename T, qualifier Q>
+std::ostream& operator<<(std::ostream& os, const vec<L, T, Q>& v)
+{
+  return nim::operator<<(os, v);
+}
+
+template<length_t C, length_t R, typename T, qualifier Q>
+std::ostream& operator<<(std::ostream& os, const mat<C, R, T, Q>& m)
+{
+  return nim::operator<<(os, m);
+}
+
+template<typename T, qualifier Q>
+std::ostream& operator<<(std::ostream& os, const qua<T, Q>& q)
+{
+  return nim::operator<<(os, q);
 }
 
 } // namespace glm

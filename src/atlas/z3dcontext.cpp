@@ -1,18 +1,19 @@
 #include "z3dcontext.h"
+#include "zcommandlineflags.h"
 
 #include "zlog.h"
 #include <QOpenGLContext>
 #include <QSurfaceFormat>
 #include <QOffscreenSurface>
 
-DEFINE_uint32(use_gpu_device, 0, "choose which gpu to use for rendering, default is 0 (the first one)");
+ABSL_FLAG(uint32_t, use_gpu_device, 0, "choose which gpu to use for rendering, default is 0 (the first one)");
 
 #if defined(__linux__)
 #define EGL_EGLEXT_PROTOTYPES
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
 
-DEFINE_bool(__use_EGL, false, "use EGL in linux console mode");
+ABSL_FLAG(bool, __use_EGL, false, "use EGL in linux console mode");
 
 namespace {
 
@@ -99,7 +100,8 @@ Z3DContext::Z3DContext(QOffscreenSurface& offscreenSurface, QOpenGLContext* shar
 #if defined(__linux__)
 Z3DContext::Z3DContext()
 {
-  CHECK(FLAGS___use_EGL);
+  CHECK(absl::GetFlag(FLAGS___use_EGL));
+  const uint32_t gpuDevice = absl::GetFlag(FLAGS_use_gpu_device);
   static const int MAX_DEVICES = 48;
   EGLDeviceEXT eglDevs[MAX_DEVICES];
   EGLint numDevices;
@@ -108,15 +110,15 @@ Z3DContext::Z3DContext()
   eglQueryDevicesEXT(MAX_DEVICES, eglDevs, &numDevices);
   checkEGLError();
   LOG(INFO) << "Detected " << numDevices << " EGL devices";
-  if (static_cast<EGLint>(FLAGS_use_gpu_device) >= numDevices) {
-    throw ZException(fmt::format("Specified GPU device {} is not available", FLAGS_use_gpu_device));
-    LOG(ERROR) << "Sepcified GPU device " << FLAGS_use_gpu_device << " is not available";
+  if (static_cast<EGLint>(gpuDevice) >= numDevices) {
+    throw ZException(fmt::format("Specified GPU device {} is not available", gpuDevice));
+    LOG(ERROR) << "Sepcified GPU device " << gpuDevice << " is not available";
   }
-  LOG(INFO) << "Use EGL Device " << FLAGS_use_gpu_device;
+  LOG(INFO) << "Use EGL Device " << gpuDevice;
 
   // 1. Initialize EGL
   // EGLDisplay eglDpy = eglGetDisplay(EGL_DEFAULT_DISPLAY);
-  m_eglDisplay = eglGetPlatformDisplay(EGL_PLATFORM_DEVICE_EXT, eglDevs[FLAGS_use_gpu_device], nullptr);
+  m_eglDisplay = eglGetPlatformDisplay(EGL_PLATFORM_DEVICE_EXT, eglDevs[gpuDevice], nullptr);
   if (m_eglDisplay == EGL_NO_DISPLAY) {
     checkEGLError();
     throw ZException("can not create EGL display");
@@ -154,7 +156,7 @@ Z3DContext::Z3DContext()
 }
 #else
 Z3DContext::Z3DContext() {
-  if (FLAGS_use_gpu_device != 0) {
+  if (absl::GetFlag(FLAGS_use_gpu_device) != 0) {
     throw ZException("Flag --use_gpu_device is Linux only");
   }
   LOG(FATAL) << "This initialization method is Linux only";
@@ -188,7 +190,7 @@ ProcAddress Z3DContext::getProcAddress(const char* name) const
   }
 
 #if defined(__linux__)
-  if (FLAGS___use_EGL) {
+  if (absl::GetFlag(FLAGS___use_EGL)) {
     return eglGetProcAddress(name);
   } else {
     return m_context->getProcAddress(name);
@@ -201,7 +203,7 @@ ProcAddress Z3DContext::getProcAddress(const char* name) const
 void Z3DContext::makeCurrent() const
 {
 #if defined(__linux__)
-  if (FLAGS___use_EGL) {
+  if (absl::GetFlag(FLAGS___use_EGL)) {
     eglMakeCurrent(m_eglDisplay, EGL_NO_SURFACE, EGL_NO_SURFACE, m_eglContext);
   } else {
     m_context->makeCurrent(m_offscreenSurface);
@@ -214,7 +216,7 @@ void Z3DContext::makeCurrent() const
 #if defined(__linux__)
 Z3DContextGroup::Z3DContextGroup()
 {
-  if (FLAGS___use_EGL) {
+  if (absl::GetFlag(FLAGS___use_EGL)) {
     m_contextGroup = eglGetCurrentContext();
   } else {
     m_contextGroup = QOpenGLContext::currentContext()->shareGroup();

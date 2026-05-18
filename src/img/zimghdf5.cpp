@@ -1,4 +1,5 @@
 #include "zimghdf5.h"
+#include "zcommandlineflags.h"
 #include "zstringutils.h"
 #include "zimgblockprovider.h"
 #include "zimginfoio.h"
@@ -23,7 +24,7 @@
 #include <tbb/enumerable_thread_specific.h>
 #include <tbb/parallel_for.h>
 
-DEFINE_bool(zimg_use_mmap_file_for_hdf5, false, "Whether to create mmap file for nim format, default is false");
+ABSL_FLAG(bool, zimg_use_mmap_file_for_hdf5, false, "Whether to create mmap file for nim format, default is false");
 
 namespace {
 
@@ -1102,11 +1103,12 @@ bool tryReadHDF5ImgWithRawChunks(const QString& filename,
                                  ZImg& img)
 {
   try {
-    if (FLAGS_zimg_use_mmap_file_for_hdf5) {
+    if (absl::GetFlag(FLAGS_zimg_use_mmap_file_for_hdf5)) {
       ZMemoryMappedFileCache::instance().getOrCreateMemoryMappedFile(filename);
     }
-    const ZMemoryMappedFile* mmf =
-      FLAGS_zimg_use_mmap_file_for_hdf5 ? ZMemoryMappedFileCache::instance().getMemoryMappedFile(filename) : nullptr;
+    const ZMemoryMappedFile* mmf = absl::GetFlag(FLAGS_zimg_use_mmap_file_for_hdf5)
+                                     ? ZMemoryMappedFileCache::instance().getMemoryMappedFile(filename)
+                                     : nullptr;
 
     const HDF5ChunkDiscovery chunkDiscovery = parseHDF5Chunks(filename);
     if (chunkDiscovery.datasets.empty()) {
@@ -1236,7 +1238,7 @@ ZImgHDF5SubBlock::ZImgHDF5SubBlock(QString fileName,
   m_chunkImgInfo = m_info;
   m_chunkImgInfo.width = chunkWidth;
   m_chunkImgInfo.height = chunkHeight;
-  if (FLAGS_zimg_use_mmap_file_for_hdf5) {
+  if (absl::GetFlag(FLAGS_zimg_use_mmap_file_for_hdf5)) {
     m_mmf = ZMemoryMappedFileCache::instance().getMemoryMappedFile(m_filename);
   }
 }
@@ -1377,7 +1379,7 @@ void ZImgHDF5::readInfo(const QString& filename,
 {
   HDF5ChunkDiscovery hdf5Discovery;
   if (subBlocks) {
-    if (FLAGS_zimg_use_mmap_file_for_hdf5) {
+    if (absl::GetFlag(FLAGS_zimg_use_mmap_file_for_hdf5)) {
       ZMemoryMappedFileCache::instance().getOrCreateMemoryMappedFile(filename);
     }
     hdf5Discovery = parseHDF5Chunks(filename);

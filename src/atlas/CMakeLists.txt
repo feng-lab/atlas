@@ -975,7 +975,6 @@ if (ATLAS_USE_MSVC_LIBRARY_SPLIT)
     img
     glbinding::glbinding-aux glbinding::glbinding
     ${OpenCV_LIBS}
-    gflags_static
     Qt6::Core Qt6::Widgets Qt6::Network Qt6::Svg Qt6::SvgWidgets
     Qt6::CorePrivate Qt6::Test
     Brotli::brotlidec
@@ -1096,7 +1095,6 @@ else ()
     img
     glbinding::glbinding-aux glbinding::glbinding
     ${OpenCV_LIBS}
-    gflags_static
     Qt6::Core Qt6::Widgets Qt6::Network Qt6::Svg Qt6::SvgWidgets
     Qt6::CorePrivate Qt6::Test
     Brotli::brotlidec

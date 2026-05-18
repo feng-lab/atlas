@@ -10,13 +10,7 @@ ZLogCache& ZLogCache::instance()
   return cache;
 }
 
-void ZLogCache::send(google::LogSeverity severity,
-                     const char* /*full_filename*/,
-                     const char* base_filename,
-                     int line,
-                     const google::LogMessageTime& logmsgtime,
-                     const char* message,
-                     size_t message_len)
+void ZLogCache::Send(const absl::LogEntry& entry)
 {
   std::scoped_lock lock(m_mutex);
   if (m_logDatas.size() == m_maxNumItems) {
@@ -25,9 +19,7 @@ void ZLogCache::send(google::LogSeverity severity,
     m_logDatas.erase(m_logDatas.begin(), m_logDatas.begin() + numItemsToErase);
     m_unsendLogDataStart = m_unsendLogDataStart <= numItemsToErase ? 0 : m_unsendLogDataStart - numItemsToErase;
   }
-  m_logDatas.emplace_back(severity,
-                          logmsgtime,
-                          formatLogMessage(severity, base_filename, line, logmsgtime, message, message_len));
+  m_logDatas.emplace_back(entry);
 }
 
 ZLogCache::ZLogCache(size_t maxNumItems)

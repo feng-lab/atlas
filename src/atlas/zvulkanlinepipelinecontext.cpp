@@ -1,4 +1,5 @@
 #include "zvulkanlinepipelinecontext.h"
+#include "zcommandlineflags.h"
 
 #include "z3drenderervulkanbackend.h"
 #include "z3drendererbase.h"
@@ -33,7 +34,7 @@
 #include <folly/coro/Invoke.h>
 #include <folly/coro/Task.h>
 
-DECLARE_bool(atlas_vk_cache_draw_secondaries);
+ABSL_DECLARE_FLAG(bool, atlas_vk_cache_draw_secondaries);
 
 namespace nim {
 namespace {
@@ -2325,7 +2326,7 @@ void ZVulkanLinePipelineContext::record(Z3DRendererBase& renderer,
   const bool ddpHook = (shaderHook == Z3DRendererBase::ShaderHookType::DualDepthPeelingInit ||
                         shaderHook == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel);
   const bool hasOit = (extraBindCount != 0);
-  if (FLAGS_atlas_vk_cache_draw_secondaries &&
+  if (absl::GetFlag(FLAGS_atlas_vk_cache_draw_secondaries) &&
       m_backend.device().context().supportsInlineAndSecondaryDynamicRendering() && payload.streamKey != 0 &&
       m_usedThinStaticVBThisFrame && allStaticSegments && !ddpHook) {
     m_backend.notifyDrawSecondaryCacheAttempt();

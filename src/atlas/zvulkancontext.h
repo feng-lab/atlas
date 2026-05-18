@@ -122,7 +122,7 @@ public:
   }
 
   // Bindless sampled-image table capacity policy:
-  // - Requested capacities come from gflags (developer override).
+  // - Requested capacities come from command-line flags (developer override).
   // - Effective capacities are clamped once per logical device creation to fit
   //   the selected physical device limits (legacy or update-after-bind) and are
   //   treated as immutable for the device lifetime (pipeline layouts depend on them).

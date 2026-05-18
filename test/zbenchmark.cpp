@@ -25,7 +25,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <future>
-#include <gflags/gflags.h>
+#include "zcommandlineflags.h"
 #include <limits>
 #include <mutex>
 #include <optional>
@@ -35,149 +35,10 @@
 #include <tuple>
 #include <vector>
 
-DECLARE_bool(atlas_bioformats_bridge_diagnostics);
-DECLARE_int32(atlas_bioformats_bridge_io_timeout_ms);
-DECLARE_int32(v);
+ABSL_DECLARE_FLAG(bool, atlas_bioformats_bridge_diagnostics);
+ABSL_DECLARE_FLAG(int32_t, atlas_bioformats_bridge_io_timeout_ms);
 
 namespace nim {
-
-void applyGlogVerbosityFlagForBenchmark(int argc, char* argv[])
-{
-  for (int i = 1; i < argc; ++i) {
-    const std::string arg(argv[i] == nullptr ? "" : argv[i]);
-    const std::string prefix = "--v=";
-    try {
-      if (arg.rfind(prefix, 0) == 0) {
-        ::FLAGS_v = std::stoi(arg.substr(prefix.size()));
-      } else if (arg == "--v" && i + 1 < argc) {
-        ::FLAGS_v = std::stoi(argv[i + 1]);
-      }
-    }
-    catch (const std::exception&) {
-      return;
-    }
-  }
-}
-
-__forceinline std::string formatLogMessageNoCompile(google::LogSeverity severity,
-                                                    const char* file,
-                                                    int line,
-                                                    const google::LogMessageTime& time,
-                                                    const char* message,
-                                                    size_t message_len)
-{
-  return fmt::format("{}{:%Y%m%d %H:%M:%S} {} {}:{}] {}",
-                     google::GetLogSeverityName(severity)[0],
-                     time.when(),
-                     std::this_thread::get_id(),
-                     file,
-                     line,
-                     fmt::string_view(message, message_len));
-}
-
-__forceinline std::string formatLogMessageNoTimeFormat(google::LogSeverity severity,
-                                                       const char* file,
-                                                       int line,
-                                                       const google::LogMessageTime& time,
-                                                       const char* message,
-                                                       size_t message_len)
-{
-  return fmt::format(FMT_COMPILE("{}{} {} {}:{}] {}"),
-                     google::GetLogSeverityName(severity)[0],
-                     time.when(),
-                     std::this_thread::get_id(),
-                     file,
-                     line,
-                     fmt::string_view(message, message_len));
-}
-
-static void BM_glogToString(benchmark::State& state)
-{
-  std::array<const char*, 5> filenames{"aftewfw", "sfwtwtwfr", "fwtwofwojwt", "fwofjwofjwo", "sfabbb"};
-  std::vector<const char*> filename(state.range(0));
-  std::vector<int> line(state.range(0));
-  std::vector<google::LogMessageTime> time(state.range(0));
-  for (size_t i = 0; i < filename.size(); ++i) {
-    filename[i] = filenames[ZRandom::instance().randInt<int>(4)];
-    line[i] = ZRandom::instance().randInt<int>(1000);
-    time[i] = google::LogMessageTime(std::chrono::system_clock::now());
-  }
-  while (state.KeepRunning()) {
-    for (size_t i = 0; i < filename.size(); ++i) {
-      auto a = google::LogSink::ToString(google::GLOG_INFO, filename[i], line[i], time[i], filename[i], 4);
-      benchmark::DoNotOptimize(a);
-    }
-  }
-  state.SetItemsProcessed(state.iterations() * state.range(0));
-}
-
-static void BM_formatLogMessageToString(benchmark::State& state)
-{
-  std::array<const char*, 5> filenames{"aftewfw", "sfwtwtwfr", "fwtwofwojwt", "fwofjwofjwo", "sfabbb"};
-  std::vector<const char*> filename(state.range(0));
-  std::vector<int> line(state.range(0));
-  std::vector<google::LogMessageTime> time(state.range(0));
-  for (size_t i = 0; i < filename.size(); ++i) {
-    filename[i] = filenames[ZRandom::instance().randInt<int>(4)];
-    line[i] = ZRandom::instance().randInt<int>(1000);
-    time[i] = google::LogMessageTime(std::chrono::system_clock::now());
-  }
-  while (state.KeepRunning()) {
-    for (size_t i = 0; i < filename.size(); ++i) {
-      auto a = formatLogMessage(google::GLOG_INFO, filename[i], line[i], time[i], filename[i], 4);
-      benchmark::DoNotOptimize(a);
-    }
-  }
-  state.SetItemsProcessed(state.iterations() * state.range(0));
-}
-
-static void BM_formatLogMessageToStringNoCompile(benchmark::State& state)
-{
-  std::array<const char*, 5> filenames{"aftewfw", "sfwtwtwfr", "fwtwofwojwt", "fwofjwofjwo", "sfabbb"};
-  std::vector<const char*> filename(state.range(0));
-  std::vector<int> line(state.range(0));
-  std::vector<google::LogMessageTime> time(state.range(0));
-  for (size_t i = 0; i < filename.size(); ++i) {
-    filename[i] = filenames[ZRandom::instance().randInt<int>(4)];
-    line[i] = ZRandom::instance().randInt<int>(1000);
-    time[i] = google::LogMessageTime(std::chrono::system_clock::now());
-  }
-  while (state.KeepRunning()) {
-    for (size_t i = 0; i < filename.size(); ++i) {
-      auto a = formatLogMessageNoCompile(google::GLOG_INFO, filename[i], line[i], time[i], filename[i], 4);
-      benchmark::DoNotOptimize(a);
-    }
-  }
-  state.SetItemsProcessed(state.iterations() * state.range(0));
-}
-
-static void BM_formatLogMessageToStringNoTimeFormat(benchmark::State& state)
-{
-  std::array<const char*, 5> filenames{"aftewfw", "sfwtwtwfr", "fwtwofwojwt", "fwofjwofjwo", "sfabbb"};
-  std::vector<const char*> filename(state.range(0));
-  std::vector<int> line(state.range(0));
-  std::vector<google::LogMessageTime> time(state.range(0));
-  for (size_t i = 0; i < filename.size(); ++i) {
-    filename[i] = filenames[ZRandom::instance().randInt<int>(4)];
-    line[i] = ZRandom::instance().randInt<int>(1000);
-    time[i] = google::LogMessageTime(std::chrono::system_clock::now());
-  }
-  while (state.KeepRunning()) {
-    for (size_t i = 0; i < filename.size(); ++i) {
-      auto a = formatLogMessageNoTimeFormat(google::GLOG_INFO, filename[i], line[i], time[i], filename[i], 4);
-      benchmark::DoNotOptimize(a);
-    }
-  }
-  state.SetItemsProcessed(state.iterations() * state.range(0));
-}
-
-static void addLogMessageFormatBench()
-{
-  BENCHMARK(BM_glogToString)->Range(8, 8 << 10);
-  BENCHMARK(BM_formatLogMessageToString)->Range(8, 8 << 10);
-  BENCHMARK(BM_formatLogMessageToStringNoCompile)->Range(8, 8 << 10);
-  BENCHMARK(BM_formatLogMessageToStringNoTimeFormat)->Range(8, 8 << 10);
-}
 
 template<typename Real>
 void BM_stdRound(benchmark::State& state)
@@ -534,8 +395,8 @@ const std::optional<std::string>& bioFormatsBenchmarkRuntimeError()
   static std::once_flag once;
   static std::optional<std::string> error;
   std::call_once(once, []() {
-    if (::FLAGS_atlas_bioformats_bridge_io_timeout_ms <= 0) {
-      ::FLAGS_atlas_bioformats_bridge_io_timeout_ms = kBioFormatsBenchmarkIoTimeoutMs;
+    if (absl::GetFlag(FLAGS_atlas_bioformats_bridge_io_timeout_ms) <= 0) {
+      absl::SetFlag(&FLAGS_atlas_bioformats_bridge_io_timeout_ms, kBioFormatsBenchmarkIoTimeoutMs);
     }
 
     const QDir thirdPartyBuild(QStringLiteral(ATLAS_THIRDPARTY_BUILD_DIR));
@@ -557,7 +418,7 @@ const std::optional<std::string>& bioFormatsBenchmarkRuntimeError()
     ZLogInit::instance("zbenchmark");
     LOG(INFO) << "Bio-Formats benchmark runtime: file=" << bioFormatsBenchmarkFile()
               << ", java=" << javaExecutableInJreDir(*jreDir) << ", jarsDIR=" << jarsDir.absolutePath()
-              << ", bridgeDiagnostics=" << ::FLAGS_atlas_bioformats_bridge_diagnostics;
+              << ", bridgeDiagnostics=" << absl::GetFlag(FLAGS_atlas_bioformats_bridge_diagnostics);
 
     try {
       ZImgInit::instance("", *jreDir, jarsDir.absolutePath(), false);
@@ -866,9 +727,6 @@ int main(int argc, char* argv[])
 {
   using namespace nim;
 
-  applyGlogVerbosityFlagForBenchmark(argc, argv);
-
-  addLogMessageFormatBench();
   addRoundBench();
   addSaturateMulBench();
   addVectorLoopBench();
@@ -876,7 +734,7 @@ int main(int argc, char* argv[])
   addBioFormatsBench();
 
   benchmark::Initialize(&argc, argv);
-  gflags::ParseCommandLineFlags(&argc, &argv, true);
+  nim::parseCommandLine(argc, argv);
   benchmark::RunSpecifiedBenchmarks();
   benchmark::Shutdown();
   return 0;

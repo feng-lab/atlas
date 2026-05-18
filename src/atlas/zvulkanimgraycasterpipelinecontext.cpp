@@ -1,4 +1,5 @@
 #include "zvulkanimgraycasterpipelinecontext.h"
+#include "zcommandlineflags.h"
 
 #include "z3dimg.h"
 #include "z3drendererbase.h"
@@ -46,38 +47,52 @@
 #include <folly/coro/Task.h>
 
 // Debug: save entry/exit textures after they are rendered (Vulkan only)
-DEFINE_bool(atlas_debug_save_entry_exit,
-            false,
-            "Save Vulkan entry/exit textures (RGBA32F) to TIF files after rendering.");
-DEFINE_string(atlas_debug_save_dir, "", "Directory to write debug images (default: current working directory)");
-DEFINE_bool(atlas_debug_save_raycaster_layers,
-            false,
-            "Save Vulkan raycaster layered outputs (color + depth, one TIF per layer) after rendering.");
-DEFINE_bool(atlas_debug_save_raycaster_merge_out,
-            false,
-            "Save Vulkan raycaster merged output (first color attachment) after merge.");
-DEFINE_bool(atlas_debug_save_slice_layers,
-            false,
-            "Save Vulkan slice layered outputs (color + depth, one TIF per layer) after rendering.");
-DEFINE_bool(atlas_debug_save_slice_merge_out,
-            false,
-            "Save Vulkan slice merged output (first color attachment) after merge.");
+ABSL_FLAG(bool,
+          atlas_debug_save_entry_exit,
+          false,
+          "Save Vulkan entry/exit textures (RGBA32F) to TIF files after rendering.");
+ABSL_FLAG(std::string,
+          atlas_debug_save_dir,
+          "",
+          "Directory to write debug images (default: current working directory)");
+ABSL_FLAG(bool,
+          atlas_debug_save_raycaster_layers,
+          false,
+          "Save Vulkan raycaster layered outputs (color + depth, one TIF per layer) after rendering.");
+ABSL_FLAG(bool,
+          atlas_debug_save_raycaster_merge_out,
+          false,
+          "Save Vulkan raycaster merged output (first color attachment) after merge.");
+ABSL_FLAG(bool,
+          atlas_debug_save_slice_layers,
+          false,
+          "Save Vulkan slice layered outputs (color + depth, one TIF per layer) after rendering.");
+ABSL_FLAG(bool,
+          atlas_debug_save_slice_merge_out,
+          false,
+          "Save Vulkan slice merged output (first color attachment) after merge.");
 
 // Debug: CPU-side count of non-zero block IDs written by the Block-ID pass (per attachment)
-DEFINE_bool(atlas_vk_debug_blockid_count,
-            false,
-            "After Block-ID draw, count non-zero IDs per attachment via CPU readback");
+ABSL_FLAG(bool,
+          atlas_vk_debug_blockid_count,
+          false,
+          "After Block-ID draw, count non-zero IDs per attachment via CPU readback");
 
 // Compaction read source override (append-only)
-DEFINE_string(atlas_vk_blockid_compaction_source,
-              "buffer",
-              "Block-ID compaction read source: 'buffer' (default), 'storage', or 'sampled' (append-only)");
+ABSL_FLAG(std::string,
+          atlas_vk_blockid_compaction_source,
+          "buffer",
+          "Block-ID compaction read source: 'buffer' (default), 'storage', or 'sampled' (append-only)");
 
 // Debug dump of Vulkan raycaster inputs before dispatch (CPU-side only)
-DEFINE_bool(atlas_vk_debug_raycaster_dump,
-            false,
-            "Dump Vulkan raycaster inputs (specializations, push constants, page data, bindings)");
-DEFINE_int32(atlas_vk_debug_raycaster_dump_levels, 8, "Max page levels to print when dumping Vulkan raycaster inputs");
+ABSL_FLAG(bool,
+          atlas_vk_debug_raycaster_dump,
+          false,
+          "Dump Vulkan raycaster inputs (specializations, push constants, page data, bindings)");
+ABSL_FLAG(int32_t,
+          atlas_vk_debug_raycaster_dump_levels,
+          8,
+          "Max page levels to print when dumping Vulkan raycaster inputs");
 
 namespace nim {
 
@@ -377,8 +392,8 @@ buildPageDataBuffer(const Z3DImg& image, size_t channel, float zeToScreenPixelVo
     const float vws = voxelWorldSizes[level];
     CHECK(std::isfinite(vws) && vws > 0.0f) << "Invalid voxelWorldSize at level " << level << ": " << vws;
     appendScalar(data, vws);
-    if (FLAGS_atlas_vk_debug_raycaster_dump) {
-      const int maxLevels = std::max(0, FLAGS_atlas_vk_debug_raycaster_dump_levels);
+    if (absl::GetFlag(FLAGS_atlas_vk_debug_raycaster_dump)) {
+      const int maxLevels = std::max(0, absl::GetFlag(FLAGS_atlas_vk_debug_raycaster_dump_levels));
       if (static_cast<int>(level) < maxLevels) {
         VLOG(2) << fmt::format(
           "Page level[{}]: dirBase=({}, {}, {}) dims=({}, {}, {}) posToIDs=({}, {}, {}) voxelWorld={:.6f}",
@@ -405,7 +420,7 @@ buildPageDataBuffer(const Z3DImg& image, size_t channel, float zeToScreenPixelVo
   if (VLOG_IS_ON(2)) {
     VLOG(2) << fmt::format("buildPageDataBuffer: end size={} bytes", data.size());
   }
-  if (FLAGS_atlas_vk_debug_raycaster_dump) {
+  if (absl::GetFlag(FLAGS_atlas_vk_debug_raycaster_dump)) {
     VLOG(2) << fmt::format(
       "Page UBO summary: pageTableBlockSize=({}, {}, {}) imageBlockSize=({}, {}, {}) cacheSize=({}, {}, {}) addrNorm=({}, {}, {}) ze2px={:.6f}",
       ptb.x,
@@ -1043,7 +1058,7 @@ void ZVulkanImgRaycasterPipelineContext::recordStageEntryExit(Z3DRendererBase& r
   recorder.recordGraphicsDraw(drawSpec);
 
   // Optional debug dump of entry/exit layers to TIF (RGBA32F). Trigger once after the second layer.
-  if (FLAGS_atlas_debug_save_entry_exit && layerIndex == 1u) {
+  if (absl::GetFlag(FLAGS_atlas_debug_save_entry_exit) && layerIndex == 1u) {
     auto leaseRef = payload.entryExitLease;
     auto* backend = dynamic_cast<Z3DRendererVulkanBackend*>(renderer.backend());
     if (backend && leaseRef && leaseRef->hasVulkanImage()) {
@@ -1053,7 +1068,7 @@ void ZVulkanImgRaycasterPipelineContext::recordStageEntryExit(Z3DRendererBase& r
         return;
       }
 
-      QString dir = QString::fromStdString(FLAGS_atlas_debug_save_dir);
+      QString dir = QString::fromStdString(absl::GetFlag(FLAGS_atlas_debug_save_dir));
       if (!dir.isEmpty() && !dir.endsWith('/')) {
         dir += '/';
       }
@@ -1617,7 +1632,7 @@ void ZVulkanImgRaycasterPipelineContext::recordStageProgressiveBlockId(Z3DRender
     m_backend.bindlessLookupSampledImageAutoOrCrash(*prep.lastDepth, "ray_prog_blockid_last_depth");
   pc.last_color_tex = m_backend.bindlessLookupSampledImageAutoOrCrash(*prep.lastColor, "ray_prog_blockid_last_color");
 
-  if (FLAGS_atlas_vk_debug_raycaster_dump) {
+  if (absl::GetFlag(FLAGS_atlas_vk_debug_raycaster_dump)) {
     if (!m_lastDebugDumpBlockIdKey || !(*m_lastDebugDumpBlockIdKey == prep.key)) {
       m_lastDebugDumpBlockIdKey = prep.key;
 
@@ -2433,12 +2448,12 @@ void ZVulkanImgRaycasterPipelineContext::ensureEntryGeometryUploadedThisFrame(co
 namespace {
 inline bool vkBlockIdUseStorage()
 {
-  const std::string v = FLAGS_atlas_vk_blockid_compaction_source;
+  const std::string v = absl::GetFlag(FLAGS_atlas_vk_blockid_compaction_source);
   return v == "storage" || v == "Storage" || v == "STORAGE";
 }
 inline bool vkBlockIdUseBuffer()
 {
-  const std::string v = FLAGS_atlas_vk_blockid_compaction_source;
+  const std::string v = absl::GetFlag(FLAGS_atlas_vk_blockid_compaction_source);
   return v == "buffer" || v == "Buffer" || v == "BUFFER";
 }
 } // namespace
@@ -3386,7 +3401,7 @@ ZVulkanImgRaycasterPipelineContext::ensureProgressivePipeline(const ProgressiveP
 
   instance.pipeline->create();
 
-  if (FLAGS_atlas_vk_debug_raycaster_dump) {
+  if (absl::GetFlag(FLAGS_atlas_vk_debug_raycaster_dump)) {
     VLOG(2) << fmt::format("Raycaster specializations: mode={} localMip={} opaque={} levels={}",
                            static_cast<int>(key.mode),
                            key.localMip,

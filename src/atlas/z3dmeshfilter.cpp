@@ -10,7 +10,7 @@
 #include "zregionannotation.h"
 #include "zfolly.h"
 
-#include <gflags/gflags.h>
+#include "zcommandlineflags.h"
 
 #include <QFileInfo>
 
@@ -25,6 +25,25 @@
 #include <string>
 #include <unordered_set>
 #include <utility>
+
+ABSL_FLAG(
+  uint32_t,
+  atlas_ng_mesh_runtime_lod_in_flight_mb_per_thread_interaction,
+  8,
+  "Runtime NG mesh LOD: max encoded fragment bytes in flight per CPU thread while interacting (0 disables byte budgeting)");
+
+ABSL_FLAG(
+  uint32_t,
+  atlas_ng_mesh_runtime_lod_in_flight_mb_per_thread_idle,
+  32,
+  "Runtime NG mesh LOD: max encoded fragment bytes in flight per CPU thread when idle (0 disables byte budgeting)");
+
+ABSL_FLAG(
+  bool,
+  atlas_ng_mesh_runtime_lod_gpu_transform,
+  true,
+  "Runtime NG mesh LOD: keep chunk vertices in Neuroglancer's stored quantized fragment coordinates and apply the "
+  "per-chunk vertex transform on GPU (OpenGL + Vulkan) instead of CPU-transforming every vertex.");
 
 namespace nim {
 
@@ -49,22 +68,6 @@ constexpr int kRuntimeNgIdleDelayMs = 180;
 // cap to converge to the idle detail target faster.
 constexpr size_t kRuntimeNgMaxTasksMultiplierInteraction = 4;
 constexpr size_t kRuntimeNgMaxTasksMultiplierIdle = 8;
-
-DEFINE_uint32(
-  atlas_ng_mesh_runtime_lod_in_flight_mb_per_thread_interaction,
-  8,
-  "Runtime NG mesh LOD: max encoded fragment bytes in flight per CPU thread while interacting (0 disables byte budgeting)");
-
-DEFINE_uint32(
-  atlas_ng_mesh_runtime_lod_in_flight_mb_per_thread_idle,
-  32,
-  "Runtime NG mesh LOD: max encoded fragment bytes in flight per CPU thread when idle (0 disables byte budgeting)");
-
-DEFINE_bool(
-  atlas_ng_mesh_runtime_lod_gpu_transform,
-  true,
-  "Runtime NG mesh LOD: keep chunk vertices in Neuroglancer's stored quantized fragment coordinates and apply the "
-  "per-chunk vertex transform on GPU (OpenGL + Vulkan) instead of CPU-transforming every vertex.");
 
 struct RuntimeNeuroglancerOpenResult
 {
@@ -177,8 +180,9 @@ collectRuntimeNeuroglancerBaseRows(const ZNeuroglancerPrecomputedMeshSource::Mul
 [[nodiscard]] uint64_t runtimeNgMaxEncodedBytesInFlight(bool interactionActive)
 {
   const size_t threads = runtimeNgWorkerThreadCount();
-  const uint32_t mbPerThread = interactionActive ? FLAGS_atlas_ng_mesh_runtime_lod_in_flight_mb_per_thread_interaction
-                                                 : FLAGS_atlas_ng_mesh_runtime_lod_in_flight_mb_per_thread_idle;
+  const uint32_t mbPerThread = interactionActive
+                                 ? absl::GetFlag(FLAGS_atlas_ng_mesh_runtime_lod_in_flight_mb_per_thread_interaction)
+                                 : absl::GetFlag(FLAGS_atlas_ng_mesh_runtime_lod_in_flight_mb_per_thread_idle);
   if (mbPerThread == 0U) {
     return std::numeric_limits<uint64_t>::max();
   }
@@ -527,7 +531,7 @@ void Z3DMeshFilter::beginExportMeshLod(const glm::uvec2& fullViewport, folly::Ca
   rowsToLoad.erase(std::unique(rowsToLoad.begin(), rowsToLoad.end()), rowsToLoad.end());
 
   QString firstError;
-  const auto vertexSpace = FLAGS_atlas_ng_mesh_runtime_lod_gpu_transform
+  const auto vertexSpace = absl::GetFlag(FLAGS_atlas_ng_mesh_runtime_lod_gpu_transform)
                              ? ZNeuroglancerPrecomputedMeshSource::ChunkVertexSpace::Quantized
                              : ZNeuroglancerPrecomputedMeshSource::ChunkVertexSpace::LocalVoxel;
   std::vector<uint32_t> missingRows;
@@ -598,7 +602,7 @@ void Z3DMeshFilter::beginExportMeshLod(const glm::uvec2& fullViewport, folly::Ca
   std::vector<ZMesh*> frozenVisibleMeshes;
   std::vector<glm::mat4> frozenVisiblePosTransforms;
   std::vector<glm::mat3> frozenVisiblePosTransformNormalMatrices;
-  const bool wantGpuTransform = FLAGS_atlas_ng_mesh_runtime_lod_gpu_transform;
+  const bool wantGpuTransform = absl::GetFlag(FLAGS_atlas_ng_mesh_runtime_lod_gpu_transform);
   for (const auto& drawChunk : drawChunks) {
     auto it = m_runtimeNgLoadedRows.find(drawChunk.row);
     if (it == m_runtimeNgLoadedRows.end()) {
@@ -1284,7 +1288,7 @@ size_t Z3DMeshFilter::requestRuntimeNeuroglancerRows(const std::vector<uint32_t>
   if (m_runtimeNgRequestFrontierMode == RuntimeNeuroglancerRequestFrontierMode::ViewDriven) {
     viewCancellationToken = m_globalParameters.currentMeshLodViewCancellationToken();
   }
-  const auto vertexSpace = FLAGS_atlas_ng_mesh_runtime_lod_gpu_transform
+  const auto vertexSpace = absl::GetFlag(FLAGS_atlas_ng_mesh_runtime_lod_gpu_transform)
                              ? ZNeuroglancerPrecomputedMeshSource::ChunkVertexSpace::Quantized
                              : ZNeuroglancerPrecomputedMeshSource::ChunkVertexSpace::LocalVoxel;
 
@@ -1541,7 +1545,7 @@ void Z3DMeshFilter::applyRuntimeNeuroglancerSelection()
     return;
   }
 
-  const bool wantGpuTransform = FLAGS_atlas_ng_mesh_runtime_lod_gpu_transform;
+  const bool wantGpuTransform = absl::GetFlag(FLAGS_atlas_ng_mesh_runtime_lod_gpu_transform);
 
   m_runtimeNgSelectionDirty = false;
   if (!m_runtimeNgBaseReady) {

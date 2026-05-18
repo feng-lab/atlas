@@ -9,7 +9,7 @@
 #include "zlog.h"
 #include "zview.h"
 
-#include <gflags/gflags.h>
+#include "zcommandlineflags.h"
 
 #include <folly/ScopeGuard.h>
 
@@ -22,23 +22,23 @@
 
 #include <utility>
 
-DEFINE_bool(run_export_3d_scene, false, "Enable exporting a 3D scene screenshot via command line");
+ABSL_FLAG(bool, run_export_3d_scene, false, "Enable exporting a 3D scene screenshot via command line");
 
-DECLARE_string(filename);
-DECLARE_string(output_filename);
-DECLARE_int32(output_width);
-DECLARE_int32(output_height);
-DECLARE_bool(overwrite);
-DECLARE_uint64(limit_memory_usage_in_gb_to);
-DECLARE_int32(maximum_output_width);
-DECLARE_int32(maximum_output_height);
-DECLARE_int32(output_tile_size);
-DECLARE_int32(output_tile_border);
-DECLARE_string(use_gpu_devices);
-DECLARE_uint32(use_gpu_device);
+ABSL_DECLARE_FLAG(std::string, filename);
+ABSL_DECLARE_FLAG(std::string, output_filename);
+ABSL_DECLARE_FLAG(int32_t, output_width);
+ABSL_DECLARE_FLAG(int32_t, output_height);
+ABSL_DECLARE_FLAG(bool, overwrite);
+ABSL_DECLARE_FLAG(uint64_t, limit_memory_usage_in_gb_to);
+ABSL_DECLARE_FLAG(int32_t, maximum_output_width);
+ABSL_DECLARE_FLAG(int32_t, maximum_output_height);
+ABSL_DECLARE_FLAG(int32_t, output_tile_size);
+ABSL_DECLARE_FLAG(int32_t, output_tile_border);
+ABSL_DECLARE_FLAG(std::string, use_gpu_devices);
+ABSL_DECLARE_FLAG(uint32_t, use_gpu_device);
 
 #if defined(__linux__)
-DECLARE_bool(__use_EGL);
+ABSL_DECLARE_FLAG(bool, __use_EGL);
 #endif
 
 namespace nim {
@@ -76,7 +76,7 @@ bool prepareOutputFile(const QString& outputFilename, bool overwriteExisting, QS
 
 bool configureSingleGpuFromFlags(QString& error)
 {
-  const QString gpuDevices = QString::fromStdString(FLAGS_use_gpu_devices).trimmed();
+  const QString gpuDevices = QString::fromStdString(absl::GetFlag(FLAGS_use_gpu_devices)).trimmed();
   if (gpuDevices.isEmpty()) {
     return true;
   }
@@ -95,8 +95,8 @@ bool configureSingleGpuFromFlags(QString& error)
     return false;
   }
 
-  FLAGS_use_gpu_device = gpuId;
-  FLAGS___use_EGL = true;
+  absl::SetFlag(&FLAGS_use_gpu_device, gpuId);
+  absl::SetFlag(&FLAGS___use_EGL, true);
   return true;
 #else
   error = "Flag --use_gpu_devices is Linux only";
@@ -106,12 +106,12 @@ bool configureSingleGpuFromFlags(QString& error)
 
 std::pair<int, int> resolveSceneTileSettings()
 {
-  const auto tileSizeInfo = gflags::GetCommandLineFlagInfoOrDie("output_tile_size");
-  const auto tileBorderInfo = gflags::GetCommandLineFlagInfoOrDie("output_tile_border");
-  if (tileSizeInfo.is_default && tileBorderInfo.is_default) {
+  const auto tileSizeInfo = getCommandLineFlagInfoOrDie("output_tile_size");
+  const auto tileBorderInfo = getCommandLineFlagInfoOrDie("output_tile_border");
+  if (tileSizeInfo.isDefault && tileBorderInfo.isDefault) {
     return {0, 0};
   }
-  return {FLAGS_output_tile_size, FLAGS_output_tile_border};
+  return {absl::GetFlag(FLAGS_output_tile_size), absl::GetFlag(FLAGS_output_tile_border)};
 }
 
 bool loadSceneForExport(const QString& filename, ZDoc& doc, ZView& view, Z3DRenderingEngine& engine, QString& error)
@@ -254,31 +254,34 @@ int ZRunExport3DScene::run()
 
   m_hasError = false;
 
-  if (FLAGS_limit_memory_usage_in_gb_to >= 32) {
-    ZCpuInfo::instance().setMemoryLimitInBytes(FLAGS_limit_memory_usage_in_gb_to * 1024 * 1024 * 1024);
+  if (absl::GetFlag(FLAGS_limit_memory_usage_in_gb_to) >= 32) {
+    ZCpuInfo::instance().setMemoryLimitInBytes(absl::GetFlag(FLAGS_limit_memory_usage_in_gb_to) * 1024 * 1024 * 1024);
   }
 
-  const QString filename = QString::fromStdString(FLAGS_filename).trimmed();
+  const QString filename = QString::fromStdString(absl::GetFlag(FLAGS_filename)).trimmed();
   if (!QFile::exists(filename)) {
-    LOG(ERROR) << fmt::format("input file ({}) does not exist", FLAGS_filename);
+    LOG(ERROR) << fmt::format("input file ({}) does not exist", absl::GetFlag(FLAGS_filename));
     return 1;
   }
 
-  const QString outputFilename = QString::fromStdString(FLAGS_output_filename).trimmed();
+  const QString outputFilename = QString::fromStdString(absl::GetFlag(FLAGS_output_filename)).trimmed();
   QString errorMsg;
-  if (!prepareOutputFile(outputFilename, FLAGS_overwrite, errorMsg)) {
+  if (!prepareOutputFile(outputFilename, absl::GetFlag(FLAGS_overwrite), errorMsg)) {
     LOG(ERROR) << errorMsg;
     return 1;
   }
 
-  if (FLAGS_output_width <= 0 || FLAGS_output_height <= 0) {
-    LOG(ERROR) << fmt::format("Invalid width {} or height {}", FLAGS_output_width, FLAGS_output_height);
+  if (absl::GetFlag(FLAGS_output_width) <= 0 || absl::GetFlag(FLAGS_output_height) <= 0) {
+    LOG(ERROR) << fmt::format("Invalid width {} or height {}",
+                              absl::GetFlag(FLAGS_output_width),
+                              absl::GetFlag(FLAGS_output_height));
     return 1;
   }
-  if (FLAGS_output_width > FLAGS_maximum_output_width || FLAGS_output_height > FLAGS_maximum_output_height) {
+  if (absl::GetFlag(FLAGS_output_width) > absl::GetFlag(FLAGS_maximum_output_width) ||
+      absl::GetFlag(FLAGS_output_height) > absl::GetFlag(FLAGS_maximum_output_height)) {
     LOG(ERROR) << fmt::format("Does not support output size larger than {} x {}",
-                              FLAGS_maximum_output_width,
-                              FLAGS_maximum_output_height);
+                              absl::GetFlag(FLAGS_maximum_output_width),
+                              absl::GetFlag(FLAGS_maximum_output_height));
     return 1;
   }
 
@@ -288,8 +291,8 @@ int ZRunExport3DScene::run()
   }
 
 #if defined(__linux__)
-  if (QString::fromStdString(FLAGS_use_gpu_devices).trimmed().isEmpty()) {
-    FLAGS___use_EGL = true;
+  if (QString::fromStdString(absl::GetFlag(FLAGS_use_gpu_devices)).trimmed().isEmpty()) {
+    absl::SetFlag(&FLAGS___use_EGL, true);
   }
 #endif
 
@@ -323,8 +326,8 @@ int ZRunExport3DScene::run()
 
   const auto [tileSize, tileBorder] = resolveSceneTileSettings();
   engine.takeFixedSizeScreenShot(outputFilename,
-                                 FLAGS_output_width,
-                                 FLAGS_output_height,
+                                 absl::GetFlag(FLAGS_output_width),
+                                 absl::GetFlag(FLAGS_output_height),
                                  Z3DScreenShotType::MonoView,
                                  tileSize,
                                  tileBorder);

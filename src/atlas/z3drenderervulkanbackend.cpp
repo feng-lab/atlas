@@ -1,4 +1,5 @@
 #include "z3drenderervulkanbackend.h"
+#include "zcommandlineflags.h"
 
 #include "z3drendererbase.h"
 #include "z3drendercommands.h"
@@ -66,41 +67,50 @@
 #include <folly/coro/Invoke.h>
 #include <folly/coro/Task.h>
 
-DEFINE_bool(vk_reserve_upload_slices,
-            true,
-            "Reserve per-draw upload arena capacity (precise) before suballocation to avoid mid-upload growth");
-DECLARE_string(atlas_perf_mode);
-DECLARE_bool(atlas_perf_trace_calibrated);
-DEFINE_bool(atlas_vk_ddp_indirect_count,
-            true,
-            "Use drawIndirectCount gating for Vulkan dual-depth peeling (device-side early stop)");
-DEFINE_bool(
+ABSL_FLAG(bool,
+          vk_reserve_upload_slices,
+          true,
+          "Reserve per-draw upload arena capacity (precise) before suballocation to avoid mid-upload growth");
+ABSL_DECLARE_FLAG(std::string, atlas_perf_mode);
+ABSL_DECLARE_FLAG(bool, atlas_perf_trace_calibrated);
+ABSL_FLAG(bool,
+          atlas_vk_ddp_indirect_count,
+          true,
+          "Use drawIndirectCount gating for Vulkan dual-depth peeling (device-side early stop)");
+ABSL_FLAG(
+  bool,
   atlas_vk_profile_pipeline_contexts,
   false,
   "If true, record additional CPU scopes attributing Vulkan batch processing time to individual pipeline contexts "
   "(mesh/line/sphere/etc). Adds overhead; intended for perf triage.");
-DEFINE_bool(
+ABSL_FLAG(
+  bool,
   atlas_vk_cache_draw_secondaries,
   true,
   "If true, cache per-draw secondary command buffers for Vulkan raster pipeline contexts (currently sphere/cone). "
   "This avoids repeating expensive vkCmd recording work in steady state (camera-only changes) at the cost of "
   "extra memory for cached command buffers.");
 
-DEFINE_int32(atlas_vk_bindless_texture2d_capacity,
-             1408,
-             "Bindless Vulkan sampled-image table capacity for texture2D entries (set=0 binding=0).");
-DEFINE_int32(atlas_vk_bindless_texture2darray_capacity,
-             256,
-             "Bindless Vulkan sampled-image table capacity for texture2DArray entries (set=0 binding=1).");
-DEFINE_int32(atlas_vk_bindless_texture3d_capacity,
-             256,
-             "Bindless Vulkan sampled-image table capacity for texture3D entries (set=0 binding=2).");
-DEFINE_int32(atlas_vk_bindless_utexture2d_capacity,
-             64,
-             "Bindless Vulkan sampled-image table capacity for utexture2D entries (set=0 binding=3).");
-DEFINE_int32(atlas_vk_bindless_utexture3d_capacity,
-             64,
-             "Bindless Vulkan sampled-image table capacity for utexture3D entries (set=0 binding=4).");
+ABSL_FLAG(int32_t,
+          atlas_vk_bindless_texture2d_capacity,
+          1408,
+          "Bindless Vulkan sampled-image table capacity for texture2D entries (set=0 binding=0).");
+ABSL_FLAG(int32_t,
+          atlas_vk_bindless_texture2darray_capacity,
+          256,
+          "Bindless Vulkan sampled-image table capacity for texture2DArray entries (set=0 binding=1).");
+ABSL_FLAG(int32_t,
+          atlas_vk_bindless_texture3d_capacity,
+          256,
+          "Bindless Vulkan sampled-image table capacity for texture3D entries (set=0 binding=2).");
+ABSL_FLAG(int32_t,
+          atlas_vk_bindless_utexture2d_capacity,
+          64,
+          "Bindless Vulkan sampled-image table capacity for utexture2D entries (set=0 binding=3).");
+ABSL_FLAG(int32_t,
+          atlas_vk_bindless_utexture3d_capacity,
+          64,
+          "Bindless Vulkan sampled-image table capacity for utexture3D entries (set=0 binding=4).");
 
 // Baseline capacity for the per-frame uniform arena (in KiB). This buffer backs
 // all dynamic UBO bindings for the frame. The backend pre-sizes beyond this baseline
@@ -1575,7 +1585,7 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
     return;
   }
 
-  const bool profilePipelineContexts = FLAGS_atlas_vk_profile_pipeline_contexts;
+  const bool profilePipelineContexts = absl::GetFlag(FLAGS_atlas_vk_profile_pipeline_contexts);
   struct PipelineCpuTimes
   {
     double lineMs = 0.0;
@@ -3528,7 +3538,7 @@ Z3DRendererVulkanBackend::UploadSlice Z3DRendererVulkanBackend::suballocateUploa
 
 void Z3DRendererVulkanBackend::reserveUploadSlices(std::initializer_list<std::pair<size_t, size_t>> slices)
 {
-  if (!FLAGS_vk_reserve_upload_slices) {
+  if (!absl::GetFlag(FLAGS_vk_reserve_upload_slices)) {
     return;
   }
   if (!m_activeFrame) {
@@ -4138,7 +4148,8 @@ void Z3DRendererVulkanBackend::ensurePPLLComputePipelines()
 
 bool Z3DRendererVulkanBackend::ddpIndirectCountEnabled() const
 {
-  return FLAGS_atlas_vk_ddp_indirect_count && m_supportsDrawIndirectCount && m_supportsFragStoresAndAtomics;
+  return absl::GetFlag(FLAGS_atlas_vk_ddp_indirect_count) && m_supportsDrawIndirectCount &&
+         m_supportsFragStoresAndAtomics;
 }
 
 void Z3DRendererVulkanBackend::primePPLLForCountPass(const glm::uvec4& viewport)
@@ -7447,7 +7458,7 @@ void Z3DRendererVulkanBackend::collectFrameTimings(FrameResources& frame)
 
   if (collectGpuTimestamps && frame.nextQuery > 0 && !frame.gpuScopes.empty()) {
     // Optional calibration: map GPU ticks to CPU nanoseconds for trace alignment
-    if (FLAGS_atlas_perf_trace_calibrated) {
+    if (absl::GetFlag(FLAGS_atlas_perf_trace_calibrated)) {
       try {
         // Check time domain support
         auto& phys = m_sharedDevice->context().physicalDevice();

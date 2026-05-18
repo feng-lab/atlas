@@ -22,7 +22,7 @@
 #include <vector>
 #include <optional>
 
-#include <gflags/gflags.h>
+#include "zcommandlineflags.h"
 
 #if !defined(_WIN32)
 #include <fcntl.h>
@@ -118,9 +118,9 @@ extern "C" {
 
 namespace fs = std::filesystem;
 
-DECLARE_bool(atlas_autotrace_seed_sort_commit_by_score);
-DECLARE_bool(atlas_trace_use_swc_geometry_mask);
-DECLARE_bool(atlas_trace_enable_legacy_isotropic_chain_canonicalization_for_parity);
+ABSL_DECLARE_FLAG(bool, atlas_autotrace_seed_sort_commit_by_score);
+ABSL_DECLARE_FLAG(bool, atlas_trace_use_swc_geometry_mask);
+ABSL_DECLARE_FLAG(bool, atlas_trace_enable_legacy_isotropic_chain_canonicalization_for_parity);
 
 namespace {
 
@@ -129,13 +129,13 @@ class LegacySeedSortCommitParityEnvironment : public ::testing::Environment
 public:
   void SetUp() override
   {
-    _previousFlag = FLAGS_atlas_autotrace_seed_sort_commit_by_score;
-    FLAGS_atlas_autotrace_seed_sort_commit_by_score = false;
+    _previousFlag = absl::GetFlag(FLAGS_atlas_autotrace_seed_sort_commit_by_score);
+    absl::SetFlag(&FLAGS_atlas_autotrace_seed_sort_commit_by_score, false);
   }
 
   void TearDown() override
   {
-    FLAGS_atlas_autotrace_seed_sort_commit_by_score = _previousFlag;
+    absl::SetFlag(&FLAGS_atlas_autotrace_seed_sort_commit_by_score, _previousFlag);
   }
 
 private:
@@ -150,13 +150,13 @@ class LegacyTraceMaskParityEnvironment : public ::testing::Environment
 public:
   void SetUp() override
   {
-    _previousFlag = FLAGS_atlas_trace_use_swc_geometry_mask;
-    FLAGS_atlas_trace_use_swc_geometry_mask = false;
+    _previousFlag = absl::GetFlag(FLAGS_atlas_trace_use_swc_geometry_mask);
+    absl::SetFlag(&FLAGS_atlas_trace_use_swc_geometry_mask, false);
   }
 
   void TearDown() override
   {
-    FLAGS_atlas_trace_use_swc_geometry_mask = _previousFlag;
+    absl::SetFlag(&FLAGS_atlas_trace_use_swc_geometry_mask, _previousFlag);
   }
 
 private:
@@ -171,13 +171,13 @@ class LegacyIsotropicChainCanonicalizationParityEnvironment : public ::testing::
 public:
   void SetUp() override
   {
-    _previousFlag = FLAGS_atlas_trace_enable_legacy_isotropic_chain_canonicalization_for_parity;
-    FLAGS_atlas_trace_enable_legacy_isotropic_chain_canonicalization_for_parity = true;
+    _previousFlag = absl::GetFlag(FLAGS_atlas_trace_enable_legacy_isotropic_chain_canonicalization_for_parity);
+    absl::SetFlag(&FLAGS_atlas_trace_enable_legacy_isotropic_chain_canonicalization_for_parity, true);
   }
 
   void TearDown() override
   {
-    FLAGS_atlas_trace_enable_legacy_isotropic_chain_canonicalization_for_parity = _previousFlag;
+    absl::SetFlag(&FLAGS_atlas_trace_enable_legacy_isotropic_chain_canonicalization_for_parity, _previousFlag);
   }
 
 private:

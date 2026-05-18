@@ -1,5 +1,6 @@
 #pragma once
 
+#include "zcommandlineflags.h"
 #include "zflagfiledocument.h"
 
 #include <QDialog>
@@ -12,10 +13,6 @@ class QComboBox;
 class QLineEdit;
 class QTabWidget;
 class QWidget;
-
-namespace gflags {
-struct CommandLineFlagInfo;
-}
 
 namespace nim {
 
@@ -39,7 +36,7 @@ private:
   struct FieldWidgets
   {
     const ZFlagSettingSpec* spec = nullptr;
-    gflags::CommandLineFlagInfo* info = nullptr;
+    ZCommandLineFlagInfo* info = nullptr;
     std::unique_ptr<ZParameter> parameter;
     QWidget* editor = nullptr;
     QLineEdit* lineEdit = nullptr;
@@ -64,7 +61,7 @@ private:
 private:
   ZFlagfileDocument m_document;
   QStringList m_preservedManualLines;
-  std::vector<std::unique_ptr<gflags::CommandLineFlagInfo>> m_flagInfos;
+  std::vector<std::unique_ptr<ZCommandLineFlagInfo>> m_flagInfos;
   std::vector<FieldWidgets> m_fields;
 
   QLabel* m_bannerLabel = nullptr;

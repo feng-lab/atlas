@@ -10,7 +10,7 @@
 #include "zrpcuidispatcher.h"
 #include "zrpcsceneids.h"
 #include "zrpctaskmanager.h"
-#include <gflags/gflags.h>
+#include "zcommandlineflags.h"
 #include <QThread>
 #include <algorithm>
 #include <chrono>
@@ -23,9 +23,10 @@
 #include <google/protobuf/struct.pb.h>
 #include <google/protobuf/wrappers.pb.h>
 
-DEFINE_bool(atlas_scene_rpc_bind_all_interfaces,
-            false,
-            "Bind the Atlas scene gRPC server to all network interfaces. Disabled by default.");
+ABSL_FLAG(bool,
+          atlas_scene_rpc_bind_all_interfaces,
+          false,
+          "Bind the Atlas scene gRPC server to all network interfaces. Disabled by default.");
 
 namespace nim {
 
@@ -3773,8 +3774,8 @@ void ZRPCService::onRPCThreadStarted()
   constexpr const char* kSceneRpcLoopbackAddress = "127.0.0.1:50051";
   constexpr const char* kSceneRpcAllInterfacesAddress = "0.0.0.0:50051";
   const std::string serverAddress =
-    FLAGS_atlas_scene_rpc_bind_all_interfaces ? kSceneRpcAllInterfacesAddress : kSceneRpcLoopbackAddress;
-  if (FLAGS_atlas_scene_rpc_bind_all_interfaces) {
+    absl::GetFlag(FLAGS_atlas_scene_rpc_bind_all_interfaces) ? kSceneRpcAllInterfacesAddress : kSceneRpcLoopbackAddress;
+  if (absl::GetFlag(FLAGS_atlas_scene_rpc_bind_all_interfaces)) {
     LOG(INFO) << "Atlas scene RPC server is binding to all network interfaces at " << serverAddress;
   }
   // Allocate services on the heap and keep them alive for the server lifetime.

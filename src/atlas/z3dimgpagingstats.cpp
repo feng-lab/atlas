@@ -2,20 +2,23 @@
 
 #include "zlog.h"
 
-#include <gflags/gflags.h>
+#include "zcommandlineflags.h"
 
 #include <algorithm>
 #include <chrono>
 #include <string>
 #include <vector>
 
-DEFINE_bool(atlas_log_3d_paging_frame_stats,
-            false,
-            "Log per-frame 3D image paging stats (resolved blocks/bytes by cache tier, underlying I/O bytes, source decoded bytes, GPU upload bytes).");
+ABSL_FLAG(
+  bool,
+  atlas_log_3d_paging_frame_stats,
+  false,
+  "Log per-frame 3D image paging stats (resolved blocks/bytes by cache tier, underlying I/O bytes, source decoded bytes, GPU upload bytes).");
 
-DEFINE_bool(atlas_log_3d_paging_round_stats,
-            false,
-            "Include per-round 3D image paging stats in the per-frame log entry (can be verbose).");
+ABSL_FLAG(bool,
+          atlas_log_3d_paging_round_stats,
+          false,
+          "Include per-round 3D image paging stats in the per-frame log entry (can be verbose).");
 
 namespace nim {
 
@@ -536,7 +539,7 @@ std::string Z3DImgPagingFrameStats::formatSummary(bool includeRoundBreakdown) co
   }
 
   // Guidance for verbosity.
-  if (!includeRoundBreakdown && FLAGS_atlas_log_3d_paging_round_stats) {
+  if (!includeRoundBreakdown && absl::GetFlag(FLAGS_atlas_log_3d_paging_round_stats)) {
     // Should never happen: includeRoundBreakdown is derived from the same flag.
     out += "  NOTE: atlas_log_3d_paging_round_stats is set but round breakdown was not requested.\n";
   } else if (!includeRoundBreakdown) {

@@ -1,4 +1,5 @@
 #include "zvulkanmeshpipelinecontext.h"
+#include "zcommandlineflags.h"
 
 #include "z3drenderervulkanbackend.h"
 #include "z3drendererbase.h"
@@ -37,7 +38,7 @@
 #include <folly/coro/Invoke.h>
 #include <folly/coro/Task.h>
 
-DECLARE_bool(atlas_vk_cache_draw_secondaries);
+ABSL_DECLARE_FLAG(bool, atlas_vk_cache_draw_secondaries);
 
 namespace nim {
 namespace {
@@ -946,7 +947,7 @@ void ZVulkanMeshPipelineContext::record(Z3DRendererBase& renderer,
       }
     };
 
-    if (FLAGS_atlas_vk_cache_draw_secondaries &&
+    if (absl::GetFlag(FLAGS_atlas_vk_cache_draw_secondaries) &&
         m_backend.device().context().supportsInlineAndSecondaryDynamicRendering() && payload.streamKey != 0 &&
         usePersistentTransforms && m_usedStaticVBThisFrame && allStaticSegments) {
       m_backend.notifyDrawSecondaryCacheAttempt();

@@ -28,7 +28,7 @@
 #include <folly/coro/Invoke.h>
 #include <folly/coro/Task.h>
 #include <folly/executors/GlobalExecutor.h>
-#include <gflags/gflags.h>
+#include "zcommandlineflags.h"
 #include <QString>
 
 #include <algorithm>
@@ -40,10 +40,10 @@
 #include <vector>
 #include <unordered_set>
 
-DECLARE_bool(atlas_debug_save_slice_layers);
-DECLARE_bool(atlas_debug_save_slice_merge_out);
-DECLARE_string(atlas_debug_save_dir);
-DECLARE_string(atlas_vk_blockid_compaction_source);
+ABSL_DECLARE_FLAG(bool, atlas_debug_save_slice_layers);
+ABSL_DECLARE_FLAG(bool, atlas_debug_save_slice_merge_out);
+ABSL_DECLARE_FLAG(std::string, atlas_debug_save_dir);
+ABSL_DECLARE_FLAG(std::string, atlas_vk_blockid_compaction_source);
 
 namespace nim {
 
@@ -63,7 +63,7 @@ enum class BlockIdCompactionSource
 
 inline BlockIdCompactionSource vkBlockIdCompactionSource()
 {
-  const std::string v = FLAGS_atlas_vk_blockid_compaction_source;
+  const std::string v = absl::GetFlag(FLAGS_atlas_vk_blockid_compaction_source);
   if (v.empty() || v == "buffer" || v == "Buffer" || v == "BUFFER") {
     return BlockIdCompactionSource::Buffer;
   }
@@ -1210,7 +1210,7 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
   recorder.recordGraphicsDraw(mergeDraw);
   maybeCancel(cancellationToken);
 
-  if (FLAGS_atlas_debug_save_slice_layers) {
+  if (absl::GetFlag(FLAGS_atlas_debug_save_slice_layers)) {
     auto leaseRef = payload.layerLease;
     auto* backend = dynamic_cast<Z3DRendererVulkanBackend*>(renderer.backend());
     if (backend && leaseRef && leaseRef->hasVulkanImage()) {
@@ -1218,7 +1218,7 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
       ZVulkanTexture* tex = leaseRef->colorAttachment(0);
       ZVulkanTexture* dtex = leaseRef->depthAttachmentTexture();
 
-      QString dir = QString::fromStdString(FLAGS_atlas_debug_save_dir);
+      QString dir = QString::fromStdString(absl::GetFlag(FLAGS_atlas_debug_save_dir));
       if (!dir.isEmpty() && !dir.endsWith('/')) {
         dir += '/';
       }
@@ -1309,7 +1309,7 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
     }
   }
 
-  if (FLAGS_atlas_debug_save_slice_merge_out) {
+  if (absl::GetFlag(FLAGS_atlas_debug_save_slice_merge_out)) {
     std::vector<AttachmentHandle> colorHandles;
     colorHandles.reserve(batch.pass.colorAttachments.size());
     for (const auto& att : batch.pass.colorAttachments) {
@@ -1325,7 +1325,7 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
       CHECK(handle.valid() && handle.backend == RenderBackend::Vulkan)
         << "Slice merge debug save: invalid color attachment handle";
 
-      QString dir = QString::fromStdString(FLAGS_atlas_debug_save_dir);
+      QString dir = QString::fromStdString(absl::GetFlag(FLAGS_atlas_debug_save_dir));
       if (!dir.isEmpty() && !dir.endsWith('/')) {
         dir += '/';
       }

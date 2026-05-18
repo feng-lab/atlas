@@ -7,16 +7,16 @@
 #include <set>
 #include <algorithm>
 #include <initializer_list>
-#include <gflags/gflags.h>
+#include "zcommandlineflags.h"
 
-DEFINE_bool(atlas_debug_vulkan, false, "Whether to enable Vulkan validation and debug utils");
-DEFINE_int32(atlas_vk_device_index, -1, "Preferred Vulkan physical device index (sorted); -1 for auto");
+ABSL_FLAG(bool, atlas_debug_vulkan, false, "Whether to enable Vulkan validation and debug utils");
+ABSL_FLAG(int32_t, atlas_vk_device_index, -1, "Preferred Vulkan physical device index (sorted); -1 for auto");
 
-DECLARE_int32(atlas_vk_bindless_texture2d_capacity);
-DECLARE_int32(atlas_vk_bindless_texture2darray_capacity);
-DECLARE_int32(atlas_vk_bindless_texture3d_capacity);
-DECLARE_int32(atlas_vk_bindless_utexture2d_capacity);
-DECLARE_int32(atlas_vk_bindless_utexture3d_capacity);
+ABSL_DECLARE_FLAG(int32_t, atlas_vk_bindless_texture2d_capacity);
+ABSL_DECLARE_FLAG(int32_t, atlas_vk_bindless_texture2darray_capacity);
+ABSL_DECLARE_FLAG(int32_t, atlas_vk_bindless_texture3d_capacity);
+ABSL_DECLARE_FLAG(int32_t, atlas_vk_bindless_utexture2d_capacity);
+ABSL_DECLARE_FLAG(int32_t, atlas_vk_bindless_utexture3d_capacity);
 
 namespace nim {
 
@@ -347,16 +347,16 @@ VKAPI_ATTR VkBool32 VKAPI_CALL debugUtilsMessengerCallback(vk::DebugUtilsMessage
     VLOG(1) << pCallbackData->pMessage;
     return VK_FALSE; // Return early since we already logged the verbose message
   }
-  auto logLevel = google::GLOG_INFO;
+  auto logLevel = absl::LogSeverity::kInfo;
   if (messageSeverity & vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning) {
-    logLevel = google::GLOG_WARNING;
+    logLevel = absl::LogSeverity::kWarning;
   } else if (messageSeverity & vk::DebugUtilsMessageSeverityFlagBitsEXT::eError) {
-    logLevel = google::GLOG_ERROR;
+    logLevel = absl::LogSeverity::kError;
   }
 
   std::string message = pCallbackData->pMessage;
-  if (logLevel == google::GLOG_WARNING && message.find("VK_LOADER_DRIVERS_SELECT") != std::string::npos) {
-    logLevel = google::GLOG_INFO;
+  if (logLevel == absl::LogSeverity::kWarning && message.find("VK_LOADER_DRIVERS_SELECT") != std::string::npos) {
+    logLevel = absl::LogSeverity::kInfo;
   }
 
   if (pCallbackData->queueLabelCount > 0) {
@@ -373,7 +373,7 @@ VKAPI_ATTR VkBool32 VKAPI_CALL debugUtilsMessengerCallback(vk::DebugUtilsMessage
     }
   }
 
-  google::LogMessage(__FILE__, __LINE__, logLevel).stream() << message;
+  LOG(LEVEL(logLevel)) << message;
 
   return VK_FALSE;
 }
@@ -620,8 +620,9 @@ void ZVulkanContext::createInstance()
   std::vector<const char*> enabledLayers;
   std::vector<const char*> enabledExtensions;
   vk::InstanceCreateFlags instanceFlags;
+  const bool debugVulkan = absl::GetFlag(FLAGS_atlas_debug_vulkan);
 
-  if (FLAGS_atlas_debug_vulkan) {
+  if (debugVulkan) {
     // Enable validation layers in debug mode
     const char* validationLayerName = "VK_LAYER_KHRONOS_validation";
     addRequiredLayers(validationLayerName, enabledLayers, availableLayers, true);
@@ -652,7 +653,7 @@ void ZVulkanContext::createInstance()
                    vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance,
     .pfnUserCallback = debugUtilsMessengerCallback};
 
-  if (FLAGS_atlas_debug_vulkan) {
+  if (debugVulkan) {
     instanceCreateInfo.setPNext(&debugUtilsMessengerCreateInfo);
   }
 
@@ -662,7 +663,7 @@ void ZVulkanContext::createInstance()
 
 void ZVulkanContext::setupDebugMessenger()
 {
-  if (!FLAGS_atlas_debug_vulkan || !m_instance) {
+  if (!absl::GetFlag(FLAGS_atlas_debug_vulkan) || !m_instance) {
     return;
   }
 
@@ -773,8 +774,9 @@ void ZVulkanContext::pickPhysicalDevice()
     }
   }
   // Honor preferred index when explicitly requested
-  if (FLAGS_atlas_vk_device_index >= 0 && static_cast<size_t>(FLAGS_atlas_vk_device_index) < infos.size()) {
-    const size_t pref = static_cast<size_t>(FLAGS_atlas_vk_device_index);
+  const int32_t preferredDeviceIndex = absl::GetFlag(FLAGS_atlas_vk_device_index);
+  if (preferredDeviceIndex >= 0 && static_cast<size_t>(preferredDeviceIndex) < infos.size()) {
+    const size_t pref = static_cast<size_t>(preferredDeviceIndex);
     if (infos[pref].suitable) {
       m_selectedDeviceIndex = pref;
       m_queueFamilyIndices = infos[pref].queues;
@@ -941,7 +943,7 @@ void ZVulkanContext::createLogicalDevice()
   enabledPhysicalDeviceFeatures2.features.fragmentStoresAndAtomics = physicalDeviceFeatures.fragmentStoresAndAtomics;
   enabledPhysicalDeviceFeatures2.features.shaderClipDistance = VK_TRUE;
 
-  if (FLAGS_atlas_debug_vulkan) {
+  if (absl::GetFlag(FLAGS_atlas_debug_vulkan)) {
 #ifdef __APPLE__
     // MoltenVK/Metal does not currently support Vulkan buffer robustness; requesting
     // robustBufferAccess triggers noisy warnings like:
@@ -1098,12 +1100,16 @@ void ZVulkanContext::computeBindlessSampledImageCapacities()
   // Requested capacities are developer overrides. Clamp to at least 1 so index
   // 0 can always be reserved for the placeholder texture.
   BindlessSampledImageCapacities requested{};
-  requested.texture2D = static_cast<uint32_t>(std::max<int32_t>(1, FLAGS_atlas_vk_bindless_texture2d_capacity));
+  requested.texture2D =
+    static_cast<uint32_t>(std::max<int32_t>(1, absl::GetFlag(FLAGS_atlas_vk_bindless_texture2d_capacity)));
   requested.texture2DArray =
-    static_cast<uint32_t>(std::max<int32_t>(1, FLAGS_atlas_vk_bindless_texture2darray_capacity));
-  requested.texture3D = static_cast<uint32_t>(std::max<int32_t>(1, FLAGS_atlas_vk_bindless_texture3d_capacity));
-  requested.uTexture2D = static_cast<uint32_t>(std::max<int32_t>(1, FLAGS_atlas_vk_bindless_utexture2d_capacity));
-  requested.uTexture3D = static_cast<uint32_t>(std::max<int32_t>(1, FLAGS_atlas_vk_bindless_utexture3d_capacity));
+    static_cast<uint32_t>(std::max<int32_t>(1, absl::GetFlag(FLAGS_atlas_vk_bindless_texture2darray_capacity)));
+  requested.texture3D =
+    static_cast<uint32_t>(std::max<int32_t>(1, absl::GetFlag(FLAGS_atlas_vk_bindless_texture3d_capacity)));
+  requested.uTexture2D =
+    static_cast<uint32_t>(std::max<int32_t>(1, absl::GetFlag(FLAGS_atlas_vk_bindless_utexture2d_capacity)));
+  requested.uTexture3D =
+    static_cast<uint32_t>(std::max<int32_t>(1, absl::GetFlag(FLAGS_atlas_vk_bindless_utexture3d_capacity)));
 
   const bool usesUpdateAfterBind = m_supportsDescriptorIndexingSampledImageUpdateAfterBind;
 
@@ -1245,7 +1251,7 @@ void ZVulkanContext::computeBindlessSampledImageCapacities()
 
   if (clamped) {
     LOG(WARNING) << fmt::format("VK bindless sampled-image capacities were clamped to device limits ({}). "
-                                "If you expected larger tables, adjust the requested gflags and/or use a different "
+                                "If you expected larger tables, adjust the requested flags and/or use a different "
                                 "Vulkan device.",
                                 clampReason.empty() ? "unknown reason" : clampReason);
   }

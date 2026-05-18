@@ -1,4 +1,5 @@
 #include "zvulkanlinearscript.h"
+#include "zcommandlineflags.h"
 
 #include "z3drendererbase.h"
 #include "z3drenderervulkanbackend.h"
@@ -25,11 +26,13 @@
 #include <unordered_set>
 #include <type_traits>
 
-DEFINE_bool(atlas_vk_linear_script_validate_batch_metadata,
-            false,
-            "Enable expensive CHECK-based validation of Vulkan batch metadata in ZVulkanLinearScript before executing");
+ABSL_FLAG(bool,
+          atlas_vk_linear_script_validate_batch_metadata,
+          false,
+          "Enable expensive CHECK-based validation of Vulkan batch metadata in ZVulkanLinearScript before executing");
 
-DEFINE_bool(
+ABSL_FLAG(
+  bool,
   atlas_vk_linear_script_merge_rasters,
   true,
   "If true, merge consecutive raster nodes into a single Vulkan submission (reduces overhead). When false, each raster "
@@ -1886,7 +1889,8 @@ void ZVulkanLinearScript::flushNodes(std::string_view reason, /*nullable*/ const
 
 void ZVulkanLinearScript::executeNodes(std::span<Node> nodes)
 {
-  const bool mergeRasters = FLAGS_atlas_vk_linear_script_merge_rasters;
+  const bool mergeRasters = absl::GetFlag(FLAGS_atlas_vk_linear_script_merge_rasters);
+  const bool validateBatchMetadata = absl::GetFlag(FLAGS_atlas_vk_linear_script_validate_batch_metadata);
   RendererCPUState merged;
   std::vector<std::string_view> mergedLabels;
   size_t mergedNodeCount = 0;
@@ -1924,7 +1928,7 @@ void ZVulkanLinearScript::executeNodes(std::span<Node> nodes)
       m_backend.endPassScope();
     });
 
-    if (FLAGS_atlas_vk_linear_script_validate_batch_metadata) {
+    if (validateBatchMetadata) {
       validateVulkanBatchMetadataOrCrash(label, merged);
     }
     m_backend.processBatches(m_renderer, merged);
@@ -1962,7 +1966,7 @@ void ZVulkanLinearScript::executeNodes(std::span<Node> nodes)
           m_backend.endPassScope();
         });
 
-        if (FLAGS_atlas_vk_linear_script_validate_batch_metadata) {
+        if (validateBatchMetadata) {
           validateVulkanBatchMetadataOrCrash(label, rasterNode->state);
         }
         m_backend.processBatches(m_renderer, rasterNode->state);
@@ -2002,7 +2006,7 @@ void ZVulkanLinearScript::executeNodes(std::span<Node> nodes)
         m_backend.endPassScope();
       });
 
-      if (FLAGS_atlas_vk_linear_script_validate_batch_metadata) {
+      if (validateBatchMetadata) {
         validateVulkanBatchMetadataOrCrash(label, *replayNode->state);
       }
       m_backend.processBatches(m_renderer, *replayNode->state);

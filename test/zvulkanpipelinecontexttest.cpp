@@ -1,9 +1,9 @@
 #include "zvulkanpipelinecontext_raii.h"
 
-#include <gflags/gflags.h>
+#include "zcommandlineflags.h"
 #include <gtest/gtest.h>
 
-DECLARE_bool(atlas_vk_enforce_pipeline_context);
+ABSL_DECLARE_FLAG(bool, atlas_vk_enforce_pipeline_context);
 
 namespace {
 
@@ -13,14 +13,14 @@ class VulkanPipelineDebugTest : public ::testing::Test
 protected:
   void SetUp() override
   {
-    previousFlag_ = FLAGS_atlas_vk_enforce_pipeline_context;
-    FLAGS_atlas_vk_enforce_pipeline_context = true;
+    previousFlag_ = absl::GetFlag(FLAGS_atlas_vk_enforce_pipeline_context);
+    absl::SetFlag(&FLAGS_atlas_vk_enforce_pipeline_context, true);
     ::testing::FLAGS_gtest_death_test_style = "threadsafe";
   }
 
   void TearDown() override
   {
-    FLAGS_atlas_vk_enforce_pipeline_context = previousFlag_;
+    absl::SetFlag(&FLAGS_atlas_vk_enforce_pipeline_context, previousFlag_);
   }
 
 private:

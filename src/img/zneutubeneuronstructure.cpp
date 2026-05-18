@@ -9,7 +9,7 @@
 
 #include "zlog.h"
 
-#include <gflags/gflags.h>
+#include "zcommandlineflags.h"
 
 #include <algorithm>
 #include <array>
@@ -17,15 +17,17 @@
 #include <limits>
 #include <optional>
 
-DEFINE_bool(atlas_autotrace_reconstruct_chain_connection_prefilter,
-            true,
-            "Use a knot-aware conservative distance prefilter before chain-connection tests during auto-trace "
-            "reconstruction. Disable for debugging or parity investigations.");
+ABSL_FLAG(bool,
+          atlas_autotrace_reconstruct_chain_connection_prefilter,
+          true,
+          "Use a knot-aware conservative distance prefilter before chain-connection tests during auto-trace "
+          "reconstruction. Disable for debugging or parity investigations.");
 
-DEFINE_bool(atlas_trace_enable_legacy_isotropic_chain_canonicalization_for_parity,
-            false,
-            "Preserve legacy Local_Neuroseg_Scale_Z(..., 1.0) canonicalization in chain connection/reconstruction "
-            "paths. This is a parity-only compatibility switch and should stay disabled for normal tracing.");
+ABSL_FLAG(bool,
+          atlas_trace_enable_legacy_isotropic_chain_canonicalization_for_parity,
+          false,
+          "Preserve legacy Local_Neuroseg_Scale_Z(..., 1.0) canonicalization in chain connection/reconstruction "
+          "paths. This is a parity-only compatibility switch and should stay disabled for normal tracing.");
 
 namespace nim {
 
@@ -140,7 +142,7 @@ void growAabb(std::array<double, 3>& aabbMin, std::array<double, 3>& aabbMax, co
     head.seg.h = 2.0;
     tail.seg.h = 2.0;
   }
-  if (FLAGS_atlas_trace_enable_legacy_isotropic_chain_canonicalization_for_parity && zToXYRatio == 1.0) {
+  if (absl::GetFlag(FLAGS_atlas_trace_enable_legacy_isotropic_chain_canonicalization_for_parity) && zToXYRatio == 1.0) {
     // Legacy C code still runs this isotropic no-op transform in these paths. Keep it behind a parity-only flag so
     // the default runtime path follows the cleaner trace-space model without surprising canonicalization noise.
     localNeurosegScaleZLegacyLike(head, 1.0);
@@ -161,7 +163,8 @@ void growAabb(std::array<double, 3>& aabbMin, std::array<double, 3>& aabbMax, co
   Geo3dBallLegacyLike segBall{};
   for (const auto& node : chain) {
     LocalNeuroseg seg = node.locseg;
-    if (FLAGS_atlas_trace_enable_legacy_isotropic_chain_canonicalization_for_parity && zToXYRatio == 1.0) {
+    if (absl::GetFlag(FLAGS_atlas_trace_enable_legacy_isotropic_chain_canonicalization_for_parity) &&
+        zToXYRatio == 1.0) {
       localNeurosegScaleZLegacyLike(seg, 1.0);
     }
     localNeurosegBallBoundLegacyLike(seg, segBall);
@@ -266,7 +269,7 @@ NeuronStructureChainsLegacyLike locsegChainCompNeurostructLegacyLike(std::vector
     return ns;
   }
 
-  const bool usePrefilter = FLAGS_atlas_autotrace_reconstruct_chain_connection_prefilter;
+  const bool usePrefilter = absl::GetFlag(FLAGS_atlas_autotrace_reconstruct_chain_connection_prefilter);
   std::vector<ChainConnectionBoundsLegacyLike> connBounds;
   if (usePrefilter) {
     // Conservative distance prefilter:

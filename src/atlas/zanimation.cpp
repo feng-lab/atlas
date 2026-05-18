@@ -1,4 +1,5 @@
 #include "zanimation.h"
+#include "zcommandlineflags.h"
 
 #include "zvideoencoder.h"
 #include "zdoc.h"
@@ -25,11 +26,12 @@
 #include <utility>
 #include "zlog.h"
 
-DEFINE_string(output_image_name_prefix, "video", "Prefix for naming output images. Default is video");
+ABSL_FLAG(std::string, output_image_name_prefix, "video", "Prefix for naming output images. Default is video");
 
-DEFINE_int32(output_image_name_field_width,
-             8,
-             "Length of the numeric part in output image names following the prefix. Default: 8");
+ABSL_FLAG(int32_t,
+          output_image_name_field_width,
+          8,
+          "Length of the numeric part in output image names following the prefix. Default: 8");
 
 namespace {
 // generic solution
@@ -915,8 +917,8 @@ void ZAnimation::exportFixedSize2DAnimation(const QString& fn,
   progress->setWindowModality(Qt::WindowModal);
   progress->setAttribute(Qt::WA_DeleteOnClose);
   progress->show();
-  int fieldWidth = std::max(FLAGS_output_image_name_field_width, numDigits(totalNumFrames - 1));
-  QString namePrefix = QString::fromStdString(FLAGS_output_image_name_prefix);
+  int fieldWidth = std::max(absl::GetFlag(FLAGS_output_image_name_field_width), numDigits(totalNumFrames - 1));
+  QString namePrefix = QString::fromStdString(absl::GetFlag(FLAGS_output_image_name_prefix));
   auto tempdir = std::make_shared<QTemporaryDir>();
   QDir tmpdir(tempdir->path());
   QString err;

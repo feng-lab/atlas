@@ -1,4 +1,5 @@
 #include "zneutubeedt3d.h"
+#include "zcommandlineflags.h"
 
 #include "zcancellation.h"
 #include "zexception.h"
@@ -18,10 +19,11 @@
 #include <folly/executors/GlobalExecutor.h>
 #include <folly/executors/ThreadPoolExecutor.h>
 
-DEFINE_bool(atlas_edt3d_parallel,
-            true,
-            "Parallelize the 3D distance transform (EDT) passes with folly's global CPU executor. "
-            "Results are deterministic and identical; this mainly improves auto-trace seed extraction throughput.");
+ABSL_FLAG(bool,
+          atlas_edt3d_parallel,
+          true,
+          "Parallelize the 3D distance transform (EDT) passes with folly's global CPU executor. "
+          "Results are deterministic and identical; this mainly improves auto-trace seed extraction throughput.");
 
 namespace nim {
 
@@ -351,7 +353,7 @@ void dt3d_mu16(uint16_t* data, const long* sz, int pad, const folly::Cancellatio
   long len = std::max({w, h, d});
   len += pad * 2;
 
-  if (FLAGS_atlas_edt3d_parallel) {
+  if (absl::GetFlag(FLAGS_atlas_edt3d_parallel)) {
     const size_t lenS = static_cast<size_t>(len);
     const size_t maxInFlight = globalCpuExecutorThreadCountOrFallback();
     auto cpuExecutor = folly::getGlobalCPUExecutor();

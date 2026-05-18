@@ -4,9 +4,15 @@
 #include "z3dgpuinfo.h"
 #include "z3dshaderprogram.h"
 
-#include <gflags/gflags.h>
+#include "zcommandlineflags.h"
 
 #include <utility>
+
+ABSL_FLAG(uint64_t,
+          atlas_sphere_preferred_instance_budget_per_segment,
+          1000000,
+          "Preferred sphere instance budget for one renderer-owned segment. This is the normal packing target; "
+          "backends still enforce maxMonolithicGeometryStreamBytes as a hard safety guard.");
 
 namespace nim {
 
@@ -16,11 +22,6 @@ constexpr size_t kSphereVerticesPerInstance = 4;
 constexpr size_t kSphereIndicesPerInstance = 6;
 
 } // namespace
-
-DEFINE_uint64(atlas_sphere_preferred_instance_budget_per_segment,
-              1000000,
-              "Preferred sphere instance budget for one renderer-owned segment. This is the normal packing target; "
-              "backends still enforce maxMonolithicGeometryStreamBytes as a hard safety guard.");
 
 Z3DSphereRenderer::Z3DSphereRenderer(Z3DRendererBase& rendererBase)
   : Z3DPrimitiveRenderer(rendererBase)
@@ -220,7 +221,7 @@ void Z3DSphereRenderer::render(Z3DEye eye)
   shader.setBoxCorrectionUniform(adj);
 
   const size_t batchVertexBudget =
-    std::max<size_t>(1, static_cast<size_t>(FLAGS_atlas_sphere_preferred_instance_budget_per_segment)) *
+    std::max<size_t>(1, static_cast<size_t>(absl::GetFlag(FLAGS_atlas_sphere_preferred_instance_budget_per_segment))) *
     kSphereVerticesPerInstance;
   size_t numBatch = std::ceil(m_pointAndRadius.size() * 1.0 / batchVertexBudget);
 
@@ -403,7 +404,7 @@ void Z3DSphereRenderer::renderPicking(Z3DEye eye)
   shader.setBoxCorrectionUniform(adj);
 
   const size_t batchVertexBudget =
-    std::max<size_t>(1, static_cast<size_t>(FLAGS_atlas_sphere_preferred_instance_budget_per_segment)) *
+    std::max<size_t>(1, static_cast<size_t>(absl::GetFlag(FLAGS_atlas_sphere_preferred_instance_budget_per_segment))) *
     kSphereVerticesPerInstance;
   size_t numBatch = std::ceil(m_pointAndRadius.size() * 1.0 / batchVertexBudget);
 
@@ -669,7 +670,7 @@ void Z3DSphereRenderer::enqueueRenderBatches(Z3DEye eye, RenderBackend backend, 
   CHECK(renderBackend != nullptr) << "Sphere segmentation requires an active backend";
   const size_t maxStreamBytes = renderBackend->maxMonolithicGeometryStreamBytes();
   const size_t preferredInstanceBudget =
-    std::max<size_t>(1, static_cast<size_t>(FLAGS_atlas_sphere_preferred_instance_budget_per_segment));
+    std::max<size_t>(1, static_cast<size_t>(absl::GetFlag(FLAGS_atlas_sphere_preferred_instance_budget_per_segment)));
   const size_t totalInstanceCount = m_pointAndRadius.size() / kSphereVerticesPerInstance;
 
   auto rangeFitsHardLimit = [&](size_t instanceCount) {

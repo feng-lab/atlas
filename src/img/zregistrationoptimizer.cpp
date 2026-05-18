@@ -140,7 +140,7 @@ void ZRegistrationOptimizer::setParameterScales(const std::vector<double>& scale
 
 void ZRegistrationOptimizer::minimize()
 {
-  CHECK_NOTNULL(m_costFunction);
+  CHECK(m_costFunction != nullptr) << "ZRegistrationOptimizer requires a cost function before minimize()";
   checkParameterNumber();
 
   m_currentParameters = m_initialParameters;

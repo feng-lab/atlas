@@ -40,9 +40,9 @@ ZImgInit::instance(const QString& resourcesDIR, const QString& jreDIR, const QSt
 
 ZImgInit::ZImgInit(const QString& resourcesDIR, const QString& jreDIR, const QString& jarsDIR, bool verbose)
 {
-  if (!google::IsGoogleLoggingInitialized()) {
+  if (!ZLogInit::isInitialized()) {
     ZLogInit::instance("zimg"s);
-    LOG(WARNING) << "glog is not initialized, initialize it now";
+    LOG(WARNING) << "Atlas logging was not initialized; initialized it from ZImgInit";
   }
 
   if (jarsDIR.isEmpty()) {
@@ -125,7 +125,9 @@ ZImgInit::ZImgInit(const QString& resourcesDIR, const QString& jreDIR, const QSt
 
   jpegxr_register_h5filter();
 
-  // folly
+  // Keep this as the small Folly runtime subset Atlas needs. Full folly::Init
+  // also initializes glog and installs Folly's fatal signal handler, while
+  // Atlas owns logging and crash handling through ZLogInit/Abseil.
   // Indicate ProcessPhase::Regular and register handler to
   // indicate ProcessPhase::Exit.
   folly::set_process_phases();

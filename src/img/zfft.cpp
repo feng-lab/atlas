@@ -1,4 +1,5 @@
 #include "zfft.h"
+#include "zcommandlineflags.h"
 
 #include "zmkl.h"
 #ifdef ZIMG_USE_FFTW
@@ -9,17 +10,20 @@
 // #include <tbb/global_control.h>
 #include <thread>
 
-DEFINE_uint32(zimg_global_fft_number_of_threads,
-              0,
-              "Number of threads fft will use, default is 0 which is hardware concurrency.");
+ABSL_FLAG(uint32_t,
+          zimg_global_fft_number_of_threads,
+          0,
+          "Number of threads fft will use, default is 0 which is hardware concurrency.");
 
-DEFINE_bool(zimg_use_mkl_for_fft_if_available,
-            true,
-            "Whether to use mkl for fft computation if available, default is true");
+ABSL_FLAG(bool,
+          zimg_use_mkl_for_fft_if_available,
+          true,
+          "Whether to use mkl for fft computation if available, default is true");
 
-DEFINE_bool(zimg_use_fftw_for_fft_if_available,
-            true,
-            "Whether to use fftw for fft computation if available, default is true");
+ABSL_FLAG(bool,
+          zimg_use_fftw_for_fft_if_available,
+          true,
+          "Whether to use fftw for fft computation if available, default is true");
 
 namespace {
 
@@ -53,18 +57,17 @@ ZComplexImg fft(const ZImg& img, size_t outWidth, size_t outHeight, size_t outDe
   ZComplexImg tmp(width, outHeight, outDepth);
   res.swap(tmp);
 
-  auto nthreads = FLAGS_zimg_global_fft_number_of_threads;
-  nthreads = nthreads ? nthreads : std::thread::hardware_concurrency();
+  const auto configuredThreadLimit = absl::GetFlag(FLAGS_zimg_global_fft_number_of_threads);
+  auto nthreads = configuredThreadLimit ? configuredThreadLimit : std::thread::hardware_concurrency();
 
 #if ZIMG_MKL_ENABLED
-  if (FLAGS_zimg_use_mkl_for_fft_if_available) {
+  if (absl::GetFlag(FLAGS_zimg_use_mkl_for_fft_if_available)) {
     ZImg wrapImg;
     // reinterpret_cast allowed (section "Complex numbers")
     wrapImg.wrapData(reinterpret_cast<double*>(res.rawData()), width * 2, outHeight, outDepth);
     wrapImg.pasteImg(img);
     wrapImg.clear(); // copy data finished
 
-    // mkl_domain_set_num_threads(FLAGS_zimg_global_fft_number_of_threads, MKL_DOMAIN_FFT);
     // tbb::global_control gc(tbb::global_control::max_allowed_parallelism, nthreads);
     MKL_LONG dims[] = {static_cast<MKL_LONG>(outDepth),
                        static_cast<MKL_LONG>(outHeight),
@@ -74,7 +77,7 @@ ZComplexImg fft(const ZImg& img, size_t outWidth, size_t outHeight, size_t outDe
     auto descHandleGuard = folly::makeGuard([&descHandle]() {
       DftiFreeDescriptor(&descHandle);
     });
-    MKL_DFTI_CHECK(DftiSetValue(descHandle, DFTI_THREAD_LIMIT, FLAGS_zimg_global_fft_number_of_threads));
+    MKL_DFTI_CHECK(DftiSetValue(descHandle, DFTI_THREAD_LIMIT, configuredThreadLimit));
     MKL_DFTI_CHECK(DftiSetValue(descHandle, DFTI_CONJUGATE_EVEN_STORAGE, DFTI_COMPLEX_COMPLEX));
     MKL_LONG rstrides[] = {0, 2 * dims[1] * (dims[2] / 2 + 1), 2 * (dims[2] / 2 + 1), 1};
     MKL_DFTI_CHECK(DftiSetValue(descHandle, DFTI_INPUT_STRIDES, rstrides));
@@ -88,7 +91,7 @@ ZComplexImg fft(const ZImg& img, size_t outWidth, size_t outHeight, size_t outDe
 #endif
 
 #ifdef ZIMG_USE_FFTW
-  if (FLAGS_zimg_use_fftw_for_fft_if_available) {
+  if (absl::GetFlag(FLAGS_zimg_use_fftw_for_fft_if_available)) {
     // from fftw benchmark, 3d inplace is faster than outofplace, so we
     // first copy real data to complex img
     ZImg wrapImg;
@@ -134,12 +137,11 @@ ZImg ifft(ZComplexImg& cimg, size_t width, size_t outWidth, size_t outHeight, si
     return res;
   }
 
-  auto nthreads = FLAGS_zimg_global_fft_number_of_threads;
-  nthreads = nthreads ? nthreads : std::thread::hardware_concurrency();
+  const auto configuredThreadLimit = absl::GetFlag(FLAGS_zimg_global_fft_number_of_threads);
+  auto nthreads = configuredThreadLimit ? configuredThreadLimit : std::thread::hardware_concurrency();
 
 #if ZIMG_MKL_ENABLED
-  if (FLAGS_zimg_use_mkl_for_fft_if_available) {
-    // mkl_domain_set_num_threads(FLAGS_zimg_global_fft_number_of_threads, MKL_DOMAIN_FFT);
+  if (absl::GetFlag(FLAGS_zimg_use_mkl_for_fft_if_available)) {
     // tbb::global_control gc(tbb::global_control::max_allowed_parallelism, nthreads);
     MKL_LONG dims[] = {static_cast<MKL_LONG>(cimg.depth()),
                        static_cast<MKL_LONG>(cimg.height()),
@@ -150,7 +152,7 @@ ZImg ifft(ZComplexImg& cimg, size_t width, size_t outWidth, size_t outHeight, si
       DftiFreeDescriptor(&descHandle);
     });
     MKL_DFTI_CHECK(DftiSetValue(descHandle, DFTI_BACKWARD_SCALE, 1. / (width * cimg.height() * cimg.depth())));
-    MKL_DFTI_CHECK(DftiSetValue(descHandle, DFTI_THREAD_LIMIT, FLAGS_zimg_global_fft_number_of_threads));
+    MKL_DFTI_CHECK(DftiSetValue(descHandle, DFTI_THREAD_LIMIT, configuredThreadLimit));
     MKL_DFTI_CHECK(DftiSetValue(descHandle, DFTI_CONJUGATE_EVEN_STORAGE, DFTI_COMPLEX_COMPLEX));
     MKL_LONG rstrides[] = {0, 2 * dims[1] * (dims[2] / 2 + 1), 2 * (dims[2] / 2 + 1), 1};
     MKL_LONG cstrides[] = {0, dims[1] * (dims[2] / 2 + 1), dims[2] / 2 + 1, 1};
@@ -171,7 +173,7 @@ ZImg ifft(ZComplexImg& cimg, size_t width, size_t outWidth, size_t outHeight, si
 #endif
 
 #ifdef ZIMG_USE_FFTW
-  if (FLAGS_zimg_use_fftw_for_fft_if_available) {
+  if (absl::GetFlag(FLAGS_zimg_use_fftw_for_fft_if_available)) {
     fftw_plan_with_nthreads(nthreads);
     fftw_plan p = fftw_plan_dft_c2r_3d(cimg.depth(),
                                        cimg.height(),

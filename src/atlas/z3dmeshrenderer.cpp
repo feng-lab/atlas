@@ -9,11 +9,17 @@
 #include "zoptionparameter.h"
 #include "znumericparameter.h"
 
-#include <gflags/gflags.h>
+#include "zcommandlineflags.h"
 
 #include <algorithm>
 #include <utility>
 #include <limits>
+
+ABSL_FLAG(uint64_t,
+          atlas_mesh_preferred_triangle_budget_per_segment,
+          1000000,
+          "Preferred mesh triangle budget for one renderer-owned segment. This is the normal performance/UX target; "
+          "backends still enforce maxMonolithicGeometryStreamBytes as a hard safety guard.");
 
 namespace nim {
 
@@ -45,12 +51,6 @@ static_assert(sizeof(glm::vec4) == sizeof(GLfloat) * 4, "Z3DMeshRenderer assumes
 }
 
 } // namespace
-
-DEFINE_uint64(
-  atlas_mesh_preferred_triangle_budget_per_segment,
-  1000000,
-  "Preferred mesh triangle budget for one renderer-owned segment. This is the normal performance/UX target; "
-  "backends still enforce maxMonolithicGeometryStreamBytes as a hard safety guard.");
 
 Z3DMeshRenderer::Z3DMeshRenderer(Z3DRendererBase& rendererBase)
   : Z3DPrimitiveRenderer(rendererBase)
@@ -293,7 +293,7 @@ void Z3DMeshRenderer::ensureMeshSegmentationPlan(RenderBackend backend)
 {
   const size_t maxStreamBytes = maxMonolithicGeometryStreamBytesForBackend(backend);
   const size_t preferredTriangleBudget =
-    std::max<size_t>(1, static_cast<size_t>(FLAGS_atlas_mesh_preferred_triangle_budget_per_segment));
+    std::max<size_t>(1, static_cast<size_t>(absl::GetFlag(FLAGS_atlas_mesh_preferred_triangle_budget_per_segment)));
   if (m_segmentationPlan.valid && m_segmentationPlan.backend == backend &&
       m_segmentationPlan.maxMonolithicGeometryStreamBytes == maxStreamBytes &&
       m_segmentationPlan.colorSource == m_colorSource) {

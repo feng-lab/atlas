@@ -5,7 +5,7 @@
 #include "zstringparameter.h"
 #include "zsysteminfo.h"
 
-#include <gflags/gflags.h>
+#include "zcommandlineflags.h"
 
 #include <QApplication>
 #include <QCheckBox>
@@ -43,15 +43,14 @@ QString editorLabel(const ZFlagSettingSpec& spec)
   return spec.advanced ? QStringLiteral("%1 (Advanced)").arg(spec.label) : spec.label;
 }
 
-QString
-helpLabelText(const ZFlagSettingSpec& spec, const gflags::CommandLineFlagInfo& info, const QString& effectiveValue)
+QString helpLabelText(const ZFlagSettingSpec& spec, const ZCommandLineFlagInfo& info, const QString& effectiveValue)
 {
   QString text = QStringLiteral("%1<br/>%2<br/><b>Compiled default:</b> %3")
                    .arg(htmlCode(QStringLiteral("--") + spec.name),
                         QString::fromStdString(info.description).toHtmlEscaped(),
-                        htmlCode(QString::fromStdString(info.default_value)));
+                        htmlCode(QString::fromStdString(info.defaultValue)));
 
-  const QString currentValue = QString::fromStdString(info.current_value);
+  const QString currentValue = QString::fromStdString(info.currentValue);
   if (currentValue != effectiveValue) {
     text += QStringLiteral("<br/><b>Current session:</b> %1").arg(htmlCode(currentValue));
   }
@@ -171,9 +170,9 @@ void ZFlagSettingsDialog::createTabs()
       pages.insert(spec.category, pageLayout);
     }
 
-    auto info = std::make_unique<gflags::CommandLineFlagInfo>();
+    auto info = std::make_unique<ZCommandLineFlagInfo>();
     const QByteArray flagName = spec.name.toUtf8();
-    *info = gflags::GetCommandLineFlagInfoOrDie(flagName.constData());
+    *info = getCommandLineFlagInfoOrDie(flagName.constData());
     auto* infoPtr = info.get();
     m_flagInfos.push_back(std::move(info));
 
@@ -183,7 +182,7 @@ void ZFlagSettingsDialog::createTabs()
 
     const QString effectiveValue = m_document.hasManagedValue(spec.name)
                                      ? m_document.managedValue(spec.name)
-                                     : QString::fromStdString(infoPtr->default_value);
+                                     : QString::fromStdString(infoPtr->defaultValue);
 
     auto* fieldContainer = new QWidget(this);
     auto* fieldLayout = new QVBoxLayout(fieldContainer);
@@ -283,7 +282,7 @@ void ZFlagSettingsDialog::populateInitialValues()
   for (auto& field : m_fields) {
     const QString initialValue = m_document.hasManagedValue(field.spec->name)
                                    ? m_document.managedValue(field.spec->name)
-                                   : QString::fromStdString(field.info->default_value);
+                                   : QString::fromStdString(field.info->defaultValue);
     setFieldValue(field, initialValue, true);
   }
 }
@@ -310,7 +309,7 @@ void ZFlagSettingsDialog::updateBanner()
 
 QString ZFlagSettingsDialog::defaultValueForField(const FieldWidgets& field) const
 {
-  return QString::fromStdString(field.info->default_value);
+  return QString::fromStdString(field.info->defaultValue);
 }
 
 void ZFlagSettingsDialog::setFieldValue(FieldWidgets& field, const QString& value, bool allowInvalidChoice)
@@ -390,11 +389,11 @@ bool ZFlagSettingsDialog::validateField(const FieldWidgets& field, QString* cano
     return false;
   }
 
-  gflags::FlagSaver saver;
+  absl::FlagSaver saver;
   const QByteArray name = field.spec->name.toUtf8();
   const QByteArray value = rawValue.toUtf8();
-  const std::string result = gflags::SetCommandLineOption(name.constData(), value.constData());
-  if (result.empty()) {
+  std::string parseError;
+  if (!setCommandLineOption(name.constData(), value.constData(), &parseError)) {
     if (error != nullptr) {
       *error = tr("Invalid value for --%1: %2").arg(field.spec->name, rawValue);
     }
@@ -402,7 +401,7 @@ bool ZFlagSettingsDialog::validateField(const FieldWidgets& field, QString* cano
   }
 
   std::string current;
-  CHECK(gflags::GetCommandLineOption(name.constData(), &current)) << "Failed to read canonical flag value";
+  CHECK(getCommandLineOption(name.constData(), &current)) << "Failed to read canonical flag value";
   if (canonicalValue != nullptr) {
     *canonicalValue = QString::fromStdString(current);
   }

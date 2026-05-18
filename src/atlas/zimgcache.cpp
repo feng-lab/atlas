@@ -1,10 +1,12 @@
 #include "zimgcache.h"
+#include "zcommandlineflags.h"
 
 #include "zcpuinfo.h"
 
-DEFINE_double(atlas_image_cache_memory_proportion,
-              0.3,
-              "Proportion of RAM that will be used for image cache, default is 0.3");
+ABSL_FLAG(double,
+          atlas_image_cache_memory_proportion,
+          0.3,
+          "Proportion of RAM that will be used for image cache, default is 0.3");
 
 namespace nim {
 
@@ -17,7 +19,7 @@ ZImgCache& ZImgCache::instance()
 
 ZImgCache::ZImgCache()
   : ZSharedCache<ZImgPack::HashKeyType, ZImg>(ZCpuInfo::instance().nPhysicalRAM *
-                                              FLAGS_atlas_image_cache_memory_proportion)
+                                              absl::GetFlag(FLAGS_atlas_image_cache_memory_proportion))
 {}
 #else
 ZImgCache& ZImgCache::instance()
@@ -27,7 +29,7 @@ ZImgCache& ZImgCache::instance()
 }
 
 ZImgCache::ZImgCache(bool canSkipDestructor)
-  : ZParentImgCache(ZCpuInfo::instance().nPhysicalRAM * FLAGS_atlas_image_cache_memory_proportion,
+  : ZParentImgCache(ZCpuInfo::instance().nPhysicalRAM * absl::GetFlag(FLAGS_atlas_image_cache_memory_proportion),
                     ZCpuInfo::instance().nLogicalCores * 2,
                     canSkipDestructor)
 {}

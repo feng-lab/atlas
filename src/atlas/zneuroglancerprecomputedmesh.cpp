@@ -9,7 +9,7 @@
 
 #include "zmesh.h"
 
-#include <gflags/gflags.h>
+#include "zcommandlineflags.h"
 
 #include <draco/compression/decode.h>
 #include <draco/core/decoder_buffer.h>

@@ -1,4 +1,5 @@
 #include "zvulkanellipsoidpipelinecontext.h"
+#include "zcommandlineflags.h"
 
 #include "z3drendererbase.h"
 #include "z3drenderervulkanbackend.h"
@@ -28,7 +29,7 @@
 #include <cstring>
 #include <cstdint>
 
-DECLARE_bool(atlas_vk_cache_draw_secondaries);
+ABSL_DECLARE_FLAG(bool, atlas_vk_cache_draw_secondaries);
 
 namespace nim {
 namespace {
@@ -353,7 +354,7 @@ void ZVulkanEllipsoidPipelineContext::record(Z3DRendererBase& renderer,
 
   const bool ddpHook = (shaderHook == Z3DRendererBase::ShaderHookType::DualDepthPeelingInit ||
                         shaderHook == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel);
-  if (FLAGS_atlas_vk_cache_draw_secondaries &&
+  if (absl::GetFlag(FLAGS_atlas_vk_cache_draw_secondaries) &&
       m_backend.device().context().supportsInlineAndSecondaryDynamicRendering() && payload.streamKey != 0 &&
       m_usedStaticVBThisFrame && allStaticSegments && !ddpHook) {
     m_backend.notifyDrawSecondaryCacheAttempt();
