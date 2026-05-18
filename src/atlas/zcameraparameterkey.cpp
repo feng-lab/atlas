@@ -3,7 +3,36 @@
 #include "zparameterfactory.h"
 #include "zlog.h"
 
+#include <cmath>
+
 namespace nim {
+
+const std::array<ZCameraParameterKey::TcbFieldInfo, 6>& ZCameraParameterKey::tcbFieldInfos()
+{
+  static constexpr std::array<TcbFieldInfo, 6> kInfos = {
+    {
+     {"posTension",
+       "Advanced camera eye-position TCB tension in [-1,1]. 0 is neutral; keep 0 unless intentionally shaping a "
+       "free-camera spline path."},
+     {"posContinuity",
+       "Advanced camera eye-position TCB continuity in [-1,1]. 0 is neutral; use only when intentionally changing "
+       "how the spline turns through this key."},
+     {"posBias",
+       "Advanced camera eye-position TCB bias in [-1,1]. 0 is neutral; use only when intentionally biasing the path "
+       "toward the previous or next segment."},
+     {"rotTension",
+       "Advanced camera rotation TCB tension in [-1,1]. 0 is neutral; keep 0 unless intentionally shaping a rotation "
+       "spline."},
+     {"rotContinuity",
+       "Advanced camera rotation TCB continuity in [-1,1]. 0 is neutral; use only when intentionally changing how "
+       "rotation turns through this key."},
+     {"rotBias",
+       "Advanced camera rotation TCB bias in [-1,1]. 0 is neutral; use only when intentionally biasing rotation "
+       "toward the previous or next segment."},
+     }
+  };
+  return kInfos;
+}
 
 ZCameraParameterKey::ZCameraParameterKey(double tm, const Z3DCameraParameter& p)
   : ZParameterKey(tm, p)
@@ -36,12 +65,46 @@ bool ZCameraParameterKey::readValue(const json::value& value)
   }
   const auto& obj = value.as_object();
   // TCB fields are optional; when unspecified, keep current defaults (0).
-  if (auto it = obj.if_contains("posTension"); it) m_posTension = json::value_to<float>(*it);
-  if (auto it = obj.if_contains("posContinuity"); it) m_posContinuity = json::value_to<float>(*it);
-  if (auto it = obj.if_contains("posBias"); it) m_posBias = json::value_to<float>(*it);
-  if (auto it = obj.if_contains("rotTension"); it) m_rotTension = json::value_to<float>(*it);
-  if (auto it = obj.if_contains("rotContinuity"); it) m_rotContinuity = json::value_to<float>(*it);
-  if (auto it = obj.if_contains("rotBias"); it) m_rotBias = json::value_to<float>(*it);
+  const auto readTcb = [&](const char* name, auto setter) {
+    if (auto it = obj.if_contains(name); it) {
+      if (!it->is_number()) {
+        LOG(WARNING) << "Invalid camera TCB value " << name << "; expected numeric value in [-1, 1]";
+        return false;
+      }
+      const double v = it->as_double();
+      if (!std::isfinite(v) || v < -1.0 || v > 1.0) {
+        LOG(WARNING) << "Invalid camera TCB value " << name << "=" << v << "; expected [-1, 1]";
+        return false;
+      }
+      setter(static_cast<float>(v));
+    }
+    return true;
+  };
+  if (!readTcb("posTension",
+               [this](float v) {
+                 setPosTension(v);
+               }) ||
+      !readTcb("posContinuity",
+               [this](float v) {
+                 setPosContinuity(v);
+               }) ||
+      !readTcb("posBias",
+               [this](float v) {
+                 setPosBias(v);
+               }) ||
+      !readTcb("rotTension",
+               [this](float v) {
+                 setRotTension(v);
+               }) ||
+      !readTcb("rotContinuity",
+               [this](float v) {
+                 setRotContinuity(v);
+               }) ||
+      !readTcb("rotBias", [this](float v) {
+        setRotBias(v);
+      })) {
+    return false;
+  }
   return true;
 }
 

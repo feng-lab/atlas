@@ -11,6 +11,8 @@
 #include "zsvgdoc.h"
 #include "zregionannotationdoc.h"
 #include "z3dglobalparameters.h"
+#include "zcameraparameteranimation.h"
+#include "zcameraparameterkey.h"
 #include "zimg.h"
 #include "zimgio.h"
 #include "zmeshio.h"
@@ -113,7 +115,9 @@ json::value makeColorSchema()
 }
 
 // Forward: build schema from supplied parameter schemas and capability index
-json::object buildSchema(const json::object& paramSchemas, const json::object& capabilitiesIndex)
+json::object buildSchema(const json::object& paramSchemas,
+                         const json::object& capabilitiesIndex,
+                         const json::object& cameraInterpolationMethodSchema)
 {
   using nim::jsonToString;
 
@@ -199,17 +203,17 @@ json::object buildSchema(const json::object& paramSchemas, const json::object& c
     allOf.emplace_back(ref);
     key["allOf"] = allOf;
     json::object props;
-    auto addNum = [&](const char* n) {
+    auto addNum = [&](const ZCameraParameterKey::TcbFieldInfo& field) {
       json::object o;
       o["type"] = "number";
-      props[n] = o;
+      o["minimum"] = -1;
+      o["maximum"] = 1;
+      o["description"] = field.description;
+      props[field.jsonName] = o;
     };
-    addNum("posTension");
-    addNum("posContinuity");
-    addNum("posBias");
-    addNum("rotTension");
-    addNum("rotContinuity");
-    addNum("rotBias");
+    for (const auto& field : ZCameraParameterKey::tcbFieldInfos()) {
+      addNum(field);
+    }
     key["properties"] = props;
     defs["CameraKey"] = key;
   }
@@ -242,6 +246,7 @@ json::object buildSchema(const json::object& paramSchemas, const json::object& c
       {"$ref", "#/defs/CameraKey"}
     };
     props["keys"] = keys;
+    props["interpolationMethod"] = cameraInterpolationMethodSchema;
     ca["properties"] = props;
     ca["additionalProperties"] = true;
     defs["CameraAnimation"] = ca;
@@ -711,9 +716,16 @@ int ZRunDumpAnimation3DSchema::run()
     }
     capsIndex["objects_patterns"] = oiPat;
 
+    ZCameraParameterAnimation cameraAnimationTemplate(QStringLiteral("Camera"));
+    json::object cameraInterpolationMethodSchema = cameraAnimationTemplate.interpolationMethodPara().valueSchema();
+    const QString cameraInterpolationDescription = cameraAnimationTemplate.interpolationMethodPara().description();
+    if (!cameraInterpolationDescription.isEmpty()) {
+      cameraInterpolationMethodSchema["description"] = cameraInterpolationDescription.toStdString();
+    }
+
     // Dump the schema with precise parameter value schemas and capability index under $defs
     LOG(INFO) << "Dumping Animation3D schema to " << schemaOut;
-    auto schema = buildSchema(paramSchemas, capsIndex);
+    auto schema = buildSchema(paramSchemas, capsIndex, cameraInterpolationMethodSchema);
     // Expose pattern schemas for dynamic, digit-indexed keys (e.g., image channels)
     schema["$defs"].as_object()["ParameterSchemaPatterns"] = patternSchemas;
     schema["defs"].as_object()["ParameterSchemaPatterns"] = patternSchemas;

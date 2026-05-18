@@ -56,6 +56,10 @@ QLabel* ZParameter::createNameLabel(QWidget* parent)
 {
   auto label = new QLabel(m_name, parent);
   label->setTextInteractionFlags(Qt::TextSelectableByMouse);
+  if (!m_description.isEmpty()) {
+    label->setToolTip(m_description);
+    label->setStatusTip(m_description);
+  }
   if (!m_isWidgetsVisible) {
     label->setVisible(m_isWidgetsVisible);
   }
@@ -77,6 +81,10 @@ QLabel* ZParameter::createNameLabel(QWidget* parent)
 QWidget* ZParameter::createWidget(QWidget* parent)
 {
   QWidget* widget = actualCreateWidget(parent);
+  if (!m_description.isEmpty()) {
+    widget->setToolTip(m_description);
+    widget->setStatusTip(m_description);
+  }
   if (!m_isWidgetsVisible) {
     widget->setVisible(m_isWidgetsVisible);
   }

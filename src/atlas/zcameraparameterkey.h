@@ -3,6 +3,8 @@
 #include "z3dcameraparameter.h"
 #include "zparameterkey.h"
 
+#include <array>
+
 namespace nim {
 
 // Kochanek-Bartels tension-continuity-bias spline interpolation for
@@ -11,6 +13,14 @@ namespace nim {
 class ZCameraParameterKey : public ZParameterKey
 {
 public:
+  struct TcbFieldInfo
+  {
+    const char* jsonName = "";
+    const char* description = "";
+  };
+
+  [[nodiscard]] static const std::array<TcbFieldInfo, 6>& tcbFieldInfos();
+
   ZCameraParameterKey(double tm, const Z3DCameraParameter& p);
 
   ZCameraParameterKey(double tm, Z3DCameraParameter* p);

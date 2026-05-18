@@ -153,7 +153,8 @@ Z3DAnimationDoc::KeyOpResult Z3DAnimationDoc::setKey(size_t animationId,
                                                      const QString& jsonKey,
                                                      double timeSec,
                                                      const QString& easing,
-                                                     const json::value& value)
+                                                     const json::value& value,
+                                                     std::optional<CameraKeyTcb> cameraTcb)
 {
   KeyOpResult out;
   const bool recordUndo = (m_undoSuppressionDepth == 0);
@@ -198,11 +199,19 @@ Z3DAnimationDoc::KeyOpResult Z3DAnimationDoc::setKey(size_t animationId,
     keyObj["time"] = timeSec;
     keyObj["type"] = easing.toStdString();
     keyObj["value"] = value;
+    if (cameraTcb) {
+      keyObj["posTension"] = cameraTcb->posTension;
+      keyObj["posContinuity"] = cameraTcb->posContinuity;
+      keyObj["posBias"] = cameraTcb->posBias;
+      keyObj["rotTension"] = cameraTcb->rotTension;
+      keyObj["rotContinuity"] = cameraTcb->rotContinuity;
+      keyObj["rotBias"] = cameraTcb->rotBias;
+    }
     try {
       if (!ckey->readValue(keyObj)) {
         out.ok = false;
         out.errorKind = KeyOpResult::ErrorKind::InvalidArgument;
-        out.error = "camera key value incompatible with parameter";
+        out.error = "camera key value or TCB fields incompatible with parameter";
         return out;
       }
     }
@@ -227,6 +236,13 @@ Z3DAnimationDoc::KeyOpResult Z3DAnimationDoc::setKey(size_t animationId,
       anim->pushUndoSnapshotCommand("Set Camera Key", std::move(before));
     }
     out.ok = true;
+    return out;
+  }
+
+  if (cameraTcb) {
+    out.ok = false;
+    out.errorKind = KeyOpResult::ErrorKind::InvalidArgument;
+    out.error = "camera_tcb is only supported for target_id=0 camera keys";
     return out;
   }
 
@@ -478,7 +494,6 @@ Z3DAnimationDoc::KeyOpResult Z3DAnimationDoc::removeKey(size_t animationId,
           before = anim->captureUndoSnapshot();
         }
         cpa->deleteKey(k.get());
-        cpa->emitKeysChangedSignal();
         if (recordUndo) {
           anim->pushUndoSnapshotCommand("Remove Camera Key", std::move(before));
         }
@@ -515,7 +530,6 @@ Z3DAnimationDoc::KeyOpResult Z3DAnimationDoc::removeKey(size_t animationId,
         before = anim->captureUndoSnapshot();
       }
       pa->deleteKey(k.get());
-      pa->emitKeysChangedSignal();
       if (recordUndo) {
         anim->pushUndoSnapshotCommand("Remove Key", std::move(before));
       }
@@ -565,7 +579,6 @@ Z3DAnimationDoc::KeyOpResult Z3DAnimationDoc::clearKeys(size_t animationId, size
     for (auto* k : keys) {
       cpa->deleteKey(k);
     }
-    cpa->emitKeysChangedSignal();
     if (recordUndo) {
       anim->pushUndoSnapshotCommand("Clear Camera Keys", std::move(before));
     }
@@ -600,7 +613,6 @@ Z3DAnimationDoc::KeyOpResult Z3DAnimationDoc::clearKeys(size_t animationId, size
       for (auto* k : keys) {
         pa->deleteKey(k);
       }
-      pa->emitKeysChangedSignal();
     }
     if (recordUndo) {
       anim->pushUndoSnapshotCommand("Clear Keys", std::move(before));
@@ -631,7 +643,6 @@ Z3DAnimationDoc::KeyOpResult Z3DAnimationDoc::clearKeys(size_t animationId, size
   for (auto* k : keys) {
     pa->deleteKey(k);
   }
-  pa->emitKeysChangedSignal();
   if (recordUndo) {
     anim->pushUndoSnapshotCommand("Clear Keys", std::move(before));
   }
@@ -759,7 +770,7 @@ Z3DAnimationDoc::KeyOpResult Z3DAnimationDoc::batchKeys(size_t animationId,
   bool hasTimeZero = false;
   for (size_t idx = 0; idx < setOps.size(); ++idx) {
     const auto& s = setOps[idx];
-    auto res = setKey(animationId, s.targetId, s.jsonKey, s.timeSec, s.easing, s.value);
+    auto res = setKey(animationId, s.targetId, s.jsonKey, s.timeSec, s.easing, s.value, s.cameraTcb);
     if (!res.ok) {
       anim->restoreFromUndoSnapshot(before);
       out.ok = false;

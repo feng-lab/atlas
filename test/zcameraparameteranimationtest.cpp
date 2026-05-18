@@ -4,6 +4,8 @@
 #include "zglmutils.h"
 #include "ztest.h"
 
+#include <Mathematics/TCBSplineCurve.h>
+
 using namespace nim;
 
 namespace {
@@ -36,11 +38,7 @@ struct SquadPoly
 
 [[nodiscard]] std::vector<SquadPoly> buildExpectedRotSpline(std::vector<QuatKey> keys)
 {
-  // Mirror ZCameraParameterAnimation::SplineRange behavior:
-  // - Duplicate first/last keys to support endpoint tangent construction.
   CHECK(keys.size() >= 2);
-  keys.insert(keys.begin(), keys.front());
-  keys.push_back(keys.back());
 
   // Ensure consecutive quaternions form an acute angle. This is required for
   // stable log/exp spline construction (q and -q represent the same rotation).
@@ -51,54 +49,70 @@ struct SquadPoly
   }
 
   std::vector<SquadPoly> out;
-  out.reserve(keys.size() - 3);
+  out.resize(keys.size() - 1);
 
-  for (size_t i0 = 0, i1 = 1, i2 = 2, i3 = 3; i3 < keys.size(); i0++, i1++, i2++, i3++) {
-    const glm::quat kQ0 = keys[i0].rot;
-    const glm::quat kQ1 = keys[i1].rot;
-    const glm::quat kQ2 = keys[i2].rot;
-    const glm::quat kQ3 = keys[i3].rot;
+  std::vector<glm::quat> inTangents(keys.size(), glm::quat(0.f, 0.f, 0.f, 0.f));
+  std::vector<glm::quat> outTangents(keys.size(), glm::quat(0.f, 0.f, 0.f, 0.f));
 
-    const glm::quat kLog10 = glm::log(glm::conjugate(kQ0) * kQ1);
-    const glm::quat kLog21 = glm::log(glm::conjugate(kQ1) * kQ2);
-    const glm::quat kLog32 = glm::log(glm::conjugate(kQ2) * kQ3);
+  {
+    const float delta = keys[1].time - keys[0].time;
+    CHECK(delta > 0.f);
+    const float coeff = (1.0f - keys[0].tension) * (1.0f - keys[0].continuity) * (1.0f - keys[0].bias) / (2.0f * delta);
+    outTangents[0] = coeff * glm::log(glm::conjugate(keys[0].rot) * keys[1].rot);
+    inTangents[0] = outTangents[0];
+  }
 
-    // Build multipliers at q[i1]
-    const float fOmT0 = 1.0f - keys[i1].tension;
-    const float fOmC0 = 1.0f - keys[i1].continuity;
-    const float fOpC0 = 1.0f + keys[i1].continuity;
-    const float fOmB0 = 1.0f - keys[i1].bias;
-    const float fOpB0 = 1.0f + keys[i1].bias;
-    const float fAdj0 =
-      2.0f * (keys[i2].time - keys[i1].time) / (keys[i2].time - keys[i0].time);
-    const float fOut0 = 0.5f * fAdj0 * fOmT0 * fOpC0 * fOpB0;
-    const float fOut1 = 0.5f * fAdj0 * fOmT0 * fOmC0 * fOmB0;
-    const glm::quat kTOut = fOut1 * kLog21 + fOut0 * kLog10;
+  for (size_t k = 1; k + 1 < keys.size(); ++k) {
+    const float prevDelta = keys[k].time - keys[k - 1].time;
+    const float nextDelta = keys[k + 1].time - keys[k].time;
+    CHECK(prevDelta > 0.f);
+    CHECK(nextDelta > 0.f);
+    const glm::quat prevLog = glm::log(glm::conjugate(keys[k - 1].rot) * keys[k].rot);
+    const glm::quat nextLog = glm::log(glm::conjugate(keys[k].rot) * keys[k + 1].rot);
+    const float omT = 1.0f - keys[k].tension;
+    const float omC = 1.0f - keys[k].continuity;
+    const float opC = 1.0f + keys[k].continuity;
+    const float omB = 1.0f - keys[k].bias;
+    const float opB = 1.0f + keys[k].bias;
+    inTangents[k] = (omT * omC * opB / (2.0f * prevDelta)) * prevLog + (omT * opC * omB / (2.0f * nextDelta)) * nextLog;
+    outTangents[k] =
+      (omT * opC * opB / (2.0f * prevDelta)) * prevLog + (omT * omC * omB / (2.0f * nextDelta)) * nextLog;
+  }
 
-    // Build multipliers at q[i2]
-    const float fOmT1 = 1.0f - keys[i2].tension;
-    const float fOmC1 = 1.0f - keys[i2].continuity;
-    const float fOpC1 = 1.0f + keys[i2].continuity;
-    const float fOmB1 = 1.0f - keys[i2].bias;
-    const float fOpB1 = 1.0f + keys[i2].bias;
-    const float fAdj1 =
-      2.0f * (keys[i2].time - keys[i1].time) / (keys[i3].time - keys[i1].time);
-    const float fIn0 = 0.5f * fAdj1 * fOmT1 * fOmC1 * fOpB1;
-    const float fIn1 = 0.5f * fAdj1 * fOmT1 * fOpC1 * fOmB1;
-    const glm::quat kTIn = fIn1 * kLog32 + fIn0 * kLog21;
+  {
+    const size_t last = keys.size() - 1;
+    const float delta = keys[last].time - keys[last - 1].time;
+    CHECK(delta > 0.f);
+    const float coeff =
+      (1.0f - keys[last].tension) * (1.0f - keys[last].continuity) * (1.0f + keys[last].bias) / (2.0f * delta);
+    inTangents[last] = coeff * glm::log(glm::conjugate(keys[last - 1].rot) * keys[last].rot);
+    outTangents[last] = inTangents[last];
+  }
 
-    SquadPoly poly;
-    poly.p = kQ1;
-    poly.q = kQ2;
-    poly.a = kQ1 * glm::exp((kTOut + (-kLog21)) * 0.5f);
-    poly.b = kQ2 * glm::exp(0.5f * (kLog21 + (-kTIn)));
-    poly.tmin = keys[i1].time;
-    poly.tmax = keys[i2].time;
-    poly.invRange = 1.0f / (keys[i2].time - keys[i1].time);
-    out.push_back(poly);
+  for (size_t k = 0; k + 1 < keys.size(); ++k) {
+    const float delta = keys[k + 1].time - keys[k].time;
+    CHECK(delta > 0.f);
+    const glm::quat segmentLog = glm::log(glm::conjugate(keys[k].rot) * keys[k + 1].rot);
+    out[k].p = keys[k].rot;
+    out[k].q = keys[k + 1].rot;
+    out[k].a = keys[k].rot * glm::exp(0.5f * (delta * outTangents[k] - segmentLog));
+    out[k].b = keys[k + 1].rot * glm::exp(0.5f * (segmentLog - delta * inTangents[k + 1]));
+    out[k].tmin = keys[k].time;
+    out[k].tmax = keys[k + 1].time;
+    out[k].invRange = 1.0f / delta;
   }
 
   return out;
+}
+
+[[nodiscard]] gte::Vector<3, float> toGte(const glm::vec3& v)
+{
+  return {v.x, v.y, v.z};
+}
+
+[[nodiscard]] glm::vec3 fromGte(const gte::Vector<3, float>& v)
+{
+  return {v[0], v[1], v[2]};
 }
 
 [[nodiscard]] glm::quat evalExpected(const std::vector<SquadPoly>& spline, float t)
@@ -118,6 +132,36 @@ struct SquadPoly
   return spline.back().eval(t);
 }
 
+class TestAnim final : public ZCameraParameterAnimation
+{
+public:
+  using ZCameraParameterAnimation::ZCameraParameterAnimation;
+
+  [[nodiscard]] glm::quat rotationAt(float t) const
+  {
+    CHECK(!m_pathSegments.empty());
+    return m_pathSegments.front().rotation(t);
+  }
+
+  [[nodiscard]] glm::vec3 positionAt(float t) const
+  {
+    CHECK(!m_pathSegments.empty());
+    return m_pathSegments.front().position(t);
+  }
+
+  [[nodiscard]] size_t numPathSegments() const
+  {
+    return m_pathSegments.size();
+  }
+};
+
+[[nodiscard]] std::unique_ptr<ZCameraParameterKey> makeCameraKey(double time, const glm::vec3& eye)
+{
+  Z3DCameraParameter cam("Camera");
+  cam.setCamera(eye, eye + glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+  return std::make_unique<ZCameraParameterKey>(time, cam);
+}
+
 } // namespace
 
 TEST(ZCameraParameterAnimationTest, RotationSplineUsesSignConsistentQuaternions)
@@ -125,18 +169,6 @@ TEST(ZCameraParameterAnimationTest, RotationSplineUsesSignConsistentQuaternions)
   // Construct a sequence of camera rotations that crosses 180° so that the raw
   // quaternion representation may flip sign (q and -q are the same rotation).
   // The rotation spline builder must enforce sign-consistency before log/exp.
-
-  class TestAnim final : public ZCameraParameterAnimation
-  {
-  public:
-    using ZCameraParameterAnimation::ZCameraParameterAnimation;
-
-    [[nodiscard]] glm::quat rotationAt(float t) const
-    {
-      CHECK(!m_pathSegments.empty());
-      return m_pathSegments.front().rotation(t);
-    }
-  };
 
   const glm::vec3 eye(0.0f, 0.0f, 0.0f);
   const glm::vec3 center(0.0f, 0.0f, -1.0f);
@@ -171,4 +203,111 @@ TEST(ZCameraParameterAnimationTest, RotationSplineUsesSignConsistentQuaternions)
   // Compare rotations up to the quaternion sign ambiguity.
   const float dot = std::abs(glm::dot(glm::normalize(actual), glm::normalize(expected)));
   EXPECT_GE(dot, 1.0f - 1e-4f);
+}
+
+TEST(ZCameraParameterAnimationTest, PositionSplineMatchesCurrentGeometricToolsForNonUniformTimes)
+{
+  TestAnim anim("CameraAnim");
+  anim.interpolationMethodPara().select("Position Spline");
+
+  struct PosKey
+  {
+    float time;
+    glm::vec3 eye;
+    float tension;
+    float continuity;
+    float bias;
+  };
+  const std::vector<PosKey> keys = {
+    {.time = 0.0f, .eye = {0.0f, 0.0f, 0.0f}, .tension = 0.25f, .continuity = -0.2f,  .bias = 0.1f },
+    {.time = 0.7f, .eye = {1.0f, 2.0f, 0.5f}, .tension = -0.1f, .continuity = 0.35f,  .bias = -0.3f},
+    {.time = 2.4f, .eye = {3.0f, 1.0f, 2.0f}, .tension = 0.4f,  .continuity = -0.25f, .bias = 0.2f },
+    {.time = 5.0f, .eye = {4.0f, 3.0f, 1.0f}, .tension = -0.2f, .continuity = 0.1f,   .bias = 0.45f},
+  };
+
+  std::vector<gte::Vector<3, float>> points;
+  std::vector<float> times;
+  std::vector<float> tensions;
+  std::vector<float> continuities;
+  std::vector<float> biases;
+  for (const auto& src : keys) {
+    auto key = makeCameraKey(src.time, src.eye);
+    key->setPosTension(src.tension);
+    key->setPosContinuity(src.continuity);
+    key->setPosBias(src.bias);
+    anim.addKey(std::move(key), /*keepRedundant=*/true);
+
+    points.push_back(toGte(src.eye));
+    times.push_back(src.time);
+    tensions.push_back(src.tension);
+    continuities.push_back(src.continuity);
+    biases.push_back(src.bias);
+  }
+
+  gte::TCBSplineCurve<3, float> reference(points, times, tensions, continuities, biases, {}, nullptr, nullptr);
+  for (float t : {0.1f, 0.7f, 1.25f, 2.4f, 3.6f, 4.9f}) {
+    gte::Vector<3, float> jet[1];
+    reference.Evaluate(t, 0, jet);
+    const glm::vec3 expected = fromGte(jet[0]);
+    const glm::vec3 actual = anim.positionAt(t);
+    EXPECT_NEAR(actual.x, expected.x, 1e-5f) << "t=" << t;
+    EXPECT_NEAR(actual.y, expected.y, 1e-5f) << "t=" << t;
+    EXPECT_NEAR(actual.z, expected.z, 1e-5f) << "t=" << t;
+  }
+}
+
+TEST(ZCameraParameterAnimationTest, DeleteKeyRebuildsSplineCache)
+{
+  TestAnim anim("CameraAnim");
+  anim.interpolationMethodPara().select("Position Spline");
+  anim.addKey(makeCameraKey(0.0, {0.0f, 0.0f, 0.0f}), /*keepRedundant=*/true);
+  anim.addKey(makeCameraKey(1.0, {10.0f, 0.0f, 0.0f}), /*keepRedundant=*/true);
+  anim.addKey(makeCameraKey(2.0, {0.0f, 2.0f, 0.0f}), /*keepRedundant=*/true);
+  ASSERT_EQ(anim.numPathSegments(), 1_uz);
+
+  ZParameterKey* middle = anim.keys()[1].get();
+  anim.deleteKey(middle);
+  ASSERT_EQ(anim.keys().size(), 2_uz);
+  ASSERT_EQ(anim.numPathSegments(), 1_uz);
+
+  std::vector<gte::Vector<3, float>> points = {toGte({0.0f, 0.0f, 0.0f}), toGte({0.0f, 2.0f, 0.0f})};
+  std::vector<float> times = {0.0f, 2.0f};
+  std::vector<float> tcb = {0.0f, 0.0f};
+  gte::TCBSplineCurve<3, float> reference(points, times, tcb, tcb, tcb, {}, nullptr, nullptr);
+  gte::Vector<3, float> jet[1];
+  reference.Evaluate(1.5f, 0, jet);
+  const glm::vec3 expected = fromGte(jet[0]);
+  const glm::vec3 actual = anim.positionAt(1.5f);
+  EXPECT_NEAR(actual.x, expected.x, 1e-5f);
+  EXPECT_NEAR(actual.y, expected.y, 1e-5f);
+  EXPECT_NEAR(actual.z, expected.z, 1e-5f);
+}
+
+TEST(ZCameraParameterAnimationTest, CameraInterpolationMethodPersistsInTrackJson)
+{
+  ZCameraParameterAnimation anim("Camera");
+  ASSERT_TRUE(anim.setInterpolationMethod("Position Rotation Spline"));
+
+  json::object root;
+  anim.write(root);
+  std::unique_ptr<ZParameterAnimation> loaded(
+    ZParameterAnimation::create(anim.jsonKey(), root.at(anim.jsonKey().toStdString())));
+  ASSERT_TRUE(loaded);
+  auto* loadedCamera = qobject_cast<ZCameraParameterAnimation*>(loaded.get());
+  ASSERT_TRUE(loadedCamera);
+  EXPECT_EQ(loadedCamera->interpolationMethodPara().get(), QStringLiteral("Position Rotation Spline"));
+}
+
+TEST(ZCameraParameterAnimationTest, RejectsOutOfRangeTcbOnRead)
+{
+  const auto source = makeCameraKey(0.0, {0.0f, 0.0f, 0.0f});
+  json::value value = source->jsonValue();
+  value.as_object()["posTension"] = 2.0;
+
+  ZCameraParameterKey loaded;
+  EXPECT_FALSE(loaded.readValue(value));
+
+  value = source->jsonValue();
+  value.as_object()["rotBias"] = "bad";
+  EXPECT_FALSE(loaded.readValue(value));
 }

@@ -18,11 +18,22 @@ ZTimelineKeyEditDialog::ZTimelineKeyEditDialog(ZParameterAnimation& paraAnimatio
   , m_paraKey(paraKey)
   , m_time("Time")
   , m_type("Type")
-  , m_posTension("Tension", 0, -1, 1)
-  , m_posContinuity("Continuity", 0, -1, 1)
-  , m_posBias("Bias", 0, -1, 1)
+  , m_posTension("Position Tension", 0, -1, 1)
+  , m_posContinuity("Position Continuity", 0, -1, 1)
+  , m_posBias("Position Bias", 0, -1, 1)
+  , m_rotTension("Rotation Tension", 0, -1, 1)
+  , m_rotContinuity("Rotation Continuity", 0, -1, 1)
+  , m_rotBias("Rotation Bias", 0, -1, 1)
 {
   setModal(false);
+
+  const auto& tcbFields = ZCameraParameterKey::tcbFieldInfos();
+  m_posTension.setDescription(QString::fromUtf8(tcbFields[0].description));
+  m_posContinuity.setDescription(QString::fromUtf8(tcbFields[1].description));
+  m_posBias.setDescription(QString::fromUtf8(tcbFields[2].description));
+  m_rotTension.setDescription(QString::fromUtf8(tcbFields[3].description));
+  m_rotContinuity.setDescription(QString::fromUtf8(tcbFields[4].description));
+  m_rotBias.setDescription(QString::fromUtf8(tcbFields[5].description));
 
   auto lo = new QGridLayout;
 
@@ -68,6 +79,12 @@ ZTimelineKeyEditDialog::ZTimelineKeyEditDialog(ZParameterAnimation& paraAnimatio
     addWidget(m_posContinuity.createNameLabel(this), m_posContinuity.createWidget(this), lo);
     m_posBias.set(cpk->posBias());
     addWidget(m_posBias.createNameLabel(this), m_posBias.createWidget(this), lo);
+    m_rotTension.set(cpk->rotTension());
+    addWidget(m_rotTension.createNameLabel(this), m_rotTension.createWidget(this), lo);
+    m_rotContinuity.set(cpk->rotContinuity());
+    addWidget(m_rotContinuity.createNameLabel(this), m_rotContinuity.createWidget(this), lo);
+    m_rotBias.set(cpk->rotBias());
+    addWidget(m_rotBias.createNameLabel(this), m_rotBias.createWidget(this), lo);
   }
 
   QVBoxLayout* vlo = new QVBoxLayout(this);
@@ -96,6 +113,9 @@ void ZTimelineKeyEditDialog::setInitialValue()
     m_posTension.set(cpk->posTension());
     m_posContinuity.set(cpk->posContinuity());
     m_posBias.set(cpk->posBias());
+    m_rotTension.set(cpk->rotTension());
+    m_rotContinuity.set(cpk->rotContinuity());
+    m_rotBias.set(cpk->rotBias());
   }
 }
 
@@ -128,6 +148,9 @@ void ZTimelineKeyEditDialog::accept()
     cpk->setPosTension(m_posTension.get());
     cpk->setPosContinuity(m_posContinuity.get());
     cpk->setPosBias(m_posBias.get());
+    cpk->setRotTension(m_rotTension.get());
+    cpk->setRotContinuity(m_rotContinuity.get());
+    cpk->setRotBias(m_rotBias.get());
   }
   m_paraAnimation.sortKeys();
   m_paraAnimation.blockSignals(false);

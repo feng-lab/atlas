@@ -211,6 +211,20 @@ message SetKeyRequest {
   double time = 4;         // seconds
   string easing = 5;       // e.g., "Linear", "InOutSine"
   google.protobuf.Value value = 6; // typed JSON value payload (camera: object; params: number/bool/string/array)
+  // Optional per-key TCB controls for target_id=0 only. All values must be in [-1, 1].
+  // These controls only affect spline camera interpolation; "Center" interpolation is still strongly advised
+  // unless the caller is intentionally authoring a free-camera path that needs spline shaping.
+  CameraKeyTcb camera_tcb = 7;
+}
+
+message CameraKeyTcb
+{
+  double pos_tension = 1;
+  double pos_continuity = 2;
+  double pos_bias = 3;
+  double rot_tension = 4;
+  double rot_continuity = 5;
+  double rot_bias = 6;
 }
 
 // Query keys present in the current animation for a specific target
@@ -697,6 +711,8 @@ message BatchSetKey {
   double time = 3;
   string easing = 4;
   google.protobuf.Value value = 5;
+  // Optional per-key TCB controls for camera keys (target_id=0) only. Values must be in [-1, 1].
+  CameraKeyTcb camera_tcb = 6;
 }
 message BatchRemoveKey {
   uint64 target_id = 1;

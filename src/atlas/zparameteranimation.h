@@ -98,7 +98,7 @@ public:
   // might return nullptr
   static ZParameterAnimation* create(const QString& key, const json::value& value, QObject* parent = nullptr);
 
-  void write(json::object& json) const;
+  virtual void write(json::object& json) const;
 
   // create a new key based on current view
   [[nodiscard]] virtual std::unique_ptr<ZParameterKey> createKey(double secs) const;

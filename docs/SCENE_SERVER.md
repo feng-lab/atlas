@@ -228,9 +228,10 @@ Keyframes override base scene values during playback/preview at nonzero times.
 - `AddKeyFrame { animation_id, time, cancel_rendering? } -> { ok }`
   - UI “Save Key Frame” parity: captures the **entire current scene state** into the animation at the requested time (writes keys for all parameters, including camera).
   - This can be used as an animation authoring workflow (“pose the scene at beat time → save keyframe”), and also to re-seed baseline keys at `t=0` after loading/adding objects during authoring.
-- `SetKey { animation_id, target_id, json_key?, time, easing, value } -> { ok }`
+- `SetKey { animation_id, target_id, json_key?, time, easing, value, camera_tcb? } -> { ok }`
   - `target_id=0` for camera (json_key ignored), or `>=4` for objects.
   - `value` is typed JSON via protobuf `Value` (camera is an object; options are strings; vectors are arrays).
+  - `camera_tcb` is only valid for `target_id=0`. It accepts `pos_tension`, `pos_continuity`, `pos_bias`, `rot_tension`, `rot_continuity`, and `rot_bias`; every value must be in `[-1, 1]`.
 - `ClearKeys { animation_id, target_id, json_key? } -> { ok }`
   - For `target_id=0`, clears all camera keys.
 - `RemoveKey { animation_id, target_id, json_key, time } -> { ok }`
@@ -293,9 +294,15 @@ These return typed camera values/keys that clients can write via `SetKey(animati
 
 Supported `method` strings:
 - `Center`
+- `Position Spline`
+- `Position Rotation Spline`
 
 Notes:
-- Spline-based camera interpolation modes are currently disabled for RPC use.
+- Method matching is case-insensitive and ignores spaces, underscores, and hyphens.
+- `Center` is the default and is strongly advised for almost all agent-authored camera animation. It matches Atlas' trackball/orbit camera model by interpolating the look-at center, center distance, and orientation, so object-centric views usually remain stable and predictable.
+- Use `Position Spline` or `Position Rotation Spline` only when there is a specific, intentional need for a free-camera path whose eye position follows a shaped spline. Agents should not choose spline modes as a general smoothing default; they frequently produce unexpected orbit, framing, or rotation results for normal scene presentations.
+- `Position Spline` evaluates the camera eye position with a Kochanek-Bartels TCB spline; `Position Rotation Spline` evaluates both eye position and rotation with TCB splines.
+- `SetKey` and `Batch.set_keys[]` can provide per-key `camera_tcb` values for camera keys. Omit `camera_tcb` for neutral TCB values (`0`) and for all non-camera tracks.
 
 ## Introspection
 

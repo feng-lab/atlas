@@ -3,6 +3,8 @@
 #include "z3danimation.h"
 #include "zobjdoc.h"
 
+#include <optional>
+
 namespace nim {
 
 class Z3DAnimationDoc : public ZObjDoc
@@ -47,12 +49,23 @@ public:
   // Set or replace a key for a target parameter track.
   // targetId follows the same convention as RPC/UI: 0=camera, 1=background,
   // 2=axis, 3=global/lighting, >=4 object id.
+  struct CameraKeyTcb
+  {
+    double posTension = 0.0;
+    double posContinuity = 0.0;
+    double posBias = 0.0;
+    double rotTension = 0.0;
+    double rotContinuity = 0.0;
+    double rotBias = 0.0;
+  };
+
   [[nodiscard]] KeyOpResult setKey(size_t animationId,
                                    size_t targetId,
                                    const QString& jsonKey,
                                    double timeSec,
                                    const QString& easing,
-                                   const json::value& value);
+                                   const json::value& value,
+                                   std::optional<CameraKeyTcb> cameraTcb = std::nullopt);
 
   [[nodiscard]] KeyOpResult removeKey(size_t animationId,
                                       size_t targetId,
@@ -95,6 +108,7 @@ public:
     double timeSec = 0.0;
     QString easing;
     json::value value;
+    std::optional<CameraKeyTcb> cameraTcb;
   };
 
   [[nodiscard]] KeyOpResult batchKeys(size_t animationId,

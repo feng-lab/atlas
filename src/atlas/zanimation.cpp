@@ -10,6 +10,7 @@
 #include "zserializationutils.h"
 #include "zview.h"
 #include "z3drenderingengine.h"
+#include "zcameraparameteranimation.h"
 #include "zgraphicsview.h"
 #include <QLabel>
 #include <QFile>
@@ -134,12 +135,16 @@ static constexpr const char* kUndoObjUniqueId = "unique_id";
 static constexpr const char* kUndoObjTracks = "tracks";
 
 static constexpr const char* kUndoTrackColor = "color";
+static constexpr const char* kUndoTrackInterpolationMethod = "interpolation_method";
 static constexpr const char* kUndoTrackKeys = "keys";
 
 [[nodiscard]] json::object snapshotTrackValue(const ZParameterAnimation& pa)
 {
   json::object obj;
   obj[kUndoTrackColor] = json::value_from(pa.color());
+  if (const auto* cpa = qobject_cast<const ZCameraParameterAnimation*>(&pa)) {
+    obj[kUndoTrackInterpolationMethod] = json::value_from(cpa->interpolationMethodPara().get());
+  }
 
   json::array keys;
   keys.reserve(pa.keys().size());
@@ -178,6 +183,17 @@ static constexpr const char* kUndoTrackKeys = "keys";
       }
     }
     pa.setColor(color);
+  }
+
+  if (auto* cpa = qobject_cast<ZCameraParameterAnimation*>(&pa)) {
+    if (auto it = obj.find(kUndoTrackInterpolationMethod); it != obj.end()) {
+      if (!it->value().is_string() || !cpa->setInterpolationMethod(json::value_to<QString>(it->value()))) {
+        if (error) {
+          *error = "invalid camera interpolation method";
+        }
+        return false;
+      }
+    }
   }
 
   std::vector<std::unique_ptr<ZParameterKey>> keys;

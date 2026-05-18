@@ -43,6 +43,9 @@ protected:
   ZFloatParameter m_posTension;
   ZFloatParameter m_posContinuity;
   ZFloatParameter m_posBias;
+  ZFloatParameter m_rotTension;
+  ZFloatParameter m_rotContinuity;
+  ZFloatParameter m_rotBias;
 
   ZParameter* m_para = nullptr;
 };

@@ -345,6 +345,16 @@ public:
 
   [[nodiscard]] BoolResult setAnimationDuration(uint64_t animationId, double duration);
 
+  struct CameraKeyTcb
+  {
+    double posTension = 0.0;
+    double posContinuity = 0.0;
+    double posBias = 0.0;
+    double rotTension = 0.0;
+    double rotContinuity = 0.0;
+    double rotBias = 0.0;
+  };
+
   struct SetKeyRequest
   {
     uint64_t animationId = 0;
@@ -353,6 +363,7 @@ public:
     double timeSec = 0.0;
     QString easing;
     json::value value;
+    std::optional<CameraKeyTcb> cameraTcb;
   };
 
   [[nodiscard]] BoolResult setAnimationKey(const SetKeyRequest& req);

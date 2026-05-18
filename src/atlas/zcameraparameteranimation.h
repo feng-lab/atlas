@@ -23,6 +23,8 @@ public:
                                                                   ZRandom::instance().randInt(255)),
                                      QObject* parent = nullptr);
 
+  static void configureInterpolationMethodParameter(ZStringIntOptionParameter& parameter);
+
   ZStringIntOptionParameter& interpolationMethodPara()
   {
     return m_interpolationMethod;
@@ -33,6 +35,8 @@ public:
     return m_interpolationMethod;
   }
 
+  [[nodiscard]] bool setInterpolationMethod(const QString& method);
+
   // create a new key based on current view
   [[nodiscard]] std::unique_ptr<ZParameterKey> createKey(double secs) const override;
 
@@ -40,19 +44,36 @@ public:
 
   void buildSpline();
 
+  void write(json::object& json) const override;
+
 Q_SIGNALS:
-  void interpolationMethodChanged();
+  void interpolationMethodChanged(const QString& method);
 
 protected:
+  struct CameraKeySample
+  {
+    explicit CameraKeySample(const ZCameraParameterKey& key);
+
+    float time = 0.f;
+    glm::vec3 eye{0.f};
+    glm::quat rot{};
+    float posTension = 0.f;
+    float posContinuity = 0.f;
+    float posBias = 0.f;
+    float rotTension = 0.f;
+    float rotContinuity = 0.f;
+    float rotBias = 0.f;
+  };
+
   class Poly
   {
   public:
     [[nodiscard]] glm::vec3 Position(float fU) const; // P(u)
-    glm::vec3 Velocity(float fU); // P'(u)
-    glm::vec3 Acceleration(float fU); // P"(u)
-    float Speed(float fU);
+    [[nodiscard]] glm::vec3 Velocity(float fU) const; // P'(u)
+    [[nodiscard]] glm::vec3 Acceleration(float fU) const; // P"(u)
+    [[nodiscard]] float Speed(float fU) const;
 
-    float Length(float fU);
+    [[nodiscard]] float Length(float fU) const;
 
     // Time interval on which polynomial is valid, tmin <= t <= tmax.
     // The normalized time is u = (t - tmin)/(tmax - tmin). The inverse
@@ -84,7 +105,7 @@ protected:
   {
     SplineRange() = default;
 
-    explicit SplineRange(std::vector<ZCameraParameterKey*>& kys);
+    explicit SplineRange(const std::vector<ZCameraParameterKey*>& kys);
 
     [[nodiscard]] glm::quat rotation(float fTime) const;
 
@@ -116,24 +137,24 @@ protected:
 
     [[nodiscard]] float startTime() const
     {
-      return keys[0]->time();
+      CHECK(!keys.empty());
+      return keys[0].time;
     }
 
     [[nodiscard]] float endTime() const
     {
-      return keys.back()->time();
+      CHECK(!keys.empty());
+      return keys.back().time;
     }
 
     void swap(SplineRange& rhs) noexcept;
 
-    std::vector<ZCameraParameterKey*> keys;
+    std::vector<CameraKeySample> keys;
     std::vector<Poly> posSpline;
     std::vector<float> posSplineLengths;
     float posSplineTotalLength = 0;
     std::vector<SquadPoly> rotSpline;
     bool m_hasSpline = false;
-    std::unique_ptr<ZCameraParameterKey> firstKey;
-    std::unique_ptr<ZCameraParameterKey> lastKey;
   };
 
   std::vector<SplineRange> m_pathSegments;

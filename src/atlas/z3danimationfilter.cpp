@@ -5,7 +5,11 @@
 #include "zcameraparameteranimation.h"
 #include "zeventlistenerparameter.h"
 #include <QFileInfo>
+#include <QMetaObject>
+#include <QPointer>
+#include <QThread>
 #include <boost/math/constants/constants.hpp>
+#include <utility>
 
 namespace nim {
 
@@ -16,6 +20,8 @@ Z3DAnimationFilter::Z3DAnimationFilter(Z3DGlobalParameters& globalParas, QObject
   , m_triangleListRenderer(m_rendererBase)
   , m_dataIsInvalid(false)
   , m_animation(nullptr)
+  , m_syncingCameraInterpolationMethod(false)
+  , m_cameraInterpolationMethod("Camera Interpolation Method")
   , m_lineWidth("Line Width", 2, 1, 100)
   , m_colorMode("Color Mode")
   , m_color("Color", glm::vec4(1, 1, 0, 1))
@@ -29,6 +35,12 @@ Z3DAnimationFilter::Z3DAnimationFilter(Z3DGlobalParameters& globalParas, QObject
   , m_cameraDirectionTimeInterval("Camera Direction Time Interval", .5, .1, 100)
 {
   setTransformEnabled(false);
+
+  ZCameraParameterAnimation::configureInterpolationMethodParameter(m_cameraInterpolationMethod);
+  connect(&m_cameraInterpolationMethod,
+          &ZStringIntOptionParameter::valueChanged,
+          this,
+          &Z3DAnimationFilter::applyCameraInterpolationMethodFromWidget);
 
   m_colorMode.addOptions("Single Color", "Colormap Time");
   m_colorMode.select("Colormap Time");
@@ -93,27 +105,78 @@ double Z3DAnimationFilter::process(Z3DEye)
 void Z3DAnimationFilter::setData(Z3DAnimation* animation)
 {
   if (m_animation) {
+    cameraParaAnimation()->disconnect(this);
     m_animation->disconnect(this);
   }
   m_animation = animation;
   if (m_animation) {
-    connect(cameraParaAnimation(),
+    auto* cameraAnimation = cameraParaAnimation();
+    connect(cameraAnimation,
             &ZCameraParameterAnimation::keysChanged,
             this,
             &Z3DAnimationFilter::updateData,
             Qt::UniqueConnection);
-    connect(cameraParaAnimation(),
+    connect(cameraAnimation,
             &ZCameraParameterAnimation::keyChanged,
             this,
             &Z3DAnimationFilter::updateData,
             Qt::UniqueConnection);
-    connect(cameraParaAnimation(),
+    connect(cameraAnimation,
             &ZCameraParameterAnimation::interpolationMethodChanged,
             this,
-            &Z3DAnimationFilter::updateData,
-            Qt::UniqueConnection);
+            [this](const QString& method) {
+              syncCameraInterpolationMethodWidget(method);
+              updateData();
+            });
+    syncCameraInterpolationMethodWidget(cameraAnimation->interpolationMethodPara().get());
   }
   updateData();
+}
+
+void Z3DAnimationFilter::applyCameraInterpolationMethodFromWidget()
+{
+  if (m_syncingCameraInterpolationMethod || !m_animation) {
+    return;
+  }
+
+  // Same proxy-parameter idea as ZTimelineKeyEditDialog, but this view-setting widget has no
+  // accept/reject boundary. Commit each proxy change through the animation undo stack instead of
+  // wiring the proxy directly to the real parameter with updateFromSender().
+  const QString method = m_cameraInterpolationMethod.get();
+  QPointer<Z3DAnimation> animation(m_animation);
+  auto applyMethod = [animation, method]() {
+    if (!animation) {
+      return;
+    }
+
+    auto* cameraAnimation = animation->cameraParameterAnimation();
+    CHECK(cameraAnimation);
+    if (cameraAnimation->interpolationMethodPara().get() == method) {
+      return;
+    }
+
+    auto before = animation->captureUndoSnapshot();
+    if (cameraAnimation->setInterpolationMethod(method)) {
+      animation->pushUndoSnapshotCommand(QStringLiteral("Set Camera Interpolation Method"), std::move(before));
+    }
+  };
+
+  if (!animation) {
+    return;
+  }
+  if (animation->thread() == QThread::currentThread()) {
+    applyMethod();
+  } else {
+    QMetaObject::invokeMethod(animation.data(), std::move(applyMethod), Qt::QueuedConnection);
+  }
+}
+
+void Z3DAnimationFilter::syncCameraInterpolationMethodWidget(const QString& method)
+{
+  CHECK(m_cameraInterpolationMethod.hasOption(method)) << "Unknown camera interpolation method: " << method;
+  m_syncingCameraInterpolationMethod = true;
+  m_cameraInterpolationMethod.select(method);
+  m_syncingCameraInterpolationMethod = false;
 }
 
 bool Z3DAnimationFilter::isReady(Z3DEye eye) const
@@ -126,6 +189,7 @@ std::shared_ptr<ZWidgetsGroup> Z3DAnimationFilter::widgetsGroup()
   if (!m_widgetsGroup) {
     m_widgetsGroup = std::make_shared<ZWidgetsGroup>("Animation3D", 1);
     m_widgetsGroup->addChild(m_visible, 1);
+    m_widgetsGroup->addChild(m_cameraInterpolationMethod, 1);
     m_widgetsGroup->addChild(m_lineWidth, 1);
     m_widgetsGroup->addChild(m_colorMode, 1);
     m_widgetsGroup->addChild(m_color, 1);
@@ -303,10 +367,16 @@ void Z3DAnimationFilter::updateData()
   m_headPosAndHeadRadius.clear();
   m_cameraDirectionTimes.clear();
 
+  if (!m_animation) {
+    updateBoundBox();
+    m_mutex.unlock();
+    return;
+  }
+
   m_timeInterval.setRange(0.01, m_animation->duration() / 2.);
   m_cameraDirectionTimeInterval.setRange(.01, m_animation->duration() / 2.);
 
-  if (m_animation) {
+  {
     const auto& keys = cameraParaAnimation()->keys();
     for (size_t i = 0; i + 1 < keys.size(); ++i) {
       double currentKeyTime = keys[i]->time();

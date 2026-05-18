@@ -77,6 +77,10 @@ private:
     return m_animation->cameraParameterAnimation();
   }
 
+  void applyCameraInterpolationMethodFromWidget();
+
+  void syncCameraInterpolationMethodWidget(const QString& method);
+
 private:
   Z3DLineRenderer m_lineRenderer;
   Z3DArrowRenderer m_arrowRenderer;
@@ -84,6 +88,8 @@ private:
 
   bool m_dataIsInvalid;
   Z3DAnimation* m_animation;
+  bool m_syncingCameraInterpolationMethod;
+  ZStringIntOptionParameter m_cameraInterpolationMethod;
   ZIntParameter m_lineWidth;
   ZStringIntOptionParameter m_colorMode;
   ZVec4Parameter m_color;

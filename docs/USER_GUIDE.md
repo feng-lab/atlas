@@ -562,6 +562,17 @@ Atlas 3D animations are **keyframe-based**:
   - **Switch** – step/hold (no interpolation; value jumps at the key time).
 - Parameters that do not support interpolation automatically restrict to **Switch** keys.
 
+**Camera track interpolation**
+
+- Camera tracks also have an **Interpolation Method**:
+  - **Center** – the default. Atlas interpolates the focal center, center distance, and orientation. This is the best fit for normal trackball/orbit animation because the camera keeps orbiting around the intended look-at point.
+  - **Position Spline** – Atlas evaluates the camera eye position with a Kochanek-Bartels TCB spline, while orientation still follows the normal eased camera interpolation.
+  - **Position Rotation Spline** – Atlas evaluates both camera eye position and camera rotation with TCB splines.
+- To change the method in the UI, select the `.animation3d` object in **Objects Manager**, then use **Object View Setting → Animation3D → Camera Interpolation Method**.
+- Use spline modes only for deliberate fly-through/free-camera paths where the eye position is the authored path. For object-centric orbit shots, **Center** is strongly advised and usually produces the intended result.
+- Camera TCB controls are per key. **Tension**, **Continuity**, and **Bias** each accept values in `[-1, 1]`; `0` is the neutral/default shape.
+- Key **Type** still controls timing/easing between keys. TCB controls the spatial shape of the camera path. A **Switch** key also creates a hard boundary between spline ranges.
+
 #### The “Save Key Frame” button (full-scene snapshot)
 
 The main workflow tool is **Save Key Frame**:
@@ -635,7 +646,7 @@ The editor has three parts:
 - **Move a key in time:** Drag the key horizontally.
 - **Edit a key:** Double-click a key to open the key editor dialog:
   - Edit **Time**, **Type (easing)**, and the **Value**.
-  - Camera keys additionally expose position-spline controls (tension/continuity/bias) for smooth camera paths.
+  - Camera keys additionally expose position and rotation TCB spline controls (tension/continuity/bias) for spline camera paths.
 - **Delete keys:** select one or more keys (rubber-band selection works), then press `Delete` or `Backspace`.
 
 **Undo/redo**
@@ -1049,14 +1060,16 @@ Atlas uses a classical **trackball/orbit** camera controller centered on the cam
 
 - Modifier keys are matched exactly. If you hold a different modifier (for example `Cmd`/Meta on macOS) while dragging, that gesture may stop matching the trackball controls.
 - Right-click opens a context menu whose contents depend on what is under the cursor (some object types provide object-specific actions).
+- For animation, the camera track's **Center** interpolation method matches this trackball/orbit model and is strongly advised for ordinary orbit/navigation shots. TCB spline modes are available for authored free-camera paths, but they are not a general smoothing default.
 
 ### 6.3 Object View Settings in 3D
 
 1. Select an object in Objects Manager.
 2. In the Object View Setting dock at right, adjust parameters such as visibility, transform (translation, rotation, scale), bounding box style, transfer functions, slice toggles, and per-object clipping.
 3. For EM-style grayscale volumes, use **Apply EM Preset** to rewrite the current transfer functions and slice colormaps so intensity `0` is transparent while non-zero values remain opaque, and switch volume rendering to **Direct Volume Rendering**.
-4. Use the Global/Per-object tabs to manage render passes.
-5. Changes immediately affect the 3D canvas; for heavy operations (full-resolution volume streaming) watch the progress toolbar.
+4. For `.animation3d` objects, the **Animation3D** view-setting group contains animation-path display options and **Camera Interpolation Method**.
+5. Use the Global/Per-object tabs to manage render passes.
+6. Changes immediately affect the 3D canvas; for heavy operations (full-resolution volume streaming) watch the progress toolbar.
 
 **Quick transform shortcut (selected objects)**
 

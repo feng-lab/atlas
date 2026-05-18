@@ -43,7 +43,11 @@ void ZParameterAnimation::deleteKey(ZParameterKey* key)
 {
   std::lock_guard<std::recursive_mutex> lock(m_keysMutex);
   Q_EMIT keyAboutToDelete(key);
+  const size_t oldSize = m_keys.size();
   std::erase_if(m_keys, [key](const auto& ckey) { return ckey.get() == key; });
+  if (m_keys.size() != oldSize) {
+    Q_EMIT keysChanged();
+  }
 }
 
 void ZParameterAnimation::addKey(std::unique_ptr<ZParameterKey> key, bool keepRedundant)
@@ -133,6 +137,13 @@ ZParameterAnimation* ZParameterAnimation::create(const QString& key, const json:
   }
   if (type == "3DCamera") {
     auto res = new ZCameraParameterAnimation(name, color, parent);
+    if (auto it = obj.if_contains("interpolationMethod"); it && it->is_string()) {
+      const QString method = json::value_to<QString>(*it);
+      if (!res->setInterpolationMethod(method)) {
+        LOG(WARNING) << "Unsupported camera interpolation method " << method << "; using "
+                     << res->interpolationMethodPara().get();
+      }
+    }
     if (obj.contains("keys")) {
       const auto& keyArray = obj.at("keys").as_array();
       for (auto&& i : keyArray) {
@@ -234,6 +245,7 @@ void ZParameterAnimation::removeRedundantKeys()
     return;
   }
 
+  const size_t oldSize = m_keys.size();
   auto it = m_keys.begin();
   auto result = it; // pointer to last non-redundant key
   ++it;
@@ -253,6 +265,9 @@ void ZParameterAnimation::removeRedundantKeys()
     ++it;
   }
   m_keys.erase(result + 1, m_keys.end());
+  if (m_keys.size() != oldSize) {
+    Q_EMIT keysChanged();
+  }
 }
 
 void ZParameterAnimation::replaceKeys(std::vector<std::unique_ptr<ZParameterKey>> keys)

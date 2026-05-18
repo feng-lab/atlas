@@ -179,6 +179,18 @@ auto invokeOnObjectThread(grpc::ServerContext* grpcContext, QObject* obj, Func&&
   return gpr_time_cmp(d, inf) != 0;
 }
 
+[[nodiscard]] ZRpcUiDispatcher::CameraKeyTcb toDispatcherCameraKeyTcb(const atlas::rpc::CameraKeyTcb& tcb)
+{
+  ZRpcUiDispatcher::CameraKeyTcb out;
+  out.posTension = tcb.pos_tension();
+  out.posContinuity = tcb.pos_continuity();
+  out.posBias = tcb.pos_bias();
+  out.rotTension = tcb.rot_tension();
+  out.rotContinuity = tcb.rot_continuity();
+  out.rotBias = tcb.rot_bias();
+  return out;
+}
+
 struct ZRpcWaitResult
 {
   bool ok = false;
@@ -1606,6 +1618,9 @@ public:
     dr.timeSec = timeSec;
     dr.easing = QString::fromStdString(easingStr);
     dr.value = valueJson;
+    if (req->has_camera_tcb()) {
+      dr.cameraTcb = toDispatcherCameraKeyTcb(req->camera_tcb());
+    }
 
     auto inv = invokeOnObjectThread(
       grpcContext,
@@ -3011,6 +3026,9 @@ public:
       op.timeSec = s.time();
       op.easing = QString::fromStdString(s.easing());
       op.value = pbToJson(s.value());
+      if (s.has_camera_tcb()) {
+        op.cameraTcb = toDispatcherCameraKeyTcb(s.camera_tcb());
+      }
       dr.setKeys.push_back(std::move(op));
     }
 

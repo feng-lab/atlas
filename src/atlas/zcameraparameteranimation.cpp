@@ -4,6 +4,24 @@
 
 namespace nim {
 
+namespace {
+
+[[nodiscard]] QString normalizeInterpolationMethod(QString s)
+{
+  s = s.toLower().trimmed();
+  QString out;
+  out.reserve(s.size());
+  for (QChar c : s) {
+    if (c.isSpace() || c == QChar('_') || c == QChar('-')) {
+      continue;
+    }
+    out.append(c);
+  }
+  return out;
+}
+
+} // namespace
+
 // Legendre polynomial information for Gaussian quadrature of speed on domain
 // [0,u], 0 <= u <= 1. The polynomial is degree 5.
 float ZCameraParameterAnimation::Poly::ms_afModRoot[5] = {
@@ -25,15 +43,36 @@ ZCameraParameterAnimation::ZCameraParameterAnimation(const QString& name, const 
   : ZParameterAnimation(name, "3DCamera", color, parent)
   , m_interpolationMethod("Interpolation Method")
 {
-  m_interpolationMethod.addOptions("Center", "Position Spline", "Position Rotation Spline");
-  m_interpolationMethod.select("Center");
-  connect(&m_interpolationMethod,
-          &ZStringIntOptionParameter::valueChanged,
-          this,
-          &ZCameraParameterAnimation::interpolationMethodChanged);
+  configureInterpolationMethodParameter(m_interpolationMethod);
+  connect(&m_interpolationMethod, &ZStringIntOptionParameter::valueChanged, this, [this]() {
+    Q_EMIT interpolationMethodChanged(m_interpolationMethod.get());
+  });
 
   connect(this, &ZCameraParameterAnimation::keysChanged, this, &ZCameraParameterAnimation::buildSpline);
   connect(this, &ZCameraParameterAnimation::keyChanged, this, &ZCameraParameterAnimation::buildSpline);
+}
+
+void ZCameraParameterAnimation::configureInterpolationMethodParameter(ZStringIntOptionParameter& parameter)
+{
+  parameter.clearOptions();
+  parameter.addOptions("Center", "Position Spline", "Position Rotation Spline");
+  parameter.select("Center");
+  parameter.setDescription(QStringLiteral(
+    "Camera track interpolation method. Center is strongly advised for normal trackball/orbit animation because it "
+    "interpolates the look-at center, center distance, and orientation predictably. Use Position Spline or Position "
+    "Rotation Spline only for intentional free-camera paths that need TCB spline shaping."));
+}
+
+bool ZCameraParameterAnimation::setInterpolationMethod(const QString& method)
+{
+  const QString wantNorm = normalizeInterpolationMethod(method);
+  for (const auto& opt : m_interpolationMethod.options()) {
+    if (normalizeInterpolationMethod(opt) == wantNorm) {
+      m_interpolationMethod.select(opt);
+      return true;
+    }
+  }
+  return false;
 }
 
 std::unique_ptr<ZParameterKey> ZCameraParameterAnimation::createKey(double secs) const
@@ -147,6 +186,15 @@ void ZCameraParameterAnimation::updateParaToTime(double secs, ZParameter* para) 
   }
 }
 
+void ZCameraParameterAnimation::write(json::object& json) const
+{
+  ZParameterAnimation::write(json);
+  auto it = json.find(jsonKey().toStdString());
+  CHECK(it != json.end());
+  CHECK(it->value().is_object());
+  it->value().as_object()["interpolationMethod"] = json::value_from(m_interpolationMethod.get());
+}
+
 void ZCameraParameterAnimation::buildSpline()
 {
   std::lock_guard<std::recursive_mutex> lock(m_keysMutex);
@@ -162,10 +210,6 @@ void ZCameraParameterAnimation::buildSpline()
       // end of one segment, build spline with range
       std::vector<ZCameraParameterKey*> res;
       for (size_t j = start; j < i; ++j) {
-        // make sure no overlap key
-        if (j > start && m_keys[j]->time() - m_keys[j - 1]->time() < 0.0001) {
-          m_keys[j]->setTime(m_keys[j - 1]->time() + 0.0001);
-        }
         res.push_back(static_cast<ZCameraParameterKey*>(m_keys[j].get()));
       }
       m_pathSegments.emplace_back();
@@ -178,10 +222,6 @@ void ZCameraParameterAnimation::buildSpline()
   // last segment
   std::vector<ZCameraParameterKey*> res;
   for (size_t j = start; j < m_keys.size(); ++j) {
-    // make sure no overlap key
-    if (j > start && m_keys[j]->time() - m_keys[j - 1]->time() < 0.0001) {
-      m_keys[j]->setTime(m_keys[j - 1]->time() + 0.0001);
-    }
     res.push_back(static_cast<ZCameraParameterKey*>(m_keys[j].get()));
   }
   m_pathSegments.emplace_back();
@@ -189,27 +229,39 @@ void ZCameraParameterAnimation::buildSpline()
   m_pathSegments.back().swap(sr);
 }
 
+ZCameraParameterAnimation::CameraKeySample::CameraKeySample(const ZCameraParameterKey& key)
+  : time(static_cast<float>(key.time()))
+  , eye(key.eye())
+  , rot(key.rot())
+  , posTension(key.posTension())
+  , posContinuity(key.posContinuity())
+  , posBias(key.posBias())
+  , rotTension(key.rotTension())
+  , rotContinuity(key.rotContinuity())
+  , rotBias(key.rotBias())
+{}
+
 glm::vec3 ZCameraParameterAnimation::Poly::Position(float fU) const
 {
   return m_akC[0] + fU * (m_akC[1] + fU * (m_akC[2] + fU * m_akC[3]));
 }
 
-glm::vec3 ZCameraParameterAnimation::Poly::Velocity(float fU)
+glm::vec3 ZCameraParameterAnimation::Poly::Velocity(float fU) const
 {
   return m_akC[1] + fU * (2.0f * m_akC[2] + 3.0f * fU * m_akC[3]);
 }
 
-glm::vec3 ZCameraParameterAnimation::Poly::Acceleration(float fU)
+glm::vec3 ZCameraParameterAnimation::Poly::Acceleration(float fU) const
 {
   return 2.0f * m_akC[2] + 6.0f * fU * m_akC[3];
 }
 
-float ZCameraParameterAnimation::Poly::Speed(float fU)
+float ZCameraParameterAnimation::Poly::Speed(float fU) const
 {
   return glm::length(Velocity(fU));
 }
 
-float ZCameraParameterAnimation::Poly::Length(float fU)
+float ZCameraParameterAnimation::Poly::Length(float fU) const
 {
   // Need to transform domain [0,u] to [-1,1]. If 0 <= x <= u
   // and -1 <= t <= 1, then x = u*(t+1)/2.
@@ -226,15 +278,15 @@ glm::quat ZCameraParameterAnimation::SquadPoly::Q(float fU) const
   return glm::squad(m_kP, m_kQ, m_kA, m_kB, fU);
 }
 
-ZCameraParameterAnimation::SplineRange::SplineRange(std::vector<ZCameraParameterKey*>& kys)
+ZCameraParameterAnimation::SplineRange::SplineRange(const std::vector<ZCameraParameterKey*>& kys)
   : m_hasSpline(kys.size() >= 2)
 {
-  keys.swap(kys);
+  keys.reserve(kys.size());
+  for (const auto* key : kys) {
+    CHECK(key);
+    keys.emplace_back(*key);
+  }
   if (m_hasSpline) {
-    firstKey = std::make_unique<ZCameraParameterKey>(*keys[0]);
-    lastKey = std::make_unique<ZCameraParameterKey>(*keys.back());
-    keys.insert(keys.begin(), firstKey.get());
-    keys.push_back(lastKey.get());
     buildPosSpline();
     buildRotSpline();
   }
@@ -243,7 +295,8 @@ ZCameraParameterAnimation::SplineRange::SplineRange(std::vector<ZCameraParameter
 glm::quat ZCameraParameterAnimation::SplineRange::rotation(float fTime) const
 {
   if (!m_hasSpline) {
-    return keys[0]->rot();
+    CHECK(!keys.empty());
+    return keys[0].rot;
   }
 
   // find the interpolating polynomial (clamping used, modify for looping)
@@ -271,7 +324,8 @@ glm::quat ZCameraParameterAnimation::SplineRange::rotation(float fTime) const
 glm::vec3 ZCameraParameterAnimation::SplineRange::position(float fTime) const
 {
   if (!m_hasSpline) {
-    return keys[0]->eye();
+    CHECK(!keys.empty());
+    return keys[0].eye;
   }
 
   size_t i;
@@ -324,7 +378,8 @@ float ZCameraParameterAnimation::SplineRange::totalLength() const
 glm::vec3 ZCameraParameterAnimation::SplineRange::positionAL(float fS)
 {
   if (!m_hasSpline) {
-    return keys[0]->eye();
+    CHECK(!keys.empty());
+    return keys[0].eye;
   }
 
   size_t i = 0;
@@ -359,43 +414,71 @@ glm::vec3 ZCameraParameterAnimation::SplineRange::accelerationAL(float fS)
 
 void ZCameraParameterAnimation::SplineRange::buildPosSpline()
 {
-  for (size_t i = 0; i < keys.size() - 3; ++i) {
-    posSpline.emplace_back();
+  CHECK(keys.size() >= 2);
+  posSpline.resize(keys.size() - 1);
+
+  std::vector<glm::vec3> inTangents(keys.size(), glm::vec3(0.f));
+  std::vector<glm::vec3> outTangents(keys.size(), glm::vec3(0.f));
+
+  {
+    const auto& key0 = keys[0];
+    const auto& key1 = keys[1];
+    const float delta = key1.time - key0.time;
+    CHECK(delta > 0.f);
+    const float coeff = (1.0f - key0.posTension) * (1.0f - key0.posContinuity) * (1.0f - key0.posBias) / (2.0f * delta);
+    outTangents[0] = coeff * (key1.eye - key0.eye);
+    inTangents[0] = outTangents[0];
   }
 
-  for (size_t i0 = 0, i1 = 1, i2 = 2, i3 = 3; i0 < posSpline.size(); i0++, i1++, i2++, i3++) {
-    glm::vec3 kDiff10 = keys[i1]->eye() - keys[i0]->eye();
-    glm::vec3 kDiff21 = keys[i2]->eye() - keys[i1]->eye();
-    glm::vec3 kDiff32 = keys[i3]->eye() - keys[i2]->eye();
-    // build multipliers at point P[i1]
-    float fOmT0 = 1.0f - keys[i1]->posTension();
-    float fOmC0 = 1.0f - keys[i1]->posContinuity();
-    float fOpC0 = 1.0f + keys[i1]->posContinuity();
-    float fOmB0 = 1.0f - keys[i1]->posBias();
-    float fOpB0 = 1.0f + keys[i1]->posBias();
-    float fAdj0 = 2.0f * (keys[i2]->time() - keys[i1]->time()) / (keys[i2]->time() - keys[i0]->time());
-    float fOut0 = 0.5f * fAdj0 * fOmT0 * fOpC0 * fOpB0;
-    float fOut1 = 0.5f * fAdj0 * fOmT0 * fOmC0 * fOmB0;
-    // build outgoing tangent at P[i1]
-    glm::vec3 kTOut = fOut1 * kDiff21 + fOut0 * kDiff10;
-    // build multipliers at point P[i2]
-    float fOmT1 = 1.0f - keys[i2]->posTension();
-    float fOmC1 = 1.0f - keys[i2]->posContinuity();
-    float fOpC1 = 1.0f + keys[i2]->posContinuity();
-    float fOmB1 = 1.0f - keys[i2]->posBias();
-    float fOpB1 = 1.0f + keys[i2]->posBias();
-    float fAdj1 = 2.0f * (keys[i2]->time() - keys[i1]->time()) / (keys[i3]->time() - keys[i1]->time());
-    float fIn0 = 0.5f * fAdj1 * fOmT1 * fOmC1 * fOpB1;
-    float fIn1 = 0.5f * fAdj1 * fOmT1 * fOpC1 * fOmB1;
-    // build incoming tangent at P[i2]
-    glm::vec3 kTIn = fIn1 * kDiff32 + fIn0 * kDiff21;
-    posSpline[i0].m_akC[0] = keys[i1]->eye();
-    posSpline[i0].m_akC[1] = kTOut;
-    posSpline[i0].m_akC[2] = 3.0f * kDiff21 - 2.0f * kTOut - kTIn;
-    posSpline[i0].m_akC[3] = -2.0f * kDiff21 + kTOut + kTIn;
-    posSpline[i0].m_fTMin = keys[i1]->time();
-    posSpline[i0].m_fTMax = keys[i2]->time();
-    posSpline[i0].m_fTInvRange = 1.0f / (keys[i2]->time() - keys[i1]->time());
+  for (size_t k = 1; k + 1 < keys.size(); ++k) {
+    const auto& keyPrev = keys[k - 1];
+    const auto& key = keys[k];
+    const auto& keyNext = keys[k + 1];
+    const glm::vec3 prevDiff = key.eye - keyPrev.eye;
+    const glm::vec3 nextDiff = keyNext.eye - key.eye;
+    const float prevDelta = key.time - keyPrev.time;
+    const float nextDelta = keyNext.time - key.time;
+    CHECK(prevDelta > 0.f);
+    CHECK(nextDelta > 0.f);
+
+    const float omT = 1.0f - key.posTension;
+    const float omC = 1.0f - key.posContinuity;
+    const float opC = 1.0f + key.posContinuity;
+    const float omB = 1.0f - key.posBias;
+    const float opB = 1.0f + key.posBias;
+    const float twoPrevDelta = 2.0f * prevDelta;
+    const float twoNextDelta = 2.0f * nextDelta;
+    inTangents[k] = (omT * omC * opB / twoPrevDelta) * prevDiff + (omT * opC * omB / twoNextDelta) * nextDiff;
+    outTangents[k] = (omT * opC * opB / twoPrevDelta) * prevDiff + (omT * omC * omB / twoNextDelta) * nextDiff;
+  }
+
+  {
+    const size_t last = keys.size() - 1;
+    const auto& keyPrev = keys[last - 1];
+    const auto& key = keys[last];
+    const float delta = key.time - keyPrev.time;
+    CHECK(delta > 0.f);
+    const float coeff = (1.0f - key.posTension) * (1.0f - key.posContinuity) * (1.0f + key.posBias) / (2.0f * delta);
+    inTangents[last] = coeff * (key.eye - keyPrev.eye);
+    outTangents[last] = inTangents[last];
+  }
+
+  for (size_t k = 0; k + 1 < keys.size(); ++k) {
+    const auto& key0 = keys[k];
+    const auto& key1 = keys[k + 1];
+    const float delta = key1.time - key0.time;
+    CHECK(delta > 0.f);
+    const glm::vec3 diff = key1.eye - key0.eye;
+    const glm::vec3 outTangent = outTangents[k];
+    const glm::vec3 inTangent = inTangents[k + 1];
+
+    posSpline[k].m_akC[0] = key0.eye;
+    posSpline[k].m_akC[1] = delta * outTangent;
+    posSpline[k].m_akC[2] = 3.0f * diff - delta * (2.0f * outTangent + inTangent);
+    posSpline[k].m_akC[3] = -2.0f * diff + delta * (outTangent + inTangent);
+    posSpline[k].m_fTMin = key0.time;
+    posSpline[k].m_fTMax = key1.time;
+    posSpline[k].m_fTInvRange = 1.0f / delta;
   }
   // compute arc lengths of polynomials and total length of spline
   posSplineLengths.resize(posSpline.size() + 1, 0.f);
@@ -410,61 +493,86 @@ void ZCameraParameterAnimation::SplineRange::buildPosSpline()
 
 void ZCameraParameterAnimation::SplineRange::buildRotSpline()
 {
-  for (size_t i = 0; i < keys.size() - 3; ++i) {
-    rotSpline.emplace_back();
-  }
+  CHECK(keys.size() >= 2);
+  rotSpline.resize(keys.size() - 1);
 
   // Consecutive quaternions should form an acute angle. Changing sign on a quaternion does not
   // change the rotation it represents, but it *does* affect log/exp-based spline construction.
-  // Note: ZCameraParameterKey::rot() returns a value (derived from the view matrix), so we must
-  // not attempt to mutate it in-place. Instead, build a local sign-consistent sequence.
   std::vector<glm::quat> qs;
   qs.reserve(keys.size());
-  for (const auto* k : keys) {
-    qs.emplace_back(k->rot());
+  for (const auto& key : keys) {
+    qs.emplace_back(key.rot);
   }
   for (size_t i = 1; i < qs.size(); ++i) {
     if (glm::dot(qs[i], qs[i - 1]) < 0.0f) {
       qs[i] = -qs[i];
     }
   }
-  for (size_t i0 = 0, i1 = 1, i2 = 2, i3 = 3; i0 < rotSpline.size(); i0++, i1++, i2++, i3++) {
-    glm::quat kQ0 = qs[i0];
-    glm::quat kQ1 = qs[i1];
-    glm::quat kQ2 = qs[i2];
-    glm::quat kQ3 = qs[i3];
-    glm::quat kLog10 = glm::log(glm::conjugate(kQ0) * kQ1);
-    glm::quat kLog21 = glm::log(glm::conjugate(kQ1) * kQ2);
-    glm::quat kLog32 = glm::log(glm::conjugate(kQ2) * kQ3);
-    // build multipliers at q[i1]
-    float fOmT0 = 1.0f - keys[i1]->rotTension();
-    float fOmC0 = 1.0f - keys[i1]->rotContinuity();
-    float fOpC0 = 1.0f + keys[i1]->rotContinuity();
-    float fOmB0 = 1.0f - keys[i1]->rotBias();
-    float fOpB0 = 1.0f + keys[i1]->rotBias();
-    float fAdj0 = 2.0f * (keys[i2]->time() - keys[i1]->time()) / (keys[i2]->time() - keys[i0]->time());
-    float fOut0 = 0.5f * fAdj0 * fOmT0 * fOpC0 * fOpB0;
-    float fOut1 = 0.5f * fAdj0 * fOmT0 * fOmC0 * fOmB0;
-    // build outgoing tangent at q[i1]
-    glm::quat kTOut = fOut1 * kLog21 + fOut0 * kLog10;
-    // build multipliers at q[i2]
-    float fOmT1 = 1.0f - keys[i2]->rotTension();
-    float fOmC1 = 1.0f - keys[i2]->rotContinuity();
-    float fOpC1 = 1.0f + keys[i2]->rotContinuity();
-    float fOmB1 = 1.0f - keys[i2]->rotBias();
-    float fOpB1 = 1.0f + keys[i2]->rotBias();
-    float fAdj1 = 2.0f * (keys[i2]->time() - keys[i1]->time()) / (keys[i3]->time() - keys[i1]->time());
-    float fIn0 = 0.5f * fAdj1 * fOmT1 * fOmC1 * fOpB1;
-    float fIn1 = 0.5f * fAdj1 * fOmT1 * fOpC1 * fOmB1;
-    // build incoming tangent at q[i2]
-    glm::quat kTIn = fIn1 * kLog32 + fIn0 * kLog21;
-    rotSpline[i0].m_kP = kQ1;
-    rotSpline[i0].m_kQ = kQ2;
-    rotSpline[i0].m_kA = kQ1 * glm::exp((kTOut + (-kLog21)) * 0.5f);
-    rotSpline[i0].m_kB = kQ2 * glm::exp(0.5f * (kLog21 + (-kTIn)));
-    rotSpline[i0].m_fTMin = keys[i1]->time();
-    rotSpline[i0].m_fTMax = keys[i2]->time();
-    rotSpline[i0].m_fTInvRange = 1.0f / (keys[i2]->time() - keys[i1]->time());
+
+  std::vector<glm::quat> inTangents(keys.size(), glm::quat(0.f, 0.f, 0.f, 0.f));
+  std::vector<glm::quat> outTangents(keys.size(), glm::quat(0.f, 0.f, 0.f, 0.f));
+
+  {
+    const auto& key0 = keys[0];
+    const auto& key1 = keys[1];
+    const float delta = key1.time - key0.time;
+    CHECK(delta > 0.f);
+    const glm::quat log01 = glm::log(glm::conjugate(qs[0]) * qs[1]);
+    const float coeff = (1.0f - key0.rotTension) * (1.0f - key0.rotContinuity) * (1.0f - key0.rotBias) / (2.0f * delta);
+    outTangents[0] = coeff * log01;
+    inTangents[0] = outTangents[0];
+  }
+
+  for (size_t k = 1; k + 1 < keys.size(); ++k) {
+    const auto& keyPrev = keys[k - 1];
+    const auto& key = keys[k];
+    const auto& keyNext = keys[k + 1];
+    const float prevDelta = key.time - keyPrev.time;
+    const float nextDelta = keyNext.time - key.time;
+    CHECK(prevDelta > 0.f);
+    CHECK(nextDelta > 0.f);
+    const glm::quat prevLog = glm::log(glm::conjugate(qs[k - 1]) * qs[k]);
+    const glm::quat nextLog = glm::log(glm::conjugate(qs[k]) * qs[k + 1]);
+
+    const float omT = 1.0f - key.rotTension;
+    const float omC = 1.0f - key.rotContinuity;
+    const float opC = 1.0f + key.rotContinuity;
+    const float omB = 1.0f - key.rotBias;
+    const float opB = 1.0f + key.rotBias;
+    const float twoPrevDelta = 2.0f * prevDelta;
+    const float twoNextDelta = 2.0f * nextDelta;
+    inTangents[k] = (omT * omC * opB / twoPrevDelta) * prevLog + (omT * opC * omB / twoNextDelta) * nextLog;
+    outTangents[k] = (omT * opC * opB / twoPrevDelta) * prevLog + (omT * omC * omB / twoNextDelta) * nextLog;
+  }
+
+  {
+    const size_t last = keys.size() - 1;
+    const auto& keyPrev = keys[last - 1];
+    const auto& key = keys[last];
+    const float delta = key.time - keyPrev.time;
+    CHECK(delta > 0.f);
+    const glm::quat log = glm::log(glm::conjugate(qs[last - 1]) * qs[last]);
+    const float coeff = (1.0f - key.rotTension) * (1.0f - key.rotContinuity) * (1.0f + key.rotBias) / (2.0f * delta);
+    inTangents[last] = coeff * log;
+    outTangents[last] = inTangents[last];
+  }
+
+  for (size_t k = 0; k + 1 < keys.size(); ++k) {
+    const auto& key0 = keys[k];
+    const auto& key1 = keys[k + 1];
+    const float delta = key1.time - key0.time;
+    CHECK(delta > 0.f);
+    const glm::quat segmentLog = glm::log(glm::conjugate(qs[k]) * qs[k + 1]);
+    const glm::quat outTangent = delta * outTangents[k];
+    const glm::quat inTangent = delta * inTangents[k + 1];
+
+    rotSpline[k].m_kP = qs[k];
+    rotSpline[k].m_kQ = qs[k + 1];
+    rotSpline[k].m_kA = qs[k] * glm::exp(0.5f * (outTangent - segmentLog));
+    rotSpline[k].m_kB = qs[k + 1] * glm::exp(0.5f * (segmentLog - inTangent));
+    rotSpline[k].m_fTMin = key0.time;
+    rotSpline[k].m_fTMax = key1.time;
+    rotSpline[k].m_fTInvRange = 1.0f / delta;
   }
 }
 
@@ -536,8 +644,6 @@ void ZCameraParameterAnimation::SplineRange::swap(ZCameraParameterAnimation::Spl
   std::swap(posSplineTotalLength, rhs.posSplineTotalLength);
   rotSpline.swap(rhs.rotSpline);
   std::swap(m_hasSpline, rhs.m_hasSpline);
-  firstKey.swap(rhs.firstKey);
-  lastKey.swap(rhs.lastKey);
 }
 
 } // namespace nim

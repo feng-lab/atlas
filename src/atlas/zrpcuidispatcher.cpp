@@ -2192,14 +2192,26 @@ ZRpcUiDispatcher::BoolResult ZRpcUiDispatcher::setAnimationKey(const SetKeyReque
     return out;
   }
 
+  std::optional<Z3DAnimationDoc::CameraKeyTcb> cameraTcb;
+  if (req.cameraTcb) {
+    Z3DAnimationDoc::CameraKeyTcb tcb;
+    tcb.posTension = req.cameraTcb->posTension;
+    tcb.posContinuity = req.cameraTcb->posContinuity;
+    tcb.posBias = req.cameraTcb->posBias;
+    tcb.rotTension = req.cameraTcb->rotTension;
+    tcb.rotContinuity = req.cameraTcb->rotContinuity;
+    tcb.rotBias = req.cameraTcb->rotBias;
+    cameraTcb = tcb;
+  }
+
   auto& ad = doc->animation3DDoc();
-  auto r =
-    ad.setKey(static_cast<size_t>(req.animationId),
-              static_cast<size_t>(req.targetId),
-              req.jsonKey,
-              req.timeSec,
-              req.easing,
-              req.value);
+  auto r = ad.setKey(static_cast<size_t>(req.animationId),
+                     static_cast<size_t>(req.targetId),
+                     req.jsonKey,
+                     req.timeSec,
+                     req.easing,
+                     req.value,
+                     cameraTcb);
   if (!r.ok) {
     out.ok = false;
     out.errorKind = mapAnimErrorKind(r.errorKind);
@@ -2313,6 +2325,16 @@ ZRpcUiDispatcher::BoolResult ZRpcUiDispatcher::batchAnimationKeys(const BatchKey
     o.timeSec = s.timeSec;
     o.easing = s.easing;
     o.value = s.value;
+    if (s.cameraTcb) {
+      Z3DAnimationDoc::CameraKeyTcb tcb;
+      tcb.posTension = s.cameraTcb->posTension;
+      tcb.posContinuity = s.cameraTcb->posContinuity;
+      tcb.posBias = s.cameraTcb->posBias;
+      tcb.rotTension = s.cameraTcb->rotTension;
+      tcb.rotContinuity = s.cameraTcb->rotContinuity;
+      tcb.rotBias = s.cameraTcb->rotBias;
+      o.cameraTcb = tcb;
+    }
     sets.push_back(std::move(o));
   }
 
