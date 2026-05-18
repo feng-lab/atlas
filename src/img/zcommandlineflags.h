@@ -24,6 +24,7 @@ struct ZCommandLineFlagInfo
 
 void setCommandLineUsageMessage(std::string_view usage);
 std::vector<char*> parseCommandLine(int argc, char* argv[], std::string_view defaultFlagfilePath = {});
+void logIgnoredCommandLineFlags();
 
 [[nodiscard]] bool getCommandLineFlagInfo(std::string_view name, ZCommandLineFlagInfo* info);
 [[nodiscard]] ZCommandLineFlagInfo getCommandLineFlagInfoOrDie(std::string_view name);

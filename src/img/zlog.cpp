@@ -175,6 +175,28 @@ LogData::LogData(const absl::LogEntry& entry)
 
 namespace {
 
+__forceinline size_t writeUnlocked(std::FILE* file, const char* data, size_t size)
+{
+#if defined(_MSC_VER)
+  return _fwrite_nolock(data, 1, size, file);
+#elif defined(__GLIBC__)
+  return ::fwrite_unlocked(data, 1, size, file);
+#else
+  return std::fwrite(data, 1, size, file);
+#endif
+}
+
+__forceinline int flushUnlocked(std::FILE* file)
+{
+#if defined(_MSC_VER)
+  return _fflush_nolock(file);
+#elif defined(__GLIBC__)
+  return ::fflush_unlocked(file);
+#else
+  return std::fflush(file);
+#endif
+}
+
 class ConsoleLogSink : public absl::LogSink
 {
   std::mutex m_mutex;
@@ -188,13 +210,8 @@ public:
 
     const absl::string_view message = entry.text_message_with_prefix_and_newline();
     std::scoped_lock lock(m_mutex);
-    std::fwrite(message.data(), 1, message.size(), stdout);
-  }
-
-  void Flush() override
-  {
-    std::scoped_lock lock(m_mutex);
-    std::fflush(stdout);
+    (void)writeUnlocked(stdout, message.data(), message.size());
+    (void)flushUnlocked(stdout);
   }
 };
 
@@ -209,10 +226,12 @@ enum class FileOpenMode
   Lazy
 };
 
+using FileHandle = std::unique_ptr<std::FILE, decltype(&std::fclose)>;
+
 class FileLogWriter
 {
   QString m_filename;
-  std::ofstream m_fileStream;
+  FileHandle m_file{nullptr, std::fclose};
   FileOpenMode m_openMode;
   bool m_openFailed = false;
 
@@ -226,9 +245,12 @@ public:
     }
   }
 
+  FileLogWriter(const FileLogWriter&) = delete;
+  FileLogWriter& operator=(const FileLogWriter&) = delete;
+
   [[nodiscard]] bool isValid() const
   {
-    return !m_openFailed && (m_openMode == FileOpenMode::Lazy || (m_fileStream.is_open() && m_fileStream));
+    return !m_openFailed && (m_openMode == FileOpenMode::Lazy || m_file != nullptr);
   }
 
   bool write(absl::string_view message)
@@ -237,32 +259,24 @@ public:
       return false;
     }
 
-    m_fileStream.write(message.data(), static_cast<std::streamsize>(message.size()));
-    m_fileStream.flush();
-    return static_cast<bool>(m_fileStream);
-  }
-
-  void flush()
-  {
-    if (!m_fileStream.is_open() || !m_fileStream) {
-      return;
-    }
-
-    m_fileStream.flush();
+    std::FILE* file = m_file.get();
+    const size_t bytesWritten = writeUnlocked(file, message.data(), message.size());
+    const bool flushed = flushUnlocked(file) == 0;
+    return bytesWritten == message.size() && flushed;
   }
 
 private:
   bool ensureOpen()
   {
-    if (m_fileStream.is_open()) {
-      return static_cast<bool>(m_fileStream);
+    if (m_file != nullptr) {
+      return true;
     }
     if (m_openFailed) {
       return false;
     }
 
     try {
-      openOFStream(m_fileStream, m_filename, std::ios_base::out | std::ios_base::binary);
+      m_file = openFile(m_filename, "wb");
     }
     catch (const ZException& e) {
       m_openFailed = true;
@@ -271,7 +285,7 @@ private:
       return false;
     }
 
-    m_openFailed = !m_fileStream;
+    m_openFailed = m_file == nullptr;
     return !m_openFailed;
   }
 };
@@ -302,12 +316,6 @@ public:
     const absl::string_view message = entry.text_message_with_prefix_and_newline();
     std::scoped_lock lock(m_mutex);
     m_file.write(message);
-  }
-
-  void Flush() override
-  {
-    std::scoped_lock lock(m_mutex);
-    m_file.flush();
   }
 };
 
@@ -367,14 +375,6 @@ public:
     std::scoped_lock lock(m_mutex);
     for (size_t i = 0; i <= maxIndex; ++i) {
       m_files[i]->write(message);
-    }
-  }
-
-  void Flush() override
-  {
-    std::scoped_lock lock(m_mutex);
-    for (const auto& file : m_files) {
-      file->flush();
     }
   }
 };

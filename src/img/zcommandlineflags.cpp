@@ -2,11 +2,20 @@
 
 #include <absl/flags/commandlineflag.h>
 #include <absl/log/check.h>
+#include <absl/log/log.h>
 #include <algorithm>
 #include <sstream>
 
 namespace nim {
 namespace {
+
+struct IgnoredCommandLineFlag
+{
+  absl::UnrecognizedFlag::Source source;
+  std::string name;
+};
+
+std::vector<IgnoredCommandLineFlag> g_ignoredCommandLineFlags;
 
 std::string flagTypeName(const absl::CommandLineFlag& flag)
 {
@@ -49,6 +58,20 @@ ZCommandLineFlagInfo makeFlagInfo(const absl::CommandLineFlag& flag)
   return info;
 }
 
+std::vector<char*> parseKnownCommandLineFlags(int argc, char* argv[])
+{
+  std::vector<char*> positionalArgs;
+  std::vector<absl::UnrecognizedFlag> unrecognizedFlags;
+  // User flagfiles can contain stale or platform-specific flags; keep valid flags and ignore the rest.
+  absl::ParseAbseilFlagsOnly(argc, argv, positionalArgs, unrecognizedFlags);
+  g_ignoredCommandLineFlags.clear();
+  g_ignoredCommandLineFlags.reserve(unrecognizedFlags.size());
+  for (const absl::UnrecognizedFlag& flag : unrecognizedFlags) {
+    g_ignoredCommandLineFlags.push_back({flag.source, flag.flag_name});
+  }
+  return positionalArgs;
+}
+
 } // namespace
 
 void setCommandLineUsageMessage(std::string_view usage)
@@ -59,7 +82,7 @@ void setCommandLineUsageMessage(std::string_view usage)
 std::vector<char*> parseCommandLine(int argc, char* argv[], std::string_view defaultFlagfilePath)
 {
   if (defaultFlagfilePath.empty()) {
-    return absl::ParseCommandLine(argc, argv);
+    return parseKnownCommandLineFlags(argc, argv);
   }
 
   std::string defaultFlagfileArg = "--flagfile=" + std::string(defaultFlagfilePath);
@@ -70,7 +93,15 @@ std::vector<char*> parseCommandLine(int argc, char* argv[], std::string_view def
   for (int i = 1; i < argc; ++i) {
     parseArgs.push_back(argv[i]);
   }
-  return absl::ParseCommandLine(static_cast<int>(parseArgs.size()), parseArgs.data());
+  return parseKnownCommandLineFlags(static_cast<int>(parseArgs.size()), parseArgs.data());
+}
+
+void logIgnoredCommandLineFlags()
+{
+  for (const IgnoredCommandLineFlag& flag : g_ignoredCommandLineFlags) {
+    const char* source = flag.source == absl::UnrecognizedFlag::kFromFlagfile ? "flagfile" : "argv";
+    LOG(INFO) << "ignored unknown command line flag from " << source << ": --" << flag.name;
+  }
 }
 
 bool getCommandLineFlagInfo(std::string_view name, ZCommandLineFlagInfo* info)

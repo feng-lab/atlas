@@ -208,6 +208,7 @@ int main(int argc, char* argv[])
     } else {
       LOG(INFO) << "no user setting file";
     }
+    logIgnoredCommandLineFlags();
     LOG(INFO) << "current settings: \n" << commandLineFlagsToString();
 
     ZImgInit::instance(ZSystemInfo::resourcesDirPath(),
