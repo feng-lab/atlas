@@ -1096,7 +1096,7 @@ void ZVulkanImgRaycasterPipelineContext::recordStageEntryExit(Z3DRendererBase& r
                                                        job.ticket.data(),
                                                        job.ticket.dataBytes(),
                                                        /*flipY=*/true)) {
-                LOG(ERROR) << "Entry/exit debug save failed for " << job.filename.toStdString();
+                LOG(ERROR) << "Entry/exit debug save failed for " << job.filename;
               }
             }
             co_return;

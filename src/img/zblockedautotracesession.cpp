@@ -142,17 +142,17 @@ void atomicWriteJsonObjectOrThrow(const QString& finalPath, const json::object& 
 {
   QSaveFile file(finalPath);
   if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
-    throw ZException(QStringLiteral("Blocked auto trace: failed to open temp JSON file: %1").arg(finalPath));
+    throw ZException(fmt::format("Blocked auto trace: failed to open temp JSON file: {}", finalPath));
   }
 
   const std::string payload = jsonToFormattedString(jo);
   const qint64 written = file.write(payload.data(), static_cast<qint64>(payload.size()));
   if (written != static_cast<qint64>(payload.size())) {
-    throw ZException(QStringLiteral("Blocked auto trace: failed to write JSON file: %1").arg(finalPath));
+    throw ZException(fmt::format("Blocked auto trace: failed to write JSON file: {}", finalPath));
   }
 
   if (!file.commit()) {
-    throw ZException(QStringLiteral("Blocked auto trace: failed to commit JSON file: %1").arg(finalPath));
+    throw ZException(fmt::format("Blocked auto trace: failed to commit JSON file: {}", finalPath));
   }
 }
 
@@ -505,7 +505,7 @@ ZBlockedAutoTraceManifest ZBlockedAutoTraceSession::loadManifestOrThrow() const
 {
   const QString path = manifestPath();
   if (!QFileInfo::exists(path)) {
-    throw ZException(QStringLiteral("Blocked auto trace: missing manifest: %1").arg(path));
+    throw ZException(fmt::format("Blocked auto trace: missing manifest: {}", path));
   }
   const json::object jo = loadJsonObject(path);
   ZBlockedAutoTraceManifest m = manifestFromJsonOrThrow(jo);
@@ -525,12 +525,12 @@ void ZBlockedAutoTraceSession::ensureCreatedOrThrow(const ZBlockedAutoTraceManif
 {
   const QDir root(m_sessionDir);
   if (!root.exists() && !QDir().mkpath(m_sessionDir)) {
-    throw ZException(QStringLiteral("Blocked auto trace: can not create session directory: %1").arg(m_sessionDir));
+    throw ZException(fmt::format("Blocked auto trace: can not create session directory: {}", m_sessionDir));
   }
 
   const QString blocksPath = blocksDirPath();
   if (!QDir(blocksPath).exists() && !QDir().mkpath(blocksPath)) {
-    throw ZException(QStringLiteral("Blocked auto trace: can not create blocks directory: %1").arg(blocksPath));
+    throw ZException(fmt::format("Blocked auto trace: can not create blocks directory: {}", blocksPath));
   }
 
   const QString manifestP = manifestPath();
@@ -689,7 +689,7 @@ void ZBlockedAutoTraceSession::writeSwcDeltaOrThrow(const QString& filePath,
   errno = 0;
   std::FILE* fp = std::fopen(filePath.toStdString().c_str(), "w");
   if (fp == nullptr) {
-    throw ZException(QStringLiteral("Blocked auto trace: failed to open SWC delta for writing: %1").arg(filePath),
+    throw ZException(fmt::format("Blocked auto trace: failed to open SWC delta for writing: {}", filePath),
                      ZException::Option::CheckErrno);
   }
 
@@ -707,7 +707,7 @@ void ZBlockedAutoTraceSession::writeSwcDeltaOrThrow(const QString& filePath,
 
   errno = 0;
   if (std::fclose(fp) != 0) {
-    throw ZException(QStringLiteral("Blocked auto trace: failed to close SWC delta: %1").arg(filePath),
+    throw ZException(fmt::format("Blocked auto trace: failed to close SWC delta: {}", filePath),
                      ZException::Option::CheckErrno);
   }
 }
@@ -717,7 +717,7 @@ std::vector<ZBlockedAutoTraceBlockId> ZBlockedAutoTraceSession::readSeedScannedB
   const json::object jo = loadJsonObject(filePath);
   auto it = jo.find("blocks");
   if (it == jo.end() || !it->value().is_array()) {
-    throw ZException(QStringLiteral("Blocked auto trace: invalid seed_scanned_blocks.json: %1").arg(filePath));
+    throw ZException(fmt::format("Blocked auto trace: invalid seed_scanned_blocks.json: {}", filePath));
   }
 
   const auto& arr = it->value().as_array();
@@ -725,7 +725,7 @@ std::vector<ZBlockedAutoTraceBlockId> ZBlockedAutoTraceSession::readSeedScannedB
   out.reserve(arr.size());
   for (const auto& value : arr) {
     if (!value.is_object()) {
-      throw ZException(QStringLiteral("Blocked auto trace: invalid seed_scanned_blocks entry: %1").arg(filePath));
+      throw ZException(fmt::format("Blocked auto trace: invalid seed_scanned_blocks entry: {}", filePath));
     }
     out.push_back(blockIdFromJsonOrThrow(value.as_object()));
   }
@@ -751,31 +751,31 @@ void copyFileAtomicOrThrow(const QString& sourcePath, const QString& finalPath)
 {
   QFile source(sourcePath);
   if (!source.open(QIODevice::ReadOnly)) {
-    throw ZException(QStringLiteral("Blocked auto trace: failed to open source file: %1").arg(sourcePath));
+    throw ZException(fmt::format("Blocked auto trace: failed to open source file: {}", sourcePath));
   }
 
   QSaveFile dest(finalPath);
   if (!dest.open(QIODevice::WriteOnly)) {
-    throw ZException(QStringLiteral("Blocked auto trace: failed to open destination file: %1").arg(finalPath));
+    throw ZException(fmt::format("Blocked auto trace: failed to open destination file: {}", finalPath));
   }
 
   std::vector<char> buffer(1 << 20);
   while (true) {
     const qint64 nread = source.read(buffer.data(), static_cast<qint64>(buffer.size()));
     if (nread < 0) {
-      throw ZException(QStringLiteral("Blocked auto trace: failed while reading source file: %1").arg(sourcePath));
+      throw ZException(fmt::format("Blocked auto trace: failed while reading source file: {}", sourcePath));
     }
     if (nread == 0) {
       break;
     }
     const qint64 nwritten = dest.write(buffer.data(), nread);
     if (nwritten != nread) {
-      throw ZException(QStringLiteral("Blocked auto trace: failed while writing destination file: %1").arg(finalPath));
+      throw ZException(fmt::format("Blocked auto trace: failed while writing destination file: {}", finalPath));
     }
   }
 
   if (!dest.commit()) {
-    throw ZException(QStringLiteral("Blocked auto trace: failed to commit destination file: %1").arg(finalPath));
+    throw ZException(fmt::format("Blocked auto trace: failed to commit destination file: {}", finalPath));
   }
 }
 
@@ -856,8 +856,7 @@ ZBlockedAutoTraceLoadedState ZBlockedAutoTraceSession::loadLatestOrEmptyOrThrow(
     if (!QFileInfo::exists(swcFullPath) || !QFileInfo::exists(seedScannedPath) ||
         !QFileInfo::exists(dir.absoluteFilePath(frontierJsonName())) ||
         !QFileInfo::exists(dir.absoluteFilePath(schedulerJsonName()))) {
-      throw ZException(
-        QStringLiteral("Blocked auto trace: missing files in self-contained commit: %1").arg(commitDir.path));
+      throw ZException(fmt::format("Blocked auto trace: missing files in self-contained commit: {}", commitDir.path));
     }
 
     state.swc.load(swcFullPath);
@@ -905,13 +904,13 @@ void ZBlockedAutoTraceSession::writeCommitOrThrow(const ZBlockedAutoTraceCommitW
   const QString blocksPath = blocksDirPath();
   const QDir blocksDir(blocksPath);
   if (!blocksDir.exists()) {
-    throw ZException(QStringLiteral("Blocked auto trace: missing blocks dir: %1").arg(blocksPath));
+    throw ZException(fmt::format("Blocked auto trace: missing blocks dir: {}", blocksPath));
   }
 
   const QString finalName = commitDirName(commit.info.commitId);
   const QString finalPath = blocksDir.absoluteFilePath(finalName);
   if (QFileInfo::exists(finalPath)) {
-    throw ZException(QStringLiteral("Blocked auto trace: commit dir already exists: %1").arg(finalPath));
+    throw ZException(fmt::format("Blocked auto trace: commit dir already exists: {}", finalPath));
   }
 
   const QString stagingName =
@@ -919,7 +918,7 @@ void ZBlockedAutoTraceSession::writeCommitOrThrow(const ZBlockedAutoTraceCommitW
   const QString stagingPath = blocksDir.absoluteFilePath(stagingName);
 
   if (!QDir().mkpath(stagingPath)) {
-    throw ZException(QStringLiteral("Blocked auto trace: failed to create staging dir: %1").arg(stagingPath));
+    throw ZException(fmt::format("Blocked auto trace: failed to create staging dir: {}", stagingPath));
   }
 
   auto stagingGuard = folly::makeGuard([&]() {
@@ -960,8 +959,8 @@ void ZBlockedAutoTraceSession::writeCommitOrThrow(const ZBlockedAutoTraceCommitW
 
   // Atomically rename staging -> final.
   if (!QDir(blocksPath).rename(stagingName, finalName)) {
-    throw ZException(QStringLiteral("Blocked auto trace: failed to commit staging dir.\nStaging: %1\nFinal: %2")
-                       .arg(stagingPath, finalPath));
+    throw ZException(
+      fmt::format("Blocked auto trace: failed to commit staging dir.\nStaging: {}\nFinal: {}", stagingPath, finalPath));
   }
 
   stagingGuard.dismiss();

@@ -155,7 +155,7 @@ QString ZObjDoc::objNameWithModifiedMarkerAndID(size_t id) const
 std::map<size_t, size_t> ZObjDoc::read(const std::vector<std::pair<QString, json::value>>& docKeyValueList,
                                        QString& err)
 {
-  ZBenchTimer bt(fmt::format("ZObjDoc::read('{}')", typeName().toStdString()));
+  ZBenchTimer bt(fmt::format("ZObjDoc::read('{}')", typeName()));
   std::map<size_t, size_t> idmap;
 
   std::map<size_t, json::value> idToJsonValue;
@@ -381,10 +381,10 @@ std::map<size_t, size_t> ZObjDoc::read(const std::vector<std::pair<QString, json
           out.prepared.errorMsg = QString("%1: load cancelled").arg(groupLabel);
         }
         catch (const ZException& e) {
-          out.prepared.errorMsg = QString("%1: %2").arg(groupLabel).arg(QString::fromUtf8(e.what()));
+          out.prepared.errorMsg = QString("%1: %2").arg(groupLabel).arg(e.what());
         }
         catch (const std::exception& e) {
-          out.prepared.errorMsg = QString("%1: %2").arg(groupLabel).arg(QString::fromUtf8(e.what()));
+          out.prepared.errorMsg = QString("%1: %2").arg(groupLabel).arg(e.what());
         }
         catch (...) {
           out.prepared.errorMsg = QString("%1: Unknown exception while preparing load").arg(groupLabel);
@@ -407,7 +407,7 @@ std::map<size_t, size_t> ZObjDoc::read(const std::vector<std::pair<QString, json
           std::rethrow_exception(r.exception().to_exception_ptr());
         }
         catch (const std::exception& e) {
-          err += QString("%1: Async prepare task failed: %2\n").arg(groupLabel).arg(QString::fromUtf8(e.what()));
+          err += QString("%1: Async prepare task failed: %2\n").arg(groupLabel).arg(e.what());
         }
         catch (...) {
           err += QString("%1: Async prepare task failed: unknown exception\n").arg(groupLabel);
@@ -455,10 +455,10 @@ std::map<size_t, size_t> ZObjDoc::read(const std::vector<std::pair<QString, json
             errMsg = QString("%1: load cancelled").arg(groupLabel);
           }
           catch (const ZException& e) {
-            errMsg = QString("%1: %2").arg(groupLabel).arg(QString::fromUtf8(e.what()));
+            errMsg = QString("%1: %2").arg(groupLabel).arg(e.what());
           }
           catch (const std::exception& e) {
-            errMsg = QString("%1: %2").arg(groupLabel).arg(QString::fromUtf8(e.what()));
+            errMsg = QString("%1: %2").arg(groupLabel).arg(e.what());
           }
           catch (...) {
             errMsg = QString("%1: Unknown exception while committing load").arg(groupLabel);

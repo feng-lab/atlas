@@ -678,7 +678,7 @@ void ZImgOmeTiff::detectImgInfo(ZTiff& tiff)
         VLOG(1) << fmt::format("Interpreting OME-TIFF series {} TiffData IFD values in '{}' as 1-based because "
                                "the explicit mapping reaches past the last zero-based IFD",
                                seriesIndex,
-                               planeFilename.toStdString());
+                               planeFilename);
         for (PlaneSource& plane : series.planes) {
           if (plane.valid && sameFilePath(plane.filename, planeFilename)) {
             --plane.ifdIndex;

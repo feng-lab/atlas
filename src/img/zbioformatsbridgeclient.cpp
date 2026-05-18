@@ -292,8 +292,7 @@ QString resolveJavaExecutable()
   if (check.ok) {
     return candidate.program;
   }
-  const QString detail = QString("Bio-Formats requires Java 11 or newer. ") + check.detail;
-  throw ZException(detail);
+  throw ZException(fmt::format("Bio-Formats requires Java 11 or newer. {}", check.detail));
 }
 
 QString checkedJavaExecutablePath(const QString& javaExecutablePath)
@@ -792,14 +791,14 @@ private:
         m_stdoutBuffer.remove(0, newline + 1);
         constexpr std::string_view prefix = "ATLAS_BIOFORMATS_GRPC_PORT=";
         if (!line.startsWith(QByteArray(prefix.data(), static_cast<qsizetype>(prefix.size())))) {
-          throw ZException(fmt::format("Bio-Formats gRPC bridge printed unexpected startup line: {}",
-                                       QString::fromUtf8(line).toStdString()));
+          throw ZException(
+            fmt::format("Bio-Formats gRPC bridge printed unexpected startup line: {}", QString::fromUtf8(line)));
         }
         bool ok = false;
         const int port = line.mid(static_cast<qsizetype>(prefix.size())).toInt(&ok);
         if (!ok || port <= 0 || port > std::numeric_limits<uint16_t>::max()) {
-          throw ZException(fmt::format("Bio-Formats gRPC bridge printed invalid startup port: {}",
-                                       QString::fromUtf8(line).toStdString()));
+          throw ZException(
+            fmt::format("Bio-Formats gRPC bridge printed invalid startup port: {}", QString::fromUtf8(line)));
         }
         return static_cast<uint16_t>(port);
       }
@@ -982,7 +981,7 @@ private:
     }
 
     resetGrpcProcessLocked();
-    throw ZBioFormatsBridgeProcessFailure(detail.toStdString());
+    throw ZBioFormatsBridgeProcessFailure(detail);
   }
 
   std::mutex m_startMutex;

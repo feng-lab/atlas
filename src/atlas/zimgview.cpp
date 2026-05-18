@@ -695,7 +695,7 @@ openAnnotationsSourceTask(std::shared_ptr<ZNeuroglancerPrecomputedVolume> vol, Q
     throw;
   }
   catch (const std::exception& e) {
-    out.error = QString("Failed to open neuroglancer annotations dataset:\n%1").arg(QString::fromUtf8(e.what()));
+    out.error = QString("Failed to open neuroglancer annotations dataset:\n%1").arg(e.what());
   }
   co_return out;
 }
@@ -832,7 +832,7 @@ loadAnnotationsForRelationshipTask(std::shared_ptr<ZNeuroglancerPrecomputedVolum
     co_return out;
   }
   catch (const std::exception& e) {
-    out.error = QString("Failed to load neuroglancer annotations:\n%1").arg(QString::fromUtf8(e.what()));
+    out.error = QString("Failed to load neuroglancer annotations:\n%1").arg(e.what());
     co_return out;
   }
 }
@@ -985,7 +985,7 @@ loadMeshBatchTask(std::shared_ptr<ZNeuroglancerPrecomputedVolume> vol,
     throw;
   }
   catch (const std::exception& e) {
-    out.error = QString("Failed to load neuroglancer mesh source: %1").arg(QString::fromUtf8(e.what()));
+    out.error = QString("Failed to load neuroglancer mesh source: %1").arg(e.what());
     co_return out;
   }
   CHECK(source);
@@ -1258,7 +1258,7 @@ folly::coro::Task<BatchLoadMessageResult> loadSkeletonBatchTask(std::shared_ptr<
     throw;
   }
   catch (const std::exception& e) {
-    out.error = QString("Failed to load neuroglancer skeleton source: %1").arg(QString::fromUtf8(e.what()));
+    out.error = QString("Failed to load neuroglancer skeleton source: %1").arg(e.what());
     co_return out;
   }
   CHECK(source);

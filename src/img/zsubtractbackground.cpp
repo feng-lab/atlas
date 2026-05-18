@@ -164,12 +164,11 @@ void ZSubtractBackground::doWork()
     throw ZException("Subtract Background only supports single-time images.");
   }
   if (m_channel >= static_cast<int>(img.numChannels())) {
-    throw ZException(QString("Channel %1 is out of range for this image.").arg(m_channel + 1));
+    throw ZException(fmt::format("Channel {} is out of range for this image.", m_channel + 1));
   }
 
-  LOG(INFO) << "Subtract Background: input=" << m_inputImagePath.toStdString() << " channel=" << (m_channel + 1)
-            << " minFr=" << m_minForegroundRatio << " maxIter=" << m_maxIterations
-            << " output=" << m_outputImagePath.toStdString();
+  LOG(INFO) << "Subtract Background: input=" << m_inputImagePath << " channel=" << (m_channel + 1)
+            << " minFr=" << m_minForegroundRatio << " maxIter=" << m_maxIterations << " output=" << m_outputImagePath;
 
   // Work on a single-channel copy.
   const ZImg view = img.createView(/*c*/ m_channel, /*t*/ 0);
@@ -183,8 +182,8 @@ void ZSubtractBackground::doWork()
   } else if (out.isType<uint16_t>()) {
     commonIntensity = subtractBackgroundInPlaceLegacyLike<uint16_t>(out, m_minForegroundRatio, m_maxIterations);
   } else {
-    throw ZException(QString("Subtract Background only supports 8-bit and 16-bit unsigned images. Got %1")
-                       .arg(QString::fromStdString(out.info().toString())));
+    throw ZException(
+      fmt::format("Subtract Background only supports 8-bit and 16-bit unsigned images. Got {}", out.info()));
   }
 
   maybeCancel(m_cancellationToken);
@@ -192,7 +191,7 @@ void ZSubtractBackground::doWork()
   LOG(INFO) << "Subtract Background: commonIntensity=" << commonIntensity;
   out.save(m_outputImagePath);
 
-  LOG(INFO) << "Subtract Background: wrote " << QFileInfo(m_outputImagePath).fileName().toStdString();
+  LOG(INFO) << "Subtract Background: wrote " << QFileInfo(m_outputImagePath).fileName();
   reportProgress(1.0);
 }
 

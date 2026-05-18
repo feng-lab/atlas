@@ -266,7 +266,7 @@ TEST(ZBlockedAutoTraceSession, RollingSwcMirrorsLatestSelfContainedCommit)
   ASSERT_NO_THROW(session.updateRollingSwcFromCommitOrThrow(2));
 
   const QString rollingPath = QDir(sessionDir).absoluteFilePath("result_tracing.swc");
-  ASSERT_TRUE(QFileInfo::exists(rollingPath)) << rollingPath.toStdString();
+  ASSERT_TRUE(QFileInfo::exists(rollingPath)) << rollingPath;
 
   std::ifstream file(rollingPath.toStdString(), std::ios_base::in);
   ASSERT_TRUE(file.is_open());
@@ -288,11 +288,11 @@ TEST(ZBlockedAutoTraceSession, RollingSwcMirrorsLatestSelfContainedCommit)
   EXPECT_EQ(ids[2], 3);
 
   const QString fullPath = QDir(sessionDir).absoluteFilePath("blocks/commit_000002/swc_full.swc");
-  ASSERT_TRUE(QFileInfo::exists(fullPath)) << fullPath.toStdString();
+  ASSERT_TRUE(QFileInfo::exists(fullPath)) << fullPath;
   EXPECT_EQ(QFileInfo(rollingPath).size(), QFileInfo(fullPath).size());
 
   const QString statePath = QDir(sessionDir).absoluteFilePath("result_tracing_state.json");
-  EXPECT_FALSE(QFileInfo::exists(statePath)) << statePath.toStdString();
+  EXPECT_FALSE(QFileInfo::exists(statePath)) << statePath;
 }
 
 TEST(ZBlockedAutoTraceSession, SelfContainedCommitResumesAfterEarlierDeletionAndLaterCorruption)

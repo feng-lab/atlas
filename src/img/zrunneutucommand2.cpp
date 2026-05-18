@@ -116,7 +116,7 @@ extractIncludePath(const json::object& root, const QString& baseConfigFilePath, 
     return nim::loadJsonObject(filePath);
   }
   catch (const std::exception& e) {
-    throw std::runtime_error(fmt::format("Failed to load JSON file '{}': {}", filePath.toStdString(), e.what()));
+    throw std::runtime_error(fmt::format("Failed to load JSON file '{}': {}", filePath, e.what()));
   }
 }
 

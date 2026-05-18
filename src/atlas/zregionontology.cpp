@@ -66,20 +66,20 @@ void readOntology(const json::object& obj,
     } else if (key == "color_hex_triplet") {
       QString colorStr = asQString(value);
       if (colorStr.size() != 6) {
-        throw ZException(QString("wrong color string: %1").arg(colorStr));
+        throw ZException(fmt::format("wrong color string: {}", colorStr));
       }
       bool ok;
       node.red = colorStr.mid(0, 2).toInt(&ok, 16);
       if (!ok) {
-        throw ZException(QString("wrong color string: %1").arg(colorStr));
+        throw ZException(fmt::format("wrong color string: {}", colorStr));
       }
       node.green = colorStr.mid(2, 2).toInt(&ok, 16);
       if (!ok) {
-        throw ZException(QString("wrong color string: %1").arg(colorStr));
+        throw ZException(fmt::format("wrong color string: {}", colorStr));
       }
       node.blue = colorStr.mid(4, 2).toInt(&ok, 16);
       if (!ok) {
-        throw ZException(QString("wrong color string: %1").arg(colorStr));
+        throw ZException(fmt::format("wrong color string: {}", colorStr));
       }
     } else if (key == "children") {
       if (!value.is_array()) {
@@ -159,7 +159,7 @@ int64_t idOfRegionAbbreviation(const QString& abbreviation, const ZTree<RegionNo
       return node.id;
     }
   }
-  throw ZException(QString("can not find region %1").arg(abbreviation));
+  throw ZException(fmt::format("can not find region {}", abbreviation));
 }
 
 std::vector<int64_t> allIDsWithinRegionAbbreviation(const QString& abbreviation, const ZTree<RegionNode>& ontology)
@@ -173,7 +173,7 @@ std::vector<int64_t> allIDsWithinRegionAbbreviation(const QString& abbreviation,
     }
   }
   if (res.empty()) {
-    throw ZException(QString("can not find region %1").arg(abbreviation));
+    throw ZException(fmt::format("can not find region {}", abbreviation));
   }
   return res;
 }

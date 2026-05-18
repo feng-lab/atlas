@@ -155,11 +155,10 @@ struct BlockedSessionManifestLoadResult
   auto requireNumber = [](const json::object& o, const char* key) -> const json::value& {
     const auto it = o.find(key);
     if (it == o.end()) {
-      throw ZException(QStringLiteral("Missing key '%1'").arg(QString::fromUtf8(key)));
+      throw ZException(fmt::format("Missing key '{}'", key));
     }
     if (!it->value().is_number()) {
-      throw ZException(QStringLiteral("Invalid '%1' type: expected number, got %2")
-                         .arg(QString::fromUtf8(key), QString::fromStdString(jsonTypeName(it->value()))));
+      throw ZException(fmt::format("Invalid '{}' type: expected number, got {}", key, jsonTypeName(it->value())));
     }
     return it->value();
   };
@@ -167,11 +166,10 @@ struct BlockedSessionManifestLoadResult
   auto requireObject = [](const json::object& o, const char* key) -> const json::object& {
     const auto it = o.find(key);
     if (it == o.end()) {
-      throw ZException(QStringLiteral("Missing key '%1'").arg(QString::fromUtf8(key)));
+      throw ZException(fmt::format("Missing key '{}'", key));
     }
     if (!it->value().is_object()) {
-      throw ZException(QStringLiteral("Invalid '%1' type: expected object, got %2")
-                         .arg(QString::fromUtf8(key), QString::fromStdString(jsonTypeName(it->value()))));
+      throw ZException(fmt::format("Invalid '{}' type: expected object, got {}", key, jsonTypeName(it->value())));
     }
     return it->value().as_object();
   };
@@ -179,11 +177,10 @@ struct BlockedSessionManifestLoadResult
   auto requireArray = [](const json::object& o, const char* key) -> const json::array& {
     const auto it = o.find(key);
     if (it == o.end()) {
-      throw ZException(QStringLiteral("Missing key '%1'").arg(QString::fromUtf8(key)));
+      throw ZException(fmt::format("Missing key '{}'", key));
     }
     if (!it->value().is_array()) {
-      throw ZException(QStringLiteral("Invalid '%1' type: expected array, got %2")
-                         .arg(QString::fromUtf8(key), QString::fromStdString(jsonTypeName(it->value()))));
+      throw ZException(fmt::format("Invalid '{}' type: expected array, got {}", key, jsonTypeName(it->value())));
     }
     return it->value().as_array();
   };
@@ -191,15 +188,14 @@ struct BlockedSessionManifestLoadResult
   try {
     const json::object jo = loadJsonObject(res.manifestPath);
 
-    const int fmt = json::value_to<int>(requireNumber(jo, "format_version"));
-    if (fmt != kBlockedAutoTraceManifestFormatVersion) {
-      throw ZException(QStringLiteral("Unsupported manifest format_version=%1").arg(fmt));
+    const int formatVersion = json::value_to<int>(requireNumber(jo, "format_version"));
+    if (formatVersion != kBlockedAutoTraceManifestFormatVersion) {
+      throw ZException(fmt::format("Unsupported manifest format_version={}", formatVersion));
     }
 
     const json::array& ratio = requireArray(jo, "signal_downsample_ratio");
     if (ratio.size() != 3) {
-      throw ZException(QStringLiteral("Invalid signal_downsample_ratio: expected array[3], got array[%1].")
-                         .arg(static_cast<int>(ratio.size())));
+      throw ZException(fmt::format("Invalid signal_downsample_ratio: expected array[3], got array[{}].", ratio.size()));
     }
     const size_t rx = json::value_to<size_t>(ratio.at(0));
     const size_t ry = json::value_to<size_t>(ratio.at(1));
@@ -208,16 +204,14 @@ struct BlockedSessionManifestLoadResult
       throw ZException("Invalid signal_downsample_ratio: values must be > 0.");
     }
     if (rx != ry) {
-      throw ZException(QStringLiteral("Invalid signal_downsample_ratio: XY ratio must be uniform, got [%1,%2,%3].")
-                         .arg(static_cast<qulonglong>(rx))
-                         .arg(static_cast<qulonglong>(ry))
-                         .arg(static_cast<qulonglong>(rz)));
+      throw ZException(
+        fmt::format("Invalid signal_downsample_ratio: XY ratio must be uniform, got [{},{},{}].", rx, ry, rz));
     }
     res.ratio = {rx, ry, rz};
 
     const double zToXYRatio = json::value_to<double>(requireNumber(jo, "z_scale"));
     if (!std::isfinite(zToXYRatio) || !(zToXYRatio > 0.0)) {
-      throw ZException(QStringLiteral("Invalid z_scale: expected a finite number > 0, got %1.").arg(zToXYRatio));
+      throw ZException(fmt::format("Invalid z_scale: expected a finite number > 0, got {}.", zToXYRatio));
     }
     res.zToXYRatio = zToXYRatio;
 
@@ -228,28 +222,25 @@ struct BlockedSessionManifestLoadResult
     const int64_t halo = json::value_to<int64_t>(requireNumber(block, "halo"));
 
     if (coreX <= 0 || coreY <= 0 || coreZ <= 0) {
-      throw ZException(QStringLiteral("Invalid block core size: (%1,%2,%3) must all be > 0.")
-                         .arg(static_cast<long long>(coreX))
-                         .arg(static_cast<long long>(coreY))
-                         .arg(static_cast<long long>(coreZ)));
+      throw ZException(fmt::format("Invalid block core size: ({},{},{}) must all be > 0.", coreX, coreY, coreZ));
     }
     if (halo < 0) {
-      throw ZException(QStringLiteral("Invalid block halo: %1 must be >= 0.").arg(static_cast<long long>(halo)));
+      throw ZException(fmt::format("Invalid block halo: {} must be >= 0.", halo));
     }
     if (coreX < kBlockedAutoTraceMinBlockSizeVoxels || coreY < kBlockedAutoTraceMinBlockSizeVoxels ||
         coreZ < kBlockedAutoTraceMinBlockSizeVoxels) {
-      throw ZException(QStringLiteral("Blocked auto trace: block core size too small for resume.\n"
-                                      "Manifest core=(%1,%2,%3), but the hard minimum is %4 voxels.")
-                         .arg(static_cast<long long>(coreX))
-                         .arg(static_cast<long long>(coreY))
-                         .arg(static_cast<long long>(coreZ))
-                         .arg(kBlockedAutoTraceMinBlockSizeVoxels));
+      throw ZException(fmt::format("Blocked auto trace: block core size too small for resume.\n"
+                                   "Manifest core=({},{},{}), but the hard minimum is {} voxels.",
+                                   coreX,
+                                   coreY,
+                                   coreZ,
+                                   kBlockedAutoTraceMinBlockSizeVoxels));
     }
     if (halo < kBlockedAutoTraceMinPaddingVoxels) {
-      throw ZException(QStringLiteral("Blocked auto trace: halo/padding too small for resume.\n"
-                                      "Manifest halo=%1, but the hard minimum is %2 voxels.")
-                         .arg(static_cast<long long>(halo))
-                         .arg(kBlockedAutoTraceMinPaddingVoxels));
+      throw ZException(fmt::format("Blocked auto trace: halo/padding too small for resume.\n"
+                                   "Manifest halo={}, but the hard minimum is {} voxels.",
+                                   halo,
+                                   kBlockedAutoTraceMinPaddingVoxels));
     }
     res.block = {coreX, coreY, coreZ, halo};
     res.ok = true;
@@ -895,7 +886,7 @@ ZImgProcessDialog::WorkerSpec ZAutoTraceDialog::createWorkerSpec()
     if (manifest.hasManifest) {
       if (!manifest.ok) {
         throw ZException(
-          QStringLiteral("The selected output folder contains an invalid manifest.json:\n%1").arg(manifest.error));
+          fmt::format("The selected output folder contains an invalid manifest.json:\n{}", manifest.error));
       }
       ratio = manifest.ratio;
       resumeZToXYRatio = manifest.zToXYRatio;
@@ -1044,8 +1035,7 @@ ZImgProcessDialog::WorkerSpec ZAutoTraceDialog::createWorkerSpec()
 
           const ZImgInfo info = imgPack->imgInfo();
           if (sc >= info.numChannels || t >= info.numTimes) {
-            throw ZException(
-              QStringLiteral("Auto Trace failed: invalid channel/time selection (c=%1, t=%2).").arg(sc).arg(t));
+            throw ZException(fmt::format("Auto Trace failed: invalid channel/time selection (c={}, t={}).", sc, t));
           }
 
           CHECK(sx >= 0 && sy >= 0 && sz >= 0);
@@ -1112,8 +1102,7 @@ ZImgProcessDialog::WorkerSpec ZAutoTraceDialog::createWorkerSpec()
 
       const ZImgInfo info = imgPack->imgInfo();
       if (sc >= info.numChannels || t >= info.numTimes) {
-        throw ZException(
-          QStringLiteral("Auto Trace failed: invalid channel/time selection (c=%1, t=%2).").arg(sc).arg(t));
+        throw ZException(fmt::format("Auto Trace failed: invalid channel/time selection (c={}, t={}).", sc, t));
       }
 
       ZImg signal = imgPack->assembleChannelTime(ratio, sc, t);

@@ -119,12 +119,11 @@ void ZSubtractBackgroundAdaptive::doWork()
     throw ZException("Subtract Background (Adaptive) only supports single-time images.");
   }
   if (m_channel >= static_cast<int>(img.numChannels())) {
-    throw ZException(QString("Channel %1 is out of range for this image.").arg(m_channel + 1));
+    throw ZException(fmt::format("Channel {} is out of range for this image.", m_channel + 1));
   }
 
-  LOG(INFO) << "Subtract Background (Adaptive): input=" << m_inputImagePath.toStdString()
-            << " channel=" << (m_channel + 1) << " nsample=" << m_numSamples << " stride=" << m_stride
-            << " output=" << m_outputImagePath.toStdString();
+  LOG(INFO) << "Subtract Background (Adaptive): input=" << m_inputImagePath << " channel=" << (m_channel + 1)
+            << " nsample=" << m_numSamples << " stride=" << m_stride << " output=" << m_outputImagePath;
 
   const ZImg view = img.createView(/*c*/ m_channel, /*t*/ 0);
   ZImg out(view);
@@ -146,15 +145,15 @@ void ZSubtractBackgroundAdaptive::doWork()
     std::copy_n(outData, out.voxelNumber(), src.data());
     subtractBackgroundAdaptiveLegacyLike(src, width, height, depth, m_numSamples, m_stride, out.timeData<uint16_t>(0));
   } else {
-    throw ZException(QString("Subtract Background (Adaptive) only supports 8-bit and 16-bit unsigned images. Got %1")
-                       .arg(QString::fromStdString(out.info().toString())));
+    throw ZException(
+      fmt::format("Subtract Background (Adaptive) only supports 8-bit and 16-bit unsigned images. Got {}", out.info()));
   }
 
   maybeCancel(m_cancellationToken);
 
   out.save(m_outputImagePath);
 
-  LOG(INFO) << "Subtract Background (Adaptive): wrote " << QFileInfo(m_outputImagePath).fileName().toStdString();
+  LOG(INFO) << "Subtract Background (Adaptive): wrote " << QFileInfo(m_outputImagePath).fileName();
   reportProgress(1.0);
 }
 

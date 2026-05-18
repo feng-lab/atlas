@@ -116,7 +116,7 @@ std::pair<QColor, QString> ZTheme::readNamedColor(const QString& color) const
 
   const QColor col('#' + color);
   if (!col.isValid()) {
-    throw ZException(QString("theme color %1 invalid").arg(color));
+    throw ZException(fmt::format("theme color {} invalid", color));
   }
   return std::make_pair(col, QString());
 }

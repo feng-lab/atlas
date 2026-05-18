@@ -1150,10 +1150,9 @@ bool ZVulkanTexture::saveToImage(const QString& filename, const ImageSaveOptions
   }
 
   if (arrayLayerCount > 1 || options.arrayLayer.has_value()) {
-    LOG(INFO) << "Saved Vulkan texture layer " << layer << " (" << w << "x" << h
-              << ") to image: " << filename.toStdString();
+    LOG(INFO) << "Saved Vulkan texture layer " << layer << " (" << w << "x" << h << ") to image: " << filename;
   } else {
-    LOG(INFO) << "Saved Vulkan texture (" << w << "x" << h << ") to image: " << filename.toStdString();
+    LOG(INFO) << "Saved Vulkan texture (" << w << "x" << h << ") to image: " << filename;
   }
   return true;
 }

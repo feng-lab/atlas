@@ -6,6 +6,7 @@
 #include "zglmutils.h"
 #include "zioutils.h"
 #include "zcsvtable.h"
+#include "zlog.h"
 
 #include <QFile>
 #include <QFileInfo>
@@ -63,7 +64,7 @@ void ZGenerateAnalysisTextFile::generate(const QString& worklistFile)
 
   const ZCsvTable allLines = readCsvTable(worklistFile);
   if (allLines.empty()) {
-    throw ZException(QString("Can not parse file (%1) or file is empty").arg(worklistFile));
+    throw ZException(fmt::format("Can not parse file ({}) or file is empty", worklistFile));
   }
 
   for (const auto& row : allLines) {
@@ -71,9 +72,12 @@ void ZGenerateAnalysisTextFile::generate(const QString& worklistFile)
     if (list.empty() || list.at(0).startsWith("#")) {
       continue;
     }
+    auto throwLineParseError = [&]() -> void {
+      throw ZException(fmt::format("Can not parse line ({}) with format <{}>", list.join(','), header.join(',')));
+    };
     if (list.size() != header.size()) {
       throw ZException(
-        QString("Wrong number of items in line (%1), expected format: <%2>").arg(list.join(',')).arg(header.join(',')));
+        fmt::format("Wrong number of items in line ({}), expected format: <{}>", list.join(','), header.join(',')));
     }
     bool ok = false;
     m_input.imgFilename = list[0];
@@ -82,38 +86,38 @@ void ZGenerateAnalysisTextFile::generate(const QString& worklistFile)
     if (!list[3].isEmpty()) {
       m_input.voxelSizeX = list[3].toDouble(&ok);
       if (!ok) {
-        throw ZException(QString("Can not parse line (%1) with format <%2>").arg(list.join(',')).arg(header.join(',')));
+        throwLineParseError();
       }
     }
     if (!list[4].isEmpty()) {
       m_input.voxelSizeY = list[4].toDouble(&ok);
       if (!ok) {
-        throw ZException(QString("Can not parse line (%1) with format <%2>").arg(list.join(',')).arg(header.join(',')));
+        throwLineParseError();
       }
     }
     if (!list[5].isEmpty()) {
       m_input.voxelSizeZ = list[5].toDouble(&ok);
       if (!ok) {
-        throw ZException(QString("Can not parse line (%1) with format <%2>").arg(list.join(',')).arg(header.join(',')));
+        throwLineParseError();
       }
     }
     m_input.dendriteChannel = list[6].toInt(&ok);
     if (!ok) {
-      throw ZException(QString("Can not parse line (%1) with format <%2>").arg(list.join(',')).arg(header.join(',')));
+      throwLineParseError();
     }
     if (!list[7].isEmpty()) {
       m_input.axonChannel = list[7].toInt(&ok);
       if (!ok) {
-        throw ZException(QString("Can not parse line (%1) with format <%2>").arg(list.join(',')).arg(header.join(',')));
+        throwLineParseError();
       }
     }
     m_input.maxDistToBranch = list[8].toDouble(&ok);
     if (!ok) {
-      throw ZException(QString("Can not parse line (%1) with format <%2>").arg(list.join(',')).arg(header.join(',')));
+      throwLineParseError();
     }
     m_input.bluenessExtend = list[9].toDouble(&ok);
     if (!ok) {
-      throw ZException(QString("Can not parse line (%1) with format <%2>").arg(list.join(',')).arg(header.join(',')));
+      throwLineParseError();
     }
     m_input.outputFolder = list[10];
     if (list[11].compare("yes", Qt::CaseInsensitive) == 0) {
@@ -121,14 +125,14 @@ void ZGenerateAnalysisTextFile::generate(const QString& worklistFile)
     } else if (list[11].compare("no", Qt::CaseInsensitive) == 0) {
       m_input.doPyramidalFunctionalSeparation = false;
     } else {
-      throw ZException(QString("Can not parse line (%1) with format <%2>").arg(list.join(',')).arg(header.join(',')));
+      throwLineParseError();
     }
     if (list[12].compare("yes", Qt::CaseInsensitive) == 0) {
       m_input.doPyramidalSubclassSeparation = true;
     } else if (list[12].compare("no", Qt::CaseInsensitive) == 0) {
       m_input.doPyramidalSubclassSeparation = false;
     } else {
-      throw ZException(QString("Can not parse line (%1) with format <%2>").arg(list.join(',')).arg(header.join(',')));
+      throwLineParseError();
     }
     m_input.somaPunctaFilename = list[13];
 
@@ -155,51 +159,51 @@ void ZGenerateAnalysisTextFile::generate()
       m_input.voxelSizeX = info.voxelSizeXInUm();
     } else {
       if (m_input.voxelSizeX != info.voxelSizeXInUm()) {
-        throw ZException(QString("voxel size x %1 doesn't match voxel size x from img %2")
-                           .arg(m_input.voxelSizeX)
-                           .arg(info.voxelSizeXInUm()));
+        throw ZException(fmt::format("voxel size x {} doesn't match voxel size x from img {}",
+                                     m_input.voxelSizeX,
+                                     info.voxelSizeXInUm()));
       }
     }
     if (m_input.voxelSizeY != -1) {
       m_input.voxelSizeY = info.voxelSizeYInUm();
     } else {
       if (m_input.voxelSizeY != info.voxelSizeYInUm()) {
-        throw ZException(QString("voxel size y %1 doesn't match voxel size y from img %2")
-                           .arg(m_input.voxelSizeY)
-                           .arg(info.voxelSizeYInUm()));
+        throw ZException(fmt::format("voxel size y {} doesn't match voxel size y from img {}",
+                                     m_input.voxelSizeY,
+                                     info.voxelSizeYInUm()));
       }
     }
     if (m_input.voxelSizeZ != -1) {
       m_input.voxelSizeZ = info.voxelSizeZInUm();
     } else {
       if (m_input.voxelSizeZ != info.voxelSizeZInUm()) {
-        throw ZException(QString("voxel size z %1 doesn't match voxel size z from img %2")
-                           .arg(m_input.voxelSizeZ)
-                           .arg(info.voxelSizeZInUm()));
+        throw ZException(fmt::format("voxel size z {} doesn't match voxel size z from img {}",
+                                     m_input.voxelSizeZ,
+                                     info.voxelSizeZInUm()));
       }
     }
   }
   if (m_input.voxelSizeX == -1 || m_input.voxelSizeY == -1 || m_input.voxelSizeZ == -1) {
-    throw ZException(QString("need valid voxel size information: %1, %2, %3")
-                       .arg(m_input.voxelSizeX)
-                       .arg(m_input.voxelSizeY)
-                       .arg(m_input.voxelSizeZ));
+    throw ZException(fmt::format("need valid voxel size information: {}, {}, {}",
+                                 m_input.voxelSizeX,
+                                 m_input.voxelSizeY,
+                                 m_input.voxelSizeZ));
   }
 
   if (m_input.dendriteChannel < 0 || m_input.dendriteChannel >= static_cast<int>(info.numChannels)) {
     throw ZException(
-      QString("invalid dendrite channel %1 of file %2").arg(m_input.dendriteChannel).arg(m_input.imgFilename));
+      fmt::format("invalid dendrite channel {} of file {}", m_input.dendriteChannel, m_input.imgFilename));
   }
   if (m_input.axonChannel >= 0 && m_input.axonChannel >= static_cast<int>(info.numChannels)) {
-    throw ZException(QString("invalid axon channel %1 of file %2").arg(m_input.axonChannel).arg(m_input.imgFilename));
+    throw ZException(fmt::format("invalid axon channel {} of file {}", m_input.axonChannel, m_input.imgFilename));
   }
   if (m_input.dendriteChannel == m_input.axonChannel) {
-    throw ZException(QString("dendrite channel and axon channel are both %1").arg(m_input.dendriteChannel));
+    throw ZException(fmt::format("dendrite channel and axon channel are both {}", m_input.dendriteChannel));
   }
 
   ZSwc tree(m_input.swcFilename);
   if (tree.numRoots() != 1) {
-    throw ZException(QString("wrong swc file %1 with %2 roots.").arg(m_input.swcFilename).arg(tree.numRoots()));
+    throw ZException(fmt::format("wrong swc file {} with {} roots.", m_input.swcFilename, tree.numRoots()));
   }
 
   QFileInfo swcFileInfo(m_input.swcFilename);
@@ -214,7 +218,7 @@ void ZGenerateAnalysisTextFile::generate()
   }
   QDir outputDir(m_input.outputFolder);
   if (!outputDir.exists()) {
-    throw ZException(QString("output folder %1 does not exist and can not be created").arg(m_input.outputFolder));
+    throw ZException(fmt::format("output folder {} does not exist and can not be created", m_input.outputFolder));
   }
 
   m_processedSwcFilename = outputDir.filePath(swcFileInfo.fileName());
@@ -225,7 +229,7 @@ void ZGenerateAnalysisTextFile::generate()
       tree.save(m_processedSwcFilename);
       // QFile::copy(m_input.swcFilename, m_processedSwcFilename);
     } else { // make it pyramidal
-      throw ZException(QString("input SWC %1 is not pyramidal SWC").arg(m_input.swcFilename));
+      throw ZException(fmt::format("input SWC {} is not pyramidal SWC", m_input.swcFilename));
       //      // mark soma from swc nodes
       //      tree.labelSomaAndOthers(3.0 / m_input.voxelSizeX);  // soma radius at least 3um
       //      tree.resortPyramidal();
@@ -258,8 +262,7 @@ void ZGenerateAnalysisTextFile::generate()
     QFile::copy(layerSwcName, m_layerSwcFilename);
     ZSwc layerTree(m_layerSwcFilename);
     if (layerTree.numRoots() != 1) {
-      throw ZException(
-        QString("wrong layer swc file %1 with %2 roots.").arg(m_layerSwcFilename).arg(layerTree.numRoots()));
+      throw ZException(fmt::format("wrong layer swc file {} with {} roots.", m_layerSwcFilename, layerTree.numRoots()));
     }
     // mark soma from swc nodes
     layerTree.setAsRoot(layerTree.thickestNode());
@@ -297,14 +300,14 @@ void ZGenerateAnalysisTextFile::generate()
       ZSwc subclassTree(m_subclassSwcFilename);
       if (subclassTree.numRoots() != 1) {
         throw ZException(
-          QString("wrong subclass swc file %1 with %2 roots.").arg(m_subclassSwcFilename).arg(subclassTree.numRoots()));
+          fmt::format("wrong subclass swc file {} with {} roots.", m_subclassSwcFilename, subclassTree.numRoots()));
       }
       subclassTree.setAsRoot(subclassTree.thickestNode());
       subclassTree.resortID();
       subclassTree.save(m_subclassSwcFilename);
       getSubclassFeature(tree, subclassTree, nodeToSubclass);
     } else {
-      throw ZException(QString("Can not find subclass SWC %1.").arg(m_subclassSwcFilename));
+      throw ZException(fmt::format("Can not find subclass SWC {}.", m_subclassSwcFilename));
     }
   }
 
@@ -317,7 +320,7 @@ void ZGenerateAnalysisTextFile::generate()
 void ZGenerateAnalysisTextFile::checkFileExist(const QString& filename) const
 {
   if (!QFile::exists(filename)) {
-    throw ZException(QString("file %1 doesn't exist").arg(filename));
+    throw ZException(fmt::format("file {} doesn't exist", filename));
   }
 }
 
@@ -890,7 +893,7 @@ QDir ZGenerateAnalysisTextFile::getSubDir(const QString& subFoldername) const
   }
   QDir res = QDir(folderInfo.absoluteFilePath());
   if (!res.exists()) {
-    throw ZException(QString("Can not create %1 for writing").arg(folderInfo.absoluteFilePath()));
+    throw ZException(fmt::format("Can not create {} for writing", folderInfo.absoluteFilePath()));
   }
   return res;
 }

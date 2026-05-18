@@ -356,10 +356,8 @@ std::string resolveRedirectUrl(const std::string& baseUrl, const std::string& lo
 
   const QString schemeLower = resolved.scheme().trimmed().toLower();
   if (schemeLower != QStringLiteral("http") && schemeLower != QStringLiteral("https")) {
-    throw ZException(fmt::format("Unsupported redirect scheme '{}' (from '{}' to '{}')",
-                                 schemeLower.toStdString(),
-                                 baseUrl,
-                                 resolved.toString().toStdString()));
+    throw ZException(
+      fmt::format("Unsupported redirect scheme '{}' (from '{}' to '{}')", schemeLower, baseUrl, resolved.toString()));
   }
 
   return resolved.toString(QUrl::FullyEncoded).toStdString();

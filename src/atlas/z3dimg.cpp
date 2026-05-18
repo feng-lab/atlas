@@ -850,7 +850,7 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
                              readRatio[0],
                              readRatio[1],
                              readRatio[2],
-                             scaleKey.toStdString());
+                             scaleKey);
         }
       } else {
         for (size_t l = 0; l + 1 < m_numLevels; ++l) {
@@ -1609,7 +1609,7 @@ size_t Z3DImg::readAndUploadImageBlocks(size_t c,
                            readRatio[0],
                            readRatio[1],
                            readRatio[2],
-                           scaleKey.toStdString());
+                           scaleKey);
       }
       VLOG(1) << msg;
     } else {

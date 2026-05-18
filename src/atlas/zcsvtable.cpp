@@ -1,7 +1,7 @@
 #include "zcsvtable.h"
 
 #include "zioutils.h"
-#include "zexception.h"
+#include "zlog.h"
 
 #include <csv.hpp>
 
@@ -54,7 +54,7 @@ ZCsvTable readCsvTable(const QString& filename, const ZCsvReadOptions& options)
     return table;
   }
   catch (const std::exception& e) {
-    throw ZException(QString("Can not read CSV file %1: %2").arg(filename, QString::fromUtf8(e.what())));
+    throw ZException(fmt::format("Can not read CSV file {}: {}", filename, e.what()));
   }
 }
 
@@ -65,7 +65,7 @@ void writeCsvTable(const QString& filename, const ZCsvTable& rows)
   writeRows(writer, rows);
 
   if (!out) {
-    throw ZException(QString("Can not write CSV file: %1").arg(filename), ZException::Option::CheckErrno);
+    throw ZException(fmt::format("Can not write CSV file: {}", filename), ZException::Option::CheckErrno);
   }
 }
 

@@ -189,8 +189,7 @@ size_t ZImgDoc::loadFile(const json::value& jValue, QString& errorMsg)
           }
           QString err;
           if (!setter(text, &err)) {
-            LOG(WARNING) << "Failed to apply neuroglancer_precomputed override '" << key
-                         << "': " << err.toStdString();
+            LOG(WARNING) << "Failed to apply neuroglancer_precomputed override '" << key << "': " << err;
           }
         };
 
@@ -495,7 +494,7 @@ void ZImgDoc::loadNeuroglancerPrecomputed()
     auto entries = dlg.userHistoryEntries();
     ZNeuroglancerPrecomputedDatasetList::normalizeAndDeduplicate(&entries);
     if (!ZNeuroglancerPrecomputedDatasetList::saveUserHistory(entries, &saveErr)) {
-      LOG(WARNING) << "Failed to save Neuroglancer history: " << saveErr.toStdString();
+      LOG(WARNING) << "Failed to save Neuroglancer history: " << saveErr;
     }
   }
 
@@ -516,7 +515,7 @@ void ZImgDoc::loadNeuroglancerPrecomputed()
     QString loadErr;
     auto entries = ZNeuroglancerPrecomputedDatasetList::loadUserHistory(&loadErr);
     if (!loadErr.isEmpty()) {
-      LOG(WARNING) << "Failed to load Neuroglancer history: " << loadErr.toStdString();
+      LOG(WARNING) << "Failed to load Neuroglancer history: " << loadErr;
     }
 
     const auto& pack = m_idToImgPacks.at(id);
@@ -542,8 +541,7 @@ void ZImgDoc::loadNeuroglancerPrecomputed()
         }
         QString err;
         if (!setter(text, &err)) {
-          LOG(WARNING) << "Failed to apply Neuroglancer " << kind << " source override from history: "
-                       << err.toStdString();
+          LOG(WARNING) << "Failed to apply Neuroglancer " << kind << " source override from history: " << err;
         }
       };
 
@@ -592,7 +590,7 @@ void ZImgDoc::loadNeuroglancerPrecomputed()
 
     QString saveErr;
     if (!ZNeuroglancerPrecomputedDatasetList::saveUserHistory(entries, &saveErr)) {
-      LOG(WARNING) << "Failed to save Neuroglancer history: " << saveErr.toStdString();
+      LOG(WARNING) << "Failed to save Neuroglancer history: " << saveErr;
     }
   }
 }
@@ -648,7 +646,7 @@ void ZImgDoc::loadNeuroglancerState()
   QString historyLoadErr;
   auto historyEntries = ZNeuroglancerPrecomputedDatasetList::loadUserHistory(&historyLoadErr);
   if (!historyLoadErr.isEmpty()) {
-    LOG(WARNING) << "Failed to load Neuroglancer history: " << historyLoadErr.toStdString();
+    LOG(WARNING) << "Failed to load Neuroglancer history: " << historyLoadErr;
   }
 
   auto defaultNameFromUrl = [](QString u) -> QString {
@@ -699,8 +697,7 @@ void ZImgDoc::loadNeuroglancerState()
       }
       QString err;
       if (!setter(text, &err)) {
-        LOG(WARNING) << "Failed to apply Neuroglancer " << kind << " source override from history: "
-                     << err.toStdString();
+        LOG(WARNING) << "Failed to apply Neuroglancer " << kind << " source override from history: " << err;
       }
     };
 
@@ -834,7 +831,7 @@ void ZImgDoc::loadNeuroglancerState()
     QString saveErr;
     ZNeuroglancerPrecomputedDatasetList::normalizeAndDeduplicate(&historyEntries);
     if (!ZNeuroglancerPrecomputedDatasetList::saveUserHistory(historyEntries, &saveErr)) {
-      LOG(WARNING) << "Failed to save Neuroglancer history: " << saveErr.toStdString();
+      LOG(WARNING) << "Failed to save Neuroglancer history: " << saveErr;
     }
   }
 

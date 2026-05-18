@@ -218,11 +218,11 @@ void ZEnhanceLine::doWork()
     throw ZException("Enhance Line only supports single-time images.");
   }
   if (m_channel >= static_cast<int>(img.numChannels())) {
-    throw ZException(QString("Channel %1 is out of range for this image.").arg(m_channel + 1));
+    throw ZException(fmt::format("Channel {} is out of range for this image.", m_channel + 1));
   }
 
-  LOG(INFO) << "Enhance Line: input=" << m_inputImagePath.toStdString() << " channel=" << (m_channel + 1)
-            << " sigma=" << m_sigma << " output=" << m_outputImagePath.toStdString();
+  LOG(INFO) << "Enhance Line: input=" << m_inputImagePath << " channel=" << (m_channel + 1) << " sigma=" << m_sigma
+            << " output=" << m_outputImagePath;
 
   const ZImg view = img.createView(/*c*/ m_channel, /*t*/ 0);
 
@@ -234,15 +234,14 @@ void ZEnhanceLine::doWork()
   } else if (view.isType<uint16_t>()) {
     out = enhanceLineOnSingleChannelLegacyLike<uint16_t>(view, m_sigma, m_cancellationToken);
   } else {
-    throw ZException(QString("Enhance Line only supports 8-bit and 16-bit unsigned images. Got %1")
-                       .arg(QString::fromStdString(view.info().toString())));
+    throw ZException(fmt::format("Enhance Line only supports 8-bit and 16-bit unsigned images. Got {}", view.info()));
   }
 
   maybeCancel(m_cancellationToken);
 
   out.save(m_outputImagePath);
 
-  LOG(INFO) << "Enhance Line: wrote " << QFileInfo(m_outputImagePath).fileName().toStdString();
+  LOG(INFO) << "Enhance Line: wrote " << QFileInfo(m_outputImagePath).fileName();
   reportProgress(1.0);
 }
 

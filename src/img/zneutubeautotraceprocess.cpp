@@ -188,7 +188,7 @@ void ZNeutubeAutoTraceProcess::writeSwcAtomicOrThrow(ZSwc& tree) const
 
   const QDir dir = QFileInfo(m_outputSwcPath).dir();
   if (!dir.exists() && !dir.mkpath(QStringLiteral("."))) {
-    throw ZException(QStringLiteral("Auto Trace failed: can not create output directory: %1").arg(dir.absolutePath()));
+    throw ZException(fmt::format("Auto Trace failed: can not create output directory: {}", dir.absolutePath()));
   }
 
   const QString tmpSwcPath =
@@ -200,11 +200,12 @@ void ZNeutubeAutoTraceProcess::writeSwcAtomicOrThrow(ZSwc& tree) const
   writeSwcLegacyNeuTuOrThrow(tree, tmpSwcPath.toStdString(), {});
 
   if (QFile::exists(m_outputSwcPath) && !QFile::remove(m_outputSwcPath)) {
-    throw ZException(QStringLiteral("Auto Trace failed: can not overwrite output SWC: %1").arg(m_outputSwcPath));
+    throw ZException(fmt::format("Auto Trace failed: can not overwrite output SWC: {}", m_outputSwcPath));
   }
   if (!QFile::rename(tmpSwcPath, m_outputSwcPath)) {
-    throw ZException(QStringLiteral("Auto Trace failed: can not move temp SWC into place.\nTemp: %1\nFinal: %2")
-                       .arg(tmpSwcPath, m_outputSwcPath));
+    throw ZException(fmt::format("Auto Trace failed: can not move temp SWC into place.\nTemp: {}\nFinal: {}",
+                                 tmpSwcPath,
+                                 m_outputSwcPath));
   }
 
   tmpGuard.dismiss();
@@ -297,8 +298,8 @@ void ZNeutubeAutoTraceProcess::read(const json::object& jo)
     if (inputImageSourceIt->value().is_object()) {
       m_inputImageSource = json::value_to<ZImgSource>(inputImageSourceIt->value());
     } else {
-      throw ZException(QStringLiteral("Invalid input_image_source: expected object, got %1")
-                         .arg(QString::fromStdString(jsonTypeName(inputImageSourceIt->value()))));
+      throw ZException(
+        fmt::format("Invalid input_image_source: expected object, got {}", jsonTypeName(inputImageSourceIt->value())));
     }
   } else if (const auto inputImagePathIt = jo.find("input_image_path"); inputImagePathIt != jo.end()) {
     m_inputImageSource = ZImgSource(json::value_to<QString>(inputImagePathIt->value()));
@@ -326,8 +327,7 @@ void ZNeutubeAutoTraceProcess::read(const json::object& jo)
     if (it->value().is_object()) {
       m_traceConfig = it->value().as_object();
     } else {
-      throw ZException(QStringLiteral("Invalid trace_config: expected object, got %1")
-                         .arg(QString::fromStdString(jsonTypeName(it->value()))));
+      throw ZException(fmt::format("Invalid trace_config: expected object, got {}", jsonTypeName(it->value())));
     }
   }
   if (auto it = jo.find("trace_level"); it != jo.end()) {

@@ -1210,11 +1210,11 @@ void ZAnimation::readContent(const QString& fn, const QString& jsonKey, bool sho
 {
   try {
     m_lastLoadIssues.clear();
-    ZBenchTimer bt(fmt::format("ZAnimation::readContent('{}')", jsonKey.toStdString()));
+    ZBenchTimer bt(fmt::format("ZAnimation::readContent('{}')", jsonKey));
     auto loadObj = loadJsonObject(fn);
     bt.recordEvent("loadJsonObject");
     if (!loadObj.contains(jsonKey.toStdString()) || !loadObj.at(jsonKey.toStdString()).is_object()) {
-      throw ZException(tr("File is not %1 format").arg(jsonKey));
+      throw ZException(fmt::format("File is not {} format", jsonKey));
     }
 
     QDir::setCurrent(QFileInfo(fn).absolutePath());
@@ -1352,7 +1352,7 @@ void ZAnimation::readContent(const QString& fn, const QString& jsonKey, bool sho
     VLOG(1) << bt;
   }
   catch (const ZException& e) {
-    throw ZException(QString("Can not load animation %1: %2").arg(fn, e.what()));
+    throw ZException(fmt::format("Can not load animation {}: {}", fn, e.what()));
   }
 }
 
@@ -1441,7 +1441,7 @@ void ZAnimation::writeContent(const QString& fn, const QString& jsonKey)
     }
   }
   catch (const ZException& e) {
-    throw ZException(QString("Can not save animation %1: %2").arg(fn, e.what()));
+    throw ZException(fmt::format("Can not save animation {}: {}", fn, e.what()));
   }
 }
 
@@ -1525,7 +1525,7 @@ void ZAnimation::restoreFromUndoSnapshot(const UndoSnapshot& snapshot)
     const std::string key = pa->jsonKey().toStdString();
     auto it = globalTracks.find(key);
     CHECK(it != globalTracks.end()) << "Undo snapshot missing global track " << key;
-    CHECK(restoreTrackFromSnapshot(*pa, it->value(), &err)) << err.toStdString();
+    CHECK(restoreTrackFromSnapshot(*pa, it->value(), &err)) << err;
   }
 
   m_objList.clear();

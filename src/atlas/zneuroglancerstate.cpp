@@ -416,7 +416,7 @@ ZNeuroglancerState::parseInputText(const QString& text,
   }
   catch (const std::exception& e) {
     out.status = InputStatus::Error;
-    out.error = QStringLiteral("Failed to parse Neuroglancer state JSON:\n%1").arg(QString::fromUtf8(e.what()));
+    out.error = QStringLiteral("Failed to parse Neuroglancer state JSON:\n%1").arg(e.what());
     return out;
   }
 

@@ -1277,7 +1277,7 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
                                                        job.ticket.data(),
                                                        job.ticket.dataBytes(),
                                                        /*flipY=*/true)) {
-                LOG(ERROR) << "Slice layer debug save failed for " << job.filename.toStdString();
+                LOG(ERROR) << "Slice layer debug save failed for " << job.filename;
               }
             }
             co_return;
@@ -1372,7 +1372,7 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
                                                                               job.ticket.data(),
                                                                               job.ticket.dataBytes(),
                                                                               /*flipY=*/true)) {
-                                       LOG(ERROR) << "Slice merge debug save failed for " << job.filename.toStdString();
+                                       LOG(ERROR) << "Slice merge debug save failed for " << job.filename;
                                      }
                                    }
                                    co_return;

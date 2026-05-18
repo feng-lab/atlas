@@ -42,13 +42,13 @@ ZChromaticShiftCorrectionDialog::ZChromaticShiftCorrectionDialog(ZDoc& doc, QWid
 ZImgProcessDialog::WorkerSpec ZChromaticShiftCorrectionDialog::createWorkerSpec()
 {
   if (m_inputImagesFileWidget->getSelectedOpenFile().isEmpty()) {
-    throw ZException(QString("No input image. Abort."));
+    throw ZException("No input image. Abort.");
   }
   if (m_outputStackWidget->getSelectedSaveFile().isEmpty()) {
-    throw ZException(QString("Result image file must be specified."));
+    throw ZException("Result image file must be specified.");
   }
   if (m_outputLogFileWidget->getSelectedSaveFile().isEmpty()) {
-    throw ZException(QString("Correction log file must be specified."));
+    throw ZException("Correction log file must be specified.");
   }
 
   auto refChannel = m_referenceChannel.associatedData() - 1;

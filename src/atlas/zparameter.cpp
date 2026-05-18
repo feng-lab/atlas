@@ -149,7 +149,7 @@ void ZParameter::read(const json::object& json)
     }
   }
 
-  LOG(WARNING) << "Parameter <" << QString::fromStdString(curKey) << "> not found.";
+  LOG(WARNING) << "Parameter <" << curKey << "> not found.";
 }
 
 void ZParameter::write(json::object& json) const

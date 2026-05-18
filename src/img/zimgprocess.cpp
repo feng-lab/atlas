@@ -39,11 +39,11 @@ void ZImgProcess::run()
   }
   catch (const itk::ProcessAborted& e) {
     LOG(INFO) << "Cancelled by user: " << e.what();
-    throw ZCancellationException(QString("Cancelled by user: %1").arg(e.what()));
+    throw ZCancellationException(fmt::format("Cancelled by user: {}", e.what()));
   }
   catch (const itk::ExceptionObject& e) {
     LOG(ERROR) << "Caught itk exception: " << e.what();
-    throw ZException(QString("Caught itk exception: %1").arg(e.what()));
+    throw ZException(fmt::format("Caught itk exception: {}", e.what()));
   }
   catch (const ZCancellationException&) {
     LOG(INFO) << "Cancelled by user";
@@ -55,7 +55,7 @@ void ZImgProcess::run()
   }
   catch (const std::exception& e) {
     LOG(ERROR) << "Caught std exception: " << e.what();
-    throw ZException(QString("Caught std exception: %1").arg(e.what()));
+    throw ZException(fmt::format("Caught std exception: {}", e.what()));
   }
 }
 

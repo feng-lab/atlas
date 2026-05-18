@@ -163,7 +163,7 @@ void ZImgProcessDialog::runWorker()
       try {
         std::unique_ptr<ZImgProcess> worker = makeWorker();
         if (!worker) {
-          throw ZException(QStringLiteral("Failed to start %1: worker creation returned null.").arg(workerName));
+          throw ZException(fmt::format("Failed to start {}: worker creation returned null.", workerName));
         }
 
         const folly::CancellationToken token = ctx.cancellationToken();

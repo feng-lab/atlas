@@ -139,7 +139,7 @@ ZImgInfo toImgInfo(const ZBioFormatsSeriesInfo& series)
             {"R", "G", "B", "A"}
           };
           const std::string suffix = rgb < suffixes.size() ? std::string(suffixes[rgb]) : fmt::format("{}", rgb + 1);
-          info.channelNames.push_back(fmt::format("{} {}", baseName.toStdString(), suffix));
+          info.channelNames.push_back(fmt::format("{} {}", baseName, suffix));
         }
       }
     }

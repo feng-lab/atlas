@@ -1,6 +1,6 @@
 #include "zhttpsystemproxy.h"
 
-#include "zexception.h"
+#include "zlog.h"
 
 #include <QCoreApplication>
 #include <QList>
@@ -63,7 +63,7 @@ std::string proxyDisplayString(const QNetworkProxy& proxy)
   const bool hasAuth = !proxy.user().isEmpty() || !proxy.password().isEmpty();
   return fmt::format("{} host='{}' port={} auth={}",
                      proxyTypeName(proxy.type()),
-                     host.toStdString(),
+                     host,
                      port,
                      hasAuth ? "present" : "none");
 }

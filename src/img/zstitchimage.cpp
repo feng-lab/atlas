@@ -260,7 +260,7 @@ size_t buildConnectionFromGrid(const ZImg& grid,
 
   for (const auto& [key, val] : idxToMinConnDist) {
     if (val > 3) {
-      throw ZException(QString("Can not stitch because images are not connected. Abort."));
+      throw ZException("Can not stitch because images are not connected. Abort.");
     }
   }
 
@@ -319,7 +319,7 @@ void buildConnectionFromRegions(const std::vector<ZImgRegion>& rgns,
   std::map<size_t, std::set<size_t>> idxToPrunedConn;
   for (const auto& [key, val] : idxToConn) {
     if (val.empty()) {
-      throw ZException(QString("Can not do restitching because images are not connected. Abort."));
+      throw ZException("Can not do restitching because images are not connected. Abort.");
     }
     std::vector<std::pair<size_t, double>> valC = val;
     for (auto& p : valC) {

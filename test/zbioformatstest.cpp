@@ -126,7 +126,7 @@ std::optional<std::string> bioFormatsRuntimeSkipReason()
   }
   const std::optional<QString> jreDir = bundledJreDir();
   if (!jreDir) {
-    return fmt::format("missing bundled JRE under {}", QStringLiteral(ATLAS_THIRDPARTY_BUILD_DIR).toStdString());
+    return fmt::format("missing bundled JRE under {}", QStringLiteral(ATLAS_THIRDPARTY_BUILD_DIR));
   }
 
   ZLogInit::instance("zbioformatstest");
@@ -176,8 +176,7 @@ QString createFakeReaderFile(QTemporaryDir& dir, const QString& basename)
   const QString path = dir.filePath(filename);
   QFile file(path);
   if (!file.open(QIODevice::WriteOnly)) {
-    throw std::runtime_error(
-      fmt::format("failed to create FakeReader file '{}': {}", path.toStdString(), file.errorString().toStdString()));
+    throw std::runtime_error(fmt::format("failed to create FakeReader file '{}': {}", path, file.errorString()));
   }
   return path;
 }
@@ -707,7 +706,7 @@ missingReferencedFileOutsideFullManifestReason(const QString& rootPath,
     if (!fullManifestRelativePaths.contains(*relativePath)) {
       return fmt::format("referenced local file is missing and absent from full_manifest.json: {} ({})",
                          relativePath->toStdString(),
-                         localPath.toStdString());
+                         localPath);
     }
   }
   return std::nullopt;
@@ -860,52 +859,47 @@ std::vector<CorpusManifestFile> corpusFilesFromManifest(const QString& rootPath,
   const QString manifestPath = QDir(rootPath).filePath(manifestName);
   QFile manifestFile(manifestPath);
   if (!manifestFile.exists()) {
-    throw std::runtime_error(fmt::format("Bio-Formats corpus manifest is missing: {}", manifestPath.toStdString()));
+    throw std::runtime_error(fmt::format("Bio-Formats corpus manifest is missing: {}", manifestPath));
   }
   if (!manifestFile.open(QIODevice::ReadOnly)) {
-    throw std::runtime_error(fmt::format("failed to open {}", manifestPath.toStdString()));
+    throw std::runtime_error(fmt::format("failed to open {}", manifestPath));
   }
 
   QJsonParseError error;
   const QJsonDocument doc = QJsonDocument::fromJson(manifestFile.readAll(), &error);
   if (error.error != QJsonParseError::NoError || !doc.isObject()) {
-    throw std::runtime_error(
-      fmt::format("failed to parse {}: {}", manifestPath.toStdString(), error.errorString().toStdString()));
+    throw std::runtime_error(fmt::format("failed to parse {}: {}", manifestPath, error.errorString()));
   }
 
   const QJsonValue samplesValue = doc.object().value(QStringLiteral("samples"));
   if (!samplesValue.isArray()) {
-    throw std::runtime_error(
-      fmt::format("Bio-Formats corpus manifest samples must be an array: {}", manifestPath.toStdString()));
+    throw std::runtime_error(fmt::format("Bio-Formats corpus manifest samples must be an array: {}", manifestPath));
   }
 
   std::vector<CorpusManifestFile> files;
   const QJsonArray samples = samplesValue.toArray();
   if (samples.isEmpty()) {
-    throw std::runtime_error(fmt::format("Bio-Formats corpus manifest has no samples: {}", manifestPath.toStdString()));
+    throw std::runtime_error(fmt::format("Bio-Formats corpus manifest has no samples: {}", manifestPath));
   }
   files.reserve(static_cast<size_t>(samples.size()));
   for (qsizetype index = 0; index < samples.size(); ++index) {
     const QJsonValue& value = samples[index];
     if (!value.isObject()) {
-      throw std::runtime_error(fmt::format("Bio-Formats corpus manifest sample {} must be an object in {}",
-                                           index + 1,
-                                           manifestPath.toStdString()));
+      throw std::runtime_error(
+        fmt::format("Bio-Formats corpus manifest sample {} must be an object in {}", index + 1, manifestPath));
     }
     const QJsonObject object = value.toObject();
     const QString relativePath = object.value(QStringLiteral("relative_path")).toString();
     if (relativePath.isEmpty()) {
-      throw std::runtime_error(fmt::format("Bio-Formats corpus manifest sample {} is missing relative_path in {}",
-                                           index + 1,
-                                           manifestPath.toStdString()));
+      throw std::runtime_error(
+        fmt::format("Bio-Formats corpus manifest sample {} is missing relative_path in {}", index + 1, manifestPath));
     }
     uint64_t sizeBytes = 0;
     if (object.contains(QStringLiteral("size"))) {
       const double sizeValue = object.value(QStringLiteral("size")).toDouble(-1.);
       if (sizeValue < 0.) {
-        throw std::runtime_error(fmt::format("Bio-Formats corpus manifest sample {} has invalid size in {}",
-                                             index + 1,
-                                             manifestPath.toStdString()));
+        throw std::runtime_error(
+          fmt::format("Bio-Formats corpus manifest sample {} has invalid size in {}", index + 1, manifestPath));
       }
       sizeBytes = static_cast<uint64_t>(sizeValue);
     }
@@ -941,7 +935,7 @@ std::optional<QString> publicCorpusRootPath()
   }
   const QString rootPath = QString::fromUtf8(root);
   if (!QDir(rootPath).exists()) {
-    throw std::runtime_error(fmt::format("ATLAS_BIOFORMATS_BREADTH_DIR does not exist: {}", rootPath.toStdString()));
+    throw std::runtime_error(fmt::format("ATLAS_BIOFORMATS_BREADTH_DIR does not exist: {}", rootPath));
   }
   return rootPath;
 }
@@ -1326,7 +1320,7 @@ std::string nativeComparisonCandidateCountsToString(const std::vector<NativeBioF
   std::vector<std::string> parts;
   parts.reserve(counts.size());
   for (const auto& [format, count] : counts) {
-    parts.push_back(fmt::format("{}={}", format.toStdString(), count));
+    parts.push_back(fmt::format("{}={}", format, count));
   }
   return fmt::format("[{}]", fmt::join(parts, ","));
 }
@@ -1783,7 +1777,7 @@ void emitCorpusFormatSummary(const QString& format,
     "metadata_level_comparisons={} "
     "metadata_level_mismatch_failures={} expected_bioformats_open_failures={} expected_bioformats_region_failures={} "
     "unavailable_corpus_open_failures={} unavailable_corpus_region_failures={}",
-    format.toStdString(),
+    format,
     processedFiles,
     targetFiles,
     secondsSince(startTime),
@@ -2264,14 +2258,14 @@ TEST(ZBioFormatsTest, NativeMicroscopyCorpusExamplesMatchBioFormats)
         ++missingFilesOutsideFullManifest;
         emitNativeComparisonProgress(fmt::format(
           "missing candidate is absent from full_manifest.json and will not be treated as a failure: {} ({})",
-          file.relativePath.toStdString(),
-          file.absolutePath.toStdString()));
+          file.relativePath,
+          file.absolutePath));
       } else {
         ++missingFiles;
         if (recordFailure(file.absolutePath,
                           fmt::format("native-vs-Bio-Formats corpus candidate is missing on disk: {} ({})",
-                                      file.relativePath.toStdString(),
-                                      file.absolutePath.toStdString()))) {
+                                      file.relativePath,
+                                      file.absolutePath))) {
           return;
         }
       }
@@ -2287,7 +2281,7 @@ TEST(ZBioFormatsTest, NativeMicroscopyCorpusExamplesMatchBioFormats)
       ++unavailableCorpusFailures;
       emitNativeComparisonProgress(fmt::format(
         "referenced corpus file is unavailable and will not be treated as a failure relative_path={} reason=\"{}\"",
-        file.relativePath.toStdString(),
+        file.relativePath,
         *reason));
       return true;
     };
@@ -2296,9 +2290,9 @@ TEST(ZBioFormatsTest, NativeMicroscopyCorpusExamplesMatchBioFormats)
                                              "size_bytes={} elapsed={:.1f}s",
                                              candidateIndex + 1,
                                              candidates.size(),
-                                             candidate.rule->topLevelFormat.toStdString(),
+                                             candidate.rule->topLevelFormat,
                                              enumToString(candidate.rule->nativeFormat),
-                                             file.relativePath.toStdString(),
+                                             file.relativePath,
                                              file.sizeBytes,
                                              secondsSince(startTime)));
 
@@ -2314,7 +2308,7 @@ TEST(ZBioFormatsTest, NativeMicroscopyCorpusExamplesMatchBioFormats)
       if (recordFailure(file.absolutePath,
                         fmt::format("native {} readInfo failed for {}: {}",
                                     enumToString(candidate.rule->nativeFormat),
-                                    file.relativePath.toStdString(),
+                                    file.relativePath,
                                     e.what()))) {
         return;
       }
@@ -2329,7 +2323,7 @@ TEST(ZBioFormatsTest, NativeMicroscopyCorpusExamplesMatchBioFormats)
       }
       if (recordFailure(file.absolutePath,
                         fmt::format("Bio-Formats readInfo failed for native comparison candidate {}: {}",
-                                    file.relativePath.toStdString(),
+                                    file.relativePath,
                                     e.what()))) {
         return;
       }
@@ -2341,7 +2335,7 @@ TEST(ZBioFormatsTest, NativeMicroscopyCorpusExamplesMatchBioFormats)
                                              "bioformats_scenes={} elapsed={:.1f}s",
                                              candidateIndex + 1,
                                              candidates.size(),
-                                             file.relativePath.toStdString(),
+                                             file.relativePath,
                                              nativeInfos.size(),
                                              bioFormatsInfos.size(),
                                              secondsSince(startTime)));
@@ -2350,7 +2344,7 @@ TEST(ZBioFormatsTest, NativeMicroscopyCorpusExamplesMatchBioFormats)
       if (recordFailure(file.absolutePath,
                         fmt::format("native-vs-Bio-Formats comparison has empty scene list for {}: native={} "
                                     "bioformats={}",
-                                    file.relativePath.toStdString(),
+                                    file.relativePath,
                                     nativeInfos.size(),
                                     bioFormatsInfos.size()))) {
         return;
@@ -2364,14 +2358,14 @@ TEST(ZBioFormatsTest, NativeMicroscopyCorpusExamplesMatchBioFormats)
       emitNativeComparisonProgress(fmt::format("scene mapping candidate={}/{} relative_path={} note=\"{}\"",
                                                candidateIndex + 1,
                                                candidates.size(),
-                                               file.relativePath.toStdString(),
+                                               file.relativePath,
                                                *sceneMapping.note));
     }
 
     if (!sceneMapping.sceneCountsAreCompatible) {
       if (recordFailure(file.absolutePath,
                         fmt::format("scene count differs for {}: native={} bioformats={}",
-                                    file.relativePath.toStdString(),
+                                    file.relativePath,
                                     nativeInfos.size(),
                                     bioFormatsInfos.size()))) {
         return;
@@ -2386,7 +2380,7 @@ TEST(ZBioFormatsTest, NativeMicroscopyCorpusExamplesMatchBioFormats)
                                              "elapsed={:.1f}s",
                                              candidateIndex + 1,
                                              candidates.size(),
-                                             file.relativePath.toStdString(),
+                                             file.relativePath,
                                              corpusScenePolicyName(scenePolicy),
                                              scenesToRead.size(),
                                              commonSceneCount,
@@ -2402,7 +2396,7 @@ TEST(ZBioFormatsTest, NativeMicroscopyCorpusExamplesMatchBioFormats)
       if (!infoMismatches.empty()) {
         if (recordFailure(file.absolutePath,
                           fmt::format("scene core metadata differs for {} native scene {} Bio-Formats scene {}:\n{}",
-                                      file.relativePath.toStdString(),
+                                      file.relativePath,
                                       scenePair.nativeScene,
                                       scenePair.bioFormatsScene,
                                       fmt::join(infoMismatches, "\n")))) {
@@ -2424,7 +2418,7 @@ TEST(ZBioFormatsTest, NativeMicroscopyCorpusExamplesMatchBioFormats)
                       "channels in display-color order\"",
                       candidateIndex + 1,
                       candidates.size(),
-                      file.relativePath.toStdString(),
+                      file.relativePath,
                       scenePair.nativeScene,
                       scenePair.bioFormatsScene,
                       channelMapToString(*nativeToBioFormatsChannelMap),
@@ -2441,7 +2435,7 @@ TEST(ZBioFormatsTest, NativeMicroscopyCorpusExamplesMatchBioFormats)
                                                    "region={}/{} bounds=\"{}\" elapsed={:.1f}s",
                                                    candidateIndex + 1,
                                                    candidates.size(),
-                                                   file.relativePath.toStdString(),
+                                                   file.relativePath,
                                                    scenePair.nativeScene,
                                                    scenePair.bioFormatsScene,
                                                    regionIndex + 1,
@@ -2469,7 +2463,7 @@ TEST(ZBioFormatsTest, NativeMicroscopyCorpusExamplesMatchBioFormats)
           if (recordFailure(file.absolutePath,
                             fmt::format("native {} region read failed for {} scene {} region \"{}\": {}",
                                         enumToString(candidate.rule->nativeFormat),
-                                        file.relativePath.toStdString(),
+                                        file.relativePath,
                                         scenePair.nativeScene,
                                         regionDescription,
                                         e.what()))) {
@@ -2493,7 +2487,7 @@ TEST(ZBioFormatsTest, NativeMicroscopyCorpusExamplesMatchBioFormats)
           }
           if (recordFailure(file.absolutePath,
                             fmt::format("Bio-Formats region read failed for {} scene {} region \"{}\": {}",
-                                        file.relativePath.toStdString(),
+                                        file.relativePath,
                                         scenePair.bioFormatsScene,
                                         regionDescription,
                                         e.what()))) {
@@ -2508,7 +2502,7 @@ TEST(ZBioFormatsTest, NativeMicroscopyCorpusExamplesMatchBioFormats)
           if (recordFailure(file.absolutePath,
                             fmt::format("native and Bio-Formats pixels differ for {} native scene {} "
                                         "Bio-Formats scene {} region \"{}\"{}{}",
-                                        file.relativePath.toStdString(),
+                                        file.relativePath,
                                         scenePair.nativeScene,
                                         scenePair.bioFormatsScene,
                                         regionDescription,
@@ -2526,7 +2520,7 @@ TEST(ZBioFormatsTest, NativeMicroscopyCorpusExamplesMatchBioFormats)
                                              "compared_scenes={} compared_regions={} failures={} elapsed={:.1f}s",
                                              candidateIndex + 1,
                                              candidates.size(),
-                                             file.relativePath.toStdString(),
+                                             file.relativePath,
                                              comparedFiles,
                                              comparedScenes,
                                              comparedRegions,
@@ -2778,7 +2772,7 @@ TEST(ZBioFormatsTest, PublicCorpusReadsMetadataAndSmallRegions)
       reportActiveFormat();
       activeFormat = format;
       emitCorpusProgress(fmt::format("starting format={} processed={}/{} elapsed={:.1f}s",
-                                     format.toStdString(),
+                                     format,
                                      processedTargetFiles,
                                      targetFiles,
                                      secondsSince(startTime)));
@@ -2803,8 +2797,8 @@ TEST(ZBioFormatsTest, PublicCorpusReadsMetadataAndSmallRegions)
         }
         emitCorpusProgress(fmt::format("missing file is absent from full_manifest.json and will not be treated as a "
                                        "bridge failure relative_path={} absolute_path={}",
-                                       file.relativePath.toStdString(),
-                                       path.toStdString()));
+                                       file.relativePath,
+                                       path));
         maybeReportProgress();
         continue;
       }
@@ -2812,8 +2806,8 @@ TEST(ZBioFormatsTest, PublicCorpusReadsMetadataAndSmallRegions)
       if (incompleteReason.has_value()) {
         emitCorpusProgress(fmt::format("known incomplete corpus entry is missing and will be reported as a failure "
                                        "relative_path={} absolute_path={} reason={}",
-                                       file.relativePath.toStdString(),
-                                       path.toStdString(),
+                                       file.relativePath,
+                                       path,
                                        *incompleteReason));
       }
       ++missingFiles;
@@ -2821,12 +2815,9 @@ TEST(ZBioFormatsTest, PublicCorpusReadsMetadataAndSmallRegions)
       if (isDriver.has_value() && *isDriver) {
         ++stats.missingDriverFiles;
       }
-      emitCorpusProgress(fmt::format("missing file relative_path={} absolute_path={}",
-                                     file.relativePath.toStdString(),
-                                     path.toStdString()));
-      std::string message = fmt::format("Bio-Formats corpus manifest entry is missing on disk: {} ({})",
-                                        file.relativePath.toStdString(),
-                                        path.toStdString());
+      emitCorpusProgress(fmt::format("missing file relative_path={} absolute_path={}", file.relativePath, path));
+      std::string message =
+        fmt::format("Bio-Formats corpus manifest entry is missing on disk: {} ({})", file.relativePath, path);
       if (incompleteReason.has_value()) {
         message += fmt::format("\nknown incomplete corpus note: {}", *incompleteReason);
       }
@@ -2856,8 +2847,8 @@ TEST(ZBioFormatsTest, PublicCorpusReadsMetadataAndSmallRegions)
         reason.has_value()) {
       emitCorpusProgress(fmt::format("known incomplete corpus driver will still be opened relative_path={} "
                                      "absolute_path={} reason={}",
-                                     file.relativePath.toStdString(),
-                                     path.toStdString(),
+                                     file.relativePath,
+                                     path,
                                      *reason));
     }
 
@@ -2876,8 +2867,8 @@ TEST(ZBioFormatsTest, PublicCorpusReadsMetadataAndSmallRegions)
       ++stats.coveredDriverFiles;
       if (logDriverFiles) {
         emitCorpusProgress(fmt::format("skipping covered dataset companion relative_path={} group_key={}",
-                                       file.relativePath.toStdString(),
-                                       datasetGroupKey->toStdString()));
+                                       file.relativePath,
+                                       *datasetGroupKey));
       }
       maybeReportProgress();
       continue;
@@ -2889,7 +2880,7 @@ TEST(ZBioFormatsTest, PublicCorpusReadsMetadataAndSmallRegions)
                                      targetDriverFiles,
                                      processedTargetFiles,
                                      targetFiles,
-                                     file.relativePath.toStdString(),
+                                     file.relativePath,
                                      secondsSince(startTime)));
     }
     warningCapture.clear();
@@ -2903,7 +2894,7 @@ TEST(ZBioFormatsTest, PublicCorpusReadsMetadataAndSmallRegions)
                                        targetDriverFiles,
                                        processedTargetFiles,
                                        targetFiles,
-                                       file.relativePath.toStdString(),
+                                       file.relativePath,
                                        secondsSince(startTime)));
       }
       dataset = ZBioFormatsBridgeClient::instance().readDatasetInfo(path, true);
@@ -2912,9 +2903,9 @@ TEST(ZBioFormatsTest, PublicCorpusReadsMetadataAndSmallRegions)
                                        "series={} used_files={} elapsed={:.1f}s",
                                        selectedDriverFiles,
                                        targetDriverFiles,
-                                       file.relativePath.toStdString(),
-                                       dataset.formatName.toStdString(),
-                                       dataset.readerClass.toStdString(),
+                                       file.relativePath,
+                                       dataset.formatName,
+                                       dataset.readerClass,
                                        dataset.series.size(),
                                        dataset.usedFiles.size(),
                                        secondsSince(startTime)));
@@ -2929,7 +2920,7 @@ TEST(ZBioFormatsTest, PublicCorpusReadsMetadataAndSmallRegions)
                                          targetDriverFiles,
                                          processedTargetFiles,
                                          targetFiles,
-                                         file.relativePath.toStdString(),
+                                         file.relativePath,
                                          secondsSince(startTime)));
         }
         try {
@@ -2940,14 +2931,14 @@ TEST(ZBioFormatsTest, PublicCorpusReadsMetadataAndSmallRegions)
             ++metadataLevelMismatchFailures;
             emitCorpusProgress(fmt::format("metadata level mismatch relative_path={} absolute_path={} count={} "
                                            "details=\"{}\"",
-                                           file.relativePath.toStdString(),
-                                           path.toStdString(),
+                                           file.relativePath,
+                                           path,
                                            mismatches.size(),
                                            fmt::join(mismatches, "; ")));
             metadataLevelMismatchRecords.push_back(
               {canonicalPath,
                fmt::format("Bio-Formats metadata level core/tile mismatch for {}:\n{}",
-                           path.toStdString(),
+                           path,
                            fmt::join(mismatches, "\n"))});
             if (maybeStopAfterFailure(metadataLevelMismatchRecords.back())) {
               return;
@@ -2957,7 +2948,7 @@ TEST(ZBioFormatsTest, PublicCorpusReadsMetadataAndSmallRegions)
                                            "mismatches=0 elapsed={:.1f}s",
                                            selectedDriverFiles,
                                            targetDriverFiles,
-                                           file.relativePath.toStdString(),
+                                           file.relativePath,
                                            secondsSince(startTime)));
           }
         }
@@ -2965,12 +2956,11 @@ TEST(ZBioFormatsTest, PublicCorpusReadsMetadataAndSmallRegions)
           ++stats.metadataLevelMismatchFailures;
           ++metadataLevelMismatchFailures;
           emitCorpusProgress(fmt::format("metadata level comparison failure relative_path={} absolute_path={} error={}",
-                                         file.relativePath.toStdString(),
-                                         path.toStdString(),
+                                         file.relativePath,
+                                         path,
                                          e.what()));
           metadataLevelMismatchRecords.push_back(
-            {canonicalPath,
-             fmt::format("failed to compare Bio-Formats metadata levels for {}: {}", path.toStdString(), e.what())});
+            {canonicalPath, fmt::format("failed to compare Bio-Formats metadata levels for {}: {}", path, e.what())});
           if (maybeStopAfterFailure(metadataLevelMismatchRecords.back())) {
             return;
           }
@@ -2983,7 +2973,7 @@ TEST(ZBioFormatsTest, PublicCorpusReadsMetadataAndSmallRegions)
                                        targetDriverFiles,
                                        processedTargetFiles,
                                        targetFiles,
-                                       file.relativePath.toStdString(),
+                                       file.relativePath,
                                        secondsSince(startTime)));
       }
       ZImgIO::instance().readInfos(path, infos, nullptr, FileFormat::BioFormats);
@@ -2991,7 +2981,7 @@ TEST(ZBioFormatsTest, PublicCorpusReadsMetadataAndSmallRegions)
         emitCorpusProgress(fmt::format("Atlas infos complete driver={}/{} relative_path={} scenes={} elapsed={:.1f}s",
                                        selectedDriverFiles,
                                        targetDriverFiles,
-                                       file.relativePath.toStdString(),
+                                       file.relativePath,
                                        infos.size(),
                                        secondsSince(startTime)));
       }
@@ -3004,8 +2994,8 @@ TEST(ZBioFormatsTest, PublicCorpusReadsMetadataAndSmallRegions)
         ++expectedBioFormatsOpenFailures;
         emitCorpusProgress(fmt::format("expected Bio-Formats jar open failure relative_path={} "
                                        "absolute_path={} reason={} error={}",
-                                       file.relativePath.toStdString(),
-                                       path.toStdString(),
+                                       file.relativePath,
+                                       path,
                                        *knownBioFormatsReason,
                                        e.what()));
         maybeReportProgress();
@@ -3018,20 +3008,18 @@ TEST(ZBioFormatsTest, PublicCorpusReadsMetadataAndSmallRegions)
         ++unavailableCorpusOpenFailures;
         emitCorpusProgress(fmt::format("unavailable corpus companion open failure relative_path={} "
                                        "absolute_path={} reason={} error={}",
-                                       file.relativePath.toStdString(),
-                                       path.toStdString(),
+                                       file.relativePath,
+                                       path,
                                        *unavailableCorpusReason,
                                        e.what()));
         maybeReportProgress();
         continue;
       }
       ++stats.openFailures;
-      emitCorpusProgress(fmt::format("open failure relative_path={} absolute_path={} error={}",
-                                     file.relativePath.toStdString(),
-                                     path.toStdString(),
-                                     e.what()));
+      emitCorpusProgress(
+        fmt::format("open failure relative_path={} absolute_path={} error={}", file.relativePath, path, e.what()));
       openFailureRecords.push_back(
-        {canonicalPath, fmt::format("failed to open Bio-Formats corpus file {}: {}", path.toStdString(), e.what())});
+        {canonicalPath, fmt::format("failed to open Bio-Formats corpus file {}: {}", path, e.what())});
       if (maybeStopAfterFailure(openFailureRecords.back())) {
         return;
       }
@@ -3041,10 +3029,10 @@ TEST(ZBioFormatsTest, PublicCorpusReadsMetadataAndSmallRegions)
     if (infos.empty()) {
       ++stats.openFailures;
       emitCorpusProgress(fmt::format("open failure relative_path={} absolute_path={} error=no readable series",
-                                     file.relativePath.toStdString(),
-                                     path.toStdString()));
+                                     file.relativePath,
+                                     path));
       openFailureRecords.push_back(
-        {canonicalPath, fmt::format("Bio-Formats corpus file has no readable series: {}", path.toStdString())});
+        {canonicalPath, fmt::format("Bio-Formats corpus file has no readable series: {}", path)});
       if (maybeStopAfterFailure(openFailureRecords.back())) {
         return;
       }
@@ -3061,7 +3049,7 @@ TEST(ZBioFormatsTest, PublicCorpusReadsMetadataAndSmallRegions)
                                      "total_scenes={} selected_scene_indices={} elapsed={:.1f}s",
                                      selectedDriverFiles,
                                      targetDriverFiles,
-                                     file.relativePath.toStdString(),
+                                     file.relativePath,
                                      corpusScenePolicyName(scenePolicy),
                                      scenesToRead.size(),
                                      infos.size(),
@@ -3083,7 +3071,7 @@ TEST(ZBioFormatsTest, PublicCorpusReadsMetadataAndSmallRegions)
                                          targetDriverFiles,
                                          processedTargetFiles,
                                          targetFiles,
-                                         file.relativePath.toStdString(),
+                                         file.relativePath,
                                          scene,
                                          regionIndex + 1,
                                          regions.size(),
@@ -3101,8 +3089,8 @@ TEST(ZBioFormatsTest, PublicCorpusReadsMetadataAndSmallRegions)
             ++expectedBioFormatsRegionFailures;
             emitCorpusProgress(fmt::format("expected Bio-Formats jar region failure relative_path={} "
                                            "absolute_path={} scene={} region=\"{}\" reason={} error={}",
-                                           file.relativePath.toStdString(),
-                                           path.toStdString(),
+                                           file.relativePath,
+                                           path,
                                            scene,
                                            regionDescription,
                                            *knownBioFormatsReason,
@@ -3116,8 +3104,8 @@ TEST(ZBioFormatsTest, PublicCorpusReadsMetadataAndSmallRegions)
             ++unavailableCorpusRegionFailures;
             emitCorpusProgress(fmt::format("unavailable corpus companion region failure relative_path={} "
                                            "absolute_path={} scene={} region=\"{}\" reason={} error={}",
-                                           file.relativePath.toStdString(),
-                                           path.toStdString(),
+                                           file.relativePath,
+                                           path,
                                            scene,
                                            regionDescription,
                                            *unavailableCorpusReason,
@@ -3127,15 +3115,15 @@ TEST(ZBioFormatsTest, PublicCorpusReadsMetadataAndSmallRegions)
           ++stats.regionFailures;
           emitCorpusProgress(
             fmt::format("region failure relative_path={} absolute_path={} scene={} region=\"{}\" error={}",
-                        file.relativePath.toStdString(),
-                        path.toStdString(),
+                        file.relativePath,
+                        path,
                         scene,
                         regionDescription,
                         e.what()));
           regionFailureRecords.push_back(
             {canonicalPath,
              fmt::format("failed to read Bio-Formats corpus region from {} scene {} region \"{}\": {}",
-                         path.toStdString(),
+                         path,
                          scene,
                          regionDescription,
                          e.what())});
@@ -3153,7 +3141,7 @@ TEST(ZBioFormatsTest, PublicCorpusReadsMetadataAndSmallRegions)
                                          targetDriverFiles,
                                          processedTargetFiles,
                                          targetFiles,
-                                         file.relativePath.toStdString(),
+                                         file.relativePath,
                                          scene,
                                          regionIndex + 1,
                                          regions.size(),
@@ -3167,12 +3155,12 @@ TEST(ZBioFormatsTest, PublicCorpusReadsMetadataAndSmallRegions)
     if (!warningMessages.empty()) {
       ++stats.warningFailures;
       emitCorpusProgress(fmt::format("warnings while reading relative_path={} absolute_path={} count={}",
-                                     file.relativePath.toStdString(),
-                                     path.toStdString(),
+                                     file.relativePath,
+                                     path,
                                      warningMessages.size()));
       warningFailureRecords.push_back({canonicalPath,
                                        fmt::format("warnings/errors while reading Bio-Formats corpus file {}:\n{}",
-                                                   path.toStdString(),
+                                                   path,
                                                    fmt::join(warningMessages, "\n"))});
       if (maybeStopAfterFailure(warningFailureRecords.back())) {
         return;
@@ -3245,7 +3233,7 @@ TEST(ZBioFormatsTest, PublicCorpusReadsMetadataAndSmallRegions)
     unavailableCorpusRegionFailures));
 
   for (const QString& format : formatsWithoutDriverRules) {
-    ADD_FAILURE() << "Bio-Formats corpus top-level format has no driver rule: " << format.toStdString();
+    ADD_FAILURE() << "Bio-Formats corpus top-level format has no driver rule: " << format;
   }
   for (const auto& [format, stats] : formatStats) {
     if (formatsWithoutDriverRules.contains(format)) {
@@ -3253,7 +3241,7 @@ TEST(ZBioFormatsTest, PublicCorpusReadsMetadataAndSmallRegions)
     }
     if (stats.selectedDriverFiles == 0) {
       formatsWithoutSelectedDrivers.insert(format);
-      ADD_FAILURE() << "Bio-Formats corpus top-level format selected no driver files: " << format.toStdString()
+      ADD_FAILURE() << "Bio-Formats corpus top-level format selected no driver files: " << format
                     << " (manifest entries: " << stats.manifestFiles
                     << "). Fix the driver rule or include at least one real driver in manifest.json.";
       continue;
@@ -3263,7 +3251,7 @@ TEST(ZBioFormatsTest, PublicCorpusReadsMetadataAndSmallRegions)
                                              stats.unavailableCorpusOpenFailures ==
                                            0) {
       formatsWithoutCheckedDrivers.insert(format);
-      ADD_FAILURE() << "Bio-Formats corpus top-level format checked no driver files: " << format.toStdString()
+      ADD_FAILURE() << "Bio-Formats corpus top-level format checked no driver files: " << format
                     << " (selected drivers: " << stats.selectedDriverFiles
                     << "). Selected drivers must open, be covered by another opened driver, match a directly "
                        "verified Bio-Formats self-failure rule, or fail only because the corpus references a local "

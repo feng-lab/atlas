@@ -186,14 +186,13 @@ ZHttpTrustStoreConfig exportWindowsSystemTrustStoreToPemOrThrow()
 
   QSaveFile file(outPath);
   if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
-    throw ZException(
-      fmt::format("Failed to open '{}' for writing exported Windows trust store PEM", outPath.toStdString()));
+    throw ZException(fmt::format("Failed to open '{}' for writing exported Windows trust store PEM", outPath));
   }
   if (file.write(pemBytes) != pemBytes.size()) {
-    throw ZException(fmt::format("Failed to write exported Windows trust store PEM to '{}'", outPath.toStdString()));
+    throw ZException(fmt::format("Failed to write exported Windows trust store PEM to '{}'", outPath));
   }
   if (!file.commit()) {
-    throw ZException(fmt::format("Failed to commit exported Windows trust store PEM to '{}'", outPath.toStdString()));
+    throw ZException(fmt::format("Failed to commit exported Windows trust store PEM to '{}'", outPath));
   }
 
   ZHttpTrustStoreConfig out{};

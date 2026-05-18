@@ -1719,7 +1719,7 @@ ZImg ZImgPack::resizedImg(size_t width, size_t height, size_t depth, size_t t) c
         ratio[0],
         ratio[1],
         ratio[2],
-        scaleKey.toStdString());
+        scaleKey);
     }
   } else {
     ratio = readRatioOf(std::max(1.0, std::floor(static_cast<double>(m_imgInfo.width) / width)),

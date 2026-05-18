@@ -1,5 +1,7 @@
 #include "zmarkdownbrowser.h"
 
+#include "zlog.h"
+
 #include <gtest/gtest.h>
 
 #include <QApplication>
@@ -73,10 +75,10 @@ TEST(ZMarkdownBrowser, InjectsAnchorsForMarkdownHeadings)
   browser.navigateTo(QUrl::fromLocalFile(path));
 
   const QString html = browser.document()->toHtml();
-  EXPECT_TRUE(html.contains(QStringLiteral("name=\"overview\""))) << html.toStdString();
-  EXPECT_TRUE(html.contains(QStringLiteral("name=\"121-keyboard-and-mouse-shortcuts\""))) << html.toStdString();
-  EXPECT_TRUE(html.contains(QStringLiteral("name=\"duplicate-heading\""))) << html.toStdString();
-  EXPECT_TRUE(html.contains(QStringLiteral("name=\"duplicate-heading-1\""))) << html.toStdString();
+  EXPECT_TRUE(html.contains(QStringLiteral("name=\"overview\""))) << html;
+  EXPECT_TRUE(html.contains(QStringLiteral("name=\"121-keyboard-and-mouse-shortcuts\""))) << html;
+  EXPECT_TRUE(html.contains(QStringLiteral("name=\"duplicate-heading\""))) << html;
+  EXPECT_TRUE(html.contains(QStringLiteral("name=\"duplicate-heading-1\""))) << html;
 }
 
 } // namespace

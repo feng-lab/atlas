@@ -174,9 +174,7 @@ void Z3DGpuInfo::logGpuInfo() const
 {
   if (!isSupported()) {
     std::string msg;
-    fmt::format_to(std::back_inserter(msg),
-                   "Current GPU card is not supported. Reason: {}\n",
-                   m_notSupportedReason.toStdString());
+    fmt::format_to(std::back_inserter(msg), "Current GPU card is not supported. Reason: {}\n", m_notSupportedReason);
     fmt::format_to(std::back_inserter(msg), "3D functions will be disabled.\n");
     LOG(INFO) << msg;
     return;
@@ -200,10 +198,10 @@ void Z3DGpuInfo::logGpuInfo() const
                  (m_capsBackend == RenderBackend::OpenGL ? "OpenGL" : "Vulkan"));
 
   if (m_capsBackend == RenderBackend::OpenGL) {
-    fmt::format_to(std::back_inserter(msg), "OpenGL Vendor:                 {}\n", m_glVendorString.toStdString());
-    fmt::format_to(std::back_inserter(msg), "OpenGL Renderer:               {}\n", m_glRendererString.toStdString());
-    fmt::format_to(std::back_inserter(msg), "OpenGL Version:                {}\n", m_glVersionString.toStdString());
-    fmt::format_to(std::back_inserter(msg), "OpenGL SL Version:             {}\n", m_glslVersionString.toStdString());
+    fmt::format_to(std::back_inserter(msg), "OpenGL Vendor:                 {}\n", m_glVendorString);
+    fmt::format_to(std::back_inserter(msg), "OpenGL Renderer:               {}\n", m_glRendererString);
+    fmt::format_to(std::back_inserter(msg), "OpenGL Version:                {}\n", m_glVersionString);
+    fmt::format_to(std::back_inserter(msg), "OpenGL SL Version:             {}\n", m_glslVersionString);
     fmt::format_to(std::back_inserter(msg), "Context Core Profile Bit: {}\n", m_contextCoreProfileBit);
     fmt::format_to(std::back_inserter(msg),
                    "Context Compatibility Profile Bit: {}\n",
@@ -213,7 +211,7 @@ void Z3DGpuInfo::logGpuInfo() const
                    m_contextFlagForwardCompatibleBit);
     fmt::format_to(std::back_inserter(msg), "Context Flag Debug Bit: {}\n", m_contextFlagDebugBit);
     fmt::format_to(std::back_inserter(msg), "Context Flag Robust Access Bit: {}\n", m_contextFlagRobustAccessBit);
-    fmt::format_to(std::back_inserter(msg), "OpenGL Extensions: {}\n", m_glExtensionsString.toStdString());
+    fmt::format_to(std::back_inserter(msg), "OpenGL Extensions: {}\n", m_glExtensionsString);
   }
 
   fmt::format_to(std::back_inserter(msg), "Max Viewport Dimensions:       {}\n", m_maxViewportDims);

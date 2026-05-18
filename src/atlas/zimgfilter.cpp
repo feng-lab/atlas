@@ -121,7 +121,7 @@ void persistNeuroglancerSourceOverridesToHistory(const ZImgPack& pack, const QSt
   QString loadErr;
   auto entries = ZNeuroglancerPrecomputedDatasetList::loadUserHistory(&loadErr);
   if (!loadErr.isEmpty()) {
-    LOG(WARNING) << "Failed to load Neuroglancer history: " << loadErr.toStdString();
+    LOG(WARNING) << "Failed to load Neuroglancer history: " << loadErr;
   }
 
   auto it = std::find_if(entries.begin(), entries.end(), [&](const ZNeuroglancerPrecomputedDatasetList::Entry& e) {
@@ -153,7 +153,7 @@ void persistNeuroglancerSourceOverridesToHistory(const ZImgPack& pack, const QSt
 
   QString saveErr;
   if (!ZNeuroglancerPrecomputedDatasetList::saveUserHistory(entries, &saveErr)) {
-    LOG(WARNING) << "Failed to save Neuroglancer history: " << saveErr.toStdString();
+    LOG(WARNING) << "Failed to save Neuroglancer history: " << saveErr;
   }
 }
 
@@ -1782,7 +1782,7 @@ void ZImgFilter::finishNeuroglancer2DCacheRender(detail::Neuroglancer2DRenderRes
   }
 
   if (!result.error.isEmpty()) {
-    LOG(ERROR) << "Neuroglancer 2D cache render failed: " << result.error.toStdString();
+    LOG(ERROR) << "Neuroglancer 2D cache render failed: " << result.error;
     if (treatAsFinal && result.epoch == m_ngRenderEpoch && m_ngFinalErrorEpoch != result.epoch) {
       m_ngFinalErrorEpoch = result.epoch;
       m_ngFinalError = QString("Neuroglancer 2D cached-final render failed: %1").arg(result.error);
@@ -1858,7 +1858,7 @@ ZImgFilter::runNeuroglancer2DCoroFanoutWorker(std::shared_ptr<Neuroglancer2DCoro
           }
 
           if (!result.error.isEmpty()) {
-            LOG(ERROR) << "Neuroglancer 2D tile render failed: " << result.error.toStdString();
+            LOG(ERROR) << "Neuroglancer 2D tile render failed: " << result.error;
             if (result.pass == Neuroglancer2DRenderParams::Pass::Final && result.epoch == filterPtr->m_ngRenderEpoch &&
                 filterPtr->m_ngFinalErrorEpoch != result.epoch) {
               filterPtr->m_ngFinalErrorEpoch = result.epoch;

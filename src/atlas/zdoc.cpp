@@ -603,7 +603,7 @@ std::map<size_t, size_t> ZDoc::read(const json::object& jo, QString& err)
         for (const auto& idid : docPack.doc->read(docKeyValueList, err)) {
           res[idid.first] = idid.second;
         }
-        bt.recordEvent(fmt::format("{} ids={}", docPack.doc->typeName().toStdString(), res.size() - beforeSize));
+        bt.recordEvent(fmt::format("{} ids={}", docPack.doc->typeName(), res.size() - beforeSize));
       }
     }
     bt.stop();

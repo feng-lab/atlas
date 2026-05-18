@@ -121,7 +121,7 @@ ZLoadNeuroglancerPrecomputedDialog::ZLoadNeuroglancerPrecomputedDialog(QWidget* 
     QString historyErr;
     const auto history = ZNeuroglancerPrecomputedDatasetList::loadUserHistory(&historyErr);
     if (!historyErr.isEmpty()) {
-      LOG(WARNING) << "Failed to load Neuroglancer history: " << historyErr.toStdString();
+      LOG(WARNING) << "Failed to load Neuroglancer history: " << historyErr;
     }
     for (const auto& e : history) {
       addHistoryRow(e);
@@ -224,7 +224,7 @@ ZLoadNeuroglancerPrecomputedDialog::ZLoadNeuroglancerPrecomputedDialog(QWidget* 
     QString examplesErr;
     const auto examples = ZNeuroglancerPrecomputedDatasetList::loadExamples(&examplesErr);
     if (!examplesErr.isEmpty()) {
-      LOG(WARNING) << "Failed to load Neuroglancer examples: " << examplesErr.toStdString();
+      LOG(WARNING) << "Failed to load Neuroglancer examples: " << examplesErr;
     }
     for (const auto& e : examples) {
       QList<QStandardItem*> row;

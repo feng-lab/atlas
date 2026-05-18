@@ -49,7 +49,7 @@ std::vector<ZNeuroglancerPrecomputedDatasetList::Entry> ZNeuroglancerPrecomputed
       entries = parseListObject(jo, &err);
     }
     catch (const std::exception& e) {
-      err = QString("Failed to parse %1: %2").arg(examplesFilePath()).arg(QString::fromUtf8(e.what()));
+      err = QString("Failed to parse %1: %2").arg(examplesFilePath()).arg(e.what());
     }
   }
 
@@ -58,7 +58,7 @@ std::vector<ZNeuroglancerPrecomputedDatasetList::Entry> ZNeuroglancerPrecomputed
       err = QString("Examples file not found: %1").arg(examplesFilePath());
     }
     if (!err.isEmpty()) {
-      LOG(WARNING) << "Failed to load Neuroglancer examples list: " << err.toStdString();
+      LOG(WARNING) << "Failed to load Neuroglancer examples list: " << err;
     }
   }
   normalizeAndDeduplicate(&entries);
@@ -83,7 +83,7 @@ std::vector<ZNeuroglancerPrecomputedDatasetList::Entry> ZNeuroglancerPrecomputed
     }
     catch (const std::exception& e) {
       if (errorMsg) {
-        *errorMsg = QString("Failed to parse %1: %2").arg(userHistoryFilePath()).arg(QString::fromUtf8(e.what()));
+        *errorMsg = QString("Failed to parse %1: %2").arg(userHistoryFilePath()).arg(e.what());
       }
     }
   }
@@ -109,7 +109,7 @@ bool ZNeuroglancerPrecomputedDatasetList::saveUserHistory(const std::vector<Entr
   }
   catch (const std::exception& e) {
     if (errorMsg) {
-      *errorMsg = QString("Failed to write %1: %2").arg(userHistoryFilePath()).arg(QString::fromUtf8(e.what()));
+      *errorMsg = QString("Failed to write %1: %2").arg(userHistoryFilePath()).arg(e.what());
     }
     return false;
   }

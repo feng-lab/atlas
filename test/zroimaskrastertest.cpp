@@ -451,12 +451,12 @@ TEST(ZNaturalCubicSpline2D, MatchesGeometricToolsForRepresentativeSplines)
 TEST(ZNaturalCubicSpline2D, MatchesGeometricToolsForNimroiSplineFixtures)
 {
   const QDir testDataDir = getTestDataDir();
-  ASSERT_TRUE(testDataDir.exists()) << "ATLAS test data dir not found: " << testDataDir.absolutePath().toStdString();
+  ASSERT_TRUE(testDataDir.exists()) << "ATLAS test data dir not found: " << testDataDir.absolutePath();
 
   size_t numSplines = 0;
   for (const char* fileName : kNimroiTestFiles) {
     const QString filePath = testDataDir.filePath(fileName);
-    ASSERT_TRUE(QFileInfo::exists(filePath)) << "Missing test nimroi file: " << filePath.toStdString();
+    ASSERT_TRUE(QFileInfo::exists(filePath)) << "Missing test nimroi file: " << filePath;
 
     ZROI roi;
     roi.load(filePath);
@@ -540,11 +540,11 @@ TEST(ZROIMaskRasterizer, ClosedSplineUsesStablePeriodicSolve)
 TEST(ZROIMaskRasterizer, MatchesQtMaskForNimroiFixtures)
 {
   const QDir testDataDir = getTestDataDir();
-  ASSERT_TRUE(testDataDir.exists()) << "ATLAS test data dir not found: " << testDataDir.absolutePath().toStdString();
+  ASSERT_TRUE(testDataDir.exists()) << "ATLAS test data dir not found: " << testDataDir.absolutePath();
 
   for (const char* fileName : kNimroiTestFiles) {
     const QString filePath = testDataDir.filePath(fileName);
-    ASSERT_TRUE(QFileInfo::exists(filePath)) << "Missing test nimroi file: " << filePath.toStdString();
+    ASSERT_TRUE(QFileInfo::exists(filePath)) << "Missing test nimroi file: " << filePath;
 
     ZROI roi;
     roi.load(filePath);

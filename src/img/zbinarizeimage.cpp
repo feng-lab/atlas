@@ -67,12 +67,12 @@ void ZBinarizeImage::doWork()
     throw ZException("Binarize only supports single-time images.");
   }
   if (m_channel >= static_cast<int>(img.numChannels())) {
-    throw ZException(QString("Channel %1 is out of range for this image.").arg(m_channel + 1));
+    throw ZException(fmt::format("Channel {} is out of range for this image.", m_channel + 1));
   }
 
-  LOG(INFO) << "Binarize: input=" << m_inputImagePath.toStdString() << " channel=" << (m_channel + 1)
+  LOG(INFO) << "Binarize: input=" << m_inputImagePath << " channel=" << (m_channel + 1)
             << " threshold_mode=" << thresholdModeToString(m_thresholdMode) << " threshold=" << m_threshold
-            << " output=" << m_outputImagePath.toStdString();
+            << " output=" << m_outputImagePath;
 
   const ZImg view = img.createView(/*c*/ m_channel, /*t*/ 0);
   maybeCancel(m_cancellationToken);
@@ -96,7 +96,7 @@ void ZBinarizeImage::doWork()
 
   binary.save(m_outputImagePath);
 
-  LOG(INFO) << "Binarize: wrote " << QFileInfo(m_outputImagePath).fileName().toStdString();
+  LOG(INFO) << "Binarize: wrote " << QFileInfo(m_outputImagePath).fileName();
   reportProgress(1.0);
 }
 

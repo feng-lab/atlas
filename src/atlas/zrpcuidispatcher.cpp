@@ -1514,7 +1514,7 @@ ZRpcUiDispatcher::BoolResult ZRpcUiDispatcher::applySceneParams(
           if (j) {
             oss << "; ";
           }
-          oss << "id=" << sp.id << " json_key=" << rr.jsonKey.toStdString() << " reason=" << rr.reason.toStdString();
+          oss << "id=" << sp.id << " json_key=" << rr.jsonKey << " reason=" << rr.reason;
         }
         r.error = oss.str();
         return r;

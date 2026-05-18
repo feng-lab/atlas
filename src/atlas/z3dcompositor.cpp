@@ -981,7 +981,7 @@ double Z3DCompositor::processGL(Z3DEye eye)
           VLOG(2) << fmt::format(
             "  vol[{}]: {} ptr={} ready={} valid={} hasImage={} hasTransparent={} transparentValid={} stayOnTop={}",
             i,
-            vf->className().toStdString(),
+            vf->className(),
             (const void*)vf,
             ready,
             valid,
@@ -5928,7 +5928,7 @@ std::vector<Z3DCompositorImageLayer> Z3DCompositor::collectNonOpaqueImageLayers(
 
     if (useVulkan) {
       VLOG(1) << fmt::format("ImageLayer collected: filter={} color=0x{:x} depth=0x{:x}",
-                             vf->className().toStdString(),
+                             vf->className(),
                              layer.colorAttachment.handle.id,
                              layer.depthAttachment.handle.id);
     }

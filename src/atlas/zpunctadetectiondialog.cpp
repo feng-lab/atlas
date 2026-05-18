@@ -39,23 +39,23 @@ ZImgProcessDialog::WorkerSpec ZPunctaDetectionDialog::createWorkerSpec()
   if (!m_useCurrentActiveImage.get() && QFile::exists(inputImagePath)) {
     imgInfo = ZImg::readImgInfos(inputImagePath).at(0);
   } else {
-    throw ZException(QString("No Image to detect."));
+    throw ZException("No Image to detect.");
   }
   if (imgInfo.numTimes != 1) {
-    throw ZException(QString("Can not detect puncta from time sequence image."));
+    throw ZException("Can not detect puncta from time sequence image.");
   }
   const QString outPunctaPath = m_outputPunctaFileWidget->getSelectedSaveFile();
   if (outPunctaPath.isEmpty()) {
-    throw ZException(QString("Result puncta file must be specified."));
+    throw ZException("Result puncta file must be specified.");
   }
   const QString outLogPath = m_outputLogFileWidget->getSelectedSaveFile();
   if (outLogPath.isEmpty()) {
-    throw ZException(QString("Detection log file must be specified."));
+    throw ZException("Detection log file must be specified.");
   }
   int punctaChannel = m_punctaChannel.get() - 1;
   int dendriteChannel = m_dendriteChannel.associatedData() - 1;
   if (punctaChannel == dendriteChannel) {
-    throw ZException(QString("Puncta and dendrite channels are not correct."));
+    throw ZException("Puncta and dendrite channels are not correct.");
   }
 
   const bool haveDendriteChannel = dendriteChannel >= 0;
@@ -63,7 +63,7 @@ ZImgProcessDialog::WorkerSpec ZPunctaDetectionDialog::createWorkerSpec()
 
   if (dendriteChannel >= 0) {
     if (m_voxelSize.get().x == 0.0 || m_voxelSize.get().y == 0.0 || m_voxelSize.get().z == 0.0) {
-      throw ZException(QString("Image Resolution is not correct."));
+      throw ZException("Image Resolution is not correct.");
     }
     imgInfo.voxelSizeUnit = VoxelSizeUnit::um;
     imgInfo.voxelSizeX = m_voxelSize.get().x;

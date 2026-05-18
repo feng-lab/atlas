@@ -241,7 +241,7 @@ const std::vector<ZFlagSettingSpec>& atlasFlagSettingSpecs()
     filteredSpecs.reserve(allSpecs.size());
     for (const auto& spec : allSpecs) {
       if (!flagExistsInCurrentBuild(spec.name)) {
-        LOG(WARNING) << "Skipping settings registry flag missing from this Atlas build: " << spec.name.toStdString();
+        LOG(WARNING) << "Skipping settings registry flag missing from this Atlas build: " << spec.name;
         continue;
       }
       filteredSpecs.push_back(spec);

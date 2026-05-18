@@ -62,8 +62,8 @@ TEST(ZImgOmeTiffPack, DetailedInfoLoadsMetadataOnDemand)
   writeTiffWithImageDescription(filename, QStringLiteral("lazy-metadata-value"));
   const QString detailedInfo = pack.detailedInfo();
 
-  EXPECT_TRUE(detailedInfo.contains(QStringLiteral("lazy-metadata-value"))) << detailedInfo.toStdString();
-  EXPECT_FALSE(detailedInfo.contains(QStringLiteral("eager-metadata-value"))) << detailedInfo.toStdString();
+  EXPECT_TRUE(detailedInfo.contains(QStringLiteral("lazy-metadata-value"))) << detailedInfo;
+  EXPECT_FALSE(detailedInfo.contains(QStringLiteral("eager-metadata-value"))) << detailedInfo;
 }
 
 TEST(ZImgReadOptions, PixelsOnlyReadSkipsTiffMetadata)

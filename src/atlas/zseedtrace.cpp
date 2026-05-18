@@ -240,7 +240,7 @@ struct SeededTraceAsyncResult
     res.cancelled = true;
   }
   catch (const std::exception& e) {
-    res.error = QString("Trace failed: %1").arg(QString::fromUtf8(e.what()));
+    res.error = QString("Trace failed: %1").arg(e.what());
   }
 
   return res;

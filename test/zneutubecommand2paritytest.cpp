@@ -4003,7 +4003,7 @@ TEST(NeutubeCommand2Parity, Trace_Auto_FromTestData_MatchesLegacy)
   }
 
   if (inputPaths.empty()) {
-    GTEST_SKIP() << "Missing auto-trace benchmark inputs under: " << nim::getTestDataDir().absolutePath().toStdString();
+    GTEST_SKIP() << "Missing auto-trace benchmark inputs under: " << nim::getTestDataDir().absolutePath();
   }
 
   const fs::path dir = makeUniqueTempDir();
@@ -4084,7 +4084,7 @@ TEST(NeutubeCommand2Parity, Trace_SequentialSeeds_Fork_MatchesLegacy)
 {
   const QString forkTiff = nim::getTestDataDir().filePath("benchmark/stack_graph/fork/fork.tif");
   if (!QFileInfo::exists(forkTiff)) {
-    GTEST_SKIP() << "Missing fork trace benchmark input: " << forkTiff.toStdString();
+    GTEST_SKIP() << "Missing fork trace benchmark input: " << forkTiff;
   }
 
   const std::vector<std::array<int, 3>> seeds = {
@@ -4186,7 +4186,7 @@ TEST(NeutubeCommand2Parity, Trace_SequentialSeeds_Fork2_MatchesLegacy)
 {
   const QString fork2Tiff = nim::getTestDataDir().filePath("benchmark/fork2/fork2.tif");
   if (!QFileInfo::exists(fork2Tiff)) {
-    GTEST_SKIP() << "Missing fork2 trace benchmark input: " << fork2Tiff.toStdString();
+    GTEST_SKIP() << "Missing fork2 trace benchmark input: " << fork2Tiff;
   }
 
   const std::vector<std::array<int, 3>> seeds = {
@@ -4308,8 +4308,7 @@ TEST(NeutubeCommand2Parity, Skeletonize_FromTestDataBinary_MatchesLegacy)
   }
 
   if (inputPaths.empty()) {
-    GTEST_SKIP() << "Missing skeletonize benchmark inputs under: "
-                 << nim::getTestDataDir().absolutePath().toStdString();
+    GTEST_SKIP() << "Missing skeletonize benchmark inputs under: " << nim::getTestDataDir().absolutePath();
   }
 
   const fs::path dir = makeUniqueTempDir();
@@ -6288,7 +6287,7 @@ TEST(NeutubeCommand2Parity, CompareSwc_MatchesLegacy)
 {
   const QDir compareDir(nim::getTestDataDir().filePath("benchmark/swc/compare"));
   if (!compareDir.exists()) {
-    GTEST_SKIP() << "Missing SWC compare test data at: " << compareDir.absolutePath().toStdString();
+    GTEST_SKIP() << "Missing SWC compare test data at: " << compareDir.absolutePath();
   }
 
   std::vector<std::string> inputs;
@@ -6296,7 +6295,7 @@ TEST(NeutubeCommand2Parity, CompareSwc_MatchesLegacy)
     const QString name = QString("compare%1.swc").arg(i);
     const QString swcPath = compareDir.filePath(name);
     if (!QFileInfo::exists(swcPath)) {
-      GTEST_SKIP() << "Missing SWC compare file: " << swcPath.toStdString();
+      GTEST_SKIP() << "Missing SWC compare file: " << swcPath;
     }
     inputs.push_back(swcPath.toStdString());
   }
@@ -6311,7 +6310,7 @@ TEST(NeutubeCommand2Parity, CompareSwc_Scale2_MatchesLegacy)
 {
   const QDir compareDir(nim::getTestDataDir().filePath("benchmark/swc/compare"));
   if (!compareDir.exists()) {
-    GTEST_SKIP() << "Missing SWC compare test data at: " << compareDir.absolutePath().toStdString();
+    GTEST_SKIP() << "Missing SWC compare test data at: " << compareDir.absolutePath();
   }
 
   std::vector<std::string> inputs;
@@ -6319,7 +6318,7 @@ TEST(NeutubeCommand2Parity, CompareSwc_Scale2_MatchesLegacy)
     const QString name = QString("compare%1.swc").arg(i);
     const QString swcPath = compareDir.filePath(name);
     if (!QFileInfo::exists(swcPath)) {
-      GTEST_SKIP() << "Missing SWC compare file: " << swcPath.toStdString();
+      GTEST_SKIP() << "Missing SWC compare file: " << swcPath;
     }
     inputs.push_back(swcPath.toStdString());
   }

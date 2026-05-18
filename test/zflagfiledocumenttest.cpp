@@ -1,5 +1,7 @@
 #include "zflagfiledocument.h"
 
+#include "zlog.h"
+
 #include <gflags/gflags.h>
 #include <gtest/gtest.h>
 
@@ -45,7 +47,7 @@ TEST(ZFlagfileDocument, LoadsManagedValuesDuplicatesAndPreservedManualBlock)
 
   ZFlagfileDocument document;
   QString error;
-  ASSERT_TRUE(document.load(path, atlasManagedFlagNames(), &error)) << error.toStdString();
+  ASSERT_TRUE(document.load(path, atlasManagedFlagNames(), &error)) << error;
 
   EXPECT_TRUE(document.fileExistedAtLoad());
   EXPECT_TRUE(document.hasManagedValue(QStringLiteral("atlas_http_backend")));
@@ -62,7 +64,7 @@ TEST(ZFlagfileDocument, LoadsManagedValuesDuplicatesAndPreservedManualBlock)
   EXPECT_EQ(preserved.at(0), QStringLiteral("# Custom settings kept across GUI saves"));
   EXPECT_EQ(preserved.at(1), QStringLiteral("--atlas_custom_debug_option=1"));
 
-  EXPECT_TRUE(document.matchesFileOnDisk(path, &error)) << error.toStdString();
+  EXPECT_TRUE(document.matchesFileOnDisk(path, &error)) << error;
 }
 
 TEST(ZFlagfileDocument, WriteFileRendersManagedSectionAndRoundTripsManualBlock)
@@ -88,7 +90,7 @@ TEST(ZFlagfileDocument, WriteFileRendersManagedSectionAndRoundTripsManualBlock)
                                             QStringLiteral("--atlas_extra_custom_toggle=true")};
 
   QString error;
-  ASSERT_TRUE(ZFlagfileDocument::writeFile(path, entries, preservedManualLines, &error)) << error.toStdString();
+  ASSERT_TRUE(ZFlagfileDocument::writeFile(path, entries, preservedManualLines, &error)) << error;
 
   const QString text = readTextFile(path);
   EXPECT_TRUE(text.contains(QStringLiteral("# Atlas user settings")));
@@ -100,7 +102,7 @@ TEST(ZFlagfileDocument, WriteFileRendersManagedSectionAndRoundTripsManualBlock)
   EXPECT_TRUE(text.contains(QStringLiteral("# ---- Atlas preserved manual entries: end ----")));
 
   ZFlagfileDocument document;
-  ASSERT_TRUE(document.load(path, atlasManagedFlagNames(), &error)) << error.toStdString();
+  ASSERT_TRUE(document.load(path, atlasManagedFlagNames(), &error)) << error;
   EXPECT_EQ(document.managedValue(QStringLiteral("atlas_default_render_backend")), QStringLiteral("vulkan"));
   EXPECT_EQ(document.managedValue(QStringLiteral("v")), QStringLiteral("2"));
   EXPECT_EQ(document.preservedManualLines(), preservedManualLines);
@@ -117,7 +119,7 @@ TEST(ZFlagfileDocument, DetectsExternalChangesAfterLoad)
 
   ZFlagfileDocument document;
   QString error;
-  ASSERT_TRUE(document.load(path, atlasManagedFlagNames(), &error)) << error.toStdString();
+  ASSERT_TRUE(document.load(path, atlasManagedFlagNames(), &error)) << error;
 
   const QString rewrittenPath = writeTextFile(tmp.path(),
                                               QStringLiteral("user_settings_flagfile.txt"),
