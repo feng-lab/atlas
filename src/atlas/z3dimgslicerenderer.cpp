@@ -7,6 +7,7 @@
 #include "z3drendercommands.h"
 #include "zbenchtimer.h"
 #include "zlog.h"
+#include "zvulkanrenderconversions.h"
 #include "zcancellation.h"
 #include "z3dscratchresourcepool.h"
 #include "z3drenderglobalstate.h"
@@ -19,7 +20,7 @@
 #include <tbb/concurrent_unordered_set.h>
 
 ABSL_DECLARE_FLAG(uint32_t, atlas_volume_rendering_maximum_round);
-ABSL_DECLARE_FLAG(std::string, atlas_vk_blockid_compaction_source);
+ABSL_DECLARE_FLAG(nim::VulkanBlockIdCompactionSource, atlas_vk_blockid_compaction_source);
 
 namespace nim {
 
@@ -385,18 +386,15 @@ Z3DImgSliceRenderer::recordVulkanStagesToScript(ZVulkanLinearScript& script,
   };
 
   auto blockIdExternalKind = []() -> ExternalImageUseKind {
-    const std::string v = absl::GetFlag(FLAGS_atlas_vk_blockid_compaction_source);
-    if (v.empty() || v == "buffer" || v == "Buffer" || v == "BUFFER") {
-      return ExternalImageUseKind::TransferSrc;
+    switch (absl::GetFlag(FLAGS_atlas_vk_blockid_compaction_source)) {
+      case VulkanBlockIdCompactionSource::Buffer:
+        return ExternalImageUseKind::TransferSrc;
+      case VulkanBlockIdCompactionSource::Storage:
+        return ExternalImageUseKind::StorageRead;
+      case VulkanBlockIdCompactionSource::Sampled:
+        return ExternalImageUseKind::SampledRead;
     }
-    if (v == "storage" || v == "Storage" || v == "STORAGE") {
-      return ExternalImageUseKind::StorageRead;
-    }
-    if (v == "sampled" || v == "Sampled" || v == "SAMPLED") {
-      return ExternalImageUseKind::SampledRead;
-    }
-    CHECK(false) << "Unknown --atlas_vk_blockid_compaction_source='" << v
-                 << "'. Expected one of: buffer, storage, sampled.";
+    CHECK(false) << "Unknown --atlas_vk_blockid_compaction_source value";
     return ExternalImageUseKind::TransferSrc;
   };
 
@@ -589,9 +587,9 @@ double Z3DImgSliceRenderer::progressiveProgress(Z3DEye eye) const
   if (chan < 0) {
     return 1.0;
   }
-  const int totalRound =
-    static_cast<int>(channelCount) * static_cast<int>(absl::GetFlag(FLAGS_atlas_volume_rendering_maximum_round));
-  const int currentRound = chan * static_cast<int>(absl::GetFlag(FLAGS_atlas_volume_rendering_maximum_round)) + round;
+  const uint32_t maxRounds = absl::GetFlag(FLAGS_atlas_volume_rendering_maximum_round);
+  const int totalRound = static_cast<int>(channelCount) * static_cast<int>(maxRounds);
+  const int currentRound = chan * static_cast<int>(maxRounds) + round;
   if (totalRound <= 0 || currentRound >= totalRound) {
     return 1.0;
   }

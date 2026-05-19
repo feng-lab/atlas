@@ -71,7 +71,6 @@ ABSL_FLAG(bool,
           vk_reserve_upload_slices,
           true,
           "Reserve per-draw upload arena capacity (precise) before suballocation to avoid mid-upload growth");
-ABSL_DECLARE_FLAG(std::string, atlas_perf_mode);
 ABSL_DECLARE_FLAG(bool, atlas_perf_trace_calibrated);
 ABSL_FLAG(bool,
           atlas_vk_ddp_indirect_count,

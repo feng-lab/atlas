@@ -12,6 +12,13 @@ class QNetworkProxy;
 
 namespace nim {
 
+enum class HttpProxyStrategy
+{
+  Auto,
+  NoProxy,
+  ProxyIfAvailable,
+};
+
 struct ZHttpProxySupport
 {
   bool supportsHttp = false;

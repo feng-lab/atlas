@@ -998,6 +998,7 @@ Runtime Flags and Config Flagfile
   - `#` begins a comment; blank lines are allowed.
   - Booleans use `true/false`; numeric flags use integers or decimals as appropriate.
   - String-list flags use Abseil's comma-separated format; optional string/path flags use an empty value for `std::nullopt`.
+  - Finite-choice flags use typed Abseil enum parsers with canonical lowercase values. Parsing is ASCII case-insensitive, and values are written back in canonical lowercase form. Invalid values fail during flag parsing instead of being normalized later in the call site.
 - Atlas Settings rewrites the managed section on save and preserves the dedicated manual block for custom flags that are not exposed in the dialog. Users who edit the file directly should place non-GUI flags in that preserved block.
 - Apply on restart: changes take effect the next time Atlas starts. Advise users to check startup logs for any flag parse errors.
 
@@ -1006,6 +1007,7 @@ Adding or updating flags for users
 - Prefer exposing options that are safe to tweak without recompiling: performance limits, memory sizing, debug toggles, rendering heuristics that don’t alter file formats or scene serialization.
 - When you add a new Abseil flag intended for users:
   - Define the flag in code with a sensible default and a clear description.
+  - For enum-like string choices, prefer a small enum plus the shared table-driven Abseil parse/unparse helper in `src/img/zabslflagtypes.h`. Keep the enum name consistent with local conventions; new enum types should not start with `Z` unless they are part of an existing `Z*` API family.
   - Add a curated entry to `src/atlas/zflagsettingsregistry.cpp` with a clear label, category, and editor type. The GUI uses Abseil flag reflection for compiled defaults and descriptions, so do not duplicate those values elsewhere.
   - Keep naming consistent with existing prefixes: `atlas_*` for app/platform/runtime behavior, `zimg_*` for image/FFT stack, `atlas_debug_vulkan` for Vulkan.
   - Group related flags and avoid leaking internal or unsafe toggles (e.g., experimental invariants, crash-on-warning). If a flag is debug-only, make that clear in its comment.

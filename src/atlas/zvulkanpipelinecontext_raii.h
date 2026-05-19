@@ -240,6 +240,7 @@ private:
   ZVulkanDebugStateTracker m_debug{};
 #endif
   bool m_segmentActive = false;
+  bool m_labelDraws = false;
 };
 
 struct ZVulkanSecondaryBuildInfo

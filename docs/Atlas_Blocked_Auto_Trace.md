@@ -38,7 +38,7 @@ We need a blocked/paged approach that preserves tracing continuity and supports 
    - The policy is block-invariant (the same rule is applied to every block), even though the auto mode can produce
      different background values per block depending on local intensity distributions.
    - Runtime controls (Abseil flags):
-     - `--atlas_autotrace_block_threshold_mode=auto|fixed` (default: `auto`)
+     - `--atlas_autotrace_block_threshold_mode=auto|fixed` (default: `auto`; parsed case-insensitively and written back lowercase)
      - `--atlas_autotrace_block_subtract_constant=<double>` (default: `0`; used only when mode is `fixed`)
 
 5) **Respect the existing downsample tracing option**:

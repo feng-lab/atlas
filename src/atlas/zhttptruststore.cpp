@@ -1,6 +1,7 @@
 #include "zhttptruststore.h"
 
 #include "zexception.h"
+#include "zabslflagtypes.h"
 #include "zlog.h"
 #include "zsysteminfo.h"
 
@@ -12,13 +13,11 @@
 #include <QFileInfo>
 #include <QSaveFile>
 
-#include <folly/String.h>
-
+#include <array>
 #include <fstream>
 #include <memory>
 #include <optional>
 #include <string>
-#include <string_view>
 #include <unordered_set>
 #include <vector>
 
@@ -35,9 +34,38 @@
 
 ABSL_DECLARE_FLAG(std::optional<std::string>, atlas_http_ca_bundle);
 
-ABSL_FLAG(std::string,
+namespace nim {
+
+enum class HttpWindowsTrustSource
+{
+  Auto,
+  WindowsStore,
+  BundledPem,
+};
+
+inline constexpr std::array<AbslEnumFlagValue<HttpWindowsTrustSource>, 3> kHttpWindowsTrustSourceFlagValues{
+  {
+   {"auto", HttpWindowsTrustSource::Auto},
+   {"windows_store", HttpWindowsTrustSource::WindowsStore},
+   {"bundled_pem", HttpWindowsTrustSource::BundledPem},
+   }
+};
+
+inline bool AbslParseFlag(absl::string_view text, HttpWindowsTrustSource* value, std::string* error)
+{
+  return parseAbslEnumFlag(text, value, error, "HttpWindowsTrustSource", kHttpWindowsTrustSourceFlagValues);
+}
+
+inline std::string AbslUnparseFlag(HttpWindowsTrustSource value)
+{
+  return unparseAbslEnumFlag(value, kHttpWindowsTrustSourceFlagValues);
+}
+
+} // namespace nim
+
+ABSL_FLAG(nim::HttpWindowsTrustSource,
           atlas_http_windows_trust_source,
-          "auto",
+          nim::HttpWindowsTrustSource::Auto,
           "Windows HTTPS trust source for remote datasets. Values: auto (prefer exported Windows system trust store, "
           "fall back to PEM bundle), windows_store (export Windows ROOT/CA stores to PEM and use that for all HTTP "
           "backends), bundled_pem (use PEM bundle discovery such as curl-ca-bundle.crt).");
@@ -204,23 +232,6 @@ ZHttpTrustStoreConfig exportWindowsSystemTrustStoreToPemOrThrow()
 
 } // namespace
 
-ZHttpWindowsTrustSource windowsTrustSourceFromString(std::string_view value)
-{
-  std::string lower(value);
-  folly::toLowerAscii(lower);
-  if (lower.empty() || lower == "auto") {
-    return ZHttpWindowsTrustSource::Auto;
-  }
-  if (lower == "windows_store" || lower == "windowsstore" || lower == "system_store" || lower == "systemstore") {
-    return ZHttpWindowsTrustSource::WindowsStore;
-  }
-  if (lower == "bundled_pem" || lower == "bundledpem" || lower == "pem_bundle" || lower == "bundle") {
-    return ZHttpWindowsTrustSource::BundledPem;
-  }
-  throw ZException(
-    fmt::format("Invalid --atlas_http_windows_trust_source='{}' (expected: auto, windows_store, bundled_pem)", value));
-}
-
 ZHttpTrustStoreConfig resolveHttpTrustStoreConfig(ZHttpTrustBackend backend)
 {
   const std::optional<std::string> caBundle = absl::GetFlag(FLAGS_atlas_http_ca_bundle);
@@ -233,13 +244,12 @@ ZHttpTrustStoreConfig resolveHttpTrustStoreConfig(ZHttpTrustBackend backend)
 
 #if defined(_WIN32)
   (void)backend;
-  const ZHttpWindowsTrustSource trustSource =
-    windowsTrustSourceFromString(absl::GetFlag(FLAGS_atlas_http_windows_trust_source));
-  if (trustSource == ZHttpWindowsTrustSource::WindowsStore) {
+  const HttpWindowsTrustSource trustSource = absl::GetFlag(FLAGS_atlas_http_windows_trust_source);
+  if (trustSource == HttpWindowsTrustSource::WindowsStore) {
     return exportWindowsSystemTrustStoreToPemOrThrow();
   }
 
-  if (trustSource == ZHttpWindowsTrustSource::Auto) {
+  if (trustSource == HttpWindowsTrustSource::Auto) {
     try {
       return exportWindowsSystemTrustStoreToPemOrThrow();
     }

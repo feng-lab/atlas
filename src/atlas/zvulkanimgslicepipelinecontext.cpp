@@ -43,7 +43,7 @@
 ABSL_DECLARE_FLAG(bool, atlas_debug_save_slice_layers);
 ABSL_DECLARE_FLAG(bool, atlas_debug_save_slice_merge_out);
 ABSL_DECLARE_FLAG(std::string, atlas_debug_save_dir);
-ABSL_DECLARE_FLAG(std::string, atlas_vk_blockid_compaction_source);
+ABSL_DECLARE_FLAG(nim::VulkanBlockIdCompactionSource, atlas_vk_blockid_compaction_source);
 
 namespace nim {
 
@@ -54,28 +54,9 @@ constexpr uint32_t kInvalidBlockID = 0u;
 constexpr uint32_t kUnmappedBlockID = 0xFFFFFFFFu;
 constexpr uint32_t kBlockIdCompactionHeaderWords = 1u + 8u; // [count][counts[8]]
 
-enum class BlockIdCompactionSource
+inline VulkanBlockIdCompactionSource vkBlockIdCompactionSource()
 {
-  Buffer,
-  Storage,
-  Sampled
-};
-
-inline BlockIdCompactionSource vkBlockIdCompactionSource()
-{
-  const std::string v = absl::GetFlag(FLAGS_atlas_vk_blockid_compaction_source);
-  if (v.empty() || v == "buffer" || v == "Buffer" || v == "BUFFER") {
-    return BlockIdCompactionSource::Buffer;
-  }
-  if (v == "storage" || v == "Storage" || v == "STORAGE") {
-    return BlockIdCompactionSource::Storage;
-  }
-  if (v == "sampled" || v == "Sampled" || v == "SAMPLED") {
-    return BlockIdCompactionSource::Sampled;
-  }
-  CHECK(false) << "Unknown --atlas_vk_blockid_compaction_source='" << v
-               << "'. Expected one of: buffer, storage, sampled.";
-  return BlockIdCompactionSource::Buffer;
+  return absl::GetFlag(FLAGS_atlas_vk_blockid_compaction_source);
 }
 
 inline void appendVec(std::vector<uint8_t>& buffer, const glm::uvec4& value)
@@ -374,9 +355,9 @@ void ZVulkanImgSlicePipelineContext::preRecordPrimeBlockIdCompaction(
     m_blockIdCompactDescriptors.resize(static_cast<size_t>(sliceCount));
   }
 
-  const BlockIdCompactionSource compSource = vkBlockIdCompactionSource();
-  const bool storageRead = (compSource == BlockIdCompactionSource::Storage);
-  const bool bufferRead = (compSource == BlockIdCompactionSource::Buffer);
+  const VulkanBlockIdCompactionSource compSource = vkBlockIdCompactionSource();
+  const bool storageRead = (compSource == VulkanBlockIdCompactionSource::Storage);
+  const bool bufferRead = (compSource == VulkanBlockIdCompactionSource::Buffer);
 
   if (bufferRead) {
     CHECK(m_blockIdCompactSetLayoutBuffer.has_value()) << "Slice block-ID buffer compaction set layout missing";
@@ -730,9 +711,9 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
 
     ensureBlockIdCompactionPipeline();
 
-    const BlockIdCompactionSource compSource = vkBlockIdCompactionSource();
-    const bool storageRead = (compSource == BlockIdCompactionSource::Storage);
-    const bool bufferRead = (compSource == BlockIdCompactionSource::Buffer);
+    const VulkanBlockIdCompactionSource compSource = vkBlockIdCompactionSource();
+    const bool storageRead = (compSource == VulkanBlockIdCompactionSource::Storage);
+    const bool bufferRead = (compSource == VulkanBlockIdCompactionSource::Buffer);
 
     if (bufferRead) {
       const size_t needed = static_cast<size_t>(imgW) * imgH * sizeof(uint32_t) * 4ull;
@@ -1782,19 +1763,19 @@ ZVulkanImgSlicePipelineContext::ensureBlockIdPipeline(const BlockIdPipelineKey& 
 void ZVulkanImgSlicePipelineContext::ensureBlockIdCompactionPipeline()
 {
   auto& device = m_backend.device().context().device();
-  const BlockIdCompactionSource source = vkBlockIdCompactionSource();
+  const VulkanBlockIdCompactionSource source = vkBlockIdCompactionSource();
   static const std::string shaderBase = nim::ZSystemInfo::resourcesDirPath().toStdString() + "/shader/vulkan/spv/";
   const vk::DescriptorSetLayout bindlessLayout = m_backend.bindlessSampledImageDescriptorSetLayout();
   CHECK(static_cast<VkDescriptorSetLayout>(bindlessLayout) != VK_NULL_HANDLE)
     << "Slice block-ID compaction requires backend bindless descriptor set layout";
 
-  auto sourceTag = [](BlockIdCompactionSource s) -> const char* {
+  auto sourceTag = [](VulkanBlockIdCompactionSource s) -> const char* {
     switch (s) {
-      case BlockIdCompactionSource::Buffer:
+      case VulkanBlockIdCompactionSource::Buffer:
         return "buffer";
-      case BlockIdCompactionSource::Storage:
+      case VulkanBlockIdCompactionSource::Storage:
         return "storage";
-      case BlockIdCompactionSource::Sampled:
+      case VulkanBlockIdCompactionSource::Sampled:
         return "sampled";
     }
     return "<unknown>";
@@ -1943,22 +1924,22 @@ void ZVulkanImgSlicePipelineContext::ensureBlockIdCompactionPipeline()
   };
 
   switch (source) {
-    case BlockIdCompactionSource::Buffer:
+    case VulkanBlockIdCompactionSource::Buffer:
       ensureBuffer();
       break;
-    case BlockIdCompactionSource::Storage:
+    case VulkanBlockIdCompactionSource::Storage:
       ensureStorage();
       break;
-    case BlockIdCompactionSource::Sampled:
+    case VulkanBlockIdCompactionSource::Sampled:
       ensureSampled();
       break;
   }
 
   if (created && VLOG_IS_ON(1)) {
     const std::string compPath =
-      (source == BlockIdCompactionSource::Buffer)    ? (shaderBase + "block_id_compact_buffer_append.comp.spv")
-      : (source == BlockIdCompactionSource::Storage) ? (shaderBase + "block_id_compact_storage_append.comp.spv")
-                                                     : (shaderBase + "block_id_compact_append.comp.spv");
+      (source == VulkanBlockIdCompactionSource::Buffer)    ? (shaderBase + "block_id_compact_buffer_append.comp.spv")
+      : (source == VulkanBlockIdCompactionSource::Storage) ? (shaderBase + "block_id_compact_storage_append.comp.spv")
+                                                           : (shaderBase + "block_id_compact_append.comp.spv");
     VLOG(1) << fmt::format("ensureSliceBlockIdCompactionPipeline: source={} shader='{}'", sourceTag(source), compPath);
   }
 }

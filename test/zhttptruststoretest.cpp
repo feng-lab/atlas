@@ -1,23 +1,43 @@
-#include "zexception.h"
+#include "zcommandlineflags.h"
 #include "zhttptruststore.h"
 
 #include <gtest/gtest.h>
 
+#include <string>
+#include <utility>
+
 namespace nim {
 namespace {
 
+[[maybe_unused]] auto* const kResolveHttpTrustStoreConfigForLink = &resolveHttpTrustStoreConfig;
+
 TEST(ZHttpTrustStore, ParsesWindowsTrustSourceValues)
 {
-  EXPECT_EQ(windowsTrustSourceFromString("auto"), ZHttpWindowsTrustSource::Auto);
-  EXPECT_EQ(windowsTrustSourceFromString("windows_store"), ZHttpWindowsTrustSource::WindowsStore);
-  EXPECT_EQ(windowsTrustSourceFromString("systemstore"), ZHttpWindowsTrustSource::WindowsStore);
-  EXPECT_EQ(windowsTrustSourceFromString("bundled_pem"), ZHttpWindowsTrustSource::BundledPem);
-  EXPECT_EQ(windowsTrustSourceFromString("bundle"), ZHttpWindowsTrustSource::BundledPem);
+  absl::FlagSaver flagSaver;
+
+  for (const auto& [inputValue, canonicalValue] : {
+         std::pair{"auto",          "auto"         },
+         std::pair{"Windows_Store", "windows_store"},
+         std::pair{"BUNDLED_PEM",   "bundled_pem"  }
+  }) {
+    std::string error;
+    EXPECT_TRUE(setCommandLineOption("atlas_http_windows_trust_source", inputValue, &error)) << error;
+
+    std::string storedValue;
+    ASSERT_TRUE(getCommandLineOption("atlas_http_windows_trust_source", &storedValue));
+    EXPECT_EQ(storedValue, canonicalValue);
+  }
 }
 
 TEST(ZHttpTrustStore, RejectsInvalidWindowsTrustSource)
 {
-  EXPECT_THROW((void)windowsTrustSourceFromString("bad_value"), ZException);
+  absl::FlagSaver flagSaver;
+
+  for (const std::string value : {"bad_value", "systemstore", "bundle"}) {
+    std::string error;
+    EXPECT_FALSE(setCommandLineOption("atlas_http_windows_trust_source", value, &error));
+    EXPECT_FALSE(error.empty());
+  }
 }
 
 } // namespace

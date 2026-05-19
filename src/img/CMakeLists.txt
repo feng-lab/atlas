@@ -108,6 +108,7 @@ set(IMG_SOURCES
         zimgneighborhoodwithcoorditerator.h
         zneighborhood.h zneighborhood.cpp
         zimgneighborhoodwithptriterator.h
+        zabslflagtypes.h
         zcommandlineflags.h zcommandlineflags.cpp
         zglogbridge.h zglogbridge.cpp
         zlog.h zlog.cpp

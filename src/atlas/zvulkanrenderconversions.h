@@ -11,6 +11,13 @@ namespace nim {
 class ZVulkanDevice;
 class ZVulkanBuffer;
 class ZVulkanTexture;
+
+enum class VulkanBlockIdCompactionSource
+{
+  Buffer,
+  Storage,
+  Sampled,
+};
 } // namespace nim
 
 namespace nim::vulkan {

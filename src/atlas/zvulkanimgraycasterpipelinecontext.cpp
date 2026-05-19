@@ -22,6 +22,7 @@
 #include "zvulkanrenderconversions.h"
 #include "zvulkanresourcemetadata.h"
 #include "zvulkanuniforms.h"
+#include "zabslflagtypes.h"
 #include "zvulkanpipelinecontext_raii.h"
 #include "zsysteminfo.h"
 #include <fstream>
@@ -78,10 +79,37 @@ ABSL_FLAG(bool,
           false,
           "After Block-ID draw, count non-zero IDs per attachment via CPU readback");
 
+namespace nim {
+
+inline constexpr std::array<AbslEnumFlagValue<VulkanBlockIdCompactionSource>, 3>
+  kVulkanBlockIdCompactionSourceFlagValues{
+    {
+     {"buffer", VulkanBlockIdCompactionSource::Buffer},
+     {"storage", VulkanBlockIdCompactionSource::Storage},
+     {"sampled", VulkanBlockIdCompactionSource::Sampled},
+     }
+};
+
+inline bool AbslParseFlag(absl::string_view text, VulkanBlockIdCompactionSource* value, std::string* error)
+{
+  return parseAbslEnumFlag(text,
+                           value,
+                           error,
+                           "VulkanBlockIdCompactionSource",
+                           kVulkanBlockIdCompactionSourceFlagValues);
+}
+
+inline std::string AbslUnparseFlag(VulkanBlockIdCompactionSource value)
+{
+  return unparseAbslEnumFlag(value, kVulkanBlockIdCompactionSourceFlagValues);
+}
+
+} // namespace nim
+
 // Compaction read source override (append-only)
-ABSL_FLAG(std::string,
+ABSL_FLAG(nim::VulkanBlockIdCompactionSource,
           atlas_vk_blockid_compaction_source,
-          "buffer",
+          nim::VulkanBlockIdCompactionSource::Buffer,
           "Block-ID compaction read source: 'buffer' (default), 'storage', or 'sampled' (append-only)");
 
 // Debug dump of Vulkan raycaster inputs before dispatch (CPU-side only)
@@ -218,8 +246,7 @@ ImgRaySetupUBOStd140 buildRaySetupUBO(const Z3DAnalyticRaySetup& setup)
 constexpr uint32_t kEmptyBlockID = 0xFFFFFFFFu;
 constexpr uint32_t kBlockIdCompactionHeaderWords = 1u + 8u; // [count][counts[8]]
 
-[[nodiscard]] bool vkBlockIdUseStorage();
-[[nodiscard]] bool vkBlockIdUseBuffer();
+[[nodiscard]] VulkanBlockIdCompactionSource vkBlockIdCompactionSource();
 
 uint32_t rayModeConstant(ImgCompositingMode mode)
 {
@@ -559,8 +586,9 @@ void ZVulkanImgRaycasterPipelineContext::preRecordPrimeBlockIdCompaction(
   ZVulkanBuffer* outBuffer = out.buffer.get();
   CHECK(outBuffer != nullptr);
 
-  const bool bufferRead = vkBlockIdUseBuffer();
-  const bool storageRead = vkBlockIdUseStorage();
+  const VulkanBlockIdCompactionSource blockIdCompactionSource = vkBlockIdCompactionSource();
+  const bool bufferRead = blockIdCompactionSource == VulkanBlockIdCompactionSource::Buffer;
+  const bool storageRead = blockIdCompactionSource == VulkanBlockIdCompactionSource::Storage;
 
   if (bufferRead) {
     // Buffer source: copy attachment -> SSBO texels, then scan on GPU.
@@ -2446,23 +2474,18 @@ void ZVulkanImgRaycasterPipelineContext::ensureEntryGeometryUploadedThisFrame(co
 }
 
 namespace {
-inline bool vkBlockIdUseStorage()
+inline VulkanBlockIdCompactionSource vkBlockIdCompactionSource()
 {
-  const std::string v = absl::GetFlag(FLAGS_atlas_vk_blockid_compaction_source);
-  return v == "storage" || v == "Storage" || v == "STORAGE";
-}
-inline bool vkBlockIdUseBuffer()
-{
-  const std::string v = absl::GetFlag(FLAGS_atlas_vk_blockid_compaction_source);
-  return v == "buffer" || v == "Buffer" || v == "BUFFER";
+  return absl::GetFlag(FLAGS_atlas_vk_blockid_compaction_source);
 }
 } // namespace
 
 void ZVulkanImgRaycasterPipelineContext::ensureBlockIdCompactionPipeline()
 {
   auto& device = m_backend.device().context().device();
-  const bool storage = vkBlockIdUseStorage();
-  const bool buffer = vkBlockIdUseBuffer();
+  const VulkanBlockIdCompactionSource source = vkBlockIdCompactionSource();
+  const bool storage = source == VulkanBlockIdCompactionSource::Storage;
+  const bool buffer = source == VulkanBlockIdCompactionSource::Buffer;
   const std::string shaderBase = nim::ZSystemInfo::resourcesDirPath().toStdString() + "/shader/vulkan/spv/";
   const std::string compPath = buffer ? (shaderBase + "block_id_compact_buffer_append.comp.spv")
                                       : (storage ? (shaderBase + "block_id_compact_storage_append.comp.spv")
@@ -2745,8 +2768,9 @@ void ZVulkanImgRaycasterPipelineContext::recordBlockIdCompaction(Z3DRendererBase
   // Record compute dispatch
   ZVulkanPipelineCommandRecorder recorder(cmd);
   auto gpuScope = m_backend.beginGpuScope("block_id_compact_append");
-  const bool storageRead = vkBlockIdUseStorage();
-  const bool bufferRead = vkBlockIdUseBuffer();
+  const VulkanBlockIdCompactionSource blockIdCompactionSource = vkBlockIdCompactionSource();
+  const bool storageRead = blockIdCompactionSource == VulkanBlockIdCompactionSource::Storage;
+  const bool bufferRead = blockIdCompactionSource == VulkanBlockIdCompactionSource::Buffer;
   ZVulkanComputePassSpec spec{};
   if (bufferRead) {
     spec.pipeline = &*m_blockIdCompactPipelineBufferAppend;

@@ -281,8 +281,7 @@ public:
       return false;
     }
 
-    std::FILE* file = m_file.get();
-    const size_t bytesWritten = writeUnlocked(file, message.data(), message.size());
+    const size_t bytesWritten = writeUnlocked(m_file.get(), message.data(), message.size());
     if (bytesWritten != message.size()) {
       return false;
     }
@@ -294,9 +293,18 @@ public:
     return true;
   }
 
-  bool flush()
+  bool flush(std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now())
   {
-    return flush(std::chrono::steady_clock::now());
+    if (m_file == nullptr) {
+      return true;
+    }
+
+    if (flushUnlocked(m_file.get()) != 0) {
+      return false;
+    }
+    m_bytesSinceFlush = 0;
+    m_nextFlushTime = now + kBufferedLogFlushInterval;
+    return true;
   }
 
 private:
@@ -322,20 +330,6 @@ private:
     m_openFailed = m_file == nullptr;
     m_nextFlushTime = now + kBufferedLogFlushInterval;
     return !m_openFailed;
-  }
-
-  bool flush(std::chrono::steady_clock::time_point now)
-  {
-    if (m_file == nullptr) {
-      return true;
-    }
-
-    if (flushUnlocked(m_file.get()) != 0) {
-      return false;
-    }
-    m_bytesSinceFlush = 0;
-    m_nextFlushTime = now + kBufferedLogFlushInterval;
-    return true;
   }
 };
 

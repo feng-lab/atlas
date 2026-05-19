@@ -1,16 +1,47 @@
 ﻿#include "z3dperfcollector.h"
 
+#include "zabslflagtypes.h"
 #include "zlog.h"
 #include "zcommandlineflags.h"
 
 #include <algorithm>
+#include <array>
 #include <fstream>
 #include <limits>
 #include <optional>
 #include <unordered_map>
 #include "zjson.h"
 
-ABSL_FLAG(std::string, atlas_perf_mode, "light", "Perf mode: off|light|full");
+namespace nim {
+
+enum class PerfMode
+{
+  Off,
+  Light,
+  Full,
+};
+
+inline constexpr std::array<AbslEnumFlagValue<PerfMode>, 3> kPerfModeFlagValues{
+  {
+   {"off", PerfMode::Off},
+   {"light", PerfMode::Light},
+   {"full", PerfMode::Full},
+   }
+};
+
+inline bool AbslParseFlag(absl::string_view text, PerfMode* value, std::string* error)
+{
+  return parseAbslEnumFlag(text, value, error, "PerfMode", kPerfModeFlagValues);
+}
+
+inline std::string AbslUnparseFlag(PerfMode value)
+{
+  return unparseAbslEnumFlag(value, kPerfModeFlagValues);
+}
+
+} // namespace nim
+
+ABSL_FLAG(nim::PerfMode, atlas_perf_mode, nim::PerfMode::Light, "Perf mode: off|light|full");
 ABSL_FLAG(std::optional<std::string>,
           atlas_perf_trace,
           std::nullopt,

@@ -7,6 +7,7 @@
 #include "zhttptruststore.h"
 #include "zcancellation.h"
 #include "zqobjectthreadinvoker.h"
+#include "zabslflagtypes.h"
 
 #include <brotli/decode.h>
 #include <folly/Optional.h>
@@ -46,9 +47,31 @@ ABSL_FLAG(std::optional<std::string>,
           std::nullopt,
           "Path to a PEM CA bundle for HTTPS requests (overrides auto-detect).");
 
-ABSL_FLAG(std::string,
+namespace nim {
+
+inline constexpr std::array<AbslEnumFlagValue<HttpProxyStrategy>, 3> kHttpProxyStrategyFlagValues{
+  {
+   {"auto", HttpProxyStrategy::Auto},
+   {"no_proxy", HttpProxyStrategy::NoProxy},
+   {"proxy_if_available", HttpProxyStrategy::ProxyIfAvailable},
+   }
+};
+
+inline bool AbslParseFlag(absl::string_view text, HttpProxyStrategy* value, std::string* error)
+{
+  return parseAbslEnumFlag(text, value, error, "HttpProxyStrategy", kHttpProxyStrategyFlagValues);
+}
+
+inline std::string AbslUnparseFlag(HttpProxyStrategy value)
+{
+  return unparseAbslEnumFlag(value, kHttpProxyStrategyFlagValues);
+}
+
+} // namespace nim
+
+ABSL_FLAG(nim::HttpProxyStrategy,
           atlas_http_proxy_strategy,
-          "auto",
+          nim::HttpProxyStrategy::Auto,
           "Outbound HTTP proxy strategy using OS system proxy settings only (no proxy URL flags). "
           "Values: auto (alternate direct/proxy between retries), no_proxy (always direct), "
           "proxy_if_available (always use system proxy if one exists for the URL).");
@@ -307,34 +330,9 @@ std::vector<std::string> resolveHostToIpAddrsSystemViaQtThread(const std::string
   return res.value;
 }
 
-enum class ProxyStrategy
-{
-  Auto,
-  NoProxy,
-  ProxyIfAvailable,
-};
-
 constexpr ZHttpProxySupport kProxygenProxySupport{
   .supportsHttp = true,
 };
-
-ProxyStrategy proxyStrategyFromFlag()
-{
-  std::string s = absl::GetFlag(FLAGS_atlas_http_proxy_strategy);
-  const std::string flagValue = s;
-  folly::toLowerAscii(s);
-  if (s.empty() || s == "auto" || s == "automatic") {
-    return ProxyStrategy::Auto;
-  }
-  if (s == "no_proxy" || s == "noproxy" || s == "none" || s == "direct") {
-    return ProxyStrategy::NoProxy;
-  }
-  if (s == "proxy_if_available" || s == "proxyifavailable" || s == "use_proxy_if_available" || s == "proxy") {
-    return ProxyStrategy::ProxyIfAvailable;
-  }
-  throw ZException(
-    fmt::format("Invalid --atlas_http_proxy_strategy='{}' (expected: auto, no_proxy, proxy_if_available)", flagValue));
-}
 
 bool isRedirectStatus(uint16_t status)
 {
@@ -508,9 +506,9 @@ folly::coro::Task<std::optional<ZHttpGetBytesResult>> ZProxygenHttpClient::getBy
     throw ZException(fmt::format("Invalid URL '{}'", request.url));
   }
 
-  const ProxyStrategy proxyStrategy = proxyStrategyFromFlag();
+  const HttpProxyStrategy proxyStrategy = absl::GetFlag(FLAGS_atlas_http_proxy_strategy);
   std::optional<ZHttpProxyEndpoint> systemProxy;
-  if (proxyStrategy != ProxyStrategy::NoProxy) {
+  if (proxyStrategy != HttpProxyStrategy::NoProxy) {
     const ZSystemHttpProxyResolution proxyResolution = querySystemHttpProxyForUrl(request.url, kProxygenProxySupport);
     if (proxyResolution.error) {
       throw ZException(fmt::format("proxygen backend: {}", *proxyResolution.error));
@@ -574,13 +572,13 @@ folly::coro::Task<std::optional<ZHttpGetBytesResult>> ZProxygenHttpClient::getBy
     if (systemProxy) {
       const bool useProxy = [&]() {
         switch (proxyStrategy) {
-        case ProxyStrategy::NoProxy:
-          return false;
-        case ProxyStrategy::ProxyIfAvailable:
-          return true;
-        case ProxyStrategy::Auto:
-          // Alternate proxy/direct between attempts when a proxy exists (attempt 0 is proxy).
-          return (attempt % 2u) == 0u;
+          case HttpProxyStrategy::NoProxy:
+            return false;
+          case HttpProxyStrategy::ProxyIfAvailable:
+            return true;
+          case HttpProxyStrategy::Auto:
+            // Alternate proxy/direct between attempts when a proxy exists (attempt 0 is proxy).
+            return (attempt % 2u) == 0u;
         }
         return false;
       }();

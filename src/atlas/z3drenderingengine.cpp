@@ -33,6 +33,7 @@
 #include "zcancellation.h"
 #include "zcpuinfo.h"
 #include "z3dperfcollector.h"
+#include "zabslflagtypes.h"
 #include "zqtexecutor.h"
 #include "zrenderthreadexecutor_tls.h"
 #include <folly/OperationCancelled.h>
@@ -50,6 +51,7 @@ ABSL_DECLARE_FLAG(bool, atlas_enable_benchmark_screen_space_sufficiency_audit);
 #include <QMetaObject>
 #include <QTimer>
 #include <QThread>
+#include <array>
 #include <chrono>
 #include <cstdint>
 #include <memory>
@@ -64,9 +66,30 @@ ABSL_FLAG(bool,
           false,
           "Whether to log openGL context switch event, default is false");
 
-ABSL_FLAG(std::string,
+namespace nim {
+
+inline constexpr std::array<AbslEnumFlagValue<RenderBackend>, 2> kRenderBackendFlagValues{
+  {
+   {"opengl", RenderBackend::OpenGL},
+   {"vulkan", RenderBackend::Vulkan},
+   }
+};
+
+inline bool AbslParseFlag(absl::string_view text, RenderBackend* value, std::string* error)
+{
+  return parseAbslEnumFlag(text, value, error, "RenderBackend", kRenderBackendFlagValues);
+}
+
+inline std::string AbslUnparseFlag(RenderBackend value)
+{
+  return unparseAbslEnumFlag(value, kRenderBackendFlagValues);
+}
+
+} // namespace nim
+
+ABSL_FLAG(nim::RenderBackend,
           atlas_default_render_backend,
-          "opengl",
+          nim::RenderBackend::OpenGL,
           "Default 3D rendering backend at startup. Values: opengl, vulkan. "
           "This sets the initial value of the 'Render Backend' global parameter; it can be changed in the UI.");
 
@@ -216,24 +239,6 @@ int numDigits(int32_t x)
 namespace nim {
 
 namespace {
-
-[[nodiscard]] bool parseRenderBackendFlagValue(const std::string& raw, RenderBackend& outBackend)
-{
-  QString normalized = QString::fromStdString(raw).trimmed().toLower();
-  normalized.remove(u'-');
-  normalized.remove(u'_');
-  normalized.remove(u' ');
-
-  if (normalized == QStringLiteral("opengl") || normalized == QStringLiteral("gl")) {
-    outBackend = RenderBackend::OpenGL;
-    return true;
-  }
-  if (normalized == QStringLiteral("vulkan") || normalized == QStringLiteral("vk")) {
-    outBackend = RenderBackend::Vulkan;
-    return true;
-  }
-  return false;
-}
 
 bool shouldFlipYWhenSaving(RenderBackend backend)
 {
@@ -1155,13 +1160,7 @@ void Z3DRenderingEngine::init()
 
   Q_EMIT progressChanged(10);
 
-  RenderBackend startupBackend = RenderBackend::OpenGL;
-  const std::string defaultRenderBackend = absl::GetFlag(FLAGS_atlas_default_render_backend);
-  if (!parseRenderBackendFlagValue(defaultRenderBackend, startupBackend)) {
-    LOG(ERROR) << fmt::format("Ignoring invalid --atlas_default_render_backend='{}' (expected 'opengl' or 'vulkan')",
-                              defaultRenderBackend);
-    startupBackend = RenderBackend::OpenGL;
-  }
+  RenderBackend startupBackend = absl::GetFlag(FLAGS_atlas_default_render_backend);
 
   // Vulkan startup must create and inject a Vulkan device before any Vulkan
   // scratch allocations (persistent output targets are acquired during

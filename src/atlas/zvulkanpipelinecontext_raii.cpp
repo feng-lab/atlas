@@ -515,6 +515,7 @@ void ZVulkanDebugStateTracker::assertComputePreDispatch(const ZVulkanComputePass
 
 ZVulkanPipelineCommandRecorder::ZVulkanPipelineCommandRecorder(vk::raii::CommandBuffer& commandBuffer)
   : m_commandBuffer(commandBuffer)
+  , m_labelDraws(absl::GetFlag(FLAGS_atlas_vk_label_draws))
 {}
 
 vk::ImageLayout ZVulkanPipelineCommandRecorder::depthAttachmentLayoutForAspect(vk::ImageAspectFlags aspect)
@@ -671,8 +672,7 @@ void ZVulkanPipelineCommandRecorder::recordComputePass(const ZVulkanComputePassS
 #endif
 
   CHECK(spec.groupX > 0 && spec.groupY > 0 && spec.groupZ > 0) << "Compute dispatch groups must be non-zero";
-  const bool labelDraws = absl::GetFlag(FLAGS_atlas_vk_label_draws);
-  if (labelDraws) {
+  if (m_labelDraws) {
     const std::string label =
       g_currentTransitionLabel.empty() ? std::string("dispatch") : (g_currentTransitionLabel + ":dispatch");
     cmdBeginDebugLabel(m_commandBuffer, label);
@@ -1019,8 +1019,7 @@ void ZVulkanPipelineCommandRecorder::recordGraphicsDraw(const ZVulkanGraphicsDra
   m_debug.assertGraphicsPreDraw(spec);
 #endif
 
-  const bool labelDraws = absl::GetFlag(FLAGS_atlas_vk_label_draws);
-  if (labelDraws) {
+  if (m_labelDraws) {
     const std::string label =
       g_currentTransitionLabel.empty() ? std::string("draw") : (g_currentTransitionLabel + ":draw");
     cmdBeginDebugLabel(m_commandBuffer, label);
@@ -1039,7 +1038,7 @@ void ZVulkanPipelineCommandRecorder::recordGraphicsDraw(const ZVulkanGraphicsDra
       m_commandBuffer.draw(spec.vertexCount, spec.instanceCount, spec.firstVertex, spec.firstInstance);
     }
   }
-  if (labelDraws) {
+  if (m_labelDraws) {
     cmdEndDebugLabel(m_commandBuffer);
   }
   if (auto* be = Z3DRendererVulkanBackend::current()) {

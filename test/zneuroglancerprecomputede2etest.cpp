@@ -11,7 +11,6 @@
 #include <cstdlib>
 #include <string>
 
-ABSL_DECLARE_FLAG(std::string, atlas_http_backend);
 ABSL_DECLARE_FLAG(uint64_t, atlas_disk_cache_http_max_bytes);
 
 namespace nim {
@@ -54,7 +53,7 @@ void runPublicDatasetSmokeTest(const char* backend)
 
   ScopedQtCoreApplication qtApp;
   absl::FlagSaver flagSaver;
-  absl::SetFlag(&FLAGS_atlas_http_backend, backend);
+  ASSERT_TRUE(setCommandLineOption("atlas_http_backend", backend));
   absl::SetFlag(&FLAGS_atlas_disk_cache_http_max_bytes, 0);
 
   using namespace std::chrono_literals;

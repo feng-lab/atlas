@@ -2,27 +2,52 @@
 
 #include "zcurlhttpclient.h"
 #include "zproxygenhttpclient.h"
+#include "zabslflagtypes.h"
 #include "zlog.h"
 
 #include "zcommandlineflags.h"
 
 #include <folly/String.h>
 
+#include <array>
 #include <limits>
 
-namespace {
+namespace nim {
+
+enum class HttpBackend
+{
+  Proxygen,
+  Curl,
+};
+
+inline constexpr std::array<AbslEnumFlagValue<HttpBackend>, 2> kHttpBackendFlagValues{
+  {
+   {"proxygen", HttpBackend::Proxygen},
+   {"curl", HttpBackend::Curl},
+   }
+};
+
+inline bool AbslParseFlag(absl::string_view text, HttpBackend* value, std::string* error)
+{
+  return parseAbslEnumFlag(text, value, error, "HttpBackend", kHttpBackendFlagValues);
+}
+
+inline std::string AbslUnparseFlag(HttpBackend value)
+{
+  return unparseAbslEnumFlag(value, kHttpBackendFlagValues);
+}
 
 #ifdef _WIN32
-constexpr const char* kDefaultAtlasHttpBackend = "curl";
+constexpr HttpBackend kDefaultAtlasHttpBackend = HttpBackend::Curl;
 #else
-constexpr const char* kDefaultAtlasHttpBackend = "proxygen";
+constexpr HttpBackend kDefaultAtlasHttpBackend = HttpBackend::Proxygen;
 #endif
 
-} // namespace
+} // namespace nim
 
-ABSL_FLAG(std::string,
+ABSL_FLAG(nim::HttpBackend,
           atlas_http_backend,
-          kDefaultAtlasHttpBackend,
+          nim::kDefaultAtlasHttpBackend,
           "HTTP backend for remote datasets. Values: proxygen, curl.");
 
 namespace nim {
@@ -40,26 +65,6 @@ namespace {
     }
   }
   return false;
-}
-
-enum class HttpBackendKind
-{
-  Proxygen,
-  Curl,
-};
-
-HttpBackendKind backendKindFromFlag()
-{
-  std::string backend = absl::GetFlag(FLAGS_atlas_http_backend);
-  folly::toLowerAscii(backend);
-  if (backend.empty() || backend == "proxygen") {
-    return HttpBackendKind::Proxygen;
-  }
-  if (backend == "curl") {
-    return HttpBackendKind::Curl;
-  }
-  throw ZException(fmt::format("Invalid --atlas_http_backend='{}' (expected: proxygen or curl)",
-                               absl::GetFlag(FLAGS_atlas_http_backend)));
 }
 
 } // namespace
@@ -92,10 +97,10 @@ ZHttpClient& ZHttpClient::instance()
 
 folly::coro::Task<std::optional<ZHttpGetBytesResult>> ZHttpClient::getBytes(ZHttpGetRequest request)
 {
-  switch (backendKindFromFlag()) {
-    case HttpBackendKind::Proxygen:
+  switch (absl::GetFlag(FLAGS_atlas_http_backend)) {
+    case HttpBackend::Proxygen:
       co_return co_await ZProxygenHttpClient::instance().getBytes(std::move(request));
-    case HttpBackendKind::Curl:
+    case HttpBackend::Curl:
       co_return co_await ZCurlHttpClient::instance().getBytes(std::move(request));
   }
 

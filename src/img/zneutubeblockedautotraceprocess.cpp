@@ -28,6 +28,7 @@
 
 #include "zcancellation.h"
 #include "zexception.h"
+#include "zabslflagtypes.h"
 #include "zlog.h"
 
 #include "zcommandlineflags.h"
@@ -40,8 +41,8 @@
 #include <folly/ScopeGuard.h>
 
 #include <algorithm>
+#include <array>
 #include <chrono>
-#include <cctype>
 #include <cmath>
 #include <limits>
 #include <string_view>
@@ -55,6 +56,33 @@ ABSL_DECLARE_FLAG(double, atlas_trace_mask_exclusion_swell_ratio);
 ABSL_DECLARE_FLAG(double, atlas_trace_mask_exclusion_swell_diff);
 ABSL_DECLARE_FLAG(double, atlas_trace_mask_exclusion_swell_limit);
 
+namespace nim {
+
+enum class AutoTraceBlockThresholdMode
+{
+  Auto,
+  Fixed,
+};
+
+inline constexpr std::array<AbslEnumFlagValue<AutoTraceBlockThresholdMode>, 2> kAutoTraceBlockThresholdModeFlagValues{
+  {
+   {"auto", AutoTraceBlockThresholdMode::Auto},
+   {"fixed", AutoTraceBlockThresholdMode::Fixed},
+   }
+};
+
+inline bool AbslParseFlag(absl::string_view text, AutoTraceBlockThresholdMode* value, std::string* error)
+{
+  return parseAbslEnumFlag(text, value, error, "AutoTraceBlockThresholdMode", kAutoTraceBlockThresholdModeFlagValues);
+}
+
+inline std::string AbslUnparseFlag(AutoTraceBlockThresholdMode value)
+{
+  return unparseAbslEnumFlag(value, kAutoTraceBlockThresholdModeFlagValues);
+}
+
+} // namespace nim
+
 ABSL_FLAG(uint32_t, atlas_autotrace_block_core_x, 1024, "Blocked auto trace: core block size in X (voxels).");
 ABSL_FLAG(uint32_t, atlas_autotrace_block_core_y, 1024, "Blocked auto trace: core block size in Y (voxels).");
 ABSL_FLAG(uint32_t, atlas_autotrace_block_core_z, 1024, "Blocked auto trace: core block size in Z (voxels).");
@@ -63,9 +91,9 @@ ABSL_FLAG(uint32_t,
           128,
           "Blocked auto trace: halo/padding size added on each side (voxels).");
 
-ABSL_FLAG(std::string,
+ABSL_FLAG(nim::AutoTraceBlockThresholdMode,
           atlas_autotrace_block_threshold_mode,
-          "auto",
+          nim::AutoTraceBlockThresholdMode::Auto,
           "Blocked auto trace: signal preprocessing threshold mode. "
           "Supported: 'auto' (subtract background per ROI using the legacy neuTube algorithm) or "
           "'fixed' (subtract atlas_autotrace_block_subtract_constant).");
@@ -82,26 +110,6 @@ namespace {
 
 constexpr int64_t kBlockedAutoTraceMinCoreVoxels = 1024;
 constexpr int64_t kBlockedAutoTraceMinHaloVoxels = 128;
-
-[[nodiscard]] std::string normalizeThresholdModeOrThrow(std::string_view mode)
-{
-  std::string out;
-  out.reserve(mode.size());
-  for (char c : mode) {
-    out.push_back(static_cast<char>(std::tolower(static_cast<unsigned char>(c))));
-  }
-
-  if (out == "auto") {
-    return out;
-  }
-  if (out == "fixed") {
-    return out;
-  }
-
-  throw ZException(
-    fmt::format("Blocked auto trace: invalid atlas_autotrace_block_threshold_mode='{}' (expected 'auto' or 'fixed').",
-                std::string(mode)));
-}
 
 [[nodiscard]] std::string_view traceDirectionToStringForLog(TraceDirection d)
 {
@@ -975,11 +983,12 @@ void ZNeutubeBlockedAutoTraceProcess::doWork()
     .coreZ = reqCoreZ,
     .halo = reqHalo,
   };
-  manifest.thresholdMode = normalizeThresholdModeOrThrow(absl::GetFlag(FLAGS_atlas_autotrace_block_threshold_mode));
+  const AutoTraceBlockThresholdMode thresholdMode = absl::GetFlag(FLAGS_atlas_autotrace_block_threshold_mode);
+  manifest.thresholdMode = AbslUnparseFlag(thresholdMode);
   const double subtractConstant = absl::GetFlag(FLAGS_atlas_autotrace_block_subtract_constant);
-  if (manifest.thresholdMode == "fixed") {
+  if (thresholdMode == AutoTraceBlockThresholdMode::Fixed) {
     manifest.subtractConstant = subtractConstant;
-  } else if (manifest.thresholdMode == "auto") {
+  } else if (thresholdMode == AutoTraceBlockThresholdMode::Auto) {
     if (subtractConstant != 0.0) {
       LOG(WARNING) << fmt::format(
         "Blocked auto trace: atlas_autotrace_block_subtract_constant={} is ignored because threshold_mode='auto'.",
@@ -987,7 +996,7 @@ void ZNeutubeBlockedAutoTraceProcess::doWork()
     }
     manifest.subtractConstant = 0.0;
   } else {
-    CHECK(false) << fmt::format("Unexpected thresholdMode: '{}'", manifest.thresholdMode);
+    CHECK(false) << fmt::format("Unexpected thresholdMode: '{}'", AbslUnparseFlag(thresholdMode));
   }
   manifest.traceConfig = cfg;
 

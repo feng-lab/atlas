@@ -21,7 +21,6 @@
 #include <algorithm>
 #include <array>
 #include <atomic>
-#include <cctype>
 #include <chrono>
 #include <cstring>
 #include <exception>
@@ -30,20 +29,13 @@
 #include <stdexcept>
 #include <string_view>
 
-ABSL_DECLARE_FLAG(std::string, atlas_http_proxy_strategy);
+ABSL_DECLARE_FLAG(nim::HttpProxyStrategy, atlas_http_proxy_strategy);
 ABSL_DECLARE_FLAG(uint32_t, atlas_http_max_redirect_hops);
 ABSL_DECLARE_FLAG(uint32_t, atlas_http_max_retries);
 ABSL_DECLARE_FLAG(uint64_t, atlas_disk_cache_http_max_bytes);
 
 namespace nim {
 namespace {
-
-enum class ProxyStrategy
-{
-  Auto,
-  NoProxy,
-  ProxyIfAvailable,
-};
 
 constexpr ZHttpProxySupport kCurlProxySupport{
   .supportsHttp = true,
@@ -214,24 +206,6 @@ std::string proxyDescription(const ZHttpProxyEndpoint& proxy)
                      (!proxy.username.empty() || !proxy.password.empty()) ? "present" : "none");
 }
 
-ProxyStrategy proxyStrategyFromFlag()
-{
-  std::string s = absl::GetFlag(FLAGS_atlas_http_proxy_strategy);
-  const std::string flagValue = s;
-  folly::toLowerAscii(s);
-  if (s.empty() || s == "auto" || s == "automatic") {
-    return ProxyStrategy::Auto;
-  }
-  if (s == "no_proxy" || s == "noproxy" || s == "none" || s == "direct") {
-    return ProxyStrategy::NoProxy;
-  }
-  if (s == "proxy_if_available" || s == "proxyifavailable" || s == "use_proxy_if_available" || s == "proxy") {
-    return ProxyStrategy::ProxyIfAvailable;
-  }
-  throw ZException(
-    fmt::format("Invalid --atlas_http_proxy_strategy='{}' (expected: auto, no_proxy, proxy_if_available)", flagValue));
-}
-
 bool looksLikeTlsTrustStoreError(std::string_view message)
 {
   std::string m(message);
@@ -299,17 +273,17 @@ bool isRetryableCurlCode(CURLcode code)
   }
 }
 
-bool requestUsesProxy(ProxyStrategy strategy, bool proxyAvailable, uint32_t attempt)
+bool requestUsesProxy(HttpProxyStrategy strategy, bool proxyAvailable, uint32_t attempt)
 {
   if (!proxyAvailable) {
     return false;
   }
   switch (strategy) {
-    case ProxyStrategy::NoProxy:
+    case HttpProxyStrategy::NoProxy:
       return false;
-    case ProxyStrategy::ProxyIfAvailable:
+    case HttpProxyStrategy::ProxyIfAvailable:
       return true;
-    case ProxyStrategy::Auto:
+    case HttpProxyStrategy::Auto:
       return (attempt % 2u) == 0u;
   }
   return false;
@@ -575,9 +549,9 @@ folly::coro::Task<std::optional<ZHttpGetBytesResult>> ZCurlHttpClient::getBytes(
     }
   }
 
-  const ProxyStrategy proxyStrategy = proxyStrategyFromFlag();
+  const HttpProxyStrategy proxyStrategy = absl::GetFlag(FLAGS_atlas_http_proxy_strategy);
   std::optional<ZHttpProxyEndpoint> systemProxy;
-  if (proxyStrategy != ProxyStrategy::NoProxy) {
+  if (proxyStrategy != HttpProxyStrategy::NoProxy) {
     const ZSystemHttpProxyResolution proxyResolution = querySystemHttpProxyForUrl(request.url, kCurlProxySupport);
     if (proxyResolution.error) {
       throw ZException(fmt::format("curl backend: {}", *proxyResolution.error));
