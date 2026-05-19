@@ -828,7 +828,7 @@ ZNeuroglancerPrecomputedVolume::open(QString url,
 
 std::shared_ptr<const ZNeuroglancerPrecomputedSegmentProperties> ZNeuroglancerPrecomputedVolume::segmentPropertiesShared() const
 {
-  const std::lock_guard<std::mutex> lock(m_segmentPropertiesMutex);
+  const std::scoped_lock lock(m_segmentPropertiesMutex);
   return m_segmentProperties;
 }
 
@@ -844,7 +844,7 @@ ZNeuroglancerPrecomputedVolume::loadSegmentPropertiesAsync() const
   bool isLeader = false;
   const folly::CancellationToken cancellationToken = co_await folly::coro::co_current_cancellation_token;
   {
-    const std::lock_guard<std::mutex> lock(m_segmentPropertiesMutex);
+    const std::scoped_lock lock(m_segmentPropertiesMutex);
     if (m_segmentProperties) {
       co_return m_segmentProperties;
     }
@@ -864,7 +864,7 @@ ZNeuroglancerPrecomputedVolume::loadSegmentPropertiesAsync() const
   }
 
   auto clearInFlight = [&]() {
-    const std::lock_guard<std::mutex> lock(m_segmentPropertiesMutex);
+    const std::scoped_lock lock(m_segmentPropertiesMutex);
     if (m_segmentPropertiesInFlight == inFlight) {
       m_segmentPropertiesInFlight.reset();
     }
@@ -876,7 +876,7 @@ ZNeuroglancerPrecomputedVolume::loadSegmentPropertiesAsync() const
     fulfillSharedLoadValue(inFlight->completion, loaded);
 
     {
-      const std::lock_guard<std::mutex> lock(m_segmentPropertiesMutex);
+      const std::scoped_lock lock(m_segmentPropertiesMutex);
       m_segmentProperties = loaded;
     }
     clearInFlight();
@@ -897,7 +897,7 @@ ZNeuroglancerPrecomputedVolume::loadSegmentPropertiesBlocking() const
 
 std::shared_ptr<const ZNeuroglancerPrecomputedMeshSource> ZNeuroglancerPrecomputedVolume::meshSourceShared() const
 {
-  const std::lock_guard<std::mutex> lock(m_meshMutex);
+  const std::scoped_lock lock(m_meshMutex);
   return m_meshSource;
 }
 
@@ -913,7 +913,7 @@ ZNeuroglancerPrecomputedVolume::loadMeshSourceAsync() const
   bool isLeader = false;
   const folly::CancellationToken cancellationToken = co_await folly::coro::co_current_cancellation_token;
   {
-    const std::lock_guard<std::mutex> lock(m_meshMutex);
+    const std::scoped_lock lock(m_meshMutex);
     if (m_meshSource) {
       co_return m_meshSource;
     }
@@ -933,7 +933,7 @@ ZNeuroglancerPrecomputedVolume::loadMeshSourceAsync() const
   }
 
   auto clearInFlight = [&]() {
-    const std::lock_guard<std::mutex> lock(m_meshMutex);
+    const std::scoped_lock lock(m_meshMutex);
     if (m_meshSourceInFlight == inFlight) {
       m_meshSourceInFlight.reset();
     }
@@ -948,7 +948,7 @@ ZNeuroglancerPrecomputedVolume::loadMeshSourceAsync() const
     fulfillSharedLoadValue(inFlight->completion, loaded);
 
     {
-      const std::lock_guard<std::mutex> lock(m_meshMutex);
+      const std::scoped_lock lock(m_meshMutex);
       m_meshSource = loaded;
     }
     clearInFlight();
@@ -968,7 +968,7 @@ std::shared_ptr<const ZNeuroglancerPrecomputedMeshSource> ZNeuroglancerPrecomput
 
 std::shared_ptr<const ZNeuroglancerPrecomputedSkeletonSource> ZNeuroglancerPrecomputedVolume::skeletonSourceShared() const
 {
-  const std::lock_guard<std::mutex> lock(m_skeletonMutex);
+  const std::scoped_lock lock(m_skeletonMutex);
   return m_skeletonSource;
 }
 
@@ -984,7 +984,7 @@ ZNeuroglancerPrecomputedVolume::loadSkeletonSourceAsync() const
   bool isLeader = false;
   const folly::CancellationToken cancellationToken = co_await folly::coro::co_current_cancellation_token;
   {
-    const std::lock_guard<std::mutex> lock(m_skeletonMutex);
+    const std::scoped_lock lock(m_skeletonMutex);
     if (m_skeletonSource) {
       co_return m_skeletonSource;
     }
@@ -1004,7 +1004,7 @@ ZNeuroglancerPrecomputedVolume::loadSkeletonSourceAsync() const
   }
 
   auto clearInFlight = [&]() {
-    const std::lock_guard<std::mutex> lock(m_skeletonMutex);
+    const std::scoped_lock lock(m_skeletonMutex);
     if (m_skeletonSourceInFlight == inFlight) {
       m_skeletonSourceInFlight.reset();
     }
@@ -1019,7 +1019,7 @@ ZNeuroglancerPrecomputedVolume::loadSkeletonSourceAsync() const
     fulfillSharedLoadValue(inFlight->completion, loaded);
 
     {
-      const std::lock_guard<std::mutex> lock(m_skeletonMutex);
+      const std::scoped_lock lock(m_skeletonMutex);
       m_skeletonSource = loaded;
     }
     clearInFlight();
@@ -1177,7 +1177,7 @@ ZNeuroglancerPrecomputedVolume::readChunkAsync(Chunk chunk,
   std::optional<SharedLoadFuture<std::shared_ptr<ZImg>>> sharedFuture;
   bool isLeader = false;
   {
-    const std::lock_guard<std::mutex> lock(m_chunkCache->inFlightMutex);
+    const std::scoped_lock lock(m_chunkCache->inFlightMutex);
     auto it = m_chunkCache->inFlightChunkReads.find(cacheKey);
     if (it != m_chunkCache->inFlightChunkReads.end()) {
       inFlight = it->second;
@@ -1197,7 +1197,7 @@ ZNeuroglancerPrecomputedVolume::readChunkAsync(Chunk chunk,
   }
 
   auto eraseInFlight = [&]() {
-    const std::lock_guard<std::mutex> lock(m_chunkCache->inFlightMutex);
+    const std::scoped_lock lock(m_chunkCache->inFlightMutex);
     auto it = m_chunkCache->inFlightChunkReads.find(cacheKey);
     if (it != m_chunkCache->inFlightChunkReads.end() && it->second == inFlight) {
       m_chunkCache->inFlightChunkReads.erase(it);
@@ -1251,7 +1251,7 @@ ZNeuroglancerPrecomputedVolume::readChunkAsync(Chunk chunk,
         std::optional<SharedLoadFuture<std::shared_ptr<const DecodedMinishardIndex>>> sharedMinishardFuture;
         bool isMinishardLeader = false;
         {
-          const std::lock_guard<std::mutex> lock(m_chunkCache->inFlightMutex);
+          const std::scoped_lock lock(m_chunkCache->inFlightMutex);
           auto it = m_chunkCache->inFlightMinishardIndexReads.find(minishardCacheKey);
           if (it != m_chunkCache->inFlightMinishardIndexReads.end()) {
             inFlightMinishard = it->second;
@@ -1272,7 +1272,7 @@ ZNeuroglancerPrecomputedVolume::readChunkAsync(Chunk chunk,
         }
 
         auto eraseMinishardInFlight = [&]() {
-          const std::lock_guard<std::mutex> lock(m_chunkCache->inFlightMutex);
+          const std::scoped_lock lock(m_chunkCache->inFlightMutex);
           auto it = m_chunkCache->inFlightMinishardIndexReads.find(minishardCacheKey);
           if (it != m_chunkCache->inFlightMinishardIndexReads.end() && it->second == inFlightMinishard) {
             m_chunkCache->inFlightMinishardIndexReads.erase(it);

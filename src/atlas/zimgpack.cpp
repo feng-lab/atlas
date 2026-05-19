@@ -348,7 +348,7 @@ folly::coro::Task<void> readPreviewChunkBestEffortAsync(const ZNeuroglancerPreco
     throw;
   }
   catch (const std::exception& e) {
-    std::lock_guard<std::mutex> guard(failureMutex);
+    std::scoped_lock guard(failureMutex);
     failureMessages.push_back(e.what());
     co_return;
   }
@@ -617,7 +617,7 @@ void ZImgPack::ensureImgMetadataLoaded() const
     return;
   }
 
-  const std::lock_guard<std::mutex> guard(m_imgMetaDataMutex);
+  const std::scoped_lock guard(m_imgMetaDataMutex);
   if (m_imgMetaDataLoaded.load(std::memory_order_relaxed)) {
     return;
   }
@@ -667,7 +667,7 @@ const QString& ZImgPack::detailedInfo() const
     m_detailedInfo += "\n\n";
 
     ensureImgMetadataLoaded();
-    const std::lock_guard<std::mutex> guard(m_imgMetaDataMutex);
+    const std::scoped_lock guard(m_imgMetaDataMutex);
     for (const auto& meta : m_imgMetaData.topLevelAttachments()) {
       m_detailedInfo += meta.toQString();
       m_detailedInfo += "\n";
@@ -742,37 +742,37 @@ namespace {
 
 bool ZImgPack::hasNeuroglancerMeshSourceOverride() const
 {
-  const std::lock_guard<std::mutex> lock(m_ngExternalSourcesMutex);
+  const std::scoped_lock lock(m_ngExternalSourcesMutex);
   return !m_ngMeshSourceOverrideUrl.trimmed().isEmpty();
 }
 
 QString ZImgPack::neuroglancerMeshSourceOverrideUrl() const
 {
-  const std::lock_guard<std::mutex> lock(m_ngExternalSourcesMutex);
+  const std::scoped_lock lock(m_ngExternalSourcesMutex);
   return m_ngMeshSourceOverrideUrl.trimmed();
 }
 
 bool ZImgPack::hasNeuroglancerSkeletonSourceOverride() const
 {
-  const std::lock_guard<std::mutex> lock(m_ngExternalSourcesMutex);
+  const std::scoped_lock lock(m_ngExternalSourcesMutex);
   return !m_ngSkeletonSourceOverrideUrl.trimmed().isEmpty();
 }
 
 QString ZImgPack::neuroglancerSkeletonSourceOverrideUrl() const
 {
-  const std::lock_guard<std::mutex> lock(m_ngExternalSourcesMutex);
+  const std::scoped_lock lock(m_ngExternalSourcesMutex);
   return m_ngSkeletonSourceOverrideUrl.trimmed();
 }
 
 bool ZImgPack::hasNeuroglancerAnnotationsSourceOverride() const
 {
-  const std::lock_guard<std::mutex> lock(m_ngExternalSourcesMutex);
+  const std::scoped_lock lock(m_ngExternalSourcesMutex);
   return !m_ngAnnotationsSourceOverrideUrl.trimmed().isEmpty();
 }
 
 QString ZImgPack::neuroglancerAnnotationsSourceOverrideUrl() const
 {
-  const std::lock_guard<std::mutex> lock(m_ngExternalSourcesMutex);
+  const std::scoped_lock lock(m_ngExternalSourcesMutex);
   return m_ngAnnotationsSourceOverrideUrl.trimmed();
 }
 
@@ -824,7 +824,7 @@ bool ZImgPack::setNeuroglancerMeshSourceOverride(QString userText, QString* erro
     return false;
   }
 
-  const std::lock_guard<std::mutex> lock(m_ngExternalSourcesMutex);
+  const std::scoped_lock lock(m_ngExternalSourcesMutex);
   m_ngMeshSourceOverrideUrl = *urlOpt;
   m_ngMeshSourceOverride.reset();
   return true;
@@ -848,7 +848,7 @@ bool ZImgPack::setNeuroglancerSkeletonSourceOverride(QString userText, QString* 
     return false;
   }
 
-  const std::lock_guard<std::mutex> lock(m_ngExternalSourcesMutex);
+  const std::scoped_lock lock(m_ngExternalSourcesMutex);
   m_ngSkeletonSourceOverrideUrl = *urlOpt;
   m_ngSkeletonSourceOverride.reset();
   return true;
@@ -872,7 +872,7 @@ bool ZImgPack::setNeuroglancerAnnotationsSourceOverride(QString userText, QStrin
     return false;
   }
 
-  const std::lock_guard<std::mutex> lock(m_ngExternalSourcesMutex);
+  const std::scoped_lock lock(m_ngExternalSourcesMutex);
   m_ngAnnotationsSourceOverrideUrl = *urlOpt;
   m_ngAnnotationsSourceOverride.reset();
   return true;
@@ -880,21 +880,21 @@ bool ZImgPack::setNeuroglancerAnnotationsSourceOverride(QString userText, QStrin
 
 void ZImgPack::clearNeuroglancerMeshSourceOverride()
 {
-  const std::lock_guard<std::mutex> lock(m_ngExternalSourcesMutex);
+  const std::scoped_lock lock(m_ngExternalSourcesMutex);
   m_ngMeshSourceOverrideUrl.clear();
   m_ngMeshSourceOverride.reset();
 }
 
 void ZImgPack::clearNeuroglancerSkeletonSourceOverride()
 {
-  const std::lock_guard<std::mutex> lock(m_ngExternalSourcesMutex);
+  const std::scoped_lock lock(m_ngExternalSourcesMutex);
   m_ngSkeletonSourceOverrideUrl.clear();
   m_ngSkeletonSourceOverride.reset();
 }
 
 void ZImgPack::clearNeuroglancerAnnotationsSourceOverride()
 {
-  const std::lock_guard<std::mutex> lock(m_ngExternalSourcesMutex);
+  const std::scoped_lock lock(m_ngExternalSourcesMutex);
   m_ngAnnotationsSourceOverrideUrl.clear();
   m_ngAnnotationsSourceOverride.reset();
 }
@@ -906,7 +906,7 @@ std::shared_ptr<const ZNeuroglancerPrecomputedMeshSource> ZImgPack::loadNeurogla
 
   QString overrideUrl;
   {
-    const std::lock_guard<std::mutex> lock(m_ngExternalSourcesMutex);
+    const std::scoped_lock lock(m_ngExternalSourcesMutex);
     overrideUrl = m_ngMeshSourceOverrideUrl.trimmed();
     if (!overrideUrl.isEmpty() && m_ngMeshSourceOverride) {
       return m_ngMeshSourceOverride;
@@ -926,7 +926,7 @@ std::shared_ptr<const ZNeuroglancerPrecomputedMeshSource> ZImgPack::loadNeurogla
                                                          m_ngVolume->sharedRemoteContext());
   CHECK(loaded);
 
-  const std::lock_guard<std::mutex> lock(m_ngExternalSourcesMutex);
+  const std::scoped_lock lock(m_ngExternalSourcesMutex);
   if (m_ngMeshSourceOverrideUrl.trimmed() == overrideUrl) {
     m_ngMeshSourceOverride = loaded;
   }
@@ -940,7 +940,7 @@ std::shared_ptr<const ZNeuroglancerPrecomputedSkeletonSource> ZImgPack::loadNeur
 
   QString overrideUrl;
   {
-    const std::lock_guard<std::mutex> lock(m_ngExternalSourcesMutex);
+    const std::scoped_lock lock(m_ngExternalSourcesMutex);
     overrideUrl = m_ngSkeletonSourceOverrideUrl.trimmed();
     if (!overrideUrl.isEmpty() && m_ngSkeletonSourceOverride) {
       return m_ngSkeletonSourceOverride;
@@ -960,7 +960,7 @@ std::shared_ptr<const ZNeuroglancerPrecomputedSkeletonSource> ZImgPack::loadNeur
                                                              m_ngVolume->sharedRemoteContext());
   CHECK(loaded);
 
-  const std::lock_guard<std::mutex> lock(m_ngExternalSourcesMutex);
+  const std::scoped_lock lock(m_ngExternalSourcesMutex);
   if (m_ngSkeletonSourceOverrideUrl.trimmed() == overrideUrl) {
     m_ngSkeletonSourceOverride = loaded;
   }
@@ -974,7 +974,7 @@ std::shared_ptr<const ZNeuroglancerPrecomputedAnnotationsSource> ZImgPack::loadN
 
   QString overrideUrl;
   {
-    const std::lock_guard<std::mutex> lock(m_ngExternalSourcesMutex);
+    const std::scoped_lock lock(m_ngExternalSourcesMutex);
     overrideUrl = m_ngAnnotationsSourceOverrideUrl.trimmed();
     if (!overrideUrl.isEmpty() && m_ngAnnotationsSourceOverride) {
       return m_ngAnnotationsSourceOverride;
@@ -992,7 +992,7 @@ std::shared_ptr<const ZNeuroglancerPrecomputedAnnotationsSource> ZImgPack::loadN
                                                                 m_ngVolume->sharedRemoteContext());
   CHECK(loaded);
 
-  const std::lock_guard<std::mutex> lock(m_ngExternalSourcesMutex);
+  const std::scoped_lock lock(m_ngExternalSourcesMutex);
   if (m_ngAnnotationsSourceOverrideUrl.trimmed() == overrideUrl) {
     m_ngAnnotationsSourceOverride = loaded;
   }
@@ -1054,7 +1054,7 @@ void ZImgPack::save(const QString& fileName, FileFormat format, const ZImgWriteP
   // (post-save) dataset identity. ZImgRegionCache is keyed by this fingerprint, so we do
   // not need to clear the global cache for correctness.
   {
-    const std::lock_guard<std::mutex> lock(m_datasetFingerprintMutex);
+    const std::scoped_lock lock(m_datasetFingerprintMutex);
     m_datasetFingerprintValid.store(false, std::memory_order_release);
     m_datasetFingerprint.fill(0);
   }
@@ -1064,7 +1064,7 @@ void ZImgPack::save(const QString& fileName, FileFormat format, const ZImgWriteP
   CHECK(!infos.empty() && !subBlocks.empty());
   m_imgInfo = infos[0];
   {
-    const std::lock_guard<std::mutex> guard(m_imgMetaDataMutex);
+    const std::scoped_lock guard(m_imgMetaDataMutex);
     m_imgMetaData.clear();
     m_imgMetaDataLoaded.store(false, std::memory_order_release);
     m_imgMetaDataLoadError.clear();
@@ -3656,7 +3656,7 @@ std::array<uint8_t, 32> ZImgPack::datasetFingerprintForCache() const
     return m_datasetFingerprint;
   }
 
-  const std::lock_guard<std::mutex> lock(m_datasetFingerprintMutex);
+  const std::scoped_lock lock(m_datasetFingerprintMutex);
   if (m_datasetFingerprintValid.load(std::memory_order_relaxed)) {
     return m_datasetFingerprint;
   }

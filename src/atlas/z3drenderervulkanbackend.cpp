@@ -638,7 +638,7 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
   if (m_sharedDevice != nullptr) {
     std::unordered_set<uint64_t> evictKeys;
     {
-      std::lock_guard<std::mutex> lock(m_pendingEvictionsMutex);
+      std::scoped_lock lock(m_pendingEvictionsMutex);
       evictKeys.swap(m_pendingEvictStreamKeys);
     }
     if (!evictKeys.empty()) {
@@ -5066,7 +5066,7 @@ void Z3DRendererVulkanBackend::requestEvictStream(uint64_t streamKey)
   if (streamKey == 0) {
     return;
   }
-  std::lock_guard<std::mutex> lock(m_pendingEvictionsMutex);
+  std::scoped_lock lock(m_pendingEvictionsMutex);
   m_pendingEvictStreamKeys.insert(streamKey);
 }
 

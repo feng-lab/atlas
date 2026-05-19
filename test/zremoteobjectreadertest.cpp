@@ -45,7 +45,7 @@ public:
   {
     std::optional<ZHttpGetBytesResult> next;
     {
-      const std::lock_guard<std::mutex> lock(mutex);
+      const std::scoped_lock lock(mutex);
       requests.push_back(Request{.url = std::move(request.url),
                                  .timeout = request.timeout,
                                  .headers = std::move(request.headers),

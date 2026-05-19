@@ -85,7 +85,7 @@ std::unique_ptr<ZParameterKey> ZCameraParameterAnimation::createKey(double secs)
 
 void ZCameraParameterAnimation::updateParaToTime(double secs, ZParameter* para) const
 {
-  std::lock_guard<std::recursive_mutex> lock(m_keysMutex);
+  std::scoped_lock lock(m_keysMutex);
   CHECK(para->type() == m_type);
   CHECK(secs >= 0);
 
@@ -197,7 +197,7 @@ void ZCameraParameterAnimation::write(json::object& json) const
 
 void ZCameraParameterAnimation::buildSpline()
 {
-  std::lock_guard<std::recursive_mutex> lock(m_keysMutex);
+  std::scoped_lock lock(m_keysMutex);
   m_pathSegments.clear();
 
   if (m_keys.size() < 2) {

@@ -97,7 +97,7 @@ uint64_t ZRpcTaskManager::startLoadTask(StartLoadParams params)
 
   auto task = std::make_shared<TaskRecord>();
   {
-    std::lock_guard<std::mutex> lock(m_mu);
+    std::scoped_lock lock(m_mu);
     task->id = m_nextId++;
     task->kind = "load";
     task->state = ZRpcTaskState::Queued;
@@ -121,7 +121,7 @@ uint64_t ZRpcTaskManager::startLoadTask(StartLoadParams params)
                              std::string message,
                              std::string error,
                              std::optional<ZRpcLoadTaskResult> loadResult) {
-        std::lock_guard<std::mutex> lock(task->mu);
+        std::scoped_lock lock(task->mu);
         if (task->deleted) {
           return;
         }
@@ -143,7 +143,7 @@ uint64_t ZRpcTaskManager::startLoadTask(StartLoadParams params)
       };
 
       auto cancelled = [&]() -> bool {
-        std::lock_guard<std::mutex> lock(task->mu);
+        std::scoped_lock lock(task->mu);
         return task->deleted || task->cancelRequested || task->state == ZRpcTaskState::Cancelled;
       };
 
@@ -226,7 +226,7 @@ uint64_t ZRpcTaskManager::startLoadTask(StartLoadParams params)
                                    std::string message,
                                    std::string error,
                                    std::optional<ZRpcLoadTaskResult> loadResult) {
-            std::lock_guard<std::mutex> lock(task->mu);
+            std::scoped_lock lock(task->mu);
             if (task->deleted) {
               return;
             }
@@ -248,7 +248,7 @@ uint64_t ZRpcTaskManager::startLoadTask(StartLoadParams params)
           };
 
           auto cancelledUi = [&]() -> bool {
-            std::lock_guard<std::mutex> lock(task->mu);
+            std::scoped_lock lock(task->mu);
             return task->deleted || task->cancelRequested || task->state == ZRpcTaskState::Cancelled;
           };
 
@@ -355,7 +355,7 @@ std::optional<ZRpcTaskSnapshot> ZRpcTaskManager::taskStatus(uint64_t taskId) con
 {
   std::shared_ptr<TaskRecord> task;
   {
-    std::lock_guard<std::mutex> lock(m_mu);
+    std::scoped_lock lock(m_mu);
     auto it = m_tasks.find(taskId);
     if (it == m_tasks.end()) {
       return std::nullopt;
@@ -363,7 +363,7 @@ std::optional<ZRpcTaskSnapshot> ZRpcTaskManager::taskStatus(uint64_t taskId) con
     task = it->second;
   }
 
-  std::lock_guard<std::mutex> lock(task->mu);
+  std::scoped_lock lock(task->mu);
   ZRpcTaskSnapshot snap;
   snap.id = task->id;
   snap.kind = task->kind;
@@ -382,7 +382,7 @@ std::optional<ZRpcTaskSnapshot> ZRpcTaskManager::waitForCompletion(uint64_t task
 {
   std::shared_ptr<TaskRecord> task;
   {
-    std::lock_guard<std::mutex> lock(m_mu);
+    std::scoped_lock lock(m_mu);
     auto it = m_tasks.find(taskId);
     if (it == m_tasks.end()) {
       return std::nullopt;
@@ -435,7 +435,7 @@ bool ZRpcTaskManager::cancelTask(uint64_t taskId)
 {
   std::shared_ptr<TaskRecord> task;
   {
-    std::lock_guard<std::mutex> lock(m_mu);
+    std::scoped_lock lock(m_mu);
     auto it = m_tasks.find(taskId);
     if (it == m_tasks.end()) {
       return false;
@@ -443,7 +443,7 @@ bool ZRpcTaskManager::cancelTask(uint64_t taskId)
     task = it->second;
   }
 
-  std::lock_guard<std::mutex> lock(task->mu);
+  std::scoped_lock lock(task->mu);
   task->cancelRequested = true;
   if (!isTerminalState(task->state)) {
     task->state = ZRpcTaskState::Cancelled;
@@ -458,7 +458,7 @@ bool ZRpcTaskManager::deleteTask(uint64_t taskId)
 {
   std::shared_ptr<TaskRecord> task;
   {
-    std::lock_guard<std::mutex> lock(m_mu);
+    std::scoped_lock lock(m_mu);
     auto it = m_tasks.find(taskId);
     if (it == m_tasks.end()) {
       return false;
@@ -467,7 +467,7 @@ bool ZRpcTaskManager::deleteTask(uint64_t taskId)
     m_tasks.erase(it);
   }
 
-  std::lock_guard<std::mutex> lock(task->mu);
+  std::scoped_lock lock(task->mu);
   task->deleted = true;
   task->cancelRequested = true;
   if (!isTerminalState(task->state)) {

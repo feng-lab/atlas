@@ -60,7 +60,7 @@ void ZSqliteAsyncWriteQueue::stop()
 {
   std::unique_ptr<folly::CPUThreadPoolExecutor> executor;
   {
-    std::lock_guard<std::mutex> lock(m_mu);
+    std::scoped_lock lock(m_mu);
     if (!m_enabled.exchange(false, std::memory_order_acq_rel)) {
       return;
     }
@@ -72,7 +72,7 @@ void ZSqliteAsyncWriteQueue::stop()
     executor->join();
   }
 
-  std::lock_guard<std::mutex> lock(m_mu);
+  std::scoped_lock lock(m_mu);
   m_cache.reset();
   m_pendingBytes.store(0, std::memory_order_release);
 }
@@ -141,7 +141,7 @@ bool ZSqliteAsyncWriteQueue::scheduleReserved(TaskFn fn, uint64_t bytes)
     return false;
   }
 
-  std::lock_guard<std::mutex> lock(m_mu);
+  std::scoped_lock lock(m_mu);
   if (!m_enabled.load(std::memory_order_acquire) || !m_executor || !m_cache) {
     return false;
   }
@@ -172,7 +172,7 @@ bool ZSqliteAsyncWriteQueue::scheduleReserved(TaskFn fn, uint64_t bytes)
       static std::chrono::steady_clock::time_point lastDropLog{};
       const auto now = std::chrono::steady_clock::now();
       {
-        std::lock_guard<std::mutex> lg(dropMu);
+        std::scoped_lock lg(dropMu);
         if (lastDropLog.time_since_epoch() == std::chrono::steady_clock::duration::zero() ||
             (now - lastDropLog) >= kDropLogMinInterval) {
           lastDropLog = now;

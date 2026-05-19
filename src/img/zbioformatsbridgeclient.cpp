@@ -151,7 +151,7 @@ BioFormatsRuntimeConfig& bioFormatsRuntimeConfig()
 
 BioFormatsRuntimeConfig bioFormatsRuntimeConfigSnapshot()
 {
-  std::lock_guard<std::mutex> lock(bioFormatsRuntimeConfigMutex());
+  std::scoped_lock lock(bioFormatsRuntimeConfigMutex());
   return bioFormatsRuntimeConfig();
 }
 
@@ -459,7 +459,7 @@ public:
 
   [[nodiscard]] std::vector<ZBioFormatsReaderFormat> listFormats()
   {
-    std::lock_guard<std::mutex> lock(m_cacheMutex);
+    std::scoped_lock lock(m_cacheMutex);
     if (!m_cachedFormats.empty()) {
       return m_cachedFormats;
     }
@@ -690,7 +690,7 @@ private:
 
   void ensureProcess()
   {
-    std::lock_guard<std::mutex> lock(m_startMutex);
+    std::scoped_lock lock(m_startMutex);
     if (m_stub && m_process.state() == QProcess::Running) {
       return;
     }
@@ -932,7 +932,7 @@ private:
   [[nodiscard]] std::shared_ptr<proto::BioFormatsBridge::Stub> stubForRequest()
   {
     ensureProcess();
-    std::lock_guard<std::mutex> lock(m_startMutex);
+    std::scoped_lock lock(m_startMutex);
     CHECK(m_stub != nullptr);
     return m_stub;
   }
@@ -959,7 +959,7 @@ private:
 
   void resetGrpcProcessAfterFailure()
   {
-    std::lock_guard<std::mutex> lock(m_startMutex);
+    std::scoped_lock lock(m_startMutex);
     resetGrpcProcessLocked();
   }
 
@@ -1061,7 +1061,7 @@ std::unique_ptr<ZBioFormatsBridgeClient>& bioFormatsBridgeClientSingleton()
 
 void configureRuntimePath(QString BioFormatsRuntimeConfig::* field, const QString& resolvedPath)
 {
-  std::lock_guard<std::mutex> singletonLock(bioFormatsBridgeClientSingletonMutex());
+  std::scoped_lock singletonLock(bioFormatsBridgeClientSingletonMutex());
   if (bioFormatsBridgeClientSingleton() != nullptr) {
     const BioFormatsRuntimeConfig config = bioFormatsRuntimeConfigSnapshot();
     if (config.*field == resolvedPath) {
@@ -1070,7 +1070,7 @@ void configureRuntimePath(QString BioFormatsRuntimeConfig::* field, const QStrin
     throw ZException("Bio-Formats runtime cannot be reconfigured after the bridge has been started");
   }
 
-  std::lock_guard<std::mutex> configLock(bioFormatsRuntimeConfigMutex());
+  std::scoped_lock configLock(bioFormatsRuntimeConfigMutex());
   BioFormatsRuntimeConfig& config = bioFormatsRuntimeConfig();
   config.*field = resolvedPath;
 }
@@ -1079,7 +1079,7 @@ void configureRuntimePath(QString BioFormatsRuntimeConfig::* field, const QStrin
 
 ZBioFormatsBridgeClient& ZBioFormatsBridgeClient::instance()
 {
-  std::lock_guard<std::mutex> lock(bioFormatsBridgeClientSingletonMutex());
+  std::scoped_lock lock(bioFormatsBridgeClientSingletonMutex());
   std::unique_ptr<ZBioFormatsBridgeClient>& client = bioFormatsBridgeClientSingleton();
   if (!client) {
     if (!hasRuntimeSupport()) {
@@ -1093,7 +1093,7 @@ ZBioFormatsBridgeClient& ZBioFormatsBridgeClient::instance()
 
 void ZBioFormatsBridgeClient::resetInstanceForTesting()
 {
-  std::lock_guard<std::mutex> lock(bioFormatsBridgeClientSingletonMutex());
+  std::scoped_lock lock(bioFormatsBridgeClientSingletonMutex());
   bioFormatsBridgeClientSingleton().reset();
 }
 

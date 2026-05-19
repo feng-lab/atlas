@@ -391,7 +391,7 @@ void Z3DGlobalParameters::setDevicePixelRatio(float f)
 
 folly::CancellationToken Z3DGlobalParameters::currentMeshLodViewCancellationToken() const
 {
-  const std::lock_guard<std::mutex> lock(m_meshLodViewCancellationMutex);
+  const std::scoped_lock lock(m_meshLodViewCancellationMutex);
   CHECK(m_meshLodViewCancellationSource);
   return m_meshLodViewCancellationSource->getToken();
 }
@@ -400,7 +400,7 @@ void Z3DGlobalParameters::requestMeshLodViewCancellation()
 {
   std::shared_ptr<folly::CancellationSource> source;
   {
-    const std::lock_guard<std::mutex> lock(m_meshLodViewCancellationMutex);
+    const std::scoped_lock lock(m_meshLodViewCancellationMutex);
     CHECK(m_meshLodViewCancellationSource);
     source = m_meshLodViewCancellationSource;
     m_meshLodViewCancellationSource = std::make_shared<folly::CancellationSource>();

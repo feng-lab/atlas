@@ -119,13 +119,13 @@ ZSqliteLRUCache::ZSqliteLRUCache(QString dbPath, uint64_t maxBytes, NowNsFn nowN
     m_nowNsFn = &defaultNowNs;
   }
 
-  std::lock_guard<std::mutex> lock(m_mu);
+  std::scoped_lock lock(m_mu);
   (void)initDbLocked();
 }
 
 ZSqliteLRUCache::~ZSqliteLRUCache()
 {
-  std::lock_guard<std::mutex> lock(m_mu);
+  std::scoped_lock lock(m_mu);
   closeDbLocked();
 }
 
@@ -163,25 +163,25 @@ void ZSqliteLRUCache::recordSqlSuccessLocked()
 
 bool ZSqliteLRUCache::isOpen() const
 {
-  std::lock_guard<std::mutex> lock(m_mu);
+  std::scoped_lock lock(m_mu);
   return m_db != nullptr;
 }
 
 QString ZSqliteLRUCache::dbPath() const
 {
-  std::lock_guard<std::mutex> lock(m_mu);
+  std::scoped_lock lock(m_mu);
   return m_dbPath;
 }
 
 uint64_t ZSqliteLRUCache::maxBytes() const
 {
-  std::lock_guard<std::mutex> lock(m_mu);
+  std::scoped_lock lock(m_mu);
   return m_maxBytes;
 }
 
 void ZSqliteLRUCache::setMaxBytes(uint64_t maxBytes)
 {
-  std::lock_guard<std::mutex> lock(m_mu);
+  std::scoped_lock lock(m_mu);
   m_maxBytes = maxBytes;
   if (m_db) {
     maybePruneLocked(nowNsLocked());
@@ -190,7 +190,7 @@ void ZSqliteLRUCache::setMaxBytes(uint64_t maxBytes)
 
 std::optional<ZSqliteLRUCache::Blob> ZSqliteLRUCache::tryGet(std::span<const std::uint8_t> keyHash)
 {
-  std::lock_guard<std::mutex> lock(m_mu);
+  std::scoped_lock lock(m_mu);
   CHECK(!m_readOnly);
   if (m_disabled || !m_db || !m_stmtSelectValue || !m_stmtTouch) {
     return std::nullopt;
@@ -269,7 +269,7 @@ std::optional<ZSqliteLRUCache::Blob> ZSqliteLRUCache::tryGet(std::span<const std
 
 std::optional<ZSqliteLRUCache::GetNoTouchResult> ZSqliteLRUCache::tryGetNoTouch(std::span<const std::uint8_t> keyHash)
 {
-  std::lock_guard<std::mutex> lock(m_mu);
+  std::scoped_lock lock(m_mu);
   if (m_disabled || !m_db || !m_stmtSelectValue) {
     return std::nullopt;
   }
@@ -337,7 +337,7 @@ std::optional<ZSqliteLRUCache::GetNoTouchResult> ZSqliteLRUCache::tryGetNoTouch(
 
 void ZSqliteLRUCache::put(std::span<const std::uint8_t> keyHash, std::span<const std::uint8_t> value)
 {
-  std::lock_guard<std::mutex> lock(m_mu);
+  std::scoped_lock lock(m_mu);
   CHECK(!m_readOnly);
   if (m_disabled || !m_db || !m_stmtUpsert) {
     return;
@@ -392,7 +392,7 @@ void ZSqliteLRUCache::put(std::span<const std::uint8_t> keyHash, std::span<const
 
 void ZSqliteLRUCache::touch(std::span<const std::uint8_t> keyHash, int64_t nowNs)
 {
-  std::lock_guard<std::mutex> lock(m_mu);
+  std::scoped_lock lock(m_mu);
   CHECK(!m_readOnly);
   if (m_disabled || !m_db || !m_stmtTouch) {
     return;
@@ -413,7 +413,7 @@ void ZSqliteLRUCache::touch(std::span<const std::uint8_t> keyHash, int64_t nowNs
 
 void ZSqliteLRUCache::erase(std::span<const std::uint8_t> keyHash)
 {
-  std::lock_guard<std::mutex> lock(m_mu);
+  std::scoped_lock lock(m_mu);
   CHECK(!m_readOnly);
   if (m_disabled || !m_db || !m_stmtDelete) {
     return;

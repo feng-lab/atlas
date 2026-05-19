@@ -200,13 +200,13 @@ class WarningLogCapture final : public absl::LogSink
 public:
   void clear()
   {
-    std::lock_guard<std::mutex> lock(m_mutex);
+    std::scoped_lock lock(m_mutex);
     m_messages.clear();
   }
 
   [[nodiscard]] std::vector<std::string> messages() const
   {
-    std::lock_guard<std::mutex> lock(m_mutex);
+    std::scoped_lock lock(m_mutex);
     return m_messages;
   }
 
@@ -215,7 +215,7 @@ public:
     if (entry.log_severity() < absl::LogSeverity::kWarning) {
       return;
     }
-    std::lock_guard<std::mutex> lock(m_mutex);
+    std::scoped_lock lock(m_mutex);
     m_messages.push_back(std::string(entry.text_message_with_prefix()));
   }
 

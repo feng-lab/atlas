@@ -127,7 +127,7 @@ auto invokeOnObjectThreadWait(QObject* obj,
   const QMetaObject::Connection destroyedConn = QObject::connect(obj, &QObject::destroyed, [state, what]() {
     state->cancelled.store(true);
     {
-      std::lock_guard<std::mutex> lock(state->mu);
+      std::scoped_lock lock(state->mu);
       state->done = true;
       state->error = std::string(what) + ": target destroyed";
     }
@@ -138,7 +138,7 @@ auto invokeOnObjectThreadWait(QObject* obj,
     QObject::connect(targetThread, &QThread::finished, [state, what]() {
       state->cancelled.store(true);
       {
-        std::lock_guard<std::mutex> lock(state->mu);
+        std::scoped_lock lock(state->mu);
         state->done = true;
         state->error = std::string(what) + ": target thread finished";
       }
@@ -154,14 +154,14 @@ auto invokeOnObjectThreadWait(QObject* obj,
       if constexpr (std::is_void_v<R>) {
         fn();
         {
-          std::lock_guard<std::mutex> lock(state->mu);
+          std::scoped_lock lock(state->mu);
           state->done = true;
         }
         state->cv.notify_all();
       } else {
         R v = fn();
         {
-          std::lock_guard<std::mutex> lock(state->mu);
+          std::scoped_lock lock(state->mu);
           state->value = std::move(v);
           state->done = true;
         }
@@ -201,7 +201,7 @@ auto invokeOnObjectThreadWait(QObject* obj,
   QObject::disconnect(threadFinishedConn);
 
   {
-    std::lock_guard<std::mutex> lock(state->mu);
+    std::scoped_lock lock(state->mu);
     if (!state->done) {
       ZQObjectThreadInvokeResult<R> out;
       out.ok = false;

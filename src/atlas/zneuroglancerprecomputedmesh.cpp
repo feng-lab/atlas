@@ -792,7 +792,7 @@ ZNeuroglancerPrecomputedMeshSource::openAsync(const QUrl& meshDirUrl,
     meshSourceCacheKey(normalizedMeshDirUrl, baseResolutionNm, baseVoxelOffset, remoteContext->objectStore());
   std::shared_ptr<const SharedMeshInfo> sharedMeshInfo;
   {
-    std::lock_guard<std::mutex> lock(openedMeshSourcesMutex());
+    std::scoped_lock lock(openedMeshSourcesMutex());
     if (auto it = sharedMeshInfoCache.find(cacheKey); it != sharedMeshInfoCache.end()) {
       if (auto existing = it->second.lock()) {
         sharedMeshInfo = std::move(existing);
@@ -872,7 +872,7 @@ ZNeuroglancerPrecomputedMeshSource::openAsync(const QUrl& meshDirUrl,
     maybeCancel(cancellationToken);
 
     {
-      std::lock_guard<std::mutex> lock(openedMeshSourcesMutex());
+      std::scoped_lock lock(openedMeshSourcesMutex());
       if (auto it = sharedMeshInfoCache.find(cacheKey); it != sharedMeshInfoCache.end()) {
         if (auto existing = it->second.lock()) {
           sharedMeshInfo = std::move(existing);
@@ -1789,7 +1789,7 @@ ZNeuroglancerPrecomputedMeshSource::loadCachedManifestAsync(uint64_t segmentId) 
   maybeCancel(cancellationToken);
 
   {
-    std::lock_guard<std::mutex> lock(m_manifestCacheMutex);
+    std::scoped_lock lock(m_manifestCacheMutex);
     if (auto it = m_manifestCache.find(segmentId); it != m_manifestCache.end()) {
       if (auto cached = it->second.lock()) {
         co_return cached;
@@ -1841,7 +1841,7 @@ ZNeuroglancerPrecomputedMeshSource::loadCachedManifestAsync(uint64_t segmentId) 
   }
 
   {
-    std::lock_guard<std::mutex> lock(m_manifestCacheMutex);
+    std::scoped_lock lock(m_manifestCacheMutex);
     if (auto it = m_manifestCache.find(segmentId); it != m_manifestCache.end()) {
       if (auto existing = it->second.lock()) {
         co_return existing;
@@ -1867,7 +1867,7 @@ ZNeuroglancerPrecomputedMeshSource::loadMultiLodChunkMeshAsync(uint64_t segmentI
 
   const ChunkCacheKey cacheKey{.segmentId = segmentId, .row = row, .vertexSpace = vertexSpace};
   {
-    std::lock_guard<std::mutex> lock(m_chunkCacheMutex);
+    std::scoped_lock lock(m_chunkCacheMutex);
     if (auto it = m_chunkCache.find(cacheKey); it != m_chunkCache.end()) {
       if (auto cached = it->second.lock()) {
         co_return cached;
@@ -1894,7 +1894,7 @@ ZNeuroglancerPrecomputedMeshSource::loadMultiLodChunkMeshAsync(uint64_t segmentI
   }
 
   if (manifest.octreeNodes[row].empty() || manifest.offsets[row + 1U] <= manifest.offsets[row]) {
-    std::lock_guard<std::mutex> lock(m_chunkCacheMutex);
+    std::scoped_lock lock(m_chunkCacheMutex);
     m_chunkCache[cacheKey] = chunkMesh;
     co_return chunkMesh;
   }
@@ -1950,7 +1950,7 @@ ZNeuroglancerPrecomputedMeshSource::loadMultiLodChunkMeshAsync(uint64_t segmentI
   maybeCancel(cancellationToken);
 
   {
-    std::lock_guard<std::mutex> lock(m_chunkCacheMutex);
+    std::scoped_lock lock(m_chunkCacheMutex);
     if (auto it = m_chunkCache.find(cacheKey); it != m_chunkCache.end()) {
       if (auto existing = it->second.lock()) {
         co_return existing;
