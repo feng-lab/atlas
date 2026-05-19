@@ -1225,17 +1225,21 @@ Additional Architecture Notes
 - Debugging GL state
   - Enable `--atlas_debug_opengl` for per-call error checks (costly); `--atlas_log_glbinding_context_switch` to audit context switches.
   - When diagnosing rendering differences across devices, log `Z3DGpuInfo::instance().logGpuInfo()` output for driver/features.
-  - GPU caps source: when the Vulkan backend is active, `Z3DGpuInfo` populates generic limits (max 2D/3D texture size, array
-    layers, anisotropy, approximate VRAM) from the selected Vulkan physical device. Paged-image cache sizing additionally
-    uses the effective Vulkan residency budget when it is smaller than physical VRAM. OpenGL-specific strings and flags in
-    that log are only meaningful under the OpenGL backend.
+  - GPU caps source: `Z3DGpuInfo` reports GPU memory as a planning capacity, not a live free/budget value. OpenGL first
+    accepts true static-capacity extensions such as NVIDIA dedicated vidmem, then falls back to `ZGpuMemoryCapacityInfo`
+    platform probes (DXGI dedicated memory on Windows, Metal `recommendedMaxWorkingSetSize` on macOS, DRM
+    `mem_info_vram_total` on Linux; Linux ranks real render-capable PCI DRM cards ahead of obvious virtual/simple
+    drivers, then selects the largest capacity in the best-ranked group). When the Vulkan backend is active, generic
+    limits (max 2D/3D texture size, array layers, anisotropy, GPU memory capacity) come from the selected Vulkan
+    physical device. Paged-image cache sizing additionally uses the effective Vulkan residency budget when it is smaller
+    than physical VRAM. OpenGL-specific strings and flags in that log are only meaningful under the OpenGL backend.
   - For Vulkan-specific details (device name, driver, limits, features, and extensions), call `ZVulkanContext::logGpuInfo()`.
     This logs a concise summary at INFO and full feature/extension detail at `--v=1`.
 
 Vulkan device selection
 
-- On initialization, all physical devices are enumerated and logged. Devices are sorted by preference: larger dedicated VRAM
-  first, then discrete > integrated > virtual > CPU, then higher API version. The first suitable device (Vulkan 1.3,
+- On initialization, all physical devices are enumerated and logged. Devices are sorted by preference: discrete > integrated
+  > virtual > CPU, then larger device-local memory capacity, then higher API version. The first suitable device (Vulkan 1.3,
   required extensions, required queue families) is selected and used to create the logical device and queues.
 - `ZVulkanContext::physicalDevice()` returns the currently selected device. `deviceCount()` and `physicalDevice(index)` can be
   used for explicit per-device introspection. The selected index is exposed via `selectedDeviceIndex()`.

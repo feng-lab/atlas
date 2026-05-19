@@ -140,7 +140,7 @@ double cappedAxisScale(size_t dim, uint32_t maxDim)
 
 size_t pagedImageCacheSizingMemoryMB()
 {
-  uint64_t memoryMB = Z3DGpuInfo::instance().dedicatedVideoMemoryMB();
+  uint64_t memoryMB = Z3DGpuInfo::instance().gpuMemoryCapacityMB();
   const uint64_t residencyBudgetBytes = absl::GetFlag(FLAGS_atlas_vk_residency_budget_bytes);
   if (residencyBudgetBytes > 0u) {
     constexpr uint64_t bytesPerMiB = 1024ull * 1024ull;

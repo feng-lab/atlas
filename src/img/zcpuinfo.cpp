@@ -856,7 +856,7 @@ void ZCpuInfo::detectCoreAndThreadNumber()
 #else
   struct sysinfo info;
   if (sysinfo(&info) == 0) {
-    nPhysicalRAM = info.totalram;
+    nPhysicalRAM = static_cast<uint64_t>(info.totalram) * static_cast<uint64_t>(info.mem_unit);
   }
 #endif
   nStdHardwareConcurrency = std::thread::hardware_concurrency();

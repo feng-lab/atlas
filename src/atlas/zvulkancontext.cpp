@@ -1,5 +1,6 @@
 #include "zvulkancontext.h"
 #include "zvulkandevice.h"
+#include "zvulkanmemoryutils.h"
 #include "zvulkanuniforms.h"
 #include "zexception.h"
 #include "zlog.h"
@@ -439,13 +440,7 @@ void ZVulkanContext::logGpuInfo() const
   for (size_t i = 0; i < m_physicalDevices.size(); ++i) {
     const auto& pd = m_physicalDevices[i];
     auto props = pd.getProperties();
-    auto memProps = pd.getMemoryProperties();
-    uint64_t dedicatedMemoryBytes = 0;
-    for (uint32_t h = 0; h < memProps.memoryHeapCount; ++h) {
-      if (memProps.memoryHeaps[h].flags & vk::MemoryHeapFlagBits::eDeviceLocal) {
-        dedicatedMemoryBytes += memProps.memoryHeaps[h].size;
-      }
-    }
+    const uint64_t deviceLocalMemoryBytes = vulkanDeviceLocalMemoryBytes(pd.getMemoryProperties());
     fmt::format_to(std::back_inserter(summary),
                    "[{}] {}{}\n",
                    i,
@@ -463,8 +458,8 @@ void ZVulkanContext::logGpuInfo() const
     fmt::format_to(std::back_inserter(summary), "     Device ID:                0x{:04x}\n", props.deviceID);
     fmt::format_to(std::back_inserter(summary), "     Device Type:              {}\n", vk::to_string(props.deviceType));
     fmt::format_to(std::back_inserter(summary),
-                   "     Dedicated GPU Memory:     {} MB\n",
-                   dedicatedMemoryBytes / (1024 * 1024));
+                   "     Device-Local Memory:      {} MB\n",
+                   deviceLocalMemoryBytes / (1024 * 1024));
 
     // Limits/features summary for every device
     auto features2 = pd.getFeatures2<vk::PhysicalDeviceFeatures2,
@@ -714,7 +709,7 @@ void ZVulkanContext::pickPhysicalDevice()
     vk::raii::PhysicalDevice device{nullptr};
     QueueFamilyIndices queues{};
     vk::PhysicalDeviceProperties props{};
-    uint64_t dedicatedBytes = 0;
+    uint64_t deviceLocalMemoryBytes = 0;
     bool suitable = false;
   };
 
@@ -726,12 +721,7 @@ void ZVulkanContext::pickPhysicalDevice()
     DeviceInfo info;
     info.device = std::move(pd);
     info.props = info.device.getProperties();
-    auto mem = info.device.getMemoryProperties();
-    for (uint32_t i = 0; i < mem.memoryHeapCount; ++i) {
-      if (mem.memoryHeaps[i].flags & vk::MemoryHeapFlagBits::eDeviceLocal) {
-        info.dedicatedBytes += mem.memoryHeaps[i].size;
-      }
-    }
+    info.deviceLocalMemoryBytes = vulkanDeviceLocalMemoryBytes(info.device.getMemoryProperties());
 
     bool apiOk = (info.props.apiVersion >= VK_MAKE_API_VERSION(0, 1, 3, 0));
     bool extOk = checkDeviceExtensionSupport(info.device);
@@ -742,15 +732,15 @@ void ZVulkanContext::pickPhysicalDevice()
     infos.emplace_back(std::move(info));
   }
 
-  // Sort by power: dedicated VRAM desc, then device type, then API version desc
+  // Sort by power: device type, then device-local memory capacity desc, then API version desc
   std::sort(infos.begin(), infos.end(), [](const DeviceInfo& a, const DeviceInfo& b) {
     const int ra = deviceTypeRank(a.props.deviceType);
     const int rb = deviceTypeRank(b.props.deviceType);
     if (ra != rb) {
       return ra > rb; // Discrete > Integrated > Virtual > CPU
     }
-    if (a.dedicatedBytes != b.dedicatedBytes) {
-      return a.dedicatedBytes > b.dedicatedBytes; // then VRAM desc
+    if (a.deviceLocalMemoryBytes != b.deviceLocalMemoryBytes) {
+      return a.deviceLocalMemoryBytes > b.deviceLocalMemoryBytes; // then device-local memory capacity desc
     }
     return a.props.apiVersion > b.props.apiVersion; // then newer API
   });
@@ -806,7 +796,7 @@ void ZVulkanContext::pickPhysicalDevice()
     LOG(INFO) << fmt::format("      Vendor ID:            0x{:04x}", p.vendorID);
     LOG(INFO) << fmt::format("      Device ID:            0x{:04x}", p.deviceID);
     LOG(INFO) << fmt::format("      Device Type:          {}", vk::to_string(p.deviceType));
-    LOG(INFO) << fmt::format("      Dedicated GPU Memory: {} MB", infos[i].dedicatedBytes / (1024 * 1024));
+    LOG(INFO) << fmt::format("      Device-Local Memory:  {} MB", infos[i].deviceLocalMemoryBytes / (1024 * 1024));
     LOG(INFO) << "-------------------------";
   }
 

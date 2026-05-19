@@ -1,6 +1,16 @@
 cmake_minimum_required(VERSION 3.17.5)
 project(Atlas)
 
+if (APPLE)
+  enable_language(OBJCXX)
+  if (DEFINED CMAKE_CXX_STANDARD)
+    set(CMAKE_OBJCXX_STANDARD ${CMAKE_CXX_STANDARD})
+  endif ()
+  if (DEFINED CMAKE_CXX_STANDARD_REQUIRED)
+    set(CMAKE_OBJCXX_STANDARD_REQUIRED ${CMAKE_CXX_STANDARD_REQUIRED})
+  endif ()
+endif ()
+
 # Version stamping: the top-level build generates `GIT_VERSION` and the codebase
 # compiles it into `src/version/version.h`. For OS metadata (Info.plist / Windows
 # VERSIONINFO) we additionally derive:
@@ -490,25 +500,18 @@ set(CSVPARSER_SOURCES
 )
 source_group(csv-parser FILES ${CSVPARSER_SOURCES})
 
-# video memory sources
-set(SYSDIR ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/sys)
+# GPU memory capacity sources
+set(ATLAS_GPU_SYSTEM_INFO_SOURCES
+    zgpusysteminfo.h)
 if (WIN32)
-  set(SYS_SOURCES
-      ${SYSDIR}/VideoMemoryWin.cpp
-      ${SYSDIR}/VidMemViaD3D9.cpp
-      ${SYSDIR}/VidMemViaDDraw.cpp
-      ${SYSDIR}/VidMemViaDxDiag.cpp
-  )
+  list(APPEND ATLAS_GPU_SYSTEM_INFO_SOURCES zgpusysteminfo_win.cpp)
 elseif (APPLE)
-  set(SYS_SOURCES
-      ${SYSDIR}/VideoMemoryMac.cpp
-  )
+  list(APPEND ATLAS_GPU_SYSTEM_INFO_SOURCES zgpusysteminfo_mac.mm)
+  set_source_files_properties(zgpusysteminfo_mac.mm PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
 else (WIN32)
-  set(SYS_SOURCES
-      ${SYSDIR}/VideoMemoryLinux.cpp
-  )
+  list(APPEND ATLAS_GPU_SYSTEM_INFO_SOURCES zgpusysteminfo_linux.cpp)
 endif (WIN32)
-source_group(sys FILES ${SYS_SOURCES})
+source_group(gpusysteminfo FILES ${ATLAS_GPU_SYSTEM_INFO_SOURCES})
 
 # main srcs
 
@@ -709,6 +712,7 @@ set(SOURCES
     z3dtexture.h z3dtexture.cpp
     z3dtransformparameter.h z3dtransformparameter.cpp
     z3dgpuinfo.h z3dgpuinfo.cpp
+    ${ATLAS_GPU_SYSTEM_INFO_SOURCES}
     zstringparameter.h zstringparameter.cpp
     z3dsdfont.h z3dsdfont.cpp
     zspanslider.h zspanslider.cpp
@@ -829,6 +833,7 @@ set(SOURCES
     zrundumpanimation3dschema.cpp zrundumpanimation3dschema.h
     zprocess.cpp zprocess.h
     zvulkan.h
+    zvulkanmemoryutils.h
     zvulkancontext.h
     zvulkancontext.cpp
     zvulkandevice.h
@@ -985,7 +990,10 @@ if (ATLAS_USE_MSVC_LIBRARY_SPLIT)
     gRPC::grpc++ protobuf::libprotobuf)
   if (WIN32)
     # Required for importing the Windows system certificate store for HTTPS.
-    target_link_libraries(atlas_core_deps INTERFACE crypt32)
+    target_link_libraries(atlas_core_deps INTERFACE crypt32 dxgi)
+  endif ()
+  if (APPLE)
+    target_link_libraries(atlas_core_deps INTERFACE "-framework Foundation" "-framework Metal")
   endif ()
   if (UNIX AND NOT APPLE)
     target_link_libraries(atlas_core_deps INTERFACE OpenGL::OpenGL OpenGL::EGL)
@@ -1003,7 +1011,6 @@ if (ATLAS_USE_MSVC_LIBRARY_SPLIT)
 
   # Support code (generated RPC stubs + small bundled sources).
   add_library(atlas_core_support STATIC
-              ${SYS_SOURCES}
               ${CSVPARSER_SOURCES}
               ${LIBQXT_HEADERS} ${LIBQXT_SOURCES}
               ${PROTO_SRCS} ${GRPC_SRCS})
@@ -1064,7 +1071,6 @@ else ()
   # Toolchains that do not need the classic MSVC archive-size workaround, including
   # clang-cl, keep the original single-library Atlas layout.
   add_library(atlas_lib STATIC
-              ${SYS_SOURCES}
               ${CSVPARSER_SOURCES}
               ${LIBQXT_HEADERS} ${LIBQXT_SOURCES}
               ${ATLAS_SOURCES_NO_MAIN}
@@ -1105,7 +1111,10 @@ else ()
     gRPC::grpc++ protobuf::libprotobuf)
   if (WIN32)
     # Required for importing the Windows system certificate store for HTTPS.
-    target_link_libraries(atlas_lib PUBLIC crypt32)
+    target_link_libraries(atlas_lib PUBLIC crypt32 dxgi)
+  endif ()
+  if (APPLE)
+    target_link_libraries(atlas_lib PUBLIC "-framework Foundation" "-framework Metal")
   endif ()
   if (UNIX AND NOT APPLE)
     target_link_libraries(atlas_lib PUBLIC OpenGL::OpenGL OpenGL::EGL)

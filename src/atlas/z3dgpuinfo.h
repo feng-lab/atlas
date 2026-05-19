@@ -41,7 +41,9 @@ public:
     int maxArrayTextureLayers = 256;         // array layers
     int maxColorAttachments = 4;             // FBO color attachments
     float maxTextureAnisotropy = 1.f;        // sampler anisotropy
-    uint64_t dedicatedVideoMemoryMB = 256;   // VRAM size in MB (approx)
+    uint64_t gpuMemoryCapacityMB = 256; // GPU-side planning capacity in MB
+    bool gpuMemoryHasUnifiedMemory = false; // true only when the source positively reports unified memory
+    QString gpuMemoryCapacitySource; // source used to populate gpuMemoryCapacityMB
 
     // The remaining fields are primarily consumed by GL paths; provide
     // conservative defaults when sourcing from non-GL backends.
@@ -161,21 +163,31 @@ public:
     return m_maxArrayTextureLayers;
   }
 
-  [[nodiscard]] size_t dedicatedVideoMemoryMB() const
+  [[nodiscard]] size_t gpuMemoryCapacityMB() const
   {
-    return m_dedicatedVideoMemoryMB;
+    return m_gpuMemoryCapacityMB;
+  }
+
+  [[nodiscard]] bool gpuMemoryHasUnifiedMemory() const
+  {
+    return m_gpuMemoryHasUnifiedMemory;
+  }
+
+  [[nodiscard]] QString gpuMemoryCapacitySource() const
+  {
+    return m_gpuMemoryCapacitySource;
   }
 
   // directX 10 resource limit
   // 128 MB
   // directX 11 resource limit
-  // min(max(128, 0.25f * (amount of dedicated VRAM)), 2048) MB
+  // min(max(128, 0.25f * GPU memory planning capacity), 2048) MB
   // D3D11_REQ_RESOURCE_SIZE_IN_MEGABYTES_EXPRESSION_A_TERM (128)
   // D3D11_REQ_RESOURCE_SIZE_IN_MEGABYTES_EXPRESSION_B_TERM (0.25f)
   // D3D11_REQ_RESOURCE_SIZE_IN_MEGABYTES_EXPRESSION_C_TERM (2048)
   [[nodiscard]] uint64_t textureSizeLimit() const
   {
-    return std::min(std::max<uint64_t>(128, 0.25 * dedicatedVideoMemoryMB()), 2048_u64) * 1024 * 1024 / 2;
+    return std::min(std::max<uint64_t>(128, 0.25 * gpuMemoryCapacityMB()), 2048_u64) * 1024 * 1024 / 2;
   }
 
   // get the required scales to fit uint8_t data of size (width, height, depth) to texture limit
@@ -271,7 +283,7 @@ protected:
 
   bool parseVersionString(const QString& versionString, int& major, int& minor, int& release);
 
-  void detectDedicatedVideoMemory();
+  void detectGpuMemoryCapacity();
 
 private:
   bool m_isSupported = false; // whether current graphic card is supported
@@ -328,7 +340,9 @@ private:
   float m_minAliasedLineWidth = 1.0f;
   float m_maxAliasedLineWidth = 1.0f;
 
-  uint64_t m_dedicatedVideoMemoryMB = 256;
+  uint64_t m_gpuMemoryCapacityMB = 256;
+  bool m_gpuMemoryHasUnifiedMemory = false;
+  QString m_gpuMemoryCapacitySource = QStringLiteral("default fallback");
 
   bool m_contextCoreProfileBit = false;
   bool m_contextCompatibilityProfileBit = false;

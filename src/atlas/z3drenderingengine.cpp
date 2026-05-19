@@ -24,6 +24,7 @@
 #include "z3dscratchresourcepool.h"
 #include "zvulkancontext.h"
 #include "zvulkandevice.h"
+#include "zvulkanmemoryutils.h"
 #include "zvulkan.h"
 #include "z3dshadermanager.h"
 #include "z3dgpuinfo.h"
@@ -253,6 +254,41 @@ bool shouldFlipYWhenSaving(RenderBackend backend)
     return !absl::GetFlag(FLAGS_atlas_vk_copy_yflip_in_shader);
   }
   return false;
+}
+
+Z3DGpuInfo::GenericCaps genericCapsFromVulkanPhysicalDevice(vk::raii::PhysicalDevice& physicalDevice)
+{
+  const auto props = physicalDevice.getProperties();
+  const auto features = physicalDevice.getFeatures();
+  const auto memoryProperties = physicalDevice.getMemoryProperties();
+
+  Z3DGpuInfo::GenericCaps caps;
+  caps.maxTextureSize = props.limits.maxImageDimension2D;
+  caps.max3DTextureSize = props.limits.maxImageDimension3D;
+  caps.maxArrayTextureLayers = static_cast<int>(props.limits.maxImageArrayLayers);
+  caps.maxColorAttachments = static_cast<int>(props.limits.maxColorAttachments);
+  caps.maxTextureAnisotropy = (features.samplerAnisotropy ? props.limits.maxSamplerAnisotropy : 1.0f);
+  caps.gpuMemoryCapacityMB = vulkanDeviceLocalMemoryBytes(memoryProperties) / (1024ull * 1024ull);
+  caps.gpuMemoryCapacitySource = QStringLiteral("Vulkan device-local memory heaps");
+  caps.maxViewportDim =
+    static_cast<int>(std::min(props.limits.maxViewportDimensions[0], props.limits.maxViewportDimensions[1]));
+
+  // These caps are OpenGL-specific call sites that still need conservative
+  // values while the renderer is running on Vulkan.
+  caps.maxCombinedTextureImageUnits = 48;
+  caps.maxTextureImageUnits = 16;
+  caps.maxVertexTextureImageUnits = 16;
+  caps.maxGeometryTextureImageUnits = 16;
+  caps.maxTextureBufferSize = static_cast<int>(props.limits.maxTexelBufferElements);
+  caps.maxDrawBuffer = static_cast<int>(props.limits.maxColorAttachments);
+
+  return caps;
+}
+
+void updateGenericGpuInfoFromVulkanPhysicalDevice(vk::raii::PhysicalDevice& physicalDevice)
+{
+  Z3DGpuInfo::instance().overrideGenericCaps(genericCapsFromVulkanPhysicalDevice(physicalDevice));
+  VLOG(1) << "Updated Z3DGpuInfo caps from Vulkan device";
 }
 
 folly::coro::Task<void> composeAnimationFrameAsync(const QString& tempDirPath,
@@ -1171,37 +1207,7 @@ void Z3DRenderingEngine::init()
       m_vkContext = std::make_unique<ZVulkanContext>();
       m_vkDevice = m_vkContext->createDevice();
 
-      auto& phys = m_vkContext->physicalDevice();
-      const auto props = phys.getProperties();
-      const auto features = phys.getFeatures();
-      const auto memProps = phys.getMemoryProperties();
-
-      uint64_t vramBytes = 0;
-      for (uint32_t i = 0; i < memProps.memoryHeapCount; ++i) {
-        if (memProps.memoryHeaps[i].flags & vk::MemoryHeapFlagBits::eDeviceLocal) {
-          vramBytes += memProps.memoryHeaps[i].size;
-        }
-      }
-
-      Z3DGpuInfo::GenericCaps caps;
-      caps.maxTextureSize = props.limits.maxImageDimension2D;
-      caps.max3DTextureSize = props.limits.maxImageDimension3D;
-      caps.maxArrayTextureLayers = static_cast<int>(props.limits.maxImageArrayLayers);
-      caps.maxColorAttachments = static_cast<int>(props.limits.maxColorAttachments);
-      caps.maxTextureAnisotropy = (features.samplerAnisotropy ? props.limits.maxSamplerAnisotropy : 1.0f);
-      caps.dedicatedVideoMemoryMB = static_cast<uint64_t>(vramBytes / (1024ull * 1024ull));
-      caps.maxViewportDim =
-        static_cast<int>(std::min(props.limits.maxViewportDimensions[0], props.limits.maxViewportDimensions[1]));
-      // Reasonable defaults for GL-only caps when running under Vulkan
-      caps.maxCombinedTextureImageUnits = 48;
-      caps.maxTextureImageUnits = 16;
-      caps.maxVertexTextureImageUnits = 16;
-      caps.maxGeometryTextureImageUnits = 16;
-      caps.maxTextureBufferSize = static_cast<int>(props.limits.maxTexelBufferElements);
-      caps.maxDrawBuffer = static_cast<int>(props.limits.maxColorAttachments);
-
-      Z3DGpuInfo::instance().overrideGenericCaps(caps);
-      VLOG(1) << "Updated Z3DGpuInfo caps from Vulkan device";
+      updateGenericGpuInfoFromVulkanPhysicalDevice(m_vkContext->physicalDevice());
 
       m_vkContext->logGpuInfo();
     }
@@ -2730,36 +2736,7 @@ void Z3DRenderingEngine::applyBackendSwitch()
 
     // Populate generic GPU caps from the selected Vulkan physical device so
     // shared code (e.g., image scaling limits) uses device-accurate numbers.
-    auto& phys = m_vkContext->physicalDevice();
-    const auto props = phys.getProperties();
-    const auto features = phys.getFeatures();
-    const auto memProps = phys.getMemoryProperties();
-
-    uint64_t vramBytes = 0;
-    for (uint32_t i = 0; i < memProps.memoryHeapCount; ++i) {
-      if (memProps.memoryHeaps[i].flags & vk::MemoryHeapFlagBits::eDeviceLocal) {
-        vramBytes += memProps.memoryHeaps[i].size;
-      }
-    }
-    Z3DGpuInfo::GenericCaps caps;
-    caps.maxTextureSize = props.limits.maxImageDimension2D;
-    caps.max3DTextureSize = props.limits.maxImageDimension3D;
-    caps.maxArrayTextureLayers = static_cast<int>(props.limits.maxImageArrayLayers);
-    caps.maxColorAttachments = static_cast<int>(props.limits.maxColorAttachments);
-    caps.maxTextureAnisotropy = (features.samplerAnisotropy ? props.limits.maxSamplerAnisotropy : 1.0f);
-    caps.dedicatedVideoMemoryMB = static_cast<uint64_t>(vramBytes / (1024ull * 1024ull));
-    caps.maxViewportDim =
-      static_cast<int>(std::min(props.limits.maxViewportDimensions[0], props.limits.maxViewportDimensions[1]));
-    // Reasonable defaults for GL-only caps when running under Vulkan
-    caps.maxCombinedTextureImageUnits = 48;
-    caps.maxTextureImageUnits = 16;
-    caps.maxVertexTextureImageUnits = 16;
-    caps.maxGeometryTextureImageUnits = 16;
-    caps.maxTextureBufferSize = static_cast<int>(props.limits.maxTexelBufferElements);
-    caps.maxDrawBuffer = static_cast<int>(props.limits.maxColorAttachments);
-
-    Z3DGpuInfo::instance().overrideGenericCaps(caps);
-    VLOG(1) << "Updated Z3DGpuInfo caps from Vulkan device";
+    updateGenericGpuInfoFromVulkanPhysicalDevice(m_vkContext->physicalDevice());
 
     // Log Vulkan device/capabilities in a consistent style
     m_vkContext->logGpuInfo();
@@ -3069,33 +3046,7 @@ bool Z3DRenderingEngine::switchVulkanDeviceIndex(int index)
     m_scratchPool->setVulkanDevice(m_vkDevice.get());
   }
 
-  // Refresh GPU caps from selected device
-  auto& phys = m_vkContext->physicalDevice();
-  const auto props = phys.getProperties();
-  const auto features = phys.getFeatures();
-  const auto memProps = phys.getMemoryProperties();
-  uint64_t vramBytes = 0;
-  for (uint32_t i = 0; i < memProps.memoryHeapCount; ++i) {
-    if (memProps.memoryHeaps[i].flags & vk::MemoryHeapFlagBits::eDeviceLocal) {
-      vramBytes += memProps.memoryHeaps[i].size;
-    }
-  }
-  Z3DGpuInfo::GenericCaps caps;
-  caps.maxTextureSize = props.limits.maxImageDimension2D;
-  caps.max3DTextureSize = props.limits.maxImageDimension3D;
-  caps.maxArrayTextureLayers = static_cast<int>(props.limits.maxImageArrayLayers);
-  caps.maxColorAttachments = static_cast<int>(props.limits.maxColorAttachments);
-  caps.maxTextureAnisotropy = (features.samplerAnisotropy ? props.limits.maxSamplerAnisotropy : 1.0f);
-  caps.dedicatedVideoMemoryMB = static_cast<uint64_t>(vramBytes / (1024ull * 1024ull));
-  caps.maxViewportDim =
-    static_cast<int>(std::min(props.limits.maxViewportDimensions[0], props.limits.maxViewportDimensions[1]));
-  caps.maxCombinedTextureImageUnits = 48;
-  caps.maxTextureImageUnits = 16;
-  caps.maxVertexTextureImageUnits = 16;
-  caps.maxGeometryTextureImageUnits = 16;
-  caps.maxTextureBufferSize = static_cast<int>(props.limits.maxTexelBufferElements);
-  caps.maxDrawBuffer = static_cast<int>(props.limits.maxColorAttachments);
-  Z3DGpuInfo::instance().overrideGenericCaps(caps);
+  updateGenericGpuInfoFromVulkanPhysicalDevice(m_vkContext->physicalDevice());
 
   m_vkContext->logGpuInfo();
 

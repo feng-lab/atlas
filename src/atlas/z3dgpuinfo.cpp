@@ -1,12 +1,11 @@
 #include "z3dgpuinfo.h"
 
+#include "zgpusysteminfo.h"
 #include "z3dgl.h"
 #include "zlog.h"
 #include <QProcess>
 
 namespace nim {
-
-size_t getDedicatedVideoMemoryMB();
 
 Z3DGpuInfo& Z3DGpuInfo::instance()
 {
@@ -33,7 +32,10 @@ void Z3DGpuInfo::overrideGenericCaps(const GenericCaps& caps)
   m_maxArrayTextureLayers = caps.maxArrayTextureLayers;
   m_maxColorAttachments = caps.maxColorAttachments;
   m_maxTextureAnisotropy = caps.maxTextureAnisotropy;
-  m_dedicatedVideoMemoryMB = caps.dedicatedVideoMemoryMB;
+  m_gpuMemoryCapacityMB = caps.gpuMemoryCapacityMB;
+  m_gpuMemoryHasUnifiedMemory = caps.gpuMemoryHasUnifiedMemory;
+  m_gpuMemoryCapacitySource =
+    caps.gpuMemoryCapacitySource.isEmpty() ? QStringLiteral("backend override") : caps.gpuMemoryCapacitySource;
   m_maxCombinedTextureImageUnits = caps.maxCombinedTextureImageUnits;
   m_maxTextureImageUnits = caps.maxTextureImageUnits;
   m_maxVertexTextureImageUnits = caps.maxVertexTextureImageUnits;
@@ -237,7 +239,11 @@ void Z3DGpuInfo::logGpuInfo() const
   fmt::format_to(std::back_inserter(msg), "Max FS Texture Image Units:    {}\n", m_maxTextureImageUnits);
   fmt::format_to(std::back_inserter(msg), "VS+GS+FS Texture Image Units:  {}\n", m_maxCombinedTextureImageUnits);
   fmt::format_to(std::back_inserter(msg), "Max Array Texture Layers:      {}\n", m_maxArrayTextureLayers);
-  fmt::format_to(std::back_inserter(msg), "Total Graphics Memory Size:    {} MB\n", dedicatedVideoMemoryMB());
+  fmt::format_to(std::back_inserter(msg),
+                 "Graphics Memory Capacity:      {} MB (source: {}, unified: {})\n",
+                 gpuMemoryCapacityMB(),
+                 m_gpuMemoryCapacitySource,
+                 m_gpuMemoryHasUnifiedMemory);
   fmt::format_to(std::back_inserter(msg),
                  "Smooth Point Size Range:       ({}, {})\n",
                  m_minSmoothPointSize,
@@ -299,7 +305,8 @@ void Z3DGpuInfo::detectGpuInfo()
     // GPU Vendor
     if (m_glVendorString.contains("NVIDIA", Qt::CaseInsensitive)) {
       m_gpuVendor = GpuVendor::NVIDIA;
-    } else if (m_glVendorString.contains("ATI", Qt::CaseInsensitive)) {
+    } else if (m_glVendorString.contains("ATI", Qt::CaseInsensitive) ||
+               m_glVendorString.contains("AMD", Qt::CaseInsensitive)) {
       m_gpuVendor = GpuVendor::AMD;
     } else if (m_glVendorString.contains("INTEL", Qt::CaseInsensitive)) {
       m_gpuVendor = GpuVendor::INTEL;
@@ -367,7 +374,7 @@ void Z3DGpuInfo::detectGpuInfo()
     m_minAliasedLineWidth = range[0];
     m_maxAliasedLineWidth = range[1];
 
-    detectDedicatedVideoMemory();
+    detectGpuMemoryCapacity();
   } else {
     m_isSupported = false;
     m_notSupportedReason =
@@ -421,29 +428,34 @@ bool Z3DGpuInfo::parseVersionString(const QString& versionString, int& major, in
   return true;
 }
 
-void Z3DGpuInfo::detectDedicatedVideoMemory()
+void Z3DGpuInfo::detectGpuMemoryCapacity()
 {
-  m_dedicatedVideoMemoryMB = 0;
+  m_gpuMemoryCapacityMB = 0;
+  m_gpuMemoryHasUnifiedMemory = false;
+  m_gpuMemoryCapacitySource.clear();
   if (m_gpuVendor == GpuVendor::NVIDIA) {
     if (isExtensionSupported("GL_NVX_gpu_memory_info")) {
-      int retVal;
-      // glGetIntegerv(GL_GPU_MEMORY_INFO_DEDICATED_VIDMEM_NVX, &retVal);
-      glGetIntegerv(GL_GPU_MEMORY_INFO_TOTAL_AVAILABLE_MEMORY_NVX, &retVal);
-      m_dedicatedVideoMemoryMB = retVal / 1024;
-    }
-  } else if (m_gpuVendor == GpuVendor::AMD) {
-    if (isExtensionSupported("GL_ATI_meminfo")) {
-      int retVal[4];
-      glGetIntegerv(GL_TEXTURE_FREE_MEMORY_ATI, retVal);
-      m_dedicatedVideoMemoryMB = retVal[0] / 1024;
+      int capacityKB = 0;
+      glGetIntegerv(GL_GPU_MEMORY_INFO_DEDICATED_VIDMEM_NVX, &capacityKB);
+      if (capacityKB > 0) {
+        m_gpuMemoryCapacityMB = static_cast<uint64_t>(capacityKB) / 1024;
+        m_gpuMemoryCapacitySource = QStringLiteral("OpenGL GL_NVX_gpu_memory_info dedicated vidmem");
+      }
     }
   }
-  if (m_dedicatedVideoMemoryMB == 0) {
-    m_dedicatedVideoMemoryMB = getDedicatedVideoMemoryMB();
+  if (m_gpuMemoryCapacityMB == 0) {
+    const ZGpuMemoryCapacityInfo systemMemoryInfo = detectSystemGpuMemoryCapacity();
+    if (systemMemoryInfo.capacityBytes > 0) {
+      m_gpuMemoryCapacityMB = systemMemoryInfo.capacityBytes / (1024ull * 1024ull);
+      m_gpuMemoryHasUnifiedMemory = systemMemoryInfo.hasUnifiedMemory;
+      m_gpuMemoryCapacitySource = systemMemoryInfo.source;
+    }
   }
-  if (m_dedicatedVideoMemoryMB == 0) {
-    LOG(ERROR) << "Can not detect dedicated video memory, use 256";
-    m_dedicatedVideoMemoryMB = 256;
+  if (m_gpuMemoryCapacityMB == 0) {
+    LOG(ERROR) << "Can not detect GPU memory capacity, use 256 MB";
+    m_gpuMemoryCapacityMB = 256;
+    m_gpuMemoryHasUnifiedMemory = false;
+    m_gpuMemoryCapacitySource = QStringLiteral("default fallback");
   }
 }
 
