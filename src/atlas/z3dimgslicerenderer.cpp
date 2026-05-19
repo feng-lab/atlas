@@ -868,13 +868,13 @@ double Z3DImgSliceRenderer::renderSlice(Z3DEye eye, bool progressive)
       m_image3DSliceWithColorMapBlockIDsShader->setViewMatrixUniform(eyeState.viewMatrix);
 
       // render block ids
-      const GLenum g_drawBuffers[] = {GL_COLOR_ATTACHMENT0};
+      const GLenum drawBuffers[] = {GL_COLOR_ATTACHMENT0};
 
       m_img->bindFullResBlockIDsShader(*m_image3DSliceWithColorMapBlockIDsShader, i);
 
       for (auto& slice : m_slices) {
         blockLease.renderTarget->bind();
-        glDrawBuffers(1, g_drawBuffers);
+        glDrawBuffers(1, drawBuffers);
         glClear(GL_COLOR_BUFFER_BIT);
 
         renderTriangleList(*m_VAO, *m_image3DSliceWithColorMapBlockIDsShader, slice);

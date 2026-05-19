@@ -13,6 +13,7 @@
 #include <QProcess>
 #include <QRegularExpression>
 #include <QStringList>
+#include <folly/ScopeGuard.h>
 #include <grpcpp/grpcpp.h>
 #include <algorithm>
 #include <atomic>
@@ -80,6 +81,31 @@ class ZBioFormatsBridgeProcessFailure final : public ZException
 public:
   using ZException::ZException;
 };
+
+class ZBioFormatsBridgeShutdownRequested final : public ZException
+{
+public:
+  using ZException::ZException;
+};
+
+std::atomic_bool& bioFormatsBridgeShutdownRequested()
+{
+  static std::atomic_bool requested = false;
+  return requested;
+}
+
+bool isBioFormatsBridgeShutdownRequested()
+{
+  return bioFormatsBridgeShutdownRequested().load(std::memory_order_acquire);
+}
+
+void throwIfBioFormatsBridgeShutdownRequested(std::string_view operation)
+{
+  if (isBioFormatsBridgeShutdownRequested()) {
+    throw ZBioFormatsBridgeShutdownRequested(
+      fmt::format("Bio-Formats bridge {} cancelled during application shutdown", operation));
+  }
+}
 
 bool bioFormatsBridgeDiagnosticsEnabled()
 {
@@ -237,12 +263,49 @@ JavaCheckResult checkJavaCandidate(const JavaCandidate& candidate)
   process.setArguments({"-version"});
   process.setProcessChannelMode(QProcess::SeparateChannels);
   process.start();
-  if (!process.waitForStarted(kJavaVersionProbeTimeoutMs)) {
+
+  QElapsedTimer startTimer;
+  startTimer.start();
+  bool started = false;
+  while (startTimer.elapsed() < kJavaVersionProbeTimeoutMs) {
+    if (isBioFormatsBridgeShutdownRequested()) {
+      if (process.state() != QProcess::NotRunning) {
+        process.kill();
+        process.waitForFinished(1000);
+      }
+      throwIfBioFormatsBridgeShutdownRequested("check Java version");
+    }
+    if (process.waitForStarted(100) || process.state() == QProcess::Running) {
+      started = true;
+      break;
+    }
+    if (process.state() == QProcess::NotRunning) {
+      break;
+    }
+  }
+  if (!started) {
     return {
       false,
       QString("%1: failed to start '%2': %3").arg(candidate.description, candidate.program, process.errorString())};
   }
-  if (!process.waitForFinished(kJavaVersionProbeTimeoutMs)) {
+
+  QElapsedTimer finishTimer;
+  finishTimer.start();
+  bool finished = false;
+  while (finishTimer.elapsed() < kJavaVersionProbeTimeoutMs) {
+    if (isBioFormatsBridgeShutdownRequested()) {
+      if (process.state() != QProcess::NotRunning) {
+        process.kill();
+        process.waitForFinished(1000);
+      }
+      throwIfBioFormatsBridgeShutdownRequested("check Java version");
+    }
+    if (process.waitForFinished(100) || process.state() == QProcess::NotRunning) {
+      finished = true;
+      break;
+    }
+  }
+  if (!finished) {
     process.kill();
     process.waitForFinished(1000);
     return {false,
@@ -439,13 +502,13 @@ public:
   ~ZBioFormatsGrpcBridgeProcess()
   {
     try {
-      if (m_stub) {
+      if (m_stub && !isBioFormatsBridgeShutdownRequested()) {
         proto::Request request;
         request.set_request_id(nextRequestId());
         request.mutable_shutdown();
         (void)transact(request, "shutdown Bio-Formats gRPC bridge");
       }
-      if (m_process.state() == QProcess::Running) {
+      if (m_process.state() == QProcess::Running && !isBioFormatsBridgeShutdownRequested()) {
         m_process.waitForFinished(5000);
       }
     }
@@ -459,7 +522,10 @@ public:
 
   [[nodiscard]] std::vector<ZBioFormatsReaderFormat> listFormats()
   {
+    throwIfBioFormatsBridgeShutdownRequested("list formats");
+
     std::scoped_lock lock(m_cacheMutex);
+    throwIfBioFormatsBridgeShutdownRequested("list formats");
     if (!m_cachedFormats.empty()) {
       return m_cachedFormats;
     }
@@ -485,17 +551,41 @@ public:
 
   void warmUp()
   {
+    if (isBioFormatsBridgeShutdownRequested()) {
+      VLOG(1) << "Bio-Formats gRPC bridge warmup skipped because application shutdown was requested";
+      return;
+    }
+
     QElapsedTimer timer;
     timer.start();
-    retryAfterBridgeProcessRestart("warm up Bio-Formats gRPC bridge", [this]() {
-      ensureProcess();
-      (void)listFormats();
-    });
-    LOG(INFO) << "Bio-Formats gRPC bridge warmup completed in " << timer.elapsed() << " ms";
+    try {
+      retryAfterBridgeProcessRestart("warm up Bio-Formats gRPC bridge", [this]() {
+        throwIfBioFormatsBridgeShutdownRequested("warmup");
+        ensureProcess();
+        (void)listFormats();
+      });
+      if (isBioFormatsBridgeShutdownRequested()) {
+        VLOG(1) << "Bio-Formats gRPC bridge warmup cancelled during application shutdown";
+        return;
+      }
+      LOG(INFO) << "Bio-Formats gRPC bridge warmup completed in " << timer.elapsed() << " ms";
+    }
+    catch (const ZBioFormatsBridgeShutdownRequested&) {
+      VLOG(1) << "Bio-Formats gRPC bridge warmup cancelled during application shutdown";
+    }
+  }
+
+  void requestShutdown()
+  {
+    // requestShutdown may come from the UI thread; only cancel gRPC calls here.
+    // QProcess cleanup stays on the bridge operation/destructor path.
+    cancelActiveGrpcContexts();
   }
 
   [[nodiscard]] bool canRead(const QString& filename)
   {
+    throwIfBioFormatsBridgeShutdownRequested("probe reader");
+
     QElapsedTimer timer;
     timer.start();
     proto::Request request;
@@ -515,6 +605,8 @@ public:
 
   [[nodiscard]] ZBioFormatsDatasetInfo readDatasetInfo(const QString& filename, bool metadataFiltered)
   {
+    throwIfBioFormatsBridgeShutdownRequested("read dataset info");
+
     QElapsedTimer timer;
     timer.start();
     proto::Request request;
@@ -543,6 +635,8 @@ public:
   [[nodiscard]] std::vector<uint8_t>
   readRegion(const QString& filename, size_t scene, uint32_t resolution, const ZImgRegion& region)
   {
+    throwIfBioFormatsBridgeShutdownRequested("read image region");
+
     QElapsedTimer timer;
     timer.start();
 
@@ -607,6 +701,8 @@ public:
 
   [[nodiscard]] ZBioFormatsThumbnail readThumbnail(const QString& filename, size_t scene, size_t z, size_t t)
   {
+    throwIfBioFormatsBridgeShutdownRequested("read thumbnail");
+
     QElapsedTimer timer;
     timer.start();
 
@@ -690,7 +786,10 @@ private:
 
   void ensureProcess()
   {
+    throwIfBioFormatsBridgeShutdownRequested("start");
+
     std::scoped_lock lock(m_startMutex);
+    throwIfBioFormatsBridgeShutdownRequested("start");
     if (m_stub && m_process.state() == QProcess::Running) {
       return;
     }
@@ -725,12 +824,29 @@ private:
     appendBioFormatsJavaBridgeArgs(args, m_diagnosticsFilePath);
 
     const QString java = javaExecutable();
+    throwIfBioFormatsBridgeShutdownRequested("start");
     m_process.setProgram(java);
     m_process.setArguments(args);
     m_process.setProcessChannelMode(QProcess::SeparateChannels);
     m_process.setStandardErrorFile(QProcess::nullDevice());
     m_process.start();
-    if (!m_process.waitForStarted(30000)) {
+    QElapsedTimer startWaitTimer;
+    startWaitTimer.start();
+    bool started = false;
+    while (startWaitTimer.elapsed() < kJavaVersionProbeTimeoutMs) {
+      if (isBioFormatsBridgeShutdownRequested()) {
+        resetGrpcProcessLocked();
+        throwIfBioFormatsBridgeShutdownRequested("start");
+      }
+      if (m_process.waitForStarted(100) || m_process.state() == QProcess::Running) {
+        started = true;
+        break;
+      }
+      if (m_process.state() == QProcess::NotRunning) {
+        break;
+      }
+    }
+    if (!started) {
       const QString error = m_process.errorString();
       if (m_process.state() != QProcess::NotRunning) {
         m_process.kill();
@@ -786,6 +902,10 @@ private:
     QElapsedTimer timer;
     timer.start();
     while (timer.elapsed() < kJavaVersionProbeTimeoutMs) {
+      if (isBioFormatsBridgeShutdownRequested()) {
+        resetGrpcProcessLocked();
+        throwIfBioFormatsBridgeShutdownRequested("start");
+      }
       m_stdoutBuffer.append(m_process.readAllStandardOutput());
       const qsizetype newline = m_stdoutBuffer.indexOf('\n');
       if (newline >= 0) {
@@ -808,7 +928,7 @@ private:
         throwGrpcProcessErrorLocked("Bio-Formats gRPC bridge exited before reporting its port");
       }
       const qint64 remaining = kJavaVersionProbeTimeoutMs - timer.elapsed();
-      m_process.waitForReadyRead(static_cast<int>(std::max<qint64>(1, std::min<qint64>(1000, remaining))));
+      m_process.waitForReadyRead(static_cast<int>(std::max<qint64>(1, std::min<qint64>(100, remaining))));
     }
     throwGrpcProcessErrorLocked("timed out waiting for Bio-Formats gRPC bridge startup");
   }
@@ -875,6 +995,9 @@ private:
                 << " responses=" << responses.size();
         return responses;
       }
+      catch (const ZBioFormatsBridgeShutdownRequested&) {
+        throw;
+      }
       catch (const ZBioFormatsBridgeProcessFailure& e) {
         resetGrpcProcessAfterFailure();
         if (attempt != 0) {
@@ -910,8 +1033,13 @@ private:
                         std::string_view operation)
   {
     CHECK(stub != nullptr);
+    throwIfBioFormatsBridgeShutdownRequested(operation);
     grpc::ClientContext context;
     applyDeadline(context);
+    registerActiveGrpcContext(context);
+    auto unregisterActiveContext = folly::makeGuard([this, &context]() {
+      unregisterActiveGrpcContext(context);
+    });
     std::vector<proto::Response> responses;
     std::unique_ptr<grpc::ClientReader<proto::Response>> reader = stub->Execute(&context, request);
     proto::Response response;
@@ -921,6 +1049,10 @@ private:
     }
     const grpc::Status status = reader->Finish();
     if (!status.ok()) {
+      if (isBioFormatsBridgeShutdownRequested()) {
+        throw ZBioFormatsBridgeShutdownRequested(
+          fmt::format("Bio-Formats gRPC bridge cancelled {} during application shutdown", operation));
+      }
       throw ZBioFormatsBridgeProcessFailure(fmt::format("Bio-Formats gRPC bridge failed to {}: {} ({})",
                                                         operation,
                                                         status.error_message(),
@@ -975,6 +1107,32 @@ private:
     m_diagnosticsFilePath.clear();
   }
 
+  void registerActiveGrpcContext(grpc::ClientContext& context)
+  {
+    std::scoped_lock lock(m_contextMutex);
+    if (isBioFormatsBridgeShutdownRequested()) {
+      context.TryCancel();
+    }
+    m_activeContexts.push_back(&context);
+  }
+
+  void unregisterActiveGrpcContext(grpc::ClientContext& context)
+  {
+    std::scoped_lock lock(m_contextMutex);
+    const auto it = std::find(m_activeContexts.begin(), m_activeContexts.end(), &context);
+    CHECK(it != m_activeContexts.end());
+    m_activeContexts.erase(it);
+  }
+
+  void cancelActiveGrpcContexts()
+  {
+    std::scoped_lock lock(m_contextMutex);
+    for (grpc::ClientContext* context : m_activeContexts) {
+      CHECK(context != nullptr);
+      context->TryCancel();
+    }
+  }
+
   [[noreturn]] void throwGrpcProcessErrorLocked(const char* message)
   {
     QString detail = QString::fromUtf8(message);
@@ -988,6 +1146,7 @@ private:
 
   std::mutex m_startMutex;
   std::mutex m_cacheMutex;
+  std::mutex m_contextMutex;
   QProcess m_process;
   QByteArray m_stdoutBuffer;
   QString m_diagnosticsFilePath;
@@ -996,6 +1155,7 @@ private:
   std::shared_ptr<proto::BioFormatsBridge::Stub> m_stub;
   std::atomic<uint64_t> m_nextRequestId = 1;
   std::vector<ZBioFormatsReaderFormat> m_cachedFormats;
+  std::vector<grpc::ClientContext*> m_activeContexts;
 };
 
 class ZBioFormatsBridgeClient::Impl
@@ -1013,6 +1173,11 @@ public:
   void warmUp()
   {
     m_grpc->warmUp();
+  }
+
+  void requestShutdown()
+  {
+    m_grpc->requestShutdown();
   }
 
   [[nodiscard]] bool canRead(const QString& filename)
@@ -1053,9 +1218,9 @@ std::mutex& bioFormatsBridgeClientSingletonMutex()
   return mutex;
 }
 
-std::unique_ptr<ZBioFormatsBridgeClient>& bioFormatsBridgeClientSingleton()
+std::shared_ptr<ZBioFormatsBridgeClient>& bioFormatsBridgeClientSingleton()
 {
-  static std::unique_ptr<ZBioFormatsBridgeClient> client;
+  static std::shared_ptr<ZBioFormatsBridgeClient> client;
   return client;
 }
 
@@ -1075,26 +1240,64 @@ void configureRuntimePath(QString BioFormatsRuntimeConfig::* field, const QStrin
   config.*field = resolvedPath;
 }
 
+std::shared_ptr<ZBioFormatsBridgeClient> bioFormatsBridgeClientSharedInstance()
+{
+  throwIfBioFormatsBridgeShutdownRequested("start");
+
+  std::scoped_lock lock(bioFormatsBridgeClientSingletonMutex());
+  std::shared_ptr<ZBioFormatsBridgeClient>& client = bioFormatsBridgeClientSingleton();
+  if (!client) {
+    if (!ZBioFormatsBridgeClient::hasRuntimeSupport()) {
+      throw ZException(fmt::format("Bio-Formats bridge runtime is incomplete. Missing: {}",
+                                   ZBioFormatsBridgeClient::missingRuntimeFiles().join(", ")));
+    }
+    client = std::make_shared<ZBioFormatsBridgeClient>();
+  }
+  return client;
+}
+
 } // namespace
 
 ZBioFormatsBridgeClient& ZBioFormatsBridgeClient::instance()
 {
-  std::scoped_lock lock(bioFormatsBridgeClientSingletonMutex());
-  std::unique_ptr<ZBioFormatsBridgeClient>& client = bioFormatsBridgeClientSingleton();
-  if (!client) {
-    if (!hasRuntimeSupport()) {
-      throw ZException(
-        fmt::format("Bio-Formats bridge runtime is incomplete. Missing: {}", missingRuntimeFiles().join(", ")));
-    }
-    client = std::make_unique<ZBioFormatsBridgeClient>();
+  return *bioFormatsBridgeClientSharedInstance();
+}
+
+void ZBioFormatsBridgeClient::warmUpInstanceBestEffort()
+{
+  try {
+    bioFormatsBridgeClientSharedInstance()->warmUp();
   }
-  return *client;
+  catch (const ZBioFormatsBridgeShutdownRequested&) {
+    VLOG(1) << "Bio-Formats bridge warmup skipped because application shutdown was requested";
+  }
+  catch (const std::exception& e) {
+    LOG(WARNING) << "Bio-Formats bridge warmup failed: " << e.what();
+  }
+  catch (...) {
+    LOG(WARNING) << "Bio-Formats bridge warmup failed with unknown exception";
+  }
 }
 
 void ZBioFormatsBridgeClient::resetInstanceForTesting()
 {
   std::scoped_lock lock(bioFormatsBridgeClientSingletonMutex());
   bioFormatsBridgeClientSingleton().reset();
+  bioFormatsBridgeShutdownRequested().store(false, std::memory_order_release);
+}
+
+void ZBioFormatsBridgeClient::requestShutdown()
+{
+  bioFormatsBridgeShutdownRequested().store(true, std::memory_order_release);
+
+  std::shared_ptr<ZBioFormatsBridgeClient> client;
+  {
+    std::scoped_lock lock(bioFormatsBridgeClientSingletonMutex());
+    client = bioFormatsBridgeClientSingleton();
+  }
+  if (client != nullptr) {
+    client->m_impl->requestShutdown();
+  }
 }
 
 bool ZBioFormatsBridgeClient::hasRuntimeSupport()

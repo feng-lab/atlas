@@ -1359,12 +1359,12 @@ void Z3DImgRaycasterRenderer::prepareEntryExit(const ZMesh& clipped, bool flippe
   m_rendererBase.acquirePersistentEntryExitRenderTarget(m_entryExitLease, size, 2);
 
   glEnable(GL_CULL_FACE);
-  const GLenum g_drawBuffers[] = {GL_COLOR_ATTACHMENT0};
+  const GLenum drawBuffers[] = {GL_COLOR_ATTACHMENT0};
 
   // Back faces to slice 1
   m_entryExitLease.renderTarget->attachSlice(1);
   m_entryExitLease.renderTarget->bind();
-  glDrawBuffers(1, g_drawBuffers);
+  glDrawBuffers(1, drawBuffers);
   glClear(GL_COLOR_BUFFER_BIT);
   glCullFace(flipped ? GL_BACK : GL_FRONT);
   m_rendererBase.frameState().updateViewportData(size);
@@ -1375,7 +1375,7 @@ void Z3DImgRaycasterRenderer::prepareEntryExit(const ZMesh& clipped, bool flippe
   // Front faces to slice 0
   m_entryExitLease.renderTarget->attachSlice(0);
   m_entryExitLease.renderTarget->bind();
-  glDrawBuffers(1, g_drawBuffers);
+  glDrawBuffers(1, drawBuffers);
   glClear(GL_COLOR_BUFFER_BIT);
   glCullFace(flipped ? GL_FRONT : GL_BACK);
   m_rendererBase.frameState().updateViewportData(size);
@@ -1803,13 +1803,13 @@ Z3DImgRaycasterRenderer::render2DSliceOf3DImage(Z3DEye eye, const std::vector<si
       m_image3DSliceWithTransferfunBlockIDsShader->setViewMatrixUniform(eyeState.viewMatrix);
 
       // render block ids
-      const GLenum g_drawBuffers[] = {GL_COLOR_ATTACHMENT0};
+      const GLenum drawBuffers[] = {GL_COLOR_ATTACHMENT0};
 
       m_img->bindFullResBlockIDsShader(*m_image3DSliceWithTransferfunBlockIDsShader, c);
 
       for (auto& quad : m_quads) {
         blockLease.renderTarget->bind();
-        glDrawBuffers(1, g_drawBuffers);
+        glDrawBuffers(1, drawBuffers);
         glClear(GL_COLOR_BUFFER_BIT);
 
         renderTriangleList(*m_VAO, *m_image3DSliceWithTransferfunBlockIDsShader, quad);
@@ -2331,7 +2331,7 @@ bool Z3DImgRaycasterRenderer::render3DImageForOneRound(Z3DEye eye,
   m_image3DRaycasterBlockIDsShader->setUniform("sampling_rate", m_samplingRateValue);
 
   // render block ids
-  const GLenum g_drawBuffers[] = {
+  const GLenum drawBuffers[] = {
     GL_COLOR_ATTACHMENT0,
     GL_COLOR_ATTACHMENT1,
     GL_COLOR_ATTACHMENT2,
@@ -2344,7 +2344,7 @@ bool Z3DImgRaycasterRenderer::render3DImageForOneRound(Z3DEye eye,
 
   if (round == 0) {
     lastTarget->bind();
-    glDrawBuffers(2, g_drawBuffers);
+    glDrawBuffers(2, drawBuffers);
     lastTarget->clear();
     lastTarget->release();
   }
@@ -2364,7 +2364,7 @@ bool Z3DImgRaycasterRenderer::render3DImageForOneRound(Z3DEye eye,
   }
   effectiveAttachments = std::max<uint32_t>(1u, effectiveAttachments);
   blockLease.renderTarget->bind();
-  glDrawBuffers(static_cast<GLsizei>(effectiveAttachments), g_drawBuffers);
+  glDrawBuffers(static_cast<GLsizei>(effectiveAttachments), drawBuffers);
   glClear(GL_COLOR_BUFFER_BIT);
 
   m_img->bindFullResBlockIDsShader(*m_image3DRaycasterBlockIDsShader, c);
@@ -2426,7 +2426,7 @@ bool Z3DImgRaycasterRenderer::render3DImageForOneRound(Z3DEye eye,
     for (auto att = 1u; !hasEnoughMissingIDs && !lastRound && att < effectiveAttachments; ++att) {
       auto numberBlock = ccSet.size();
       maybeCancelFirstProgressiveRound();
-      blockLease.renderTarget->attachment(g_drawBuffers[att])
+      blockLease.renderTarget->attachment(drawBuffers[att])
         ->downloadTextureToBuffer(GL_RGBA_INTEGER, GL_UNSIGNED_INT, m_blockIDs.data());
       maybeCancelFirstProgressiveRound();
 
@@ -2508,7 +2508,7 @@ bool Z3DImgRaycasterRenderer::render3DImageForOneRound(Z3DEye eye,
   raycasterShader.setUniform("sampling_rate", m_samplingRateValue);
 
   currentTarget->bind();
-  glDrawBuffers(2, g_drawBuffers);
+  glDrawBuffers(2, drawBuffers);
   currentTarget->clear();
 
   m_img->bindFullResRenderShader(raycasterShader, c);

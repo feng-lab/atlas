@@ -4033,29 +4033,29 @@ void Z3DCompositor::renderTransparentDDP(const std::vector<Z3DBoundedFilter*>& f
     ddpRT.isFBOComplete();
   }
 
-  const Z3DTexture* g_dualDepthTexId[2];
-  g_dualDepthTexId[0] = ddpRT.attachment(GL_COLOR_ATTACHMENT0);
-  g_dualDepthTexId[1] = ddpRT.attachment(GL_COLOR_ATTACHMENT3);
-  const Z3DTexture* g_dualFrontBlenderTexId[2];
-  g_dualFrontBlenderTexId[0] = ddpRT.attachment(GL_COLOR_ATTACHMENT1);
-  g_dualFrontBlenderTexId[1] = ddpRT.attachment(GL_COLOR_ATTACHMENT4);
-  const Z3DTexture* g_dualBackTempTexId[2];
-  g_dualBackTempTexId[0] = ddpRT.attachment(GL_COLOR_ATTACHMENT2);
-  g_dualBackTempTexId[1] = ddpRT.attachment(GL_COLOR_ATTACHMENT5);
-  const Z3DTexture* g_dualBackBlenderTexId = ddpRT.attachment(GL_COLOR_ATTACHMENT6);
-  const Z3DTexture* g_depthTex = ddpRT.attachment(GL_COLOR_ATTACHMENT7);
-  const GLenum g_drawBuffers[] = {GL_COLOR_ATTACHMENT0,
-                                  GL_COLOR_ATTACHMENT1,
-                                  GL_COLOR_ATTACHMENT2,
-                                  GL_COLOR_ATTACHMENT3,
-                                  GL_COLOR_ATTACHMENT4,
-                                  GL_COLOR_ATTACHMENT5,
-                                  GL_COLOR_ATTACHMENT6};
+  const Z3DTexture* dualDepthTex[2];
+  dualDepthTex[0] = ddpRT.attachment(GL_COLOR_ATTACHMENT0);
+  dualDepthTex[1] = ddpRT.attachment(GL_COLOR_ATTACHMENT3);
+  const Z3DTexture* dualFrontBlenderTex[2];
+  dualFrontBlenderTex[0] = ddpRT.attachment(GL_COLOR_ATTACHMENT1);
+  dualFrontBlenderTex[1] = ddpRT.attachment(GL_COLOR_ATTACHMENT4);
+  const Z3DTexture* dualBackTempTex[2];
+  dualBackTempTex[0] = ddpRT.attachment(GL_COLOR_ATTACHMENT2);
+  dualBackTempTex[1] = ddpRT.attachment(GL_COLOR_ATTACHMENT5);
+  const Z3DTexture* dualBackBlenderTex = ddpRT.attachment(GL_COLOR_ATTACHMENT6);
+  const Z3DTexture* depthTex = ddpRT.attachment(GL_COLOR_ATTACHMENT7);
+  const GLenum drawBuffers[] = {GL_COLOR_ATTACHMENT0,
+                                GL_COLOR_ATTACHMENT1,
+                                GL_COLOR_ATTACHMENT2,
+                                GL_COLOR_ATTACHMENT3,
+                                GL_COLOR_ATTACHMENT4,
+                                GL_COLOR_ATTACHMENT5,
+                                GL_COLOR_ATTACHMENT6};
 
-  const GLenum g_db[] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT7};
+  const GLenum minMaxDepthDrawBuffers[] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT7};
 
-  bool g_useOQ = true;
-  size_t g_numPasses = static_cast<size_t>(std::max(1, absl::GetFlag(FLAGS_atlas_ddp_max_passes)));
+  bool useOcclusionQuery = true;
+  size_t maxPeelPasses = static_cast<size_t>(std::max(1, absl::GetFlag(FLAGS_atlas_ddp_max_passes)));
 
 #define MAX_DEPTH 1.0
 
@@ -4075,12 +4075,12 @@ void Z3DCompositor::renderTransparentDDP(const std::vector<Z3DBoundedFilter*>& f
   // Render targets 1 and 2 store the front and back colors
   // Clear to 0.0 and use MAX blending to filter written color
   // At most one front color and one back color can be written every pass
-  glDrawBuffers(2, &g_drawBuffers[1]);
+  glDrawBuffers(2, &drawBuffers[1]);
   glClearColor(0, 0, 0, 0);
   glClear(GL_COLOR_BUFFER_BIT);
 
   // Render target 0 stores (-minDepth, maxDepth, alphaMultiplier)
-  glDrawBuffers(2, g_db);
+  glDrawBuffers(2, minMaxDepthDrawBuffers);
   glClearColor(-MAX_DEPTH, -MAX_DEPTH, 0, 0);
   glClear(GL_COLOR_BUFFER_BIT);
   glBlendEquation(GL_MAX);
@@ -4107,36 +4107,36 @@ void Z3DCompositor::renderTransparentDDP(const std::vector<Z3DBoundedFilter*>& f
 
   // Since we cannot blend the back colors in the geometry passes,
   // we use another render target to do the alpha blending
-  glDrawBuffer(g_drawBuffers[6]);
+  glDrawBuffer(drawBuffers[6]);
   glClearColor(0, 0, 0, 0);
   glClear(GL_COLOR_BUFFER_BIT);
 
   size_t currId = 0;
   size_t executedPasses = 0;
-  for (size_t pass = 1; g_useOQ && pass < g_numPasses; pass++) {
+  for (size_t pass = 1; useOcclusionQuery && pass < maxPeelPasses; pass++) {
     currId = pass % 2;
     auto prevId = 1 - currId;
     auto bufId = currId * 3;
 
-    glDrawBuffers(2, &g_drawBuffers[bufId + 1]);
+    glDrawBuffers(2, &drawBuffers[bufId + 1]);
     glClearColor(0, 0, 0, 0);
     glClear(GL_COLOR_BUFFER_BIT);
 
-    glDrawBuffer(g_drawBuffers[bufId + 0]);
+    glDrawBuffer(drawBuffers[bufId + 0]);
     glClearColor(-MAX_DEPTH, -MAX_DEPTH, 0, 0);
     glClear(GL_COLOR_BUFFER_BIT);
 
     // Render target 0: RG32F MAX blending
     // Render target 1: RGBA MAX blending
     // Render target 2: RGBA MAX blending
-    glDrawBuffers(3, &g_drawBuffers[bufId + 0]);
+    glDrawBuffers(3, &drawBuffers[bufId + 0]);
     glBlendEquation(GL_MAX);
 
     for (auto filter : filters) {
       filter->setViewport(ddpRT.size());
       filter->setShaderHookType(Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel);
-      filter->setShaderHookParaDDPDepthBlenderTexture(g_dualDepthTexId[prevId]);
-      filter->setShaderHookParaDDPFrontBlenderTexture(g_dualFrontBlenderTexId[prevId]);
+      filter->setShaderHookParaDDPDepthBlenderTexture(dualDepthTex[prevId]);
+      filter->setShaderHookParaDDPFrontBlenderTexture(dualFrontBlenderTex[prevId]);
       filter->renderTransparent(eye);
     }
     if (!imageColorTexList.empty()) {
@@ -4151,19 +4151,19 @@ void Z3DCompositor::renderTransparentDDP(const std::vector<Z3DBoundedFilter*>& f
     }
 
     // Full screen pass to alpha-blend the back color
-    glDrawBuffer(g_drawBuffers[6]);
+    glDrawBuffer(drawBuffers[6]);
 
     glBlendEquation(GL_FUNC_ADD);
     glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
 
     GLuint queryId;
-    if (g_useOQ) {
+    if (useOcclusionQuery) {
       glGenQueries(1, &queryId);
       glBeginQuery(GL_SAMPLES_PASSED, queryId);
     }
 
     m_ddpBlendShader->bind();
-    m_ddpBlendShader->bindTexture("TempTex", g_dualBackTempTexId[currId]);
+    m_ddpBlendShader->bindTexture("TempTex", dualBackTempTex[currId]);
     const glm::uvec2 ddpBlendSize = ddpRT.size();
     const glm::vec2 ddpBlendScreenDimRcp(ddpBlendSize.x > 0u ? 1.f / static_cast<float>(ddpBlendSize.x) : 0.f,
                                          ddpBlendSize.y > 0u ? 1.f / static_cast<float>(ddpBlendSize.y) : 0.f);
@@ -4174,7 +4174,7 @@ void Z3DCompositor::renderTransparentDDP(const std::vector<Z3DBoundedFilter*>& f
     Z3DPrimitiveRenderer::renderScreenQuad(*m_screenQuadVAO, *m_ddpBlendShader);
     m_ddpBlendShader->release();
 
-    if (g_useOQ) {
+    if (useOcclusionQuery) {
       glEndQuery(GL_SAMPLES_PASSED);
       GLuint sample_count;
       glGetQueryObjectuiv(queryId, GL_QUERY_RESULT, &sample_count);
@@ -4224,9 +4224,9 @@ void Z3DCompositor::renderTransparentDDP(const std::vector<Z3DBoundedFilter*>& f
   glTarget->bind();
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
   m_ddpFinalShader->bind();
-  m_ddpFinalShader->bindTexture("DepthTex", g_depthTex);
-  m_ddpFinalShader->bindTexture("FrontBlenderTex", g_dualFrontBlenderTexId[currId]);
-  m_ddpFinalShader->bindTexture("BackBlenderTex", g_dualBackBlenderTexId);
+  m_ddpFinalShader->bindTexture("DepthTex", depthTex);
+  m_ddpFinalShader->bindTexture("FrontBlenderTex", dualFrontBlenderTex[currId]);
+  m_ddpFinalShader->bindTexture("BackBlenderTex", dualBackBlenderTex);
 
   const glm::uvec2 ddpSize = ddpRT.size();
   const glm::vec2 ddpScreenDimRcp(ddpSize.x > 0u ? 1.f / static_cast<float>(ddpSize.x) : 0.f,
@@ -4263,10 +4263,10 @@ void Z3DCompositor::renderTransparentWA(const std::vector<Z3DBoundedFilter*>& fi
     waRT.isFBOComplete();
   }
 
-  const Z3DTexture* g_accumulationTexId[2];
-  g_accumulationTexId[0] = waRT.attachment(GL_COLOR_ATTACHMENT0);
-  g_accumulationTexId[1] = waRT.attachment(GL_COLOR_ATTACHMENT1);
-  const GLenum g_drawBuffers[] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
+  const Z3DTexture* accumulationTex[2];
+  accumulationTex[0] = waRT.attachment(GL_COLOR_ATTACHMENT0);
+  accumulationTex[1] = waRT.attachment(GL_COLOR_ATTACHMENT1);
+  const GLenum drawBuffers[] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
 
   if (depthTexture) {
     glDepthMask(GL_FALSE);
@@ -4275,7 +4275,7 @@ void Z3DCompositor::renderTransparentWA(const std::vector<Z3DBoundedFilter*>& fi
   }
 
   waRT.bind();
-  glDrawBuffers(2, g_drawBuffers);
+  glDrawBuffers(2, drawBuffers);
   float clearColorZero[4] = {0.f, 0.f, 0.f, 0.f};
   glClearBufferfv(GL_COLOR, 0, clearColorZero);
   glClearBufferfv(GL_COLOR, 1, clearColorZero);
@@ -4330,8 +4330,8 @@ void Z3DCompositor::renderTransparentWA(const std::vector<Z3DBoundedFilter*>& fi
   glTarget->bind();
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
   m_waFinalShader->bind();
-  m_waFinalShader->bindTexture("ColorTex0", g_accumulationTexId[0]);
-  m_waFinalShader->bindTexture("ColorTex1", g_accumulationTexId[1]);
+  m_waFinalShader->bindTexture("ColorTex0", accumulationTex[0]);
+  m_waFinalShader->bindTexture("ColorTex1", accumulationTex[1]);
 
   const glm::uvec2 waSize = waRT.size();
   const glm::vec2 waScreenDimRcp(waSize.x > 0u ? 1.f / static_cast<float>(waSize.x) : 0.f,
@@ -4366,10 +4366,10 @@ void Z3DCompositor::renderTransparentWB(const std::vector<Z3DBoundedFilter*>& fi
     wbRT.isFBOComplete();
   }
 
-  const Z3DTexture* g_accumulationTexId[2];
-  g_accumulationTexId[0] = wbRT.attachment(GL_COLOR_ATTACHMENT0);
-  g_accumulationTexId[1] = wbRT.attachment(GL_COLOR_ATTACHMENT1);
-  const GLenum g_drawBuffers[] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
+  const Z3DTexture* accumulationTex[2];
+  accumulationTex[0] = wbRT.attachment(GL_COLOR_ATTACHMENT0);
+  accumulationTex[1] = wbRT.attachment(GL_COLOR_ATTACHMENT1);
+  const GLenum drawBuffers[] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
 
   if (depthTexture) {
     glDepthMask(GL_FALSE);
@@ -4378,7 +4378,7 @@ void Z3DCompositor::renderTransparentWB(const std::vector<Z3DBoundedFilter*>& fi
   }
 
   wbRT.bind();
-  glDrawBuffers(2, g_drawBuffers);
+  glDrawBuffers(2, drawBuffers);
 
   float clearColorZero[4] = {0.f, 0.f, 0.f, 0.f};
   float clearColorOne[4] = {1.f, 1.f, 1.f, 1.f};
@@ -4437,8 +4437,8 @@ void Z3DCompositor::renderTransparentWB(const std::vector<Z3DBoundedFilter*>& fi
   glTarget->bind();
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
   m_wbFinalShader->bind();
-  m_wbFinalShader->bindTexture("ColorTex0", g_accumulationTexId[0]);
-  m_wbFinalShader->bindTexture("ColorTex1", g_accumulationTexId[1]);
+  m_wbFinalShader->bindTexture("ColorTex0", accumulationTex[0]);
+  m_wbFinalShader->bindTexture("ColorTex1", accumulationTex[1]);
 
   const glm::uvec2 wbSize = wbRT.size();
   const glm::vec2 wbScreenDimRcp(wbSize.x > 0u ? 1.f / static_cast<float>(wbSize.x) : 0.f,

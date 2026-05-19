@@ -92,6 +92,10 @@ class ZBioFormatsBridgeClient
 public:
   static ZBioFormatsBridgeClient& instance();
 
+  // Best-effort singleton warmup for startup preloading. Shutdown cancellation is quiet;
+  // non-shutdown warmup failures are logged and do not affect application startup.
+  static void warmUpInstanceBestEffort();
+
   static bool hasRuntimeSupport();
 
   static QStringList missingRuntimeFiles();
@@ -102,6 +106,7 @@ public:
   static QString javaExecutablePath();
   static QString bridgeJarPath();
   static QString bioFormatsJarPath();
+  static void requestShutdown();
 
   // Tests reconfigure runtime paths in-process; reset before the next
   // instance() call so the singleton captures the new paths.

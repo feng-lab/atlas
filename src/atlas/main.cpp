@@ -12,6 +12,7 @@
 #include "zrpcservice.h"
 #include "zsysteminfo.h"
 #include "ztheme.h"
+#include "zcommandlineflags.h"
 
 #include "zrunexport3danimation.h"
 #include "zrunexport3dscene.h"
@@ -26,7 +27,6 @@
 #include <QTimer>
 #include <QUrl>
 #include <folly/ScopeGuard.h>
-#include "zcommandlineflags.h"
 
 ABSL_DECLARE_FLAG(bool, run_export_3d_animation);
 ABSL_DECLARE_FLAG(bool, run_export_3d_scene);
@@ -244,14 +244,14 @@ int main(int argc, char* argv[])
       QObject::connect(&app, &ZApplication::fileOpenRequest, mainWin, &ZMainWindow::loadUrls);
       mainWin->show();
 
+      // Warmup is only an optimization; app shutdown should cancel it instead of letting it finish after close.
+      QObject::connect(&app, &QCoreApplication::aboutToQuit, &app, []() {
+        ZBioFormatsBridgeClient::requestShutdown();
+      });
+
       QTimer::singleShot(0, mainWin, []() {
         getAtlasBackgroundExecutor()->add([]() {
-          try {
-            ZBioFormatsBridgeClient::instance().warmUp();
-          }
-          catch (const std::exception& e) {
-            LOG(WARNING) << "Bio-Formats bridge warmup failed: " << e.what();
-          }
+          ZBioFormatsBridgeClient::warmUpInstanceBestEffort();
         });
       });
 
