@@ -4,23 +4,34 @@ namespace nim {
 
 namespace {
 
-thread_local ZImgReadStatsSink* g_tlsSink = nullptr;
-thread_local ZImgReadStatsContext g_tlsCtx{};
+struct ImgReadStatsTlsState
+{
+  ZImgReadStatsSink* sink = nullptr;
+  ZImgReadStatsContext ctx;
+};
+
+ImgReadStatsTlsState& imgReadStatsTlsState()
+{
+  thread_local ImgReadStatsTlsState state;
+  return state;
+}
 
 } // namespace
 
 ZImgReadStatsScope::ZImgReadStatsScope(ZImgReadStatsSink* sink, const ZImgReadStatsContext& ctx)
-  : m_prevSink(g_tlsSink)
-  , m_prevCtx(g_tlsCtx)
+  : m_prevSink(imgReadStatsTlsState().sink)
+  , m_prevCtx(imgReadStatsTlsState().ctx)
 {
-  g_tlsSink = sink;
-  g_tlsCtx = ctx;
+  auto& state = imgReadStatsTlsState();
+  state.sink = sink;
+  state.ctx = ctx;
 }
 
 ZImgReadStatsScope::~ZImgReadStatsScope()
 {
-  g_tlsSink = m_prevSink;
-  g_tlsCtx = m_prevCtx;
+  auto& state = imgReadStatsTlsState();
+  state.sink = m_prevSink;
+  state.ctx = m_prevCtx;
 }
 
 void reportUnderlyingIoBytesFromImgReadStatsScope(ZImgUnderlyingIoKind kind, size_t bytes)
@@ -28,11 +39,11 @@ void reportUnderlyingIoBytesFromImgReadStatsScope(ZImgUnderlyingIoKind kind, siz
   if (bytes == 0) {
     return;
   }
-  if (!g_tlsSink) {
+  auto& state = imgReadStatsTlsState();
+  if (!state.sink) {
     return;
   }
-  g_tlsSink->onUnderlyingIoBytes(g_tlsCtx, kind, bytes);
+  state.sink->onUnderlyingIoBytes(state.ctx, kind, bytes);
 }
 
 } // namespace nim
-

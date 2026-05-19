@@ -18,9 +18,18 @@ namespace nim {
 
 namespace {
 // Thread-local label for annotating transition logs with the active pass label.
-// Declared here so all helpers (transitionImage/transitionToFinal) can reference it.
-thread_local std::string g_currentTransitionLabel;
-thread_local bool g_segmentDebugLabelOpen = false;
+// Accessors keep the TLS state available to helpers without namespace-scope mutable variables.
+std::string& currentTransitionLabel()
+{
+  thread_local std::string label;
+  return label;
+}
+
+bool& segmentDebugLabelOpen()
+{
+  thread_local bool open = false;
+  return open;
+}
 
 // Safe wrappers for debug-utils labels; only emit when extension is present.
 inline void cmdBeginDebugLabel(vk::raii::CommandBuffer& cmd, const std::string& label)
@@ -121,9 +130,10 @@ void transitionImage(vk::raii::CommandBuffer& cmd,
 
   // Diagnostics to help trace unexpected layout state.
   if (VLOG_IS_ON(3)) {
+    const std::string& label = currentTransitionLabel();
     VLOG(2) << fmt::format(
       "transitionImage(pass='{}'): img=0x{:x} initial={} tracked={} effectiveOld={} new={} aspect=0x{:x}",
-      g_currentTransitionLabel.empty() ? std::string("<unlabeled-pass>") : g_currentTransitionLabel,
+      label.empty() ? std::string("<unlabeled-pass>") : label,
       reinterpret_cast<uint64_t>(static_cast<VkImage>(info.image)),
       enumOrUnderlying(requestedOld, 16),
       enumOrUnderlying(trackedOld, 16),
@@ -167,9 +177,9 @@ void transitionToFinal(vk::raii::CommandBuffer& cmd,
   const vk::ImageAspectFlags aspect = resolveAttachmentAspect(info);
 
   if (VLOG_IS_ON(2)) {
+    const std::string& label = currentTransitionLabel();
     VLOG(2) << fmt::format("transitionToFinal(pass='{}'): img=0x{:x} old={} new={} aspect=0x{:x}",
-                           g_currentTransitionLabel.empty() ? std::string("<unlabeled-pass>")
-                                                            : g_currentTransitionLabel,
+                           label.empty() ? std::string("<unlabeled-pass>") : label,
                            reinterpret_cast<uint64_t>(static_cast<VkImage>(info.image)),
                            enumOrUnderlying(oldLayout, 16),
                            enumOrUnderlying(info.finalLayout, 16),
@@ -673,8 +683,8 @@ void ZVulkanPipelineCommandRecorder::recordComputePass(const ZVulkanComputePassS
 
   CHECK(spec.groupX > 0 && spec.groupY > 0 && spec.groupZ > 0) << "Compute dispatch groups must be non-zero";
   if (m_labelDraws) {
-    const std::string label =
-      g_currentTransitionLabel.empty() ? std::string("dispatch") : (g_currentTransitionLabel + ":dispatch");
+    const std::string& transitionLabel = currentTransitionLabel();
+    const std::string label = transitionLabel.empty() ? std::string("dispatch") : (transitionLabel + ":dispatch");
     cmdBeginDebugLabel(m_commandBuffer, label);
     m_commandBuffer.dispatch(spec.groupX, spec.groupY, spec.groupZ);
     cmdEndDebugLabel(m_commandBuffer);
@@ -686,13 +696,15 @@ void ZVulkanPipelineCommandRecorder::recordComputePass(const ZVulkanComputePassS
 void ZVulkanPipelineCommandRecorder::beginRenderingSegment(const ZVulkanRenderingSegmentSpec& spec)
 {
   // Annotate transitions with the segment's debug label
-  g_currentTransitionLabel = spec.debugLabel;
+  std::string& transitionLabel = currentTransitionLabel();
+  transitionLabel = spec.debugLabel;
   // Open a debug label to wrap the entire segment (pre, rendering, post)
-  if (!g_currentTransitionLabel.empty()) {
-    cmdBeginDebugLabel(m_commandBuffer, g_currentTransitionLabel);
-    g_segmentDebugLabelOpen = true;
+  bool& debugLabelOpen = segmentDebugLabelOpen();
+  if (!transitionLabel.empty()) {
+    cmdBeginDebugLabel(m_commandBuffer, transitionLabel);
+    debugLabelOpen = true;
   } else {
-    g_segmentDebugLabelOpen = false;
+    debugLabelOpen = false;
   }
   // Pre transitions
   constexpr vk::PipelineStageFlags2 kRenderColorStage = vk::PipelineStageFlagBits2::eColorAttachmentOutput;
@@ -782,7 +794,7 @@ void ZVulkanPipelineCommandRecorder::endRenderingSegment(const ZVulkanRenderingS
     const uint32_t colors = static_cast<uint32_t>(spec.colorAttachments.size());
     const bool hasDepth = spec.depthStencilAttachment.has_value();
     const auto& r = spec.renderArea;
-    const std::string& lbl = g_currentTransitionLabel;
+    const std::string& lbl = currentTransitionLabel();
     VLOG(3) << fmt::format("VK cmdEndRendering: label='{}' colors={} depth={} renderArea=({},{} {}x{})",
                            lbl.empty() ? std::string("<unlabeled-pass>") : lbl,
                            colors,
@@ -817,11 +829,12 @@ void ZVulkanPipelineCommandRecorder::endRenderingSegment(const ZVulkanRenderingS
                       kRenderDepthAccess);
   }
   // Clear the label after completing this segment's transitions
-  g_currentTransitionLabel.clear();
+  currentTransitionLabel().clear();
   // Close the debug label region for this segment
-  if (g_segmentDebugLabelOpen) {
+  bool& debugLabelOpen = segmentDebugLabelOpen();
+  if (debugLabelOpen) {
     cmdEndDebugLabel(m_commandBuffer);
-    g_segmentDebugLabelOpen = false;
+    debugLabelOpen = false;
   }
 }
 
@@ -1020,8 +1033,8 @@ void ZVulkanPipelineCommandRecorder::recordGraphicsDraw(const ZVulkanGraphicsDra
 #endif
 
   if (m_labelDraws) {
-    const std::string label =
-      g_currentTransitionLabel.empty() ? std::string("draw") : (g_currentTransitionLabel + ":draw");
+    const std::string& transitionLabel = currentTransitionLabel();
+    const std::string label = transitionLabel.empty() ? std::string("draw") : (transitionLabel + ":draw");
     cmdBeginDebugLabel(m_commandBuffer, label);
   }
   if (drawFn) {

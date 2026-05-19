@@ -4,23 +4,34 @@ namespace nim {
 
 namespace {
 
-thread_local ZIoReadStatsHooks g_tlsHooks{};
-thread_local ZIoReadStatsContext g_tlsCtx{};
+struct IoReadStatsTlsState
+{
+  ZIoReadStatsHooks hooks;
+  ZIoReadStatsContext ctx;
+};
+
+IoReadStatsTlsState& ioReadStatsTlsState()
+{
+  thread_local IoReadStatsTlsState state;
+  return state;
+}
 
 } // namespace
 
 ZIoReadStatsScope::ZIoReadStatsScope(const ZIoReadStatsHooks& hooks, const ZIoReadStatsContext& ctx)
-  : m_prevHooks(g_tlsHooks)
-  , m_prevCtx(g_tlsCtx)
+  : m_prevHooks(ioReadStatsTlsState().hooks)
+  , m_prevCtx(ioReadStatsTlsState().ctx)
 {
-  g_tlsHooks = hooks;
-  g_tlsCtx = ctx;
+  auto& state = ioReadStatsTlsState();
+  state.hooks = hooks;
+  state.ctx = ctx;
 }
 
 ZIoReadStatsScope::~ZIoReadStatsScope()
 {
-  g_tlsHooks = m_prevHooks;
-  g_tlsCtx = m_prevCtx;
+  auto& state = ioReadStatsTlsState();
+  state.hooks = m_prevHooks;
+  state.ctx = m_prevCtx;
 }
 
 void reportFileReadBytes(size_t bytes)
@@ -28,11 +39,11 @@ void reportFileReadBytes(size_t bytes)
   if (bytes == 0) {
     return;
   }
-  if (!g_tlsHooks.onFileReadBytes) {
+  auto& state = ioReadStatsTlsState();
+  if (!state.hooks.onFileReadBytes) {
     return;
   }
-  g_tlsHooks.onFileReadBytes(g_tlsHooks.user, g_tlsCtx, bytes);
+  state.hooks.onFileReadBytes(state.hooks.user, state.ctx, bytes);
 }
 
 } // namespace nim
-

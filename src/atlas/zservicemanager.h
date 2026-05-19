@@ -68,6 +68,4 @@ private:
   bool m_init = false;
 };
 
-extern ZServiceManager* g_sm;
-
 } // namespace nim

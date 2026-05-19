@@ -32,19 +32,9 @@ ABSL_FLAG(bool,
           "Flush Atlas file logs after every write. Set false to buffer INFO/VLOG file logs and flush on severity, "
           "size, time, explicit flush, or shutdown.");
 
-namespace nim {
-
 namespace {
 
-constexpr size_t kBufferedLogFlushBytes = 1'000'000;
-constexpr std::chrono::seconds kBufferedLogFlushInterval{30};
-
-std::atomic_bool g_logInitialized = false;
-
-QString fallbackLogFileRunToken()
-{
-  return QDateTime::currentDateTime().toString(QStringLiteral("yyyyMMdd-hhmmss.zzz"));
-}
+constinit std::atomic_bool g_logReady{false};
 
 QString logFileRunToken(const QString& filenamePrefix)
 {
@@ -57,16 +47,29 @@ QString logFileRunToken(const QString& filenamePrefix)
       return token;
     }
   }
-  return fallbackLogFileRunToken();
+  return QDateTime::currentDateTime().toString(QStringLiteral("yyyyMMdd-hhmmss.zzz"));
 }
 
-QString severityLogFilePath(const QString& filenamePrefix, const QString& severityName, const QString& runToken)
+__forceinline size_t writeUnlocked(std::FILE* file, const char* data, size_t size)
 {
-  CHECK(!filenamePrefix.isEmpty());
-  CHECK(!severityName.isEmpty());
-  CHECK(!runToken.isEmpty());
+#if defined(_MSC_VER)
+  return _fwrite_nolock(data, 1, size, file);
+#elif defined(__GLIBC__)
+  return ::fwrite_unlocked(data, 1, size, file);
+#else
+  return std::fwrite(data, 1, size, file);
+#endif
+}
 
-  return filenamePrefix + '_' + severityName + '_' + runToken + QStringLiteral("_log.txt");
+__forceinline int flushUnlocked(std::FILE* file)
+{
+#if defined(_MSC_VER)
+  return _fflush_nolock(file);
+#elif defined(__GLIBC__)
+  return ::fflush_unlocked(file);
+#else
+  return std::fflush(file);
+#endif
 }
 
 std::string programDisplayName(std::string_view programNameOrPath)
@@ -91,11 +94,6 @@ std::string programDisplayName(std::string_view programNameOrPath)
   return std::string(basename);
 }
 
-std::shared_ptr<absl::LogSink> createConsoleLogSink();
-std::shared_ptr<absl::LogSink> createSeverityFileLogSink(const QString& filenamePrefix);
-
-} // namespace
-
 void myMessageOutput(QtMsgType type, const QMessageLogContext& context, const QString& msg)
 {
   const char* file = context.file ? context.file : "Qt";
@@ -119,97 +117,15 @@ void myMessageOutput(QtMsgType type, const QMessageLogContext& context, const QS
   }
 }
 
-const ZLogInit& ZLogInit::instance(std::string programNameOrPath, const QString& filename)
-{
-  static ZLogInit logInit(std::move(programNameOrPath), filename);
-  return logInit;
-}
+} // namespace
 
-bool ZLogInit::isInitialized()
-{
-  return g_logInitialized.load(std::memory_order_acquire);
-}
-
-ZLogInit::ZLogInit(std::string programNameOrPath, const QString& filename)
-{
-  const bool wasInitialized = g_logInitialized.exchange(true, std::memory_order_acq_rel);
-  CHECK(!wasInitialized) << "ZLogInit must be initialized exactly once";
-
-  const std::string appName = programDisplayName(programNameOrPath);
-
-  absl::SetMinLogLevel(absl::LogSeverityAtLeast::kInfo);
-  absl::SetStderrThreshold(absl::LogSeverityAtLeast::kError);
-
-  absl::InitializeSymbolizer(programNameOrPath.c_str());
-  absl::FailureSignalHandlerOptions failureOptions;
-  absl::InstallFailureSignalHandler(failureOptions);
-
-  absl::InitializeLog();
-
-  auto consoleSink = createConsoleLogSink();
-  CHECK(consoleSink) << "Failed to create Atlas console log sink";
-  addLogSink(consoleSink);
-  m_logSinks.push_back(std::move(consoleSink));
-
-  if (!filename.isEmpty()) {
-    auto fileSink = createSeverityFileLogSink(filename);
-    CHECK(fileSink) << "Failed to create Atlas file log sink: " << filename;
-    addLogSink(fileSink);
-    m_logSinks.push_back(std::move(fileSink));
-  }
-
-  installGlogToAbseilLogBridge();
-
-  LOG(INFO) << fmt::format("--- {} Log Start ---", appName);
-
-  // handle qt message
-  qInstallMessageHandler(myMessageOutput);
-}
-
-ZLogInit::~ZLogInit()
-{
-  qInstallMessageHandler(nullptr);
-
-  uninstallGlogToAbseilLogBridge();
-
-  for (const auto& sink : m_logSinks) {
-    if (sink) {
-      sink->Flush();
-    }
-    removeLogSink(sink);
-  }
-  g_logInitialized.store(false, std::memory_order_release);
-}
+namespace nim {
 
 LogData::LogData(const absl::LogEntry& entry)
   : level(entry.log_severity())
   , time(absl::ToChronoTime(entry.timestamp()))
   , formatted(entry.text_message_with_prefix())
 {}
-
-namespace {
-
-__forceinline size_t writeUnlocked(std::FILE* file, const char* data, size_t size)
-{
-#if defined(_MSC_VER)
-  return _fwrite_nolock(data, 1, size, file);
-#elif defined(__GLIBC__)
-  return ::fwrite_unlocked(data, 1, size, file);
-#else
-  return std::fwrite(data, 1, size, file);
-#endif
-}
-
-__forceinline int flushUnlocked(std::FILE* file)
-{
-#if defined(_MSC_VER)
-  return _fflush_nolock(file);
-#elif defined(__GLIBC__)
-  return ::fflush_unlocked(file);
-#else
-  return std::fflush(file);
-#endif
-}
 
 class ConsoleLogSink : public absl::LogSink
 {
@@ -235,11 +151,6 @@ public:
   }
 };
 
-std::shared_ptr<absl::LogSink> createConsoleLogSink()
-{
-  return std::make_shared<ConsoleLogSink>();
-}
-
 enum class FileOpenMode
 {
   Immediate,
@@ -250,6 +161,9 @@ using FileHandle = std::unique_ptr<std::FILE, decltype(&std::fclose)>;
 
 class FileLogWriter
 {
+  static constexpr size_t kBufferedFlushBytes = 1'000'000;
+  static constexpr std::chrono::seconds kBufferedFlushInterval{30};
+
   QString m_filename;
   FileHandle m_file{nullptr, std::fclose};
   FileOpenMode m_openMode;
@@ -287,7 +201,7 @@ public:
     }
 
     m_bytesSinceFlush += bytesWritten;
-    if (forceFlush || m_bytesSinceFlush >= kBufferedLogFlushBytes || now >= m_nextFlushTime) {
+    if (forceFlush || m_bytesSinceFlush >= kBufferedFlushBytes || now >= m_nextFlushTime) {
       return flush(now);
     }
     return true;
@@ -303,7 +217,7 @@ public:
       return false;
     }
     m_bytesSinceFlush = 0;
-    m_nextFlushTime = now + kBufferedLogFlushInterval;
+    m_nextFlushTime = now + kBufferedFlushInterval;
     return true;
   }
 
@@ -328,7 +242,7 @@ private:
     }
 
     m_openFailed = m_file == nullptr;
-    m_nextFlushTime = now + kBufferedLogFlushInterval;
+    m_nextFlushTime = now + kBufferedFlushInterval;
     return !m_openFailed;
   }
 };
@@ -415,7 +329,8 @@ public:
     const QString runToken = logFileRunToken(filenamePrefix);
     for (size_t i = 0; i < severityFiles.size(); ++i) {
       const SeverityFileSpec& spec = severityFiles[i];
-      const QString logFile = severityLogFilePath(filenamePrefix, QString::fromLatin1(spec.severityName), runToken);
+      const QString severityName = QString::fromLatin1(spec.severityName);
+      const QString logFile = filenamePrefix + '_' + severityName + '_' + runToken + QStringLiteral("_log.txt");
       m_files[i] = std::make_unique<FileLogWriter>(logFile, spec.openMode);
       if (spec.openMode == FileOpenMode::Immediate) {
         CHECK(m_files[i]->isValid()) << "Failed to create Atlas log sink: " << logFile;
@@ -444,12 +359,65 @@ public:
   }
 };
 
-std::shared_ptr<absl::LogSink> createSeverityFileLogSink(const QString& filenamePrefix)
+const ZLogInit& ZLogInit::instance(std::string programNameOrPath, const QString& filename)
 {
-  return filenamePrefix.isEmpty() ? nullptr : std::make_shared<SeverityFileLogSink>(filenamePrefix);
+  static ZLogInit logInit(std::move(programNameOrPath), filename);
+  return logInit;
 }
 
-} // namespace
+bool ZLogInit::isInitialized()
+{
+  return g_logReady.load(std::memory_order_acquire);
+}
+
+ZLogInit::ZLogInit(std::string programNameOrPath, const QString& filename)
+{
+  const std::string appName = programDisplayName(programNameOrPath);
+
+  absl::SetMinLogLevel(absl::LogSeverityAtLeast::kInfo);
+  absl::SetStderrThreshold(absl::LogSeverityAtLeast::kError);
+
+  absl::InitializeSymbolizer(programNameOrPath.c_str());
+  absl::FailureSignalHandlerOptions failureOptions;
+  absl::InstallFailureSignalHandler(failureOptions);
+
+  absl::InitializeLog();
+
+  auto consoleSink = std::make_shared<ConsoleLogSink>();
+  addLogSink(consoleSink);
+  m_logSinks.push_back(std::move(consoleSink));
+
+  if (!filename.isEmpty()) {
+    auto fileSink = std::make_shared<SeverityFileLogSink>(filename);
+    addLogSink(fileSink);
+    m_logSinks.push_back(std::move(fileSink));
+  }
+
+  installGlogToAbseilLogBridge();
+
+  LOG(INFO) << fmt::format("--- {} Log Start ---", appName);
+
+  // handle qt message
+  qInstallMessageHandler(myMessageOutput);
+
+  g_logReady.store(true, std::memory_order_release);
+}
+
+ZLogInit::~ZLogInit()
+{
+  g_logReady.store(false, std::memory_order_release);
+
+  qInstallMessageHandler(nullptr);
+
+  uninstallGlogToAbseilLogBridge();
+
+  for (const auto& sink : m_logSinks) {
+    if (sink) {
+      sink->Flush();
+    }
+    removeLogSink(sink);
+  }
+}
 
 std::shared_ptr<absl::LogSink> createFileLogSink(const QString& filename)
 {

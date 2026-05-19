@@ -145,10 +145,12 @@ using atlas::rpc::KeyInfo;
 using atlas::rpc::TimeStatus;
 using atlas::rpc::GetTimeRequest;
 
-ZRPCService::ZRPCService(std::string_view appVersion, QObject* parent)
+ZRPCService::ZRPCService(std::string_view appVersion, ZServiceManager* serviceManager, QObject* parent)
   : QObject(parent)
+  , m_serviceManager(serviceManager)
   , m_appVersion(appVersion)
 {
+  CHECK(m_serviceManager);
   CHECK(!m_appVersion.empty());
 }
 
@@ -3743,7 +3745,7 @@ private:
 
 void ZRPCService::init()
 {
-  g_sm->checkCurrentOn(ZServiceManager::RPC);
+  m_serviceManager->checkCurrentOn(ZServiceManager::RPC);
   // We are already running on the dedicated RPC thread managed by ZServiceManager.
   // Start the gRPC server on this thread, but run the blocking Wait in a
   // dedicated std::thread so the Qt event loop remains responsive for
@@ -3753,7 +3755,7 @@ void ZRPCService::init()
 
 void ZRPCService::shutdown()
 {
-  g_sm->checkCurrentOn(ZServiceManager::RPC);
+  m_serviceManager->checkCurrentOn(ZServiceManager::RPC);
   if (m_grpcServer) {
     m_grpcServer->Shutdown();
   }
@@ -3769,7 +3771,7 @@ void ZRPCService::shutdown()
 void ZRPCService::onRPCThreadStarted()
 {
   // Ensure we are on the RPC thread
-  CHECK(g_sm->isCurrentOn(ZServiceManager::RPC));
+  CHECK(m_serviceManager->isCurrentOn(ZServiceManager::RPC));
 
   constexpr const char* kSceneRpcLoopbackAddress = "127.0.0.1:50051";
   constexpr const char* kSceneRpcAllInterfacesAddress = "0.0.0.0:50051";

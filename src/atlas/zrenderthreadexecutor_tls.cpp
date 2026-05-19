@@ -5,30 +5,39 @@
 
 namespace nim {
 
-thread_local ZQtExecutor* g_renderThreadExecutor = nullptr;
+namespace {
+
+ZQtExecutor*& renderThreadExecutorSlot()
+{
+  thread_local ZQtExecutor* executor = nullptr;
+  return executor;
+}
+
+} // namespace
 
 ZQtExecutor* currentRenderThreadExecutorOrNull()
 {
-  return g_renderThreadExecutor;
+  return renderThreadExecutorSlot();
 }
 
 ZQtExecutor& currentRenderThreadExecutor()
 {
-  CHECK(g_renderThreadExecutor != nullptr) << "Render-thread executor is not set for this thread";
-  return *g_renderThreadExecutor;
+  ZQtExecutor* executor = renderThreadExecutorSlot();
+  CHECK(executor != nullptr) << "Render-thread executor is not set for this thread";
+  return *executor;
 }
 
 folly::Executor::KeepAlive<> currentRenderThreadExecutorKeepAlive(std::string_view debugLabel)
 {
-  CHECK(g_renderThreadExecutor != nullptr)
-    << "Render-thread executor is not set for this thread" << (debugLabel.empty() ? "" : " (") << debugLabel
-    << (debugLabel.empty() ? "" : ")");
-  return folly::getKeepAliveToken(g_renderThreadExecutor);
+  ZQtExecutor* executor = renderThreadExecutorSlot();
+  CHECK(executor != nullptr) << "Render-thread executor is not set for this thread" << (debugLabel.empty() ? "" : " (")
+                             << debugLabel << (debugLabel.empty() ? "" : ")");
+  return folly::getKeepAliveToken(executor);
 }
 
 void setCurrentRenderThreadExecutor(ZQtExecutor* executor)
 {
-  g_renderThreadExecutor = executor;
+  renderThreadExecutorSlot() = executor;
 }
 
 } // namespace nim

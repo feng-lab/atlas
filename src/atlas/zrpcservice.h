@@ -15,13 +15,14 @@ class Service;
 namespace nim {
 
 class ZRpcUiDispatcher;
+class ZServiceManager;
 
 class ZRPCService : public QObject
 {
   Q_OBJECT
 
 public:
-  explicit ZRPCService(std::string_view appVersion, QObject* parent = nullptr);
+  explicit ZRPCService(std::string_view appVersion, ZServiceManager* serviceManager, QObject* parent = nullptr);
 
   ~ZRPCService() override; // defined in .cpp to keep grpc::Service complete
 
@@ -48,6 +49,8 @@ private:
 
   // Non-owning; owned by ZServiceManager on the UI thread.
   ZRpcUiDispatcher* m_uiDispatcher = nullptr;
+  // Non-owning back-reference; ZServiceManager owns this service and outlives it.
+  ZServiceManager* m_serviceManager = nullptr;
   // Non-owning reference to the app's version string. Must outlive the RPC service.
   std::string_view m_appVersion;
 };
