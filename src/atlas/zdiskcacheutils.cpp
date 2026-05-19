@@ -8,6 +8,8 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <optional>
+#include <string>
 
 namespace {
 
@@ -34,9 +36,9 @@ constexpr uint64_t kDefaultImgPreviewDiskCacheAsyncMaxPendingBytes = 1024ULL * k
 
 } // namespace
 
-ABSL_FLAG(std::string,
+ABSL_FLAG(std::optional<std::string>,
           atlas_disk_cache_dir,
-          "",
+          std::nullopt,
           "Root directory for the persistent Atlas disk cache (default: auto-chosen Atlas cache directory).");
 
 ABSL_FLAG(uint64_t,
@@ -107,8 +109,9 @@ namespace nim {
 
 QString atlasDiskCacheRootDirFromFlags()
 {
-  if (!absl::GetFlag(FLAGS_atlas_disk_cache_dir).empty()) {
-    return QString::fromStdString(absl::GetFlag(FLAGS_atlas_disk_cache_dir)).trimmed();
+  const std::optional<std::string> rootOverride = absl::GetFlag(FLAGS_atlas_disk_cache_dir);
+  if (rootOverride.has_value()) {
+    return QString::fromStdString(*rootOverride).trimmed();
   }
 
   // Prefer the Atlas image cache root (may select a non-system volume with enough space).

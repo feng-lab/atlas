@@ -33,7 +33,7 @@
 #include <openssl/x509.h>
 #endif
 
-ABSL_DECLARE_FLAG(std::string, atlas_http_ca_bundle);
+ABSL_DECLARE_FLAG(std::optional<std::string>, atlas_http_ca_bundle);
 
 ABSL_FLAG(std::string,
           atlas_http_windows_trust_source,
@@ -223,12 +223,12 @@ ZHttpWindowsTrustSource windowsTrustSourceFromString(std::string_view value)
 
 ZHttpTrustStoreConfig resolveHttpTrustStoreConfig(ZHttpTrustBackend backend)
 {
-  const std::string caBundle = absl::GetFlag(FLAGS_atlas_http_ca_bundle);
-  if (!caBundle.empty()) {
-    if (!isReadableFile(caBundle)) {
-      throw ZException(fmt::format("--atlas_http_ca_bundle points to an unreadable file: '{}'", caBundle));
+  const std::optional<std::string> caBundle = absl::GetFlag(FLAGS_atlas_http_ca_bundle);
+  if (caBundle.has_value()) {
+    if (!isReadableFile(*caBundle)) {
+      throw ZException(fmt::format("--atlas_http_ca_bundle points to an unreadable file: '{}'", *caBundle));
     }
-    return ZHttpTrustStoreConfig{caBundle, "flag:atlas_http_ca_bundle"};
+    return ZHttpTrustStoreConfig{*caBundle, "flag:atlas_http_ca_bundle"};
   }
 
 #if defined(_WIN32)

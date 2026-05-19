@@ -13,6 +13,8 @@
 #include <folly/futures/Future.h>
 #include <folly/executors/CPUThreadPoolExecutor.h>
 #include <QCoreApplication>
+#include <string>
+#include <vector>
 
 ABSL_FLAG(bool, run_export_3d_animation, false, "Enable exporting 3D animation via command line");
 ABSL_FLAG(std::string,
@@ -55,9 +57,9 @@ ABSL_FLAG(int32_t, output_tile_border, 64, "Tile border size for segmented rende
 ABSL_FLAG(int32_t, maximum_output_width, 15360, "Maximum possible output video width. Default: 15360");
 ABSL_FLAG(int32_t, maximum_output_height, 8640, "Maximum possible output video height. Default: 8640");
 
-ABSL_FLAG(std::string,
+ABSL_FLAG(std::vector<std::string>,
           use_gpu_devices,
-          "",
+          std::vector<std::string>{},
           "Comma-separated list of GPU device IDs to use (e.g., '0,1,2,3'). Linux only.");
 ABSL_DECLARE_FLAG(uint32_t, use_gpu_device);
 
@@ -122,11 +124,9 @@ int ZRunExport3DAnimation::run()
   }
 
 #if defined(__linux__)
-  if (std::vector<std::string_view> gpuDevices =
-        absl::StrSplit(absl::GetFlag(FLAGS_use_gpu_devices), absl::ByAnyChar(delimiter_literal), absl::SkipEmpty());
-      !gpuDevices.empty()) {
+  if (std::vector<std::string> gpuDevices = absl::GetFlag(FLAGS_use_gpu_devices); !gpuDevices.empty()) {
     std::vector<uint32_t> gpuList;
-    for (auto numStr : gpuDevices) {
+    for (const std::string& numStr : gpuDevices) {
       uint32_t v;
       if (!stringToValueNoThrow(numStr, v)) {
         LOG(ERROR) << fmt::format("invalid gpu device {}", numStr);
@@ -264,7 +264,7 @@ int ZRunExport3DAnimation::run()
 
   absl::SetFlag(&FLAGS___use_EGL, true);
 #else
-  if (auto gpuDevices = QString::fromStdString(absl::GetFlag(FLAGS_use_gpu_devices)).trimmed(); !gpuDevices.isEmpty()) {
+  if (!absl::GetFlag(FLAGS_use_gpu_devices).empty()) {
     LOG(ERROR) << "Flag --use_gpu_devices is Linux only";
   }
 #endif

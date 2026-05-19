@@ -952,6 +952,10 @@ Canvas and Lifecycle
 Logging
 
 - Uses Abseil logging: `LOG`, `VLOG`, and `CHECK`.
+- Atlas file logs flush every write by default for debugging parity during the glog-to-Abseil migration. Setting
+  `--atlas_log_always_flush_files=false` buffers INFO/VLOG file writes and flushes on WARNING or higher, after 1 MB of
+  buffered file output, after 30 seconds on the next log write, on explicit `absl::FlushLogSinks()`, and during logging
+  shutdown. Console output still flushes immediately.
 - Notable info logs:
   - “3D scene parameters applied” — deferred scene apply queue drained.
   - “3D animation parameters bound” — first animation binding completed.
@@ -993,6 +997,7 @@ Runtime Flags and Config Flagfile
   - One flag per line, `--name=value`.
   - `#` begins a comment; blank lines are allowed.
   - Booleans use `true/false`; numeric flags use integers or decimals as appropriate.
+  - String-list flags use Abseil's comma-separated format; optional string/path flags use an empty value for `std::nullopt`.
 - Atlas Settings rewrites the managed section on save and preserves the dedicated manual block for custom flags that are not exposed in the dialog. Users who edit the file directly should place non-GUI flags in that preserved block.
 - Apply on restart: changes take effect the next time Atlas starts. Advise users to check startup logs for any flag parse errors.
 
@@ -1013,6 +1018,7 @@ Common examples in the generated settings file / dialog
 - `--atlas_debug_opengl` / `--atlas_debug_vulkan` — enable GL/Vulkan debugging aids.
 - `--atlas_default_render_backend` — choose the default 3D renderer backend at startup (`opengl` or `vulkan`).
 - `--atlas_volume_rendering_maximum_round` — raise/lower ray-march rounds.
+- `--atlas_log_always_flush_files` — keep file logs immediately flushed for debugging, or disable for lower log overhead.
 - `--v` — set global log verbosity.
 
 Render Batch Contract

@@ -11,6 +11,7 @@
 #include <QPoint>
 #include <absl/debugging/failure_signal_handler.h>
 #include <absl/debugging/symbolize.h>
+#include <absl/flags/flag.h>
 #include <absl/log/globals.h>
 #include <absl/log/log_sink_registry.h>
 #include <absl/log/initialize.h>
@@ -18,15 +19,25 @@
 #include <algorithm>
 #include <array>
 #include <atomic>
+#include <chrono>
 #include <cctype>
 #include <cstdio>
 #include <iostream>
 #include <mutex>
 #include <utility>
 
+ABSL_FLAG(bool,
+          atlas_log_always_flush_files,
+          true,
+          "Flush Atlas file logs after every write. Set false to buffer INFO/VLOG file logs and flush on severity, "
+          "size, time, explicit flush, or shutdown.");
+
 namespace nim {
 
 namespace {
+
+constexpr size_t kBufferedLogFlushBytes = 1'000'000;
+constexpr std::chrono::seconds kBufferedLogFlushInterval{30};
 
 std::atomic_bool g_logInitialized = false;
 
@@ -162,6 +173,9 @@ ZLogInit::~ZLogInit()
   uninstallGlogToAbseilLogBridge();
 
   for (const auto& sink : m_logSinks) {
+    if (sink) {
+      sink->Flush();
+    }
     removeLogSink(sink);
   }
   g_logInitialized.store(false, std::memory_order_release);
@@ -213,6 +227,12 @@ public:
     (void)writeUnlocked(stdout, message.data(), message.size());
     (void)flushUnlocked(stdout);
   }
+
+  void Flush() override
+  {
+    std::scoped_lock lock(m_mutex);
+    (void)flushUnlocked(stdout);
+  }
 };
 
 std::shared_ptr<absl::LogSink> createConsoleLogSink()
@@ -233,6 +253,8 @@ class FileLogWriter
   QString m_filename;
   FileHandle m_file{nullptr, std::fclose};
   FileOpenMode m_openMode;
+  size_t m_bytesSinceFlush = 0;
+  std::chrono::steady_clock::time_point m_nextFlushTime;
   bool m_openFailed = false;
 
 public:
@@ -241,7 +263,7 @@ public:
     , m_openMode(openMode)
   {
     if (m_openMode == FileOpenMode::Immediate) {
-      ensureOpen();
+      ensureOpen(std::chrono::steady_clock::now());
     }
   }
 
@@ -253,20 +275,32 @@ public:
     return !m_openFailed && (m_openMode == FileOpenMode::Lazy || m_file != nullptr);
   }
 
-  bool write(absl::string_view message)
+  bool write(absl::string_view message, bool forceFlush, std::chrono::steady_clock::time_point now)
   {
-    if (m_openMode == FileOpenMode::Lazy && !ensureOpen()) {
+    if (!ensureOpen(now)) {
       return false;
     }
 
     std::FILE* file = m_file.get();
     const size_t bytesWritten = writeUnlocked(file, message.data(), message.size());
-    const bool flushed = flushUnlocked(file) == 0;
-    return bytesWritten == message.size() && flushed;
+    if (bytesWritten != message.size()) {
+      return false;
+    }
+
+    m_bytesSinceFlush += bytesWritten;
+    if (forceFlush || m_bytesSinceFlush >= kBufferedLogFlushBytes || now >= m_nextFlushTime) {
+      return flush(now);
+    }
+    return true;
+  }
+
+  bool flush()
+  {
+    return flush(std::chrono::steady_clock::now());
   }
 
 private:
-  bool ensureOpen()
+  bool ensureOpen(std::chrono::steady_clock::time_point now)
   {
     if (m_file != nullptr) {
       return true;
@@ -286,7 +320,22 @@ private:
     }
 
     m_openFailed = m_file == nullptr;
+    m_nextFlushTime = now + kBufferedLogFlushInterval;
     return !m_openFailed;
+  }
+
+  bool flush(std::chrono::steady_clock::time_point now)
+  {
+    if (m_file == nullptr) {
+      return true;
+    }
+
+    if (flushUnlocked(m_file.get()) != 0) {
+      return false;
+    }
+    m_bytesSinceFlush = 0;
+    m_nextFlushTime = now + kBufferedLogFlushInterval;
+    return true;
   }
 };
 
@@ -295,11 +344,13 @@ class SingleFileLogSink : public absl::LogSink
   FileLogWriter m_file;
   std::mutex m_mutex;
   absl::LogSeverity m_minSeverity;
+  bool m_alwaysFlushFiles;
 
 public:
   explicit SingleFileLogSink(const QString& filename, absl::LogSeverity minSeverity = absl::LogSeverity::kInfo)
     : m_file(filename)
     , m_minSeverity(minSeverity)
+    , m_alwaysFlushFiles(absl::GetFlag(FLAGS_atlas_log_always_flush_files))
   {}
 
   [[nodiscard]] bool isValid() const
@@ -314,8 +365,16 @@ public:
     }
 
     const absl::string_view message = entry.text_message_with_prefix_and_newline();
+    const bool forceFlush = m_alwaysFlushFiles || entry.log_severity() >= absl::LogSeverity::kWarning;
+    const auto now = std::chrono::steady_clock::now();
     std::scoped_lock lock(m_mutex);
-    m_file.write(message);
+    m_file.write(message, forceFlush, now);
+  }
+
+  void Flush() override
+  {
+    std::scoped_lock lock(m_mutex);
+    m_file.flush();
   }
 };
 
@@ -353,9 +412,11 @@ class SeverityFileLogSink : public absl::LogSink
 
   std::array<std::unique_ptr<FileLogWriter>, severityFiles.size()> m_files;
   std::mutex m_mutex;
+  bool m_alwaysFlushFiles;
 
 public:
   explicit SeverityFileLogSink(const QString& filenamePrefix)
+    : m_alwaysFlushFiles(absl::GetFlag(FLAGS_atlas_log_always_flush_files))
   {
     const QString runToken = logFileRunToken(filenamePrefix);
     for (size_t i = 0; i < severityFiles.size(); ++i) {
@@ -372,9 +433,19 @@ public:
   {
     const absl::string_view message = entry.text_message_with_prefix_and_newline();
     const size_t maxIndex = severityFileIndex(entry.log_severity());
+    const bool forceFlush = m_alwaysFlushFiles || entry.log_severity() >= absl::LogSeverity::kWarning;
+    const auto now = std::chrono::steady_clock::now();
     std::scoped_lock lock(m_mutex);
     for (size_t i = 0; i <= maxIndex; ++i) {
-      m_files[i]->write(message);
+      m_files[i]->write(message, forceFlush, now);
+    }
+  }
+
+  void Flush() override
+  {
+    std::scoped_lock lock(m_mutex);
+    for (const auto& file : m_files) {
+      file->flush();
     }
   }
 };

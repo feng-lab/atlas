@@ -27,9 +27,9 @@
 #include <utility>
 #include <vector>
 
-ABSL_FLAG(std::string,
+ABSL_FLAG(std::optional<std::string>,
           atlas_bioformats_java_xmx,
-          "",
+          std::nullopt,
           "Optional maximum Java heap for the persistent Bio-Formats bridge process. Empty means no -Xmx argument.");
 ABSL_FLAG(int32_t,
           atlas_bioformats_bridge_io_timeout_ms,
@@ -432,7 +432,8 @@ public:
   ZBioFormatsGrpcBridgeProcess()
   {
     LOG(INFO) << "Bio-Formats bridge gRPC backend enabled with one stateless Java bridge process"
-              << " (--atlas_bioformats_java_xmx=" << absl::GetFlag(FLAGS_atlas_bioformats_java_xmx) << ")";
+              << " (--atlas_bioformats_java_xmx="
+              << absl::GetFlag(FLAGS_atlas_bioformats_java_xmx).value_or(std::string{}) << ")";
   }
 
   ~ZBioFormatsGrpcBridgeProcess()
@@ -712,9 +713,9 @@ private:
     startupTimer.start();
 
     QStringList args;
-    const std::string javaXmx = absl::GetFlag(FLAGS_atlas_bioformats_java_xmx);
-    if (!javaXmx.empty()) {
-      args.push_back(QString("-Xmx%1").arg(QString::fromStdString(javaXmx)));
+    const std::optional<std::string> javaXmx = absl::GetFlag(FLAGS_atlas_bioformats_java_xmx);
+    if (javaXmx.has_value()) {
+      args.push_back(QString("-Xmx%1").arg(QString::fromStdString(*javaXmx)));
     }
     args << "-Djava.awt.headless=true"
          << "-Dorg.slf4j.simpleLogger.logFile=System.err"

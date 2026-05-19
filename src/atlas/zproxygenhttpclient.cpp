@@ -36,11 +36,15 @@
 #include <algorithm>
 #include <exception>
 #include <memory>
+#include <optional>
 #include <stdexcept>
 
 ABSL_DECLARE_FLAG(uint64_t, atlas_disk_cache_http_max_bytes);
 
-ABSL_FLAG(std::string, atlas_http_ca_bundle, "", "Path to a PEM CA bundle for HTTPS requests (overrides auto-detect).");
+ABSL_FLAG(std::optional<std::string>,
+          atlas_http_ca_bundle,
+          std::nullopt,
+          "Path to a PEM CA bundle for HTTPS requests (overrides auto-detect).");
 
 ABSL_FLAG(std::string,
           atlas_http_proxy_strategy,

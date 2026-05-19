@@ -382,7 +382,9 @@ bool ZFlagSettingsDialog::validateField(const FieldWidgets& field, QString* cano
   }
 
   const QString flagType = QString::fromStdString(field.info->type);
-  if (flagType != QLatin1String("string") && rawValue.isEmpty()) {
+  const bool acceptsEmptyValue = flagType == QLatin1String("string") || flagType == QLatin1String("optional_string") ||
+                                 flagType == QLatin1String("string_list");
+  if (!acceptsEmptyValue && rawValue.isEmpty()) {
     if (error != nullptr) {
       *error = tr("%1 requires a value.").arg(field.spec->label);
     }

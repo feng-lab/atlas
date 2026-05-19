@@ -204,6 +204,12 @@ const std::vector<ZFlagSettingSpec>& atlasFlagSettingSpecs()
                                 ZFlagSettingEditorKind::Auto,
                                 {},
                                 true));
+    allSpecs.push_back(makeSpec("atlas_log_always_flush_files",
+                                "Logging & Debugging",
+                                "Always flush file logs",
+                                ZFlagSettingEditorKind::Auto,
+                                {},
+                                true));
     allSpecs.push_back(makeSpec("atlas_debug_opengl",
                                 "Logging & Debugging",
                                 "Enable OpenGL debug checks",

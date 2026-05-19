@@ -11,17 +11,17 @@
 #include "zjson.h"
 
 ABSL_FLAG(std::string, atlas_perf_mode, "light", "Perf mode: off|light|full");
-ABSL_FLAG(std::string,
+ABSL_FLAG(std::optional<std::string>,
           atlas_perf_trace,
-          "",
+          std::nullopt,
           "If non-empty, write Chrome trace JSON for each flushed frame to this path (overwrites)");
-ABSL_FLAG(std::string,
+ABSL_FLAG(std::optional<std::string>,
           atlas_perf_trace_append,
-          "",
+          std::nullopt,
           "If non-empty, append this frame's Chrome trace events into the given file (accumulates frames)");
-ABSL_FLAG(std::string,
+ABSL_FLAG(std::optional<std::string>,
           atlas_perf_summary,
-          "",
+          std::nullopt,
           "Summary export. Format 'csv:path' or 'json:path'. Appends per-frame totals, top labels, and stats");
 ABSL_FLAG(bool,
           atlas_perf_trace_calibrated,
@@ -348,8 +348,8 @@ void Z3DPerfCollector::flush(uint64_t token)
 
   // Optional: emit a Chrome trace JSON for this frame
   const bool traceCalibrated = absl::GetFlag(FLAGS_atlas_perf_trace_calibrated);
-  const std::string tracePath = absl::GetFlag(FLAGS_atlas_perf_trace);
-  if (!tracePath.empty()) {
+  const std::optional<std::string> tracePath = absl::GetFlag(FLAGS_atlas_perf_trace);
+  if (tracePath.has_value()) {
     struct Ev
     {
       std::string name;
@@ -406,7 +406,7 @@ void Z3DPerfCollector::flush(uint64_t token)
     }
 
     try {
-      std::ofstream ofs(tracePath, std::ios::out | std::ios::trunc);
+      std::ofstream ofs(*tracePath, std::ios::out | std::ios::trunc);
       ofs << "{\n\"traceEvents\":[\n";
       for (size_t i = 0; i < events.size(); ++i) {
         const auto& e = events[i];
@@ -419,7 +419,7 @@ void Z3DPerfCollector::flush(uint64_t token)
       }
       ofs << "]\n}\n";
       ofs.close();
-      VLOG(1) << "Wrote Chrome trace to " << tracePath;
+      VLOG(1) << "Wrote Chrome trace to " << *tracePath;
     }
     catch (const std::exception& ex) {
       LOG(ERROR) << "Failed to write perf trace: " << ex.what();
@@ -427,8 +427,8 @@ void Z3DPerfCollector::flush(uint64_t token)
   }
 
   // Optional: append this frame's trace events to a multi-frame Chrome trace file
-  const std::string traceAppendPath = absl::GetFlag(FLAGS_atlas_perf_trace_append);
-  if (!traceAppendPath.empty()) {
+  const std::optional<std::string> traceAppendPath = absl::GetFlag(FLAGS_atlas_perf_trace_append);
+  if (traceAppendPath.has_value()) {
     // Build events as above
     struct Ev
     {
@@ -487,14 +487,14 @@ void Z3DPerfCollector::flush(uint64_t token)
 
     try {
       // Append by reopening and inserting before closing ]}
-      std::ifstream ifs(traceAppendPath);
+      std::ifstream ifs(*traceAppendPath);
       std::string existing;
       if (ifs.good()) {
         existing.assign(std::istreambuf_iterator<char>(ifs), std::istreambuf_iterator<char>());
       }
       ifs.close();
 
-      std::ofstream ofs(traceAppendPath, std::ios::out | std::ios::trunc);
+      std::ofstream ofs(*traceAppendPath, std::ios::out | std::ios::trunc);
       if (!ofs.good()) {
         throw std::runtime_error("Cannot open trace append file for write");
       }
@@ -563,7 +563,7 @@ void Z3DPerfCollector::flush(uint64_t token)
         }
       }
       ofs.close();
-      VLOG(1) << "Appended Chrome trace events to " << traceAppendPath;
+      VLOG(1) << "Appended Chrome trace events to " << *traceAppendPath;
     }
     catch (const std::exception& ex) {
       LOG(ERROR) << "Failed to append perf trace: " << ex.what();
@@ -571,16 +571,16 @@ void Z3DPerfCollector::flush(uint64_t token)
   }
 
   // Optional: per-frame summary export (CSV/JSON)
-  const std::string perfSummary = absl::GetFlag(FLAGS_atlas_perf_summary);
-  if (!perfSummary.empty()) {
+  const std::optional<std::string> perfSummary = absl::GetFlag(FLAGS_atlas_perf_summary);
+  if (perfSummary.has_value()) {
     try {
       // parse format:path
-      const auto sep = perfSummary.find(":");
+      const auto sep = perfSummary->find(":");
       if (sep == std::string::npos) {
         throw std::runtime_error("atlas_perf_summary must be 'csv:path' or 'json:path'");
       }
-      const std::string fmtKind = perfSummary.substr(0, sep);
-      const std::string outPath = perfSummary.substr(sep + 1);
+      const std::string fmtKind = perfSummary->substr(0, sep);
+      const std::string outPath = perfSummary->substr(sep + 1);
       if (fmtKind == "csv") {
         // Append CSV with header if file new. Top5 labels for stable columns.
         std::ifstream ifs(outPath);

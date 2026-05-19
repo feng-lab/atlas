@@ -1266,7 +1266,7 @@ For automation or cluster rendering:
    - `--output_tile_size 1024 --output_tile_border 64` (default for 3D animation export)
    - `--output_tile_size 512 --output_tile_border 64` for huge out-of-core or low-VRAM exports where smaller tiles improve page-cache reuse
    - `--limit_memory_usage_in_gb_to 12`
-   - On Linux: `--use_gpu_devices 0,1 --__use_EGL`
+   - On Linux: `--use_gpu_devices=0,1 --__use_EGL`
 4. Monitor CLI logs for progress updates and errors while the export is running.
 5. Atlas exits non-zero if the export reports an error. In headless mode the first rendering/export error aborts the
    export instead of continuing and returning success.
@@ -1291,7 +1291,7 @@ For reproducible still-image capture from saved workspaces:
 3. Optional flags:
    - `--output_tile_size 1024 --output_tile_border 64`
    - `--limit_memory_usage_in_gb_to 12`
-   - On Linux: `--use_gpu_devices 0 --__use_EGL`
+   - On Linux: `--use_gpu_devices=0 --__use_EGL`
 4. Atlas blocks until deferred `View3DGeneral` and per-object `View3D` scene settings finish applying, then captures
    the image file. There is no scene-apply timeout in this mode; the export does not proceed until the saved scene
    state is fully ready.
@@ -1417,7 +1417,7 @@ Atlas supports a flag-based configuration file that lets you tweak performance, 
 - Structured editor: use **Edit → Settings...** to edit the supported settings in a GUI. On macOS, this action may appear in the standard application menu instead of Edit. Saving creates `user_settings_flagfile.txt` if it does not already exist.
 - Open location: use **Edit → Settings...**, then click **Open Config Folder**.
 - Direct text editing: use **Edit → Settings...**, then click **Edit Config Flag File...** to open `user_settings_flagfile.txt` in your default external editor.
-- Edit format: use one flag per line with `--name=value`. Lines starting with `#` are comments; blank lines are allowed.
+- Edit format: use one flag per line with `--name=value`. Lines starting with `#` are comments; blank lines are allowed. String-list flags use Abseil's comma-separated format, for example `--use_gpu_devices=0,1`; optional path/string flags use an empty value to mean "unset" or "auto".
 - Custom unmanaged flags: Atlas Settings preserves the dedicated manual block in the file. Put custom flags there if Atlas does not expose them in the dialog.
 - Reset to defaults: in **Edit → Settings...**, use **Reset to Defaults** and then **Save** to rewrite the managed settings back to their compiled defaults. On macOS, open the same dialog from the standard application menu if Settings is not shown under Edit.
 - Apply changes: use **Save and Restart** in the Settings dialog, or save and restart Atlas manually. Flags are read at startup. If a value is invalid or misspelled, it will not be applied—check the startup logs for any parse errors.
@@ -1459,7 +1459,9 @@ Tips
 
 1. **Open log folder**: **Help → Open Log Folder**. Each run generates timestamped logs.
 2. **Increase verbosity**: launch Atlas with `--v=1` for detailed logging.
-3. **Debug-oriented builds** may provide additional diagnostic lines beyond the standard release logs.
+3. **High-volume logging**: `--atlas_log_always_flush_files=false` reduces file-log overhead by buffering INFO/VLOG file
+   writes. Warnings, errors, fatal logs, explicit flushes, and shutdown still flush file logs.
+4. **Debug-oriented builds** may provide additional diagnostic lines beyond the standard release logs.
 
 ### 10.3 Updating and Multiple Instances
 
@@ -1560,7 +1562,7 @@ Use **Help → Shortcuts** in either the 2D or 3D window to open this section di
 | `--output_tile_size`, `--output_tile_border` | Enable tiled rendering for high-resolution outputs. Animation export defaults to `1024`/`64`; use `512`/`64` for huge out-of-core or low-VRAM exports where smaller tiles improve page-cache reuse. Scene export uses its built-in still-image defaults unless either flag is provided explicitly. |
 | `--limit_memory_usage_in_gb_to` | Cap GPU memory usage (GB). |
 | `--atlas_vk_residency_budget_bytes` | Strict byte cap for Atlas-owned Vulkan device-local residency. When set, Atlas keeps each existing Vulkan pass hot set within the cap by making needed resources resident and evicting cold backing at safe points; paged image caches are sized from the effective Vulkan budget rather than uncapped physical VRAM. If one required pass working set exceeds the cap, export fails with a memory diagnostic instead of allocating past the cap. |
-| `--use_gpu_devices` | Specify GPU indices (Linux). |
+| `--use_gpu_devices` | Specify comma-separated GPU indices (Linux), for example `0,1`. |
 | `--__use_EGL` | Force EGL context creation (Linux headless). |
 | `--v=LEVEL` | Adjust log verbosity; `--v=1` prints additional diagnostics. |
 

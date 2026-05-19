@@ -4,7 +4,9 @@
 #include <absl/log/check.h>
 #include <absl/log/log.h>
 #include <algorithm>
+#include <optional>
 #include <sstream>
+#include <vector>
 
 namespace nim {
 namespace {
@@ -42,6 +44,12 @@ std::string flagTypeName(const absl::CommandLineFlag& flag)
   }
   if (flag.IsOfType<std::string>()) {
     return "string";
+  }
+  if (flag.IsOfType<std::optional<std::string>>()) {
+    return "optional_string";
+  }
+  if (flag.IsOfType<std::vector<std::string>>()) {
+    return "string_list";
   }
   return "unknown";
 }

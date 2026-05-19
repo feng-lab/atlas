@@ -8,6 +8,7 @@
 #include "zjson.h"
 #include "zlog.h"
 #include "zview.h"
+#include "zstringutils.h"
 
 #include "zcommandlineflags.h"
 
@@ -20,7 +21,9 @@
 #include <QFileInfo>
 #include <QThread>
 
+#include <string>
 #include <utility>
+#include <vector>
 
 ABSL_FLAG(bool, run_export_3d_scene, false, "Enable exporting a 3D scene screenshot via command line");
 
@@ -34,7 +37,7 @@ ABSL_DECLARE_FLAG(int32_t, maximum_output_width);
 ABSL_DECLARE_FLAG(int32_t, maximum_output_height);
 ABSL_DECLARE_FLAG(int32_t, output_tile_size);
 ABSL_DECLARE_FLAG(int32_t, output_tile_border);
-ABSL_DECLARE_FLAG(std::string, use_gpu_devices);
+ABSL_DECLARE_FLAG(std::vector<std::string>, use_gpu_devices);
 ABSL_DECLARE_FLAG(uint32_t, use_gpu_device);
 
 #if defined(__linux__)
@@ -76,22 +79,20 @@ bool prepareOutputFile(const QString& outputFilename, bool overwriteExisting, QS
 
 bool configureSingleGpuFromFlags(QString& error)
 {
-  const QString gpuDevices = QString::fromStdString(absl::GetFlag(FLAGS_use_gpu_devices)).trimmed();
-  if (gpuDevices.isEmpty()) {
+  const std::vector<std::string> gpuDevices = absl::GetFlag(FLAGS_use_gpu_devices);
+  if (gpuDevices.empty()) {
     return true;
   }
 
 #if defined(__linux__)
-  const QStringList gpuIds = gpuDevices.split(',', Qt::SkipEmptyParts);
-  if (gpuIds.size() != 1) {
+  if (gpuDevices.size() != 1) {
     error = "Scene export supports exactly one GPU device id in --use_gpu_devices";
     return false;
   }
 
-  bool ok = false;
-  const uint32_t gpuId = gpuIds.front().trimmed().toUInt(&ok);
-  if (!ok) {
-    error = QString("invalid gpu device %1").arg(gpuIds.front().trimmed());
+  uint32_t gpuId = 0;
+  if (!stringToValueNoThrow(gpuDevices.front(), gpuId)) {
+    error = QString("invalid gpu device %1").arg(QString::fromStdString(gpuDevices.front()));
     return false;
   }
 
@@ -291,7 +292,7 @@ int ZRunExport3DScene::run()
   }
 
 #if defined(__linux__)
-  if (QString::fromStdString(absl::GetFlag(FLAGS_use_gpu_devices)).trimmed().isEmpty()) {
+  if (absl::GetFlag(FLAGS_use_gpu_devices).empty()) {
     absl::SetFlag(&FLAGS___use_EGL, true);
   }
 #endif
