@@ -22,6 +22,8 @@
             "PaletteBase": "normalBackground",
             "PaletteAlternateBase": "alternateBackground",
             "PaletteText": "text",
+            "PaletteButtonText": "text",
+            "PaletteButtonTextDisabled": "textDisabled",
             "PaletteToolTipBase": "tooltipBackground",
             "PaletteHighlight": "selectedBackgroundText",
             "PaletteDark": "shadowBackground",
