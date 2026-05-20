@@ -5,6 +5,7 @@
 #include "zlog.h"
 
 #include <QHBoxLayout>
+#include <QColor>
 #include <QLabel>
 #include <QProgressBar>
 #include <QScrollBar>
@@ -34,6 +35,11 @@ namespace {
       return QStringLiteral("cancelled");
   }
   return QStringLiteral("unknown");
+}
+
+[[nodiscard]] QColor errorTextColor()
+{
+  return ZTheme::instance().isDarkTheme() ? QColor(242, 182, 179) : QColor(176, 0, 32);
 }
 
 class ZBackgroundTaskRowWidget final : public QWidget
@@ -66,7 +72,7 @@ public:
 
     m_cancelButton = new QToolButton(this);
     m_cancelButton->setToolTip(tr("Cancel task"));
-    m_cancelButton->setIcon(ZTheme::instance().icon(ZTheme::CancelIcon));
+    ZTheme::instance().bindIcon(m_cancelButton, ZTheme::CancelIcon);
     headerRow->addWidget(m_cancelButton, 0);
 
     layout->addLayout(headerRow);
@@ -90,6 +96,9 @@ public:
     });
 
     connect(m_task, &ZBackgroundTask::changed, this, [this]() {
+      refresh();
+    });
+    connect(&ZTheme::instance(), &ZTheme::themeChanged, this, [this]() {
       refresh();
     });
     refresh();
@@ -117,7 +126,7 @@ public:
     if (!m_task->error().isEmpty()) {
       m_messageLabel->setText(m_task->error());
       QPalette pal = m_messageLabel->palette();
-      pal.setColor(QPalette::WindowText, QColor(200, 30, 30));
+      pal.setColor(QPalette::WindowText, errorTextColor());
       m_messageLabel->setPalette(pal);
     } else {
       m_messageLabel->setText(m_task->message());

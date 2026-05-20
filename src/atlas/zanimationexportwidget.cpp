@@ -234,7 +234,7 @@ void ZAnimationExportWidget::createWidget()
   lo->addLayout(hlo);
 
   m_captureButton = new QPushButton(tr("Export"), this);
-  m_captureButton->setIcon(ZTheme::instance().icon(ZTheme::CamcoderIcon));
+  ZTheme::instance().bindIcon(m_captureButton, ZTheme::CamcoderIcon);
   m_captureButton->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
   lo->addWidget(m_captureButton, 0, Qt::AlignHCenter | Qt::AlignVCenter);
 

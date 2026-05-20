@@ -832,6 +832,7 @@ void ZView::createActions()
   //  connect(m_deleteAction, &QAction::triggered, this, &ZView::deleteKeyPressed);
 
   m_zoomInAction = new QAction(ZTheme::instance().icon(ZTheme::ZoomInIcon), tr("Zoom &In"), this);
+  ZTheme::instance().bindIcon(m_zoomInAction, ZTheme::ZoomInIcon);
   QList<QKeySequence> zoomInKey;
   zoomInKey << QKeySequence::ZoomIn << QKeySequence(Qt::Key_Plus) << QKeySequence(Qt::Key_Equal);
   m_zoomInAction->setShortcuts(zoomInKey);
@@ -839,6 +840,7 @@ void ZView::createActions()
   connect(m_zoomInAction, &QAction::triggered, this, &ZView::zoomIn);
 
   m_zoomOutAction = new QAction(ZTheme::instance().icon(ZTheme::ZoomOutIcon), tr("Zoom &Out"), this);
+  ZTheme::instance().bindIcon(m_zoomOutAction, ZTheme::ZoomOutIcon);
   QList<QKeySequence> zoomOutKey;
   zoomOutKey << QKeySequence::ZoomOut << QKeySequence(Qt::Key_Minus);
   m_zoomOutAction->setShortcuts(zoomOutKey);
@@ -846,17 +848,20 @@ void ZView::createActions()
   connect(m_zoomOutAction, &QAction::triggered, this, &ZView::zoomOut);
 
   m_normalViewAction = new QAction(ZTheme::instance().icon(ZTheme::NormalViewIcon), tr("&Normal View"), this);
+  ZTheme::instance().bindIcon(m_normalViewAction, ZTheme::NormalViewIcon);
   m_normalViewAction->setCheckable(true);
   m_normalViewAction->setStatusTip(tr("Default Image View"));
   connect(m_normalViewAction, &QAction::toggled, this, &ZView::triggerNormalView);
 
   m_maxZProjViewAction =
     new QAction(ZTheme::instance().icon(ZTheme::ProjectionViewIcon), tr("&Maximum Z Projection"), this);
+  ZTheme::instance().bindIcon(m_maxZProjViewAction, ZTheme::ProjectionViewIcon);
   m_maxZProjViewAction->setCheckable(true);
   m_maxZProjViewAction->setStatusTip(tr("Maximum Project Image Along Dimension Z"));
   connect(m_maxZProjViewAction, &QAction::toggled, this, &ZView::triggerMaxZProjView);
 
   m_montageViewAction = new QAction(ZTheme::instance().icon(ZTheme::MontageViewIcon), tr("&Montage View"), this);
+  ZTheme::instance().bindIcon(m_montageViewAction, ZTheme::MontageViewIcon);
   m_montageViewAction->setCheckable(true);
   m_montageViewAction->setStatusTip(tr("Montage View of Z Slices"));
   connect(m_montageViewAction, &QAction::toggled, this, &ZView::triggerMontageView);
@@ -871,6 +876,7 @@ void ZView::createActions()
   m_montageViewAction->setChecked(currentViewStyle() == ViewStyle::Montage);
 
   m_fitIntoWindowAction = new QAction(ZTheme::instance().icon(ZTheme::CollapseIcon), tr("&Fit Into Window"), this);
+  ZTheme::instance().bindIcon(m_fitIntoWindowAction, ZTheme::CollapseIcon);
   m_fitIntoWindowAction->setStatusTip(tr("Fit everything inside window"));
   connect(m_fitIntoWindowAction, &QAction::triggered, this, &ZView::fitContentIntoWindow);
 
@@ -879,10 +885,12 @@ void ZView::createActions()
   m_imgViewStyleActionGroup->setEnabled(false);
 
   m_scrollHandDragAction = new QAction(ZTheme::instance().icon(ZTheme::DragIcon), tr("&Scroll Hand Drag"), this);
+  ZTheme::instance().bindIcon(m_scrollHandDragAction, ZTheme::DragIcon);
   m_scrollHandDragAction->setCheckable(true);
   m_scrollHandDragAction->setStatusTip(tr("Scroll Hand Drag"));
 
   m_rubberBandDragAction = new QAction(ZTheme::instance().icon(ZTheme::SelectionIcon), tr("&Rubber Band Drag"), this);
+  ZTheme::instance().bindIcon(m_rubberBandDragAction, ZTheme::SelectionIcon);
   m_rubberBandDragAction->setCheckable(true);
   m_rubberBandDragAction->setStatusTip(tr("Rubber Band Drag"));
 
@@ -895,22 +903,27 @@ void ZView::createActions()
 
   m_roiRectangleAction =
     new QAction(ZTheme::instance().icon(ZTheme::RectangleIcon), tr("&Rectangular Selections"), this);
+  ZTheme::instance().bindIcon(m_roiRectangleAction, ZTheme::RectangleIcon);
   m_roiRectangleAction->setCheckable(true);
   m_roiRectangleAction->setStatusTip(tr("Make Rectangular Selections"));
 
   m_roiEllipseAction = new QAction(ZTheme::instance().icon(ZTheme::EllipseIcon), tr("&Elliptical Selections"), this);
+  ZTheme::instance().bindIcon(m_roiEllipseAction, ZTheme::EllipseIcon);
   m_roiEllipseAction->setCheckable(true);
   m_roiEllipseAction->setStatusTip(tr("Make Elliptical Selections"));
 
   m_roiPolygonAction = new QAction(ZTheme::instance().icon(ZTheme::PolygonIcon), tr("&Polygon Selections"), this);
+  ZTheme::instance().bindIcon(m_roiPolygonAction, ZTheme::PolygonIcon);
   m_roiPolygonAction->setCheckable(true);
   m_roiPolygonAction->setStatusTip(tr("Make Polygon Selections"));
 
   m_roiSplineAction = new QAction(ZTheme::instance().icon(ZTheme::SplineIcon), tr("&Spline Selections"), this);
+  ZTheme::instance().bindIcon(m_roiSplineAction, ZTheme::SplineIcon);
   m_roiSplineAction->setCheckable(true);
   m_roiSplineAction->setStatusTip(tr("Make Spline Selections"));
 
   m_roiCutLineAction = new QAction(ZTheme::instance().icon(ZTheme::SplineCutIcon), tr("&Cut ROI"), this);
+  ZTheme::instance().bindIcon(m_roiCutLineAction, ZTheme::SplineCutIcon);
   m_roiCutLineAction->setCheckable(true);
   m_roiCutLineAction->setStatusTip(tr("Draw Line to Cut ROI"));
 

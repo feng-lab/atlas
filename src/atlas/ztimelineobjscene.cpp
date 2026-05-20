@@ -138,6 +138,7 @@ ZTimelineObjScene::ZTimelineObjScene(ZTimelineWidget& timeline, QObject* parent)
   connect(&m_timeline.animation(), &ZAnimation::expandChanged, this, &ZTimelineObjScene::updateItems);
   connect(&m_timeline.animation(), &ZAnimation::objChanged, this, &ZTimelineObjScene::updateItems);
   connect(&m_timeline.animation(), &ZAnimation::objViewChanged, this, &ZTimelineObjScene::updateItems);
+  connect(&ZTheme::instance(), &ZTheme::themeChanged, this, &ZTimelineObjScene::updateItems);
 }
 
 void ZTimelineObjScene::updateItems()

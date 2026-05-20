@@ -1103,11 +1103,13 @@ void ZImgDoc::sendChangedSignal(size_t id)
 void ZImgDoc::createActions()
 {
   m_loadImgAction = new QAction(ZTheme::instance().icon(ZTheme::LoadObjectIcon), tr("&Load Image..."), this);
+  ZTheme::instance().bindIcon(m_loadImgAction, ZTheme::LoadObjectIcon);
   m_loadImgAction->setStatusTip(tr("Load one or more existing image files"));
   connect(m_loadImgAction, &QAction::triggered, this, qOverload<>(&ZImgDoc::loadImg));
 
   m_loadNeuroglancerPrecomputedAction =
     new QAction(ZTheme::instance().icon(ZTheme::LoadObjectIcon), tr("Load &Neuroglancer (Precomputed)..."), this);
+  ZTheme::instance().bindIcon(m_loadNeuroglancerPrecomputedAction, ZTheme::LoadObjectIcon);
   m_loadNeuroglancerPrecomputedAction->setStatusTip(tr("Load a Neuroglancer precomputed volume via URL"));
   connect(m_loadNeuroglancerPrecomputedAction,
           &QAction::triggered,
@@ -1116,6 +1118,7 @@ void ZImgDoc::createActions()
 
   m_loadNeuroglancerStateAction =
     new QAction(ZTheme::instance().icon(ZTheme::LoadObjectIcon), tr("Load Neuroglancer (&State JSON)..."), this);
+  ZTheme::instance().bindIcon(m_loadNeuroglancerStateAction, ZTheme::LoadObjectIcon);
   m_loadNeuroglancerStateAction->setStatusTip(tr("Load supported precomputed layers from a Neuroglancer viewer state URL/JSON"));
   connect(m_loadNeuroglancerStateAction, &QAction::triggered, this, &ZImgDoc::loadNeuroglancerState);
 
@@ -1136,6 +1139,7 @@ void ZImgDoc::createActions()
   connect(m_correctChromaticShiftAction, &QAction::triggered, this, &ZImgDoc::correctChromaticShift);
 
   m_autoTraceAction = new QAction(ZTheme::instance().icon(ZTheme::AutoTraceIcon), tr("&Auto Trace..."), this);
+  ZTheme::instance().bindIcon(m_autoTraceAction, ZTheme::AutoTraceIcon);
   m_autoTraceAction->setStatusTip(tr("Automatically trace neurons in a selected image/channel"));
   connect(m_autoTraceAction, &QAction::triggered, this, &ZImgDoc::autoTrace);
 

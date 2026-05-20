@@ -52,6 +52,8 @@ protected:
 private:
   void createWidget();
 
+  void refreshTheme();
+
 private:
   ZAnimation& m_animation;
 

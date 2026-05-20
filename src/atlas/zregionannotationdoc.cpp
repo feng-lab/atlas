@@ -394,6 +394,7 @@ void ZRegionAnnotationDoc::createActions()
 {
   m_loadRegionAnnotationAction =
     new QAction(ZTheme::instance().icon(ZTheme::LoadObjectIcon), tr("&Load RegionAnnotation..."), this);
+  ZTheme::instance().bindIcon(m_loadRegionAnnotationAction, ZTheme::LoadObjectIcon);
   m_loadRegionAnnotationAction->setStatusTip(tr("Load one or more existing regionAnnotation files"));
   connect(m_loadRegionAnnotationAction, &QAction::triggered, this, &ZRegionAnnotationDoc::loadRegionAnnotation);
 

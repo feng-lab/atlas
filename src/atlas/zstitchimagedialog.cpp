@@ -1080,6 +1080,7 @@ void ZStitchImageDialog::editConnFromTileImage()
     auto hlayout = new QHBoxLayout;
 
     auto m_zoomInAction = new QAction(ZTheme::instance().icon(ZTheme::ZoomInIcon), tr("Zoom &In"), &dia);
+    ZTheme::instance().bindIcon(m_zoomInAction, ZTheme::ZoomInIcon);
     QList<QKeySequence> zoomInKey;
     zoomInKey << QKeySequence::ZoomIn << QKeySequence(Qt::Key_Plus) << QKeySequence(Qt::Key_Equal);
     m_zoomInAction->setShortcuts(zoomInKey);
@@ -1087,6 +1088,7 @@ void ZStitchImageDialog::editConnFromTileImage()
     connect(m_zoomInAction, &QAction::triggered, this, &ZStitchImageDialog::zoomInTileImageWidget);
 
     auto m_zoomOutAction = new QAction(ZTheme::instance().icon(ZTheme::ZoomOutIcon), tr("Zoom &Out"), &dia);
+    ZTheme::instance().bindIcon(m_zoomOutAction, ZTheme::ZoomOutIcon);
     QList<QKeySequence> zoomOutKey;
     zoomOutKey << QKeySequence::ZoomOut << QKeySequence(Qt::Key_Minus);
     m_zoomOutAction->setShortcuts(zoomOutKey);

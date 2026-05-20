@@ -7,6 +7,7 @@
 #include "zlog.h"
 #include "zselectfilewidget.h"
 #include "zsysteminfo.h"
+#include "ztheme.h"
 #include "ztracesettings.h"
 #include "zswcdoc.h"
 
@@ -105,6 +106,12 @@ void disableFirstComboRow(QComboBox* combo)
 
   channelColor.setAlpha(255);
   return channelColor;
+}
+
+[[nodiscard]] QString errorLabelStyleSheet()
+{
+  const QColor color = ZTheme::instance().isDarkTheme() ? QColor(242, 182, 179) : QColor(176, 0, 32);
+  return QStringLiteral("QLabel { color: %1; }").arg(color.name(QColor::HexRgb));
 }
 
 [[nodiscard]] QString makeSafeStem(QString s)
@@ -616,7 +623,7 @@ ZAutoTraceDialog::ZAutoTraceDialog(ZDoc& doc, QWidget* parent)
           "Blocked tracing session detected in the selected output folder, but the session manifest is invalid:\n%1\n\n"
           "Choose a different (empty) output folder to start a new session, or fix/remove manifest.json to resume.")
           .arg(m_blockedSessionManifestError));
-      m_blockedSessionInfoLabel->setStyleSheet(QStringLiteral("QLabel { color: #b00020; }"));
+      m_blockedSessionInfoLabel->setStyleSheet(errorLabelStyleSheet());
       m_blockedSessionInfoLabel->setVisible(true);
       return;
     }
@@ -637,7 +644,7 @@ ZAutoTraceDialog::ZAutoTraceDialog(ZDoc& doc, QWidget* parent)
           .arg(static_cast<long long>(coreY))
           .arg(static_cast<long long>(coreZ))
           .arg(static_cast<long long>(halo)));
-      m_blockedSessionInfoLabel->setStyleSheet(QStringLiteral("QLabel { color: #b00020; }"));
+      m_blockedSessionInfoLabel->setStyleSheet(errorLabelStyleSheet());
       m_blockedSessionInfoLabel->setVisible(true);
       return;
     }
@@ -709,6 +716,8 @@ ZAutoTraceDialog::ZAutoTraceDialog(ZDoc& doc, QWidget* parent)
   updateDownsampleUi();
   updateOutputUi();
   updateZToXYRatioUi();
+
+  connect(&ZTheme::instance(), &ZTheme::themeChanged, this, updateBlockedSessionUi);
 
   connect(m_imageCombo,
           &QComboBox::currentIndexChanged,

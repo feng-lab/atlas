@@ -321,16 +321,19 @@ void Z3DMainWindow::createActions()
 {
   // file
   m_openAction = new QAction(ZTheme::instance().icon(ZTheme::OpenFolderIcon), tr("&Open..."), this);
+  ZTheme::instance().bindIcon(m_openAction, ZTheme::OpenFolderIcon);
   m_openAction->setShortcuts(QKeySequence::Open);
   m_openAction->setStatusTip(tr("Open an existing scene file"));
   connect(m_openAction, &QAction::triggered, this, &Z3DMainWindow::loadScene);
 
   m_saveAction = new QAction(ZTheme::instance().icon(ZTheme::SaveIcon), tr("&Save"), this);
+  ZTheme::instance().bindIcon(m_saveAction, ZTheme::SaveIcon);
   m_saveAction->setShortcuts(QKeySequence::Save);
   m_saveAction->setStatusTip(tr("Save unsaved objects to disk"));
   connect(m_saveAction, &QAction::triggered, this, &Z3DMainWindow::save);
 
   m_saveAsAction = new QAction(ZTheme::instance().icon(ZTheme::SaveAsIcon), tr("Save &As..."), this);
+  ZTheme::instance().bindIcon(m_saveAsAction, ZTheme::SaveAsIcon);
   m_saveAsAction->setShortcuts(QKeySequence::SaveAs);
   m_saveAsAction->setStatusTip(tr("Save selected objects under a new name"));
   connect(m_saveAsAction, &QAction::triggered, this, &Z3DMainWindow::saveAs);
@@ -352,6 +355,7 @@ void Z3DMainWindow::createActions()
 
   // view
   m_zoomInAction = new QAction(ZTheme::instance().icon(ZTheme::ZoomInIcon), tr("Zoom &In"), this);
+  ZTheme::instance().bindIcon(m_zoomInAction, ZTheme::ZoomInIcon);
   QList<QKeySequence> zoomInKey;
   zoomInKey << QKeySequence::ZoomIn << QKeySequence(Qt::Key_Plus) << QKeySequence(Qt::Key_Equal);
   m_zoomInAction->setShortcuts(zoomInKey);
@@ -359,6 +363,7 @@ void Z3DMainWindow::createActions()
   connect(m_zoomInAction, &QAction::triggered, this, &Z3DMainWindow::zoomIn);
 
   m_zoomOutAction = new QAction(ZTheme::instance().icon(ZTheme::ZoomOutIcon), tr("Zoom &Out"), this);
+  ZTheme::instance().bindIcon(m_zoomOutAction, ZTheme::ZoomOutIcon);
   QList<QKeySequence> zoomOutKey;
   zoomOutKey << QKeySequence::ZoomOut << QKeySequence(Qt::Key_Minus);
   m_zoomOutAction->setShortcuts(zoomOutKey);
@@ -371,18 +376,22 @@ void Z3DMainWindow::createActions()
 
   m_changeBackgroundAction =
     new QAction(ZTheme::instance().icon(ZTheme::BackgroundIcon), tr("&Change Background"), this);
+  ZTheme::instance().bindIcon(m_changeBackgroundAction, ZTheme::BackgroundIcon);
   m_changeBackgroundAction->setStatusTip(tr("Change background of 3d view"));
   connect(m_changeBackgroundAction, &QAction::triggered, this, &Z3DMainWindow::changeBackground);
 
   m_changeAxisAction = new QAction(ZTheme::instance().icon(ZTheme::AxisIcon), tr("&Change Axis"), this);
+  ZTheme::instance().bindIcon(m_changeAxisAction, ZTheme::AxisIcon);
   m_changeAxisAction->setStatusTip(tr("Change axis of 3d view"));
   connect(m_changeAxisAction, &QAction::triggered, this, &Z3DMainWindow::changeAxis);
 
   m_screenShotAction = new QAction(ZTheme::instance().icon(ZTheme::ScreenshotIcon), tr("&Screenshot"), this);
+  ZTheme::instance().bindIcon(m_screenShotAction, ZTheme::ScreenshotIcon);
   m_screenShotAction->setStatusTip(tr("Screenshot"));
   connect(m_screenShotAction, &QAction::triggered, this, &Z3DMainWindow::openScreenshotPanel);
 
   m_traceToolAction = new QAction(ZTheme::instance().icon(ZTheme::TraceIcon), tr("Trace"), this);
+  ZTheme::instance().bindIcon(m_traceToolAction, ZTheme::TraceIcon);
   m_traceToolAction->setStatusTip(tr("Enable trace tool (left-click to trace)"));
   m_traceToolAction->setCheckable(true);
   m_traceToolAction->setChecked(m_doc.traceSettings().traceToolEnabled());
@@ -406,6 +415,7 @@ void Z3DMainWindow::createActions()
   });
 
   m_cancelAction = new QAction(ZTheme::instance().icon(ZTheme::CancelIcon), tr("&Cancel Rendering"), this);
+  ZTheme::instance().bindIcon(m_cancelAction, ZTheme::CancelIcon);
   m_cancelAction->setStatusTip(tr("Cancel Rendering"));
   connect(m_cancelAction, &QAction::triggered, this, &Z3DMainWindow::cancelRendering);
 }
@@ -444,6 +454,8 @@ void Z3DMainWindow::createMenus()
   m_viewMenu->addSeparator();
   m_viewMenu->addAction(m_changeBackgroundAction);
   m_viewMenu->addAction(m_changeAxisAction);
+  m_viewMenu->addSeparator();
+  ZTheme::instance().addThemeMenu(m_viewMenu);
   m_viewMenu->addSeparator();
   m_viewMenu->addAction(m_screenShotAction);
 
@@ -558,7 +570,7 @@ void Z3DMainWindow::createDockWindows()
   addDockWidget(Qt::RightDockWidgetArea, m_traceDockWidget);
   tabifyDockWidget(m_globalSettingDockWidget, m_traceDockWidget);
   auto* traceToggle = m_traceDockWidget->toggleViewAction();
-  traceToggle->setIcon(ZTheme::instance().icon(ZTheme::TraceIcon));
+  ZTheme::instance().bindIcon(traceToggle, ZTheme::TraceIcon);
   m_windowMenu->addAction(traceToggle);
   m_traceDockWidget->setVisible(false);
 

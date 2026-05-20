@@ -205,8 +205,9 @@ Below is an expanded description of each menu. Some menu items appear only when 
 1. **Zoom In / Zoom Out** – navigational shortcuts.
 2. **Fit Into Window** – resizes the viewport to fit all visible data.
 3. **Normal View / Maximum Z Projection / Montage View** – toggles among slice views.
-4. **Open 3D Window** – launches or raises the synced 3D window.
-5. **Screenshot** – opens the Capture dock.
+4. **Theme** – switches the application appearance between **System**, **Light**, and **Dark** immediately.
+5. **Open 3D Window** – launches or raises the synced 3D window.
+6. **Screenshot** – opens the Capture dock.
 
 #### Animation
 

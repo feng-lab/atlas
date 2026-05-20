@@ -93,12 +93,11 @@ ZRegionAnnotationViewSettingTreeView::ZRegionAnnotationViewSettingTreeView(
   setModel(m_ratProxyModel);
   setContextMenuPolicy(Qt::CustomContextMenu);
   sortByColumn(ZRegionAnnotationViewSettingTreeModel::AbbreviationColumn, Qt::AscendingOrder);
-  setStyleSheet(QString("QTreeView::indicator:unchecked {image: url(%1);}"
-                        "QTreeView::indicator:checked {image: url(%2);}"
-                        "QTreeView::indicator:indeterminate {image: url(%3);}")
-                  .arg(ZTheme::instance().iconFile(ZTheme::EyeCloseIcon))
-                  .arg(ZTheme::instance().iconFile(ZTheme::EyeOpenIcon))
-                  .arg(ZTheme::instance().iconFile(ZTheme::EyeHalfIcon)));
+  setStyleSheet(ZTheme::instance().treeViewIndicatorStyleSheet());
+  connect(&ZTheme::instance(), &ZTheme::themeChanged, this, [this]() {
+    setStyleSheet(ZTheme::instance().treeViewIndicatorStyleSheet());
+    viewport()->update();
+  });
 
   connect(this,
           &ZRegionAnnotationViewSettingTreeView::customContextMenuRequested,

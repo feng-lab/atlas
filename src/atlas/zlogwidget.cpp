@@ -5,17 +5,27 @@
 
 namespace nim {
 
+namespace {
+
+[[nodiscard]] QColor logErrorTextColor()
+{
+  return ZTheme::instance().isDarkTheme() ? QColor(242, 182, 179) : QColor(176, 0, 32);
+}
+
+} // namespace
+
 ZLogWidget::ZLogWidget(bool receiveOldMessages, QWidget* parent)
   : QPlainTextEdit(parent)
 {
   // setCenterOnScroll(true);
   m_normalFormat = currentCharFormat();
   m_errorFormat = m_normalFormat;
-  if (ZTheme::instance().isDarkTheme()) {
-    m_errorFormat.setForeground(QBrush(QColor(242, 182, 179)));
-  } else {
-    m_errorFormat.setForeground(QBrush(QColor(176, 0, 0)));
-  }
+  m_errorFormat.setForeground(QBrush(logErrorTextColor()));
+  connect(&ZTheme::instance(), &ZTheme::themeChanged, this, [this]() {
+    m_normalFormat = currentCharFormat();
+    m_errorFormat = m_normalFormat;
+    m_errorFormat.setForeground(QBrush(logErrorTextColor()));
+  });
   ZLogCache::instance().receiveLogMessages(this, &ZLogWidget::writeLogData, receiveOldMessages);
 }
 

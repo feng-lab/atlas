@@ -29,12 +29,11 @@ ZObjWidget::ZObjWidget(ZDoc* doc, ZObjModel* objModel, QItemSelectionModel* sele
   setSelectionBehavior(QAbstractItemView::SelectItems);
   setContextMenuPolicy(Qt::CustomContextMenu);
   sortByColumn(ZObjModel::TypeColumn, Qt::AscendingOrder);
-  setStyleSheet(QString("QTreeView::indicator:unchecked {image: url(%1);}"
-                        "QTreeView::indicator:checked {image: url(%2);}"
-                        "QTreeView::indicator:indeterminate {image: url(%3);}")
-                  .arg(ZTheme::instance().iconFile(ZTheme::EyeCloseIcon),
-                       ZTheme::instance().iconFile(ZTheme::EyeOpenIcon),
-                       ZTheme::instance().iconFile(ZTheme::EyeHalfIcon)));
+  setStyleSheet(ZTheme::instance().treeViewIndicatorStyleSheet());
+  connect(&ZTheme::instance(), &ZTheme::themeChanged, this, [this]() {
+    setStyleSheet(ZTheme::instance().treeViewIndicatorStyleSheet());
+    viewport()->update();
+  });
 
   connect(this, &ZObjWidget::customContextMenuRequested, this, &ZObjWidget::contextMenu);
   connect(this, &ZObjWidget::clicked, this, &ZObjWidget::indexClicked);

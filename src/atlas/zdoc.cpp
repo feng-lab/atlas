@@ -828,11 +828,11 @@ void ZDoc::create3DAnimation()
 void ZDoc::createActions()
 {
   m_undoAction = m_undoGroup->createUndoAction(this, tr("&Undo"));
-  m_undoAction->setIcon(ZTheme::instance().icon(ZTheme::UndoIcon));
+  ZTheme::instance().bindIcon(m_undoAction, ZTheme::UndoIcon);
   m_undoAction->setShortcuts(QKeySequence::Undo);
 
   m_redoAction = m_undoGroup->createRedoAction(this, tr("&Redo"));
-  m_redoAction->setIcon(ZTheme::instance().icon(ZTheme::RedoIcon));
+  ZTheme::instance().bindIcon(m_redoAction, ZTheme::RedoIcon);
   m_redoAction->setShortcuts(QKeySequence::Redo);
 
   m_removeAllAction = new QAction(tr("&Remove Everything"), this);

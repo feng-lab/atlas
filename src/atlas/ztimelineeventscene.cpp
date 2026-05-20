@@ -4,6 +4,7 @@
 #include "zanimation.h"
 #include "zbenchtimer.h"
 #include "zlog.h"
+#include "ztheme.h"
 #include "ztimelineeventview.h"
 #include "zparameteranimation.h"
 #include <QScrollBar>
@@ -204,6 +205,7 @@ ZTimelineEventScene::ZTimelineEventScene(ZTimelineWidget& timeline, ZTimelineEve
   connect(&m_timeline.animation(), &ZAnimation::keyChanged, this, &ZTimelineEventScene::updateKey);
   connect(&m_timeline.animation(), &ZAnimation::keyAboutToDelete, this, &ZTimelineEventScene::deleteKeyItem);
   connect(&m_timeline.animation(), &ZAnimation::colorChanged, this, &ZTimelineEventScene::updateParameterAnimation);
+  connect(&ZTheme::instance(), &ZTheme::themeChanged, this, &ZTimelineEventScene::updateItems);
 }
 
 void ZTimelineEventScene::updateKey(ZParameterKey* paraKey)

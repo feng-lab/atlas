@@ -638,6 +638,7 @@ const QString& ZMeshDoc::MeshPack::detailedInfo() const
 void ZMeshDoc::createActions()
 {
   m_loadMeshAction = new QAction(ZTheme::instance().icon(ZTheme::LoadObjectIcon), tr("&Load Mesh..."), this);
+  ZTheme::instance().bindIcon(m_loadMeshAction, ZTheme::LoadObjectIcon);
   m_loadMeshAction->setStatusTip(tr("Load an existing mesh file"));
   connect(m_loadMeshAction, &QAction::triggered, this, &ZMeshDoc::loadMesh);
 }

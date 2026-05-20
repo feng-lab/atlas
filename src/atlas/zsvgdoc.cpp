@@ -208,6 +208,7 @@ const QString& ZSvgDoc::SvgPack::info() const
 void ZSvgDoc::createActions()
 {
   m_loadSvgAction = new QAction(ZTheme::instance().icon(ZTheme::LoadObjectIcon), tr("&Load Svg..."), this);
+  ZTheme::instance().bindIcon(m_loadSvgAction, ZTheme::LoadObjectIcon);
   m_loadSvgAction->setStatusTip(tr("Load an existing Svg file"));
   connect(m_loadSvgAction, &QAction::triggered, this, &ZSvgDoc::loadSvg);
 }

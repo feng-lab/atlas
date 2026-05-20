@@ -51,6 +51,7 @@ ZAnimationWidget::ZAnimationWidget(ZAnimation& ani, QWidget* parent)
   connect(m_gotoStartButton, &QToolButton::clicked, this, &ZAnimationWidget::gotoStart);
   connect(m_gotoEndButton, &QToolButton::clicked, this, &ZAnimationWidget::gotoEnd);
   connect(m_repeatButton, &QToolButton::toggled, this, &ZAnimationWidget::repeatChanged);
+  connect(&ZTheme::instance(), &ZTheme::themeChanged, this, &ZAnimationWidget::refreshTheme);
 
   m_animation.cancelRenderingAndSetCurrentTime(0);
 }
@@ -141,6 +142,18 @@ void ZAnimationWidget::timeLineFinished()
   m_isPlaying = false;
   m_playButton->setIcon(ZTheme::instance().icon(ZTheme::PlayIcon));
   m_reversePlayButton->setIcon(ZTheme::instance().icon(ZTheme::ReversePlayIcon));
+}
+
+void ZAnimationWidget::refreshTheme()
+{
+  m_gotoStartButton->setIcon(ZTheme::instance().icon(ZTheme::ReturnToStartIcon));
+  m_gotoEndButton->setIcon(ZTheme::instance().icon(ZTheme::GoToEndIcon));
+  m_repeatButton->setIcon(ZTheme::instance().icon(ZTheme::RepeatIcon));
+
+  const bool playingForward = m_isPlaying && m_timeLine->direction() == QTimeLine::Forward;
+  const bool playingBackward = m_isPlaying && m_timeLine->direction() == QTimeLine::Backward;
+  m_playButton->setIcon(ZTheme::instance().icon(playingForward ? ZTheme::PauseIcon : ZTheme::PlayIcon));
+  m_reversePlayButton->setIcon(ZTheme::instance().icon(playingBackward ? ZTheme::PauseIcon : ZTheme::ReversePlayIcon));
 }
 
 void ZAnimationWidget::gotoStart()

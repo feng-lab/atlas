@@ -8,6 +8,10 @@
 #include <vector>
 #include <map>
 
+class QAction;
+class QAbstractButton;
+class QMenu;
+
 namespace nim {
 
 class ZTheme : public QObject
@@ -16,21 +20,43 @@ class ZTheme : public QObject
 
   Q_ENUMS(Color)
   Q_ENUMS(Icon)
+  Q_ENUMS(ThemePreference)
 
 public:
+  enum ThemePreference
+  {
+    SystemTheme,
+    LightTheme,
+    DarkTheme,
+    QtDarkTheme,
+  };
+
   static ZTheme& instance();
 
   void updateTheme();
 
+Q_SIGNALS:
+  void themeChanged();
+
+  void themePreferenceChanged(ThemePreference preference);
+
+public:
   [[nodiscard]] QString currentTheme() const
   {
     return m_currentTheme;
+  }
+
+  [[nodiscard]] ThemePreference themePreference() const
+  {
+    return m_themePreference;
   }
 
   [[nodiscard]] bool isDarkTheme() const
   {
     return m_currentTheme == "dark";
   }
+
+  void setThemePreference(ThemePreference preference);
 
   bool event(QEvent* event) override;
 
@@ -150,19 +176,37 @@ public:
     return m_iconFiles.at(file);
   }
 
+  void bindIcon(QAction* action, Icon file);
+
+  void bindIcon(QAbstractButton* button, Icon file);
+
+  QMenu* addThemeMenu(QMenu* parentMenu);
+
+  [[nodiscard]] QString treeViewIndicatorStyleSheet() const;
+
 private:
   ZTheme();
 
-  void loadTheme(const QString& file);
+  void loadTheme(const QString& file, bool applyPaletteOverrides);
 
-  const QColor& color(Color role) const
+  QColor color(Color role) const
   {
     return m_colors.at(role).first;
   }
 
+  [[nodiscard]] QString detectCurrentTheme() const;
+
+  [[nodiscard]] QString resolvedTheme() const;
+
+  [[nodiscard]] bool shouldApplyAtlasPalette() const;
+
+  void syncQtColorSchemePreference() const;
+
+  void resetApplicationPaletteToStyleDefault() const;
+
   QPalette palette() const;
 
-  std::pair<QColor, QString> readNamedColor(const QString& color) const;
+  std::pair<QColor, QString> readNamedColor(const QString& color, const std::map<QString, QColor>& palette) const;
 
   std::map<QString, QColor> m_palette;
   std::vector<std::pair<QColor, QString>> m_colors;
@@ -170,6 +214,8 @@ private:
   std::vector<QString> m_iconFiles;
 
   QString m_currentTheme;
+  ThemePreference m_themePreference = SystemTheme;
+  bool m_updatingTheme = false;
 };
 
 } // namespace nim

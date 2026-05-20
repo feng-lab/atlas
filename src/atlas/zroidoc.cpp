@@ -404,6 +404,7 @@ size_t ZROIDoc::addROI(ZROI* roi, const QString& path, bool unsaved)
 void ZROIDoc::createActions()
 {
   m_loadROIAction = new QAction(ZTheme::instance().icon(ZTheme::LoadObjectIcon), tr("&Load ROI..."), this);
+  ZTheme::instance().bindIcon(m_loadROIAction, ZTheme::LoadObjectIcon);
   m_loadROIAction->setStatusTip(tr("Load an existing ROI file"));
   connect(m_loadROIAction, &QAction::triggered, this, &ZROIDoc::loadROI);
 
