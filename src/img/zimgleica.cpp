@@ -9,6 +9,7 @@
 #include <QUrl>
 #include <limits>
 #include <map>
+#include <optional>
 #include <set>
 #include <string_view>
 
@@ -130,6 +131,165 @@ bool allFilesAreLeicaLof(const QStringList& fileNames)
   });
 }
 
+struct LeicaTimestampPlaneDimension
+{
+  size_t count;
+  uint64_t stride;
+};
+
+std::optional<size_t> checkedLeicaPlaneCount(const std::vector<LeicaTimestampPlaneDimension>& dimensions)
+{
+  size_t count = 1;
+  for (const auto& dimension : dimensions) {
+    if (dimension.count == 0) {
+      return std::nullopt;
+    }
+    if (count > std::numeric_limits<size_t>::max() / dimension.count) {
+      return std::nullopt;
+    }
+    count *= dimension.count;
+  }
+  return count;
+}
+
+std::vector<LeicaTimestampPlaneDimension> leicaTimestampPlaneDimensions(const ImageInfo& imageInfo)
+{
+  std::vector<LeicaTimestampPlaneDimension> dimensions;
+  const auto& sourceDimensions =
+    imageInfo.timeStampDimensions.empty() ? imageInfo.dimensions : imageInfo.timeStampDimensions;
+  for (const auto& dimension : sourceDimensions) {
+    if (dimension.numberOfElements <= 1 || dimension.dimID == 1 || dimension.dimID == 2) {
+      continue;
+    }
+    if (dimension.bytesInc == 0) {
+      return {};
+    }
+    dimensions.push_back({dimension.numberOfElements, dimension.bytesInc});
+  }
+
+  if (imageInfo.channels.size() > 1) {
+    std::vector<uint64_t> channelOffsets;
+    channelOffsets.reserve(imageInfo.channels.size());
+    for (const auto& channel : imageInfo.channels) {
+      channelOffsets.push_back(channel.bytesInc);
+    }
+    std::ranges::sort(channelOffsets);
+    const uint64_t channelStride = channelOffsets[1] - channelOffsets[0];
+    if (channelStride == 0) {
+      return {};
+    }
+    dimensions.push_back({imageInfo.channels.size(), channelStride});
+  }
+
+  std::ranges::sort(dimensions, {}, &LeicaTimestampPlaneDimension::stride);
+  return dimensions;
+}
+
+std::optional<uint64_t> leicaPlaneOffsetForLinearIndex(const std::vector<LeicaTimestampPlaneDimension>& dimensions,
+                                                       size_t linearIndex)
+{
+  uint64_t offset = 0;
+  for (const auto& dimension : dimensions) {
+    const size_t coordinate = linearIndex % dimension.count;
+    linearIndex /= dimension.count;
+    if (coordinate > std::numeric_limits<uint64_t>::max() / dimension.stride) {
+      return std::nullopt;
+    }
+    const uint64_t dimensionOffset = coordinate * dimension.stride;
+    if (offset > std::numeric_limits<uint64_t>::max() - dimensionOffset) {
+      return std::nullopt;
+    }
+    offset += dimensionOffset;
+  }
+  return offset;
+}
+
+std::optional<std::vector<std::pair<uint64_t, size_t>>>
+leicaTimestampOffsetIndex(const std::vector<LeicaTimestampPlaneDimension>& dimensions, size_t planeCount)
+{
+  std::vector<std::pair<uint64_t, size_t>> offsetIndex;
+  offsetIndex.reserve(planeCount);
+  for (size_t planeIndex = 0; planeIndex < planeCount; ++planeIndex) {
+    const std::optional<uint64_t> offset = leicaPlaneOffsetForLinearIndex(dimensions, planeIndex);
+    if (!offset.has_value()) {
+      return std::nullopt;
+    }
+    offsetIndex.emplace_back(*offset, planeIndex);
+  }
+  std::ranges::sort(offsetIndex);
+  return offsetIndex;
+}
+
+std::optional<uint64_t> leicaTimeStride(const ImageInfo& imageInfo)
+{
+  const auto& sourceDimensions =
+    imageInfo.timeStampDimensions.empty() ? imageInfo.dimensions : imageInfo.timeStampDimensions;
+  const auto it = std::ranges::find_if(sourceDimensions, [](const DimensionDescription& dimension) {
+    return dimension.dimID == 4;
+  });
+  if (it == sourceDimensions.end()) {
+    return std::nullopt;
+  }
+  return it->bytesInc;
+}
+
+std::optional<std::vector<double>> leicaRepresentativeTimeStamps(const ImageInfo& imageInfo, const ZImgInfo& info)
+{
+  if (imageInfo.timeStamps.empty()) {
+    return std::nullopt;
+  }
+
+  if (imageInfo.timeStamps.size() == info.numTimes) {
+    return imageInfo.timeStamps;
+  }
+
+  const uint64_t timeStride = leicaTimeStride(imageInfo).value_or(0);
+  const std::vector<LeicaTimestampPlaneDimension> planeDimensions = leicaTimestampPlaneDimensions(imageInfo);
+  const std::optional<size_t> planeCount = checkedLeicaPlaneCount(planeDimensions);
+  if (planeCount.has_value() && *planeCount == imageInfo.timeStamps.size()) {
+    const std::optional<std::vector<std::pair<uint64_t, size_t>>> offsetIndex =
+      leicaTimestampOffsetIndex(planeDimensions, *planeCount);
+    if (offsetIndex.has_value()) {
+      std::vector<double> result;
+      result.reserve(info.numTimes);
+      bool foundAllTimes = true;
+      for (size_t t = 0; t < info.numTimes; ++t) {
+        if (timeStride != 0 &&
+            t > (std::numeric_limits<uint64_t>::max() - imageInfo.imageMemory.sceneOffset) / timeStride) {
+          foundAllTimes = false;
+          break;
+        }
+        const uint64_t targetOffset = imageInfo.imageMemory.sceneOffset + t * timeStride;
+        const auto it = std::ranges::lower_bound(*offsetIndex, targetOffset, {}, &std::pair<uint64_t, size_t>::first);
+        if (it == offsetIndex->end() || it->first != targetOffset || it->second >= imageInfo.timeStamps.size()) {
+          foundAllTimes = false;
+          break;
+        }
+        result.push_back(imageInfo.timeStamps[it->second]);
+      }
+      if (foundAllTimes) {
+        return result;
+      }
+    }
+  }
+
+  if (imageInfo.timeStamps.size() % info.numTimes == 0) {
+    const size_t planesPerTime = imageInfo.timeStamps.size() / info.numTimes;
+    std::vector<double> result;
+    result.reserve(info.numTimes);
+    for (size_t t = 0; t < info.numTimes; ++t) {
+      result.push_back(imageInfo.timeStamps[t * planesPerTime]);
+    }
+    return result;
+  }
+
+  if (info.numTimes == 1) {
+    return std::vector<double>{imageInfo.timeStamps.front()};
+  }
+
+  return std::nullopt;
+}
+
 ZImgInfo leicaSinglePlaneInfo(const ZImgInfo& info)
 {
   ZImgInfo planeInfo = info;
@@ -150,6 +310,58 @@ std::vector<size_t> leicaFileChannelSourceOrder(const ImageInfo& imageInfo)
     channelOffsets.push_back(cd.bytesInc);
   }
   return argSort(channelOffsets);
+}
+
+std::optional<col4> leicaDisplayColorFromLutName(QString lutName)
+{
+  lutName.remove(QChar(' '));
+  if (lutName.isEmpty()) {
+    return std::nullopt;
+  }
+
+  if (lutName.startsWith(QStringLiteral("Gradient("), Qt::CaseInsensitive) && lutName.endsWith(QChar(')'))) {
+    const QStringList rgb = lutName.mid(9, lutName.size() - 10).split(QChar(','), Qt::SkipEmptyParts);
+    if (rgb.size() == 3) {
+      bool ok = false;
+      const int red = rgb[2].toInt(&ok);
+      if (ok) {
+        const int green = rgb[1].toInt(&ok);
+        if (ok) {
+          const int blue = rgb[0].toInt(&ok);
+          if (ok && red >= 0 && red <= 255 && green >= 0 && green <= 255 && blue >= 0 && blue <= 255) {
+            return col4{static_cast<col4::value_type>(red),
+                        static_cast<col4::value_type>(green),
+                        static_cast<col4::value_type>(blue)};
+          }
+        }
+      }
+    }
+    return col4{255, 255, 255};
+  }
+
+  if (lutName.compare(QStringLiteral("Gray"), Qt::CaseInsensitive) == 0) {
+    return col4{255, 255, 255};
+  }
+  if (lutName.compare(QStringLiteral("Red"), Qt::CaseInsensitive) == 0) {
+    return col4{255, 0, 0};
+  }
+  if (lutName.compare(QStringLiteral("Green"), Qt::CaseInsensitive) == 0) {
+    return col4{0, 255, 0};
+  }
+  if (lutName.compare(QStringLiteral("Blue"), Qt::CaseInsensitive) == 0) {
+    return col4{0, 0, 255};
+  }
+  if (lutName.compare(QStringLiteral("Cyan"), Qt::CaseInsensitive) == 0) {
+    return col4{0, 255, 255};
+  }
+  if (lutName.compare(QStringLiteral("Magenta"), Qt::CaseInsensitive) == 0) {
+    return col4{255, 0, 255};
+  }
+  if (lutName.compare(QStringLiteral("Yellow"), Qt::CaseInsensitive) == 0) {
+    return col4{255, 255, 0};
+  }
+
+  return col4{255, 255, 255};
 }
 
 } // namespace
@@ -659,7 +871,7 @@ void ZImgLeica::readXml(const QString& filename,
       }
       majorVersion = parseLIFVersion(xml);
       do {
-        if (!readStructFromFileStreamNoThrow(nb, inputFileStream)) {
+        if (!readStructFromFileStreamNoThrow(nb, inputFileStream, true)) {
           break;
         }
 
@@ -908,7 +1120,9 @@ void ZImgLeica::parseElement(QXmlStreamReader& xml, const QDir& xmlDir, std::vec
               }
 
               if (values.empty()) {
-                LOG(WARNING) << "Leica TimeStampList is empty";
+                // Some Leica XML blocks carry an empty TimeStampList even for
+                // single-time images. Warn later only if the selected image is
+                // actually a time series that needs those timestamps.
                 continue;
               }
               for (size_t i = 1; i < values.size(); ++i) {
@@ -1004,6 +1218,7 @@ void ZImgLeica::parseElement(QXmlStreamReader& xml, const QDir& xmlDir, std::vec
     }
   }
   if (willRead) {
+    imageInfo.timeStampDimensions = imageInfo.dimensions;
     imageInfos.push_back(imageInfo);
   }
 }
@@ -1339,32 +1554,28 @@ void ZImgLeica::detectInfos(std::vector<ZImgInfo>& infos, const std::vector<Imag
       } else if (cd.channelTag == 3) {
         info.channelColors[i] = col4{0, 0, 255};
       } else if (cd.channelTag == 0) {
-        if (cd.LUTName.compare("Gray", Qt::CaseInsensitive) == 0) {
-          info.channelColors[i] = col4{255, 255, 255};
-        } else if (cd.LUTName.compare("red", Qt::CaseInsensitive) == 0) {
-          info.channelColors[i] = col4{255, 0, 0};
-        } else if (cd.LUTName.compare("green", Qt::CaseInsensitive) == 0) {
-          info.channelColors[i] = col4{0, 255, 0};
-        } else if (cd.LUTName.compare("blue", Qt::CaseInsensitive) == 0) {
-          info.channelColors[i] = col4{0, 0, 255};
-        } else if (cd.LUTName.compare("cyan", Qt::CaseInsensitive) == 0) {
-          info.channelColors[i] = col4{0, 255, 255};
-        } else if (cd.LUTName.compare("magenta", Qt::CaseInsensitive) == 0) {
-          info.channelColors[i] = col4{255, 0, 255};
-        } else if (cd.LUTName.compare("yellow", Qt::CaseInsensitive) == 0) {
-          info.channelColors[i] = col4{255, 255, 0};
-        } else if (!cd.LUTName.isEmpty()) {
-          LOG(WARNING) << "Unsupported Leica LUT name '" << cd.LUTName << "'; keeping the default channel color";
+        if (const std::optional<col4> lutColor = leicaDisplayColorFromLutName(cd.LUTName); lutColor.has_value()) {
+          info.channelColors[i] = *lutColor;
         }
       } else {
         throw ZException("invalid channel tag");
       }
     }
 
-    if (info.timeStamps.size() > 1) {
-      double timeInterval = lastTime / (info.timeStamps.size() - 1.);
-      for (size_t i = 0; i < info.timeStamps.size(); ++i) {
-        info.timeStamps[i] = i * timeInterval;
+    // Leica may report one timestamp per image plane. ZImgInfo can only store
+    // one timestamp per time point, so use the first acquired plane for each T.
+    if (const std::optional<std::vector<double>> timeStamps = leicaRepresentativeTimeStamps(ii, info);
+        timeStamps.has_value()) {
+      info.timeStamps = *timeStamps;
+    } else {
+      if (ii.timeStamps.empty() && info.numTimes > 1) {
+        LOG(WARNING) << "Leica TimeStampList is empty for time series; using dimension-derived timestamps";
+      }
+      if (info.timeStamps.size() > 1) {
+        double timeInterval = lastTime / (info.timeStamps.size() - 1.);
+        for (size_t i = 0; i < info.timeStamps.size(); ++i) {
+          info.timeStamps[i] = i * timeInterval;
+        }
       }
     }
 

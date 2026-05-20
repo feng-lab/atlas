@@ -46,6 +46,7 @@ struct ImageInfo
 {
   std::vector<ChannelDescription> channels;
   std::vector<DimensionDescription> dimensions;
+  std::vector<DimensionDescription> timeStampDimensions;
   std::vector<double> timeStamps;
   ImageMemory imageMemory;
 };

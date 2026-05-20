@@ -4,6 +4,8 @@
 #include "zioutils.h"
 #include "zlog.h"
 
+#include <istream>
+
 #ifndef Q_MOC_RUN
 #define NTEST
 #include <reflect>
@@ -131,8 +133,20 @@ void readStructFromFileStream(T& t, std::istream& fs)
 
 template<class T>
   requires std::is_aggregate_v<T>
-bool readStructFromFileStreamNoThrow(T& t, std::istream& fs)
+bool readStructFromFileStreamNoThrow(T& t, std::istream& fs, bool suppressCleanEofWarning = false)
 {
+  if (suppressCleanEofWarning) {
+    const std::streampos originalPosition = fs.tellg();
+    if (originalPosition != std::streampos(-1)) {
+      fs.seekg(0, std::ios_base::end);
+      const std::streampos endPosition = fs.tellg();
+      fs.seekg(originalPosition);
+      if (endPosition != std::streampos(-1) && originalPosition == endPosition) {
+        return false;
+      }
+    }
+  }
+
   try {
     readStructFromFileStream(t, fs);
     return true;

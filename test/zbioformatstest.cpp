@@ -1486,6 +1486,32 @@ std::string channelColorsRgbToString(const std::vector<col4>& colors)
   return fmt::format("[{}]", fmt::join(parts, ","));
 }
 
+void expectTimeStampsNear(const ZImgInfo& info, const std::vector<double>& expected)
+{
+  ASSERT_EQ(expected.size(), info.timeStamps.size());
+  for (size_t i = 0; i < expected.size(); ++i) {
+    EXPECT_NEAR(expected[i], info.timeStamps[i], 1e-6) << "timestamp index " << i;
+  }
+}
+
+void expectRgbColor(const col4& color, uint32_t red, uint32_t green, uint32_t blue)
+{
+  EXPECT_EQ(red, static_cast<uint32_t>(color.r));
+  EXPECT_EQ(green, static_cast<uint32_t>(color.g));
+  EXPECT_EQ(blue, static_cast<uint32_t>(color.b));
+}
+
+std::vector<ZImgInfo> readLeicaCorpusInfos(const QString& corpusRootPath, const QString& relativePath)
+{
+  const QString path = QDir(corpusRootPath).filePath(relativePath);
+  if (!QFileInfo::exists(path)) {
+    throw std::runtime_error(fmt::format("Leica corpus file is missing: {}", path));
+  }
+  std::vector<ZImgInfo> infos;
+  ZImgIO::instance().readInfos(path, infos, nullptr, FileFormat::Leica);
+  return infos;
+}
+
 bool channelMapIsIdentity(const std::vector<size_t>& channelMap)
 {
   for (size_t c = 0; c < channelMap.size(); ++c) {
@@ -2183,6 +2209,54 @@ TEST(ZBioFormatsTest, FakeReaderThumbnailIsReadWhenAvailable)
   });
 }
 
+TEST(ZBioFormatsTest, LeicaCorpusMetadataPreservesTimeStamps)
+{
+  const std::optional<QString> corpusRootPath = publicCorpusRootPath();
+  if (!corpusRootPath.has_value()) {
+    GTEST_SKIP() << "set ATLAS_BIOFORMATS_BREADTH_DIR to run Leica corpus metadata tests";
+  }
+
+  const std::vector<ZImgInfo> perTimeInfos =
+    readLeicaCorpusInfos(*corpusRootPath,
+                         QStringLiteral("Leica-LIF/seanwarren/150519_FRAP_test_ROIs_chromagreen/"
+                                        "150519_FRAP_test_ROIs_chromagreen.lif"));
+  ASSERT_FALSE(perTimeInfos.empty());
+  ASSERT_EQ(5u, perTimeInfos.front().numTimes);
+  expectTimeStampsNear(perTimeInfos.front(), std::vector<double>{0.0, 1.622, 3.25, 4.879, 6.508});
+
+  const std::vector<ZImgInfo> perPlaneInfos =
+    readLeicaCorpusInfos(*corpusRootPath, QStringLiteral("Leica-LIF/michael/PR2729_frameOrderCombinedScanTypes.lif"));
+  ASSERT_GE(perPlaneInfos.size(), 2u);
+  ASSERT_EQ(2u, perPlaneInfos[1].numTimes);
+  expectTimeStampsNear(perPlaneInfos[1], std::vector<double>{0.001, 8.274});
+}
+
+TEST(ZBioFormatsTest, LeicaCorpusMetadataMapsLutsToDisplayColor)
+{
+  const std::optional<QString> corpusRootPath = publicCorpusRootPath();
+  if (!corpusRootPath.has_value()) {
+    GTEST_SKIP() << "set ATLAS_BIOFORMATS_BREADTH_DIR to run Leica corpus metadata tests";
+  }
+
+  const std::vector<ZImgInfo> pColorInfos =
+    readLeicaCorpusInfos(*corpusRootPath,
+                         QStringLiteral("Leica-LIF/imagesc-30856/20191025 Test FRET 585. 423, 426.lif"));
+  ASSERT_GT(pColorInfos.size(), 5u);
+  ASSERT_EQ(1u, pColorInfos[5].channelColors.size());
+  expectRgbColor(pColorInfos[5].channelColors[0], 255, 255, 255);
+
+  const std::vector<ZImgInfo> xlefInfos =
+    readLeicaCorpusInfos(*corpusRootPath,
+                         QStringLiteral("Leica-XLEF/falcon_sample_data_small/XLEF-LOF falcon_sample_data_small/"
+                                        "falcon_sample_data_small.xlef"));
+  const auto greenRedInfo = std::ranges::find_if(xlefInfos, [](const ZImgInfo& info) {
+    return info.channelColors.size() == 2;
+  });
+  ASSERT_NE(xlefInfos.end(), greenRedInfo);
+  expectRgbColor(greenRedInfo->channelColors[0], 0, 255, 0);
+  expectRgbColor(greenRedInfo->channelColors[1], 255, 0, 0);
+}
+
 TEST(ZBioFormatsTest, NativeMicroscopyCorpusExamplesMatchBioFormats)
 {
   initializePublicCorpusLogging();
@@ -2441,14 +2515,14 @@ TEST(ZBioFormatsTest, NativeMicroscopyCorpusExamplesMatchBioFormats)
         ZImg nativeRegion;
         ZImg bioFormatsRegion;
         try {
-          ZImgIO::instance().readImg(file.absolutePath,
-                                     nativeRegion,
-                                     region,
-                                     scenePair.nativeScene,
-                                     1,
-                                     1,
-                                     1,
-                                     candidate.rule->nativeFormat);
+          ZImgIO::instance().readImgPixelsOnly(file.absolutePath,
+                                               nativeRegion,
+                                               region,
+                                               scenePair.nativeScene,
+                                               1,
+                                               1,
+                                               1,
+                                               candidate.rule->nativeFormat);
         }
         catch (const std::exception& e) {
           if (ignoreUnavailableCorpusFailure(e.what())) {
@@ -2466,14 +2540,14 @@ TEST(ZBioFormatsTest, NativeMicroscopyCorpusExamplesMatchBioFormats)
           continue;
         }
         try {
-          ZImgIO::instance().readImg(file.absolutePath,
-                                     bioFormatsRegion,
-                                     region,
-                                     scenePair.bioFormatsScene,
-                                     1,
-                                     1,
-                                     1,
-                                     FileFormat::BioFormats);
+          ZImgIO::instance().readImgPixelsOnly(file.absolutePath,
+                                               bioFormatsRegion,
+                                               region,
+                                               scenePair.bioFormatsScene,
+                                               1,
+                                               1,
+                                               1,
+                                               FileFormat::BioFormats);
         }
         catch (const std::exception& e) {
           if (ignoreUnavailableCorpusFailure(e.what())) {
@@ -3073,7 +3147,7 @@ TEST(ZBioFormatsTest, PublicCorpusReadsMetadataAndSmallRegions)
                                          secondsSince(startTime)));
         }
         try {
-          ZImgIO::instance().readImg(path, img, region, scene, 1, 1, 1, FileFormat::BioFormats);
+          ZImgIO::instance().readImgPixelsOnly(path, img, region, scene, 1, 1, 1, FileFormat::BioFormats);
         }
         catch (const std::exception& e) {
           const std::optional<std::string> knownBioFormatsReason =
