@@ -1,7 +1,43 @@
 #include "zlogwidget.h"
 #include "zlogcache.h"
 #include "ztheme.h"
+#include <QApplication>
+#include <QFontDatabase>
+#include <QFontMetricsF>
 #include <vector>
+
+namespace {
+
+// Log messages use tabs as compact indentation after the Abseil prefix; keep
+// that visual indent stable instead of inheriting Qt's wider pixel tab stop.
+constexpr int kLogTabStopColumns = 2;
+constexpr qreal kLogFontPointSizeReduction = 1.0;
+constexpr int kLogFontPixelSizeReduction = 1;
+
+QFont fixedPitchLogFont()
+{
+  QFont font = QFontDatabase::systemFont(QFontDatabase::FixedFont);
+  const QFont uiFont = QApplication::font();
+  if (uiFont.pointSizeF() > kLogFontPointSizeReduction) {
+    font.setPointSizeF(uiFont.pointSizeF() - kLogFontPointSizeReduction);
+  } else if (uiFont.pointSizeF() > 0) {
+    font.setPointSizeF(uiFont.pointSizeF());
+  } else if (uiFont.pixelSize() > kLogFontPixelSizeReduction) {
+    font.setPixelSize(uiFont.pixelSize() - kLogFontPixelSizeReduction);
+  } else if (uiFont.pixelSize() > 0) {
+    font.setPixelSize(uiFont.pixelSize());
+  }
+  font.setStyleHint(QFont::Monospace);
+  font.setFixedPitch(true);
+  return font;
+}
+
+qreal logTabStopDistance(const QFont& font)
+{
+  return QFontMetricsF(font).horizontalAdvance(QLatin1Char(' ')) * kLogTabStopColumns;
+}
+
+} // namespace
 
 namespace nim {
 
@@ -18,6 +54,8 @@ ZLogWidget::ZLogWidget(bool receiveOldMessages, QWidget* parent)
   : QPlainTextEdit(parent)
 {
   // setCenterOnScroll(true);
+  setFont(fixedPitchLogFont());
+  setTabStopDistance(logTabStopDistance(font()));
   m_normalFormat = currentCharFormat();
   m_errorFormat = m_normalFormat;
   m_errorFormat.setForeground(QBrush(logErrorTextColor()));
