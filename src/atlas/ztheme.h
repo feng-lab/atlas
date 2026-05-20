@@ -181,7 +181,7 @@ public:
 private:
   ZTheme();
 
-  void loadTheme(const QString& file, bool applyPaletteOverrides);
+  void loadTheme(const QString& file, bool applyPaletteOverrides, const QPalette& basePalette);
 
   QColor configuredColor(Color role) const;
 
@@ -191,9 +191,9 @@ private:
 
   void syncQtColorSchemePreference() const;
 
-  void resetApplicationPaletteToStyleDefault() const;
+  QPalette styleDefaultPalette() const;
 
-  QPalette palette() const;
+  QPalette palette(const QPalette& basePalette) const;
 
   std::pair<QColor, QString> readNamedColor(const QString& color, const std::map<QString, QColor>& palette) const;
 

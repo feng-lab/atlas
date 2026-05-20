@@ -215,15 +215,16 @@ void ZTheme::updateTheme()
   syncQtColorSchemePreference();
   m_currentTheme = resolvedTheme();
   LOG(INFO) << "Current Theme: " << m_currentTheme;
-  resetApplicationPaletteToStyleDefault();
+  const QPalette basePalette = styleDefaultPalette();
   const QString themePath = QString(":Resources/themes/%1.atlastheme").arg(m_currentTheme);
   if (!QFile::exists(themePath)) {
     LOG(WARNING) << "Theme file not found: " << themePath << ". Falling back to Qt defaults.";
+    QApplication::setPalette(basePalette);
     return;
   }
   const bool applyAtlasPalette =
     m_themePreference == DarkTheme || (m_themePreference == SystemTheme && m_currentTheme == QStringLiteral("dark"));
-  loadTheme(themePath, applyAtlasPalette);
+  loadTheme(themePath, applyAtlasPalette, basePalette);
   Q_EMIT themeChanged();
 }
 
@@ -239,7 +240,7 @@ void ZTheme::setThemePreference(ThemePreference preference)
   updateTheme();
 }
 
-void ZTheme::loadTheme(const QString& fn, bool applyPaletteOverrides)
+void ZTheme::loadTheme(const QString& fn, bool applyPaletteOverrides, const QPalette& basePalette)
 {
   const auto& loadObj = loadJsonObject(fn);
   if (!loadObj.contains("AtlasTheme") || !loadObj.at("AtlasTheme").is_object()) {
@@ -290,7 +291,7 @@ void ZTheme::loadTheme(const QString& fn, bool applyPaletteOverrides)
   m_palette = std::move(paletteNames);
   m_colors = std::move(colors);
   m_iconFiles = std::move(iconFiles);
-  QApplication::setPalette(palette());
+  QApplication::setPalette(palette(basePalette));
 }
 
 std::pair<QColor, QString> ZTheme::readNamedColor(const QString& color, const std::map<QString, QColor>& palette) const
@@ -381,13 +382,12 @@ QString ZTheme::detectCurrentTheme() const
 #endif
 }
 
-void ZTheme::resetApplicationPaletteToStyleDefault() const
+QPalette ZTheme::styleDefaultPalette() const
 {
   if (QApplication::style()) {
-    QApplication::setPalette(QApplication::style()->standardPalette());
-  } else {
-    QApplication::setPalette(QPalette{});
+    return QApplication::style()->standardPalette();
   }
+  return {};
 }
 
 QMenu* ZTheme::addThemeMenu(QMenu* parentMenu)
@@ -481,9 +481,9 @@ QColor ZTheme::configuredColor(Color role) const
 
 // #define DEBUG_QPalette
 
-QPalette ZTheme::palette() const
+QPalette ZTheme::palette(const QPalette& basePalette) const
 {
-  QPalette pal = QApplication::palette();
+  QPalette pal = basePalette;
 
 #ifdef DEBUG_QPalette
   const QMetaObject& m = QPalette::staticMetaObject;
