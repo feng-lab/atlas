@@ -80,55 +80,14 @@ ZTheme::ThemePreference themePreferenceFromSettingsValue(const QString& value)
   return ZTheme::SystemTheme;
 }
 
-QPalette qtDarkOverlayPalette()
+QColor defaultLogErrorTextColor(bool darkTheme)
 {
-  const QColor window = QColor::fromRgb(0x30, 0x30, 0x30);
-  const QColor base = QColor::fromRgb(0x24, 0x24, 0x24);
-  const QColor alternateBase = QColor::fromRgb(0x2e, 0x2e, 0x2e);
-  const QColor button = QColor::fromRgb(0x3a, 0x3a, 0x3a);
-  const QColor text = QColor::fromRgb(0xe7, 0xe7, 0xe7);
-  const QColor disabledText = QColor::fromRgb(0x8a, 0x8a, 0x8a);
-  const QColor disabledBackground = QColor::fromRgb(0x35, 0x35, 0x35);
-  const QColor highlight = QColor::fromRgb(0x1f, 0x75, 0xcc);
-  const QColor highlightedText = QColor::fromRgb(0xff, 0xff, 0xff);
-  const QColor light = QColor::fromRgb(0x4a, 0x4a, 0x4a);
-  const QColor midlight = QColor::fromRgb(0x3f, 0x3f, 0x3f);
-  const QColor mid = QColor::fromRgb(0x68, 0x68, 0x68);
-  const QColor dark = QColor::fromRgb(0x20, 0x20, 0x20);
-  const QColor shadow = QColor::fromRgb(0x11, 0x11, 0x11);
+  return darkTheme ? QColor(242, 182, 179) : QColor(176, 0, 32);
+}
 
-  QPalette palette = QApplication::style() ? QApplication::style()->standardPalette() : QApplication::palette();
-
-  palette.setColor(QPalette::All, QPalette::Window, window);
-  palette.setColor(QPalette::All, QPalette::Base, base);
-  palette.setColor(QPalette::All, QPalette::AlternateBase, alternateBase);
-  palette.setColor(QPalette::All, QPalette::Button, button);
-  palette.setColor(QPalette::All, QPalette::Light, light);
-  palette.setColor(QPalette::All, QPalette::Midlight, midlight);
-  palette.setColor(QPalette::All, QPalette::Mid, mid);
-  palette.setColor(QPalette::All, QPalette::Dark, dark);
-  palette.setColor(QPalette::All, QPalette::Shadow, shadow);
-  palette.setColor(QPalette::All, QPalette::Highlight, highlight);
-  palette.setColor(QPalette::All, QPalette::HighlightedText, highlightedText);
-  palette.setColor(QPalette::All, QPalette::ToolTipBase, base);
-  palette.setColor(QPalette::All, QPalette::ToolTipText, text);
-
-  palette.setColor(QPalette::Disabled, QPalette::Window, disabledBackground);
-  palette.setColor(QPalette::Disabled, QPalette::Base, disabledBackground);
-  palette.setColor(QPalette::Disabled, QPalette::AlternateBase, disabledBackground);
-  palette.setColor(QPalette::Disabled, QPalette::Button, disabledBackground);
-
-  palette.setColor(QPalette::Active, QPalette::WindowText, text);
-  palette.setColor(QPalette::Inactive, QPalette::WindowText, text);
-  palette.setColor(QPalette::Disabled, QPalette::WindowText, disabledText);
-  palette.setColor(QPalette::Active, QPalette::Text, text);
-  palette.setColor(QPalette::Inactive, QPalette::Text, text);
-  palette.setColor(QPalette::Disabled, QPalette::Text, disabledText);
-  palette.setColor(QPalette::Active, QPalette::ButtonText, text);
-  palette.setColor(QPalette::Inactive, QPalette::ButtonText, text);
-  palette.setColor(QPalette::Disabled, QPalette::ButtonText, disabledText);
-
-  return palette;
+QColor defaultLogWarningTextColor(bool darkTheme)
+{
+  return darkTheme ? QColor(224, 183, 22) : QColor(143, 89, 2);
 }
 
 class ZThemeIconEngine final : public QIconEngine
@@ -261,9 +220,6 @@ void ZTheme::updateTheme()
   const bool applyAtlasPalette =
     m_themePreference == DarkTheme || (m_themePreference == SystemTheme && m_currentTheme == QStringLiteral("dark"));
   loadTheme(themePath, applyAtlasPalette);
-  if (m_themePreference == QtDarkTheme) {
-    QApplication::setPalette(qtDarkOverlayPalette());
-  }
   Q_EMIT themeChanged();
 }
 
@@ -479,6 +435,30 @@ QString ZTheme::treeViewIndicatorStyleSheet() const
     .arg(iconFile(EyeCloseIcon), iconFile(EyeOpenIcon), iconFile(EyeHalfIcon));
 }
 
+QColor ZTheme::color(Color role) const
+{
+  const QColor configured = configuredColor(role);
+  if (configured.isValid()) {
+    return configured;
+  }
+
+  switch (role) {
+    case LogErrorMessageTextColor:
+      return defaultLogErrorTextColor(isDarkTheme());
+    case LogNormalMessageTextColor:
+      return QApplication::palette().color(QPalette::Text);
+    case LogWarningMessageTextColor:
+      return defaultLogWarningTextColor(isDarkTheme());
+    default:
+      return configured;
+  }
+}
+
+QColor ZTheme::configuredColor(Color role) const
+{
+  return m_colors.at(role).first;
+}
+
 // #define DEBUG_QPalette
 
 QPalette ZTheme::palette() const
@@ -553,7 +533,7 @@ QPalette ZTheme::palette() const
   };
 
   for (auto entry : mapping) {
-    const QColor themeColor = color(entry.themeColor);
+    const QColor themeColor = configuredColor(entry.themeColor);
     // Use original color if color is not defined in theme.
     if (themeColor.isValid()) {
       if (entry.setColorRoleAsBrush) {

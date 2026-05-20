@@ -1,16 +1,14 @@
 #include "zlogwidget.h"
 #include "zlogcache.h"
+#include "zlog.h"
 #include "ztheme.h"
 #include <QApplication>
 #include <QFontDatabase>
-#include <QFontMetricsF>
+#include <tuple>
 #include <vector>
 
 namespace {
 
-// Log messages use tabs as compact indentation after the Abseil prefix; keep
-// that visual indent stable instead of inheriting Qt's wider pixel tab stop.
-constexpr int kLogTabStopColumns = 2;
 constexpr qreal kLogFontPointSizeReduction = 1.0;
 constexpr int kLogFontPixelSizeReduction = 1;
 
@@ -32,20 +30,19 @@ QFont fixedPitchLogFont()
   return font;
 }
 
-qreal logTabStopDistance(const QFont& font)
-{
-  return QFontMetricsF(font).horizontalAdvance(QLatin1Char(' ')) * kLogTabStopColumns;
-}
-
 } // namespace
 
 namespace nim {
 
 namespace {
 
-[[nodiscard]] QColor logErrorTextColor()
+[[nodiscard]] QTextCharFormat logFormat(const QTextCharFormat& baseFormat, ZTheme::Color role)
 {
-  return ZTheme::instance().isDarkTheme() ? QColor(242, 182, 179) : QColor(176, 0, 32);
+  QTextCharFormat format = baseFormat;
+  const QColor color = ZTheme::instance().color(role);
+  CHECK(color.isValid()) << "ZTheme returned an invalid log color for role " << role;
+  format.setForeground(QBrush(color));
+  return format;
 }
 
 } // namespace
@@ -55,50 +52,69 @@ ZLogWidget::ZLogWidget(bool receiveOldMessages, QWidget* parent)
 {
   // setCenterOnScroll(true);
   setFont(fixedPitchLogFont());
-  setTabStopDistance(logTabStopDistance(font()));
-  m_normalFormat = currentCharFormat();
-  m_errorFormat = m_normalFormat;
-  m_errorFormat.setForeground(QBrush(logErrorTextColor()));
+  updateFormats();
   connect(&ZTheme::instance(), &ZTheme::themeChanged, this, [this]() {
-    m_normalFormat = currentCharFormat();
-    m_errorFormat = m_normalFormat;
-    m_errorFormat.setForeground(QBrush(logErrorTextColor()));
+    updateFormats();
   });
   ZLogCache::instance().receiveLogMessages(this, &ZLogWidget::writeLogData, receiveOldMessages);
 }
 
+void ZLogWidget::updateFormats()
+{
+  const QTextCharFormat baseFormat;
+  m_normalFormat = logFormat(baseFormat, ZTheme::LogNormalMessageTextColor);
+  m_warningFormat = logFormat(baseFormat, ZTheme::LogWarningMessageTextColor);
+  m_errorFormat = logFormat(baseFormat, ZTheme::LogErrorMessageTextColor);
+  setCurrentCharFormat(m_normalFormat);
+}
+
 void ZLogWidget::writeLogData(const std::vector<LogData>* messages, size_t start, size_t end)
 {
+  auto isNormalLogLevel = [](absl::LogSeverity level) {
+    return level <= absl::LogSeverity::kInfo;
+  };
+
+  auto formatForLogLevel = [this](absl::LogSeverity level) -> const QTextCharFormat& {
+    if (level <= absl::LogSeverity::kInfo) {
+      return m_normalFormat;
+    }
+    if (level == absl::LogSeverity::kWarning) {
+      return m_warningFormat;
+    }
+    return m_errorFormat;
+  };
+
   if (end - start == 1) {
     const auto& logData = (*messages)[start];
-    if (logData.level <= absl::LogSeverity::kInfo) {
-      appendPlainText(QString::fromStdString(logData.formatted));
-    } else {
-      setCurrentCharFormat(m_errorFormat);
-      appendPlainText(QString::fromStdString(logData.formatted));
+    if (!isNormalLogLevel(logData.level)) {
+      setCurrentCharFormat(formatForLogLevel(logData.level));
+    }
+    appendPlainText(QString::fromStdString(logData.formatted));
+    if (!isNormalLogLevel(logData.level)) {
       setCurrentCharFormat(m_normalFormat);
     }
   } else {
     const auto& logData = (*messages)[start];
-    bool firstFormat = logData.level <= absl::LogSeverity::kInfo;
-    bool lastFormat = firstFormat;
-    std::vector<QStringList> textList;
-    textList.emplace_back();
-    textList.back().push_back(QString::fromStdString(logData.formatted));
+    std::vector<std::tuple<absl::LogSeverity, const QTextCharFormat*, QStringList>> textList;
+    textList.emplace_back(logData.level, &formatForLogLevel(logData.level), QStringList{});
+    std::get<2>(textList.back()).push_back(QString::fromStdString(logData.formatted));
     for (auto i = start + 1; i < end; ++i) {
       const auto& logD = (*messages)[i];
-      if ((logD.level <= absl::LogSeverity::kInfo) != lastFormat) {
-        lastFormat = !lastFormat;
-        textList.emplace_back();
+      const QTextCharFormat* format = &formatForLogLevel(logD.level);
+      if (format != std::get<1>(textList.back())) {
+        textList.emplace_back(logD.level, format, QStringList{});
       }
-      textList.back().push_back(QString::fromStdString(logD.formatted));
+      std::get<2>(textList.back()).push_back(QString::fromStdString(logD.formatted));
     }
-    for (const auto& si : textList) {
-      setCurrentCharFormat(firstFormat ? m_normalFormat : m_errorFormat);
-      firstFormat = !firstFormat;
-      appendPlainText(si.join("\n"));
+    for (const auto& [level, format, lines] : textList) {
+      if (!isNormalLogLevel(level)) {
+        setCurrentCharFormat(*format);
+      }
+      appendPlainText(lines.join("\n"));
+      if (!isNormalLogLevel(level)) {
+        setCurrentCharFormat(m_normalFormat);
+      }
     }
-    setCurrentCharFormat(m_normalFormat);
   }
 }
 

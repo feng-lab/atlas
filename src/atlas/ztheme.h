@@ -162,6 +162,8 @@ public:
     CancelIcon,
   };
 
+  QColor color(Color role) const;
+
   const QIcon& icon(Icon file) const
   {
     return m_icons.at(file);
@@ -181,10 +183,7 @@ private:
 
   void loadTheme(const QString& file, bool applyPaletteOverrides);
 
-  QColor color(Color role) const
-  {
-    return m_colors.at(role).first;
-  }
+  QColor configuredColor(Color role) const;
 
   [[nodiscard]] QString detectCurrentTheme() const;
 
