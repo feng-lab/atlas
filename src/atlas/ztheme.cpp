@@ -73,7 +73,11 @@ ZTheme::ThemePreference themePreferenceFromSettingsValue(const QString& value)
     return ZTheme::DarkTheme;
   }
   if (normalized == QStringLiteral("qt_dark") || normalized == QStringLiteral("qt-dark")) {
+#if ATLAS_ENABLE_CUSTOM_COMMAND
     return ZTheme::QtDarkTheme;
+#else
+    return ZTheme::SystemTheme;
+#endif
   }
 
   LOG(WARNING) << "Unknown saved theme preference " << value << "; falling back to system";
@@ -396,6 +400,7 @@ QMenu* ZTheme::addThemeMenu(QMenu* parentMenu)
   auto* systemAction = new QAction(themePreferenceLabel(SystemTheme), themeMenu);
   auto* lightAction = new QAction(themePreferenceLabel(LightTheme), themeMenu);
   auto* darkAction = new QAction(themePreferenceLabel(DarkTheme), themeMenu);
+#if ATLAS_ENABLE_CUSTOM_COMMAND
   auto* qtDarkAction = new QAction(themePreferenceLabel(QtDarkTheme), themeMenu);
   const std::array<std::pair<QAction*, ThemePreference>, 4> actions = {
     std::make_pair(systemAction, SystemTheme),
@@ -403,6 +408,13 @@ QMenu* ZTheme::addThemeMenu(QMenu* parentMenu)
     std::make_pair(darkAction, DarkTheme),
     std::make_pair(qtDarkAction, QtDarkTheme),
   };
+#else
+  const std::array<std::pair<QAction*, ThemePreference>, 3> actions = {
+    std::make_pair(systemAction, SystemTheme),
+    std::make_pair(lightAction, LightTheme),
+    std::make_pair(darkAction, DarkTheme),
+  };
+#endif
 
   for (const auto& actionAndPreference : actions) {
     QAction* action = actionAndPreference.first;
@@ -415,12 +427,20 @@ QMenu* ZTheme::addThemeMenu(QMenu* parentMenu)
     });
   }
 
+#if ATLAS_ENABLE_CUSTOM_COMMAND
   auto syncActions = [this, systemAction, lightAction, darkAction, qtDarkAction]() {
     systemAction->setChecked(m_themePreference == SystemTheme);
     lightAction->setChecked(m_themePreference == LightTheme);
     darkAction->setChecked(m_themePreference == DarkTheme);
     qtDarkAction->setChecked(m_themePreference == QtDarkTheme);
   };
+#else
+  auto syncActions = [this, systemAction, lightAction, darkAction]() {
+    systemAction->setChecked(m_themePreference == SystemTheme);
+    lightAction->setChecked(m_themePreference == LightTheme);
+    darkAction->setChecked(m_themePreference == DarkTheme);
+  };
+#endif
   connect(this, &ZTheme::themePreferenceChanged, themeMenu, syncActions);
   syncActions();
 
