@@ -72,7 +72,7 @@ public:
 
     m_cancelButton = new QToolButton(this);
     m_cancelButton->setToolTip(tr("Cancel task"));
-    ZTheme::instance().bindIcon(m_cancelButton, ZTheme::CancelIcon);
+    m_cancelButton->setIcon(ZTheme::instance().icon(ZTheme::CancelIcon));
     headerRow->addWidget(m_cancelButton, 0);
 
     layout->addLayout(headerRow);

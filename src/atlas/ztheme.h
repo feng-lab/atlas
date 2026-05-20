@@ -8,8 +8,6 @@
 #include <vector>
 #include <map>
 
-class QAction;
-class QAbstractButton;
 class QMenu;
 
 namespace nim {
@@ -57,8 +55,6 @@ public:
   }
 
   void setThemePreference(ThemePreference preference);
-
-  bool event(QEvent* event) override;
 
   enum Color
   {
@@ -176,10 +172,6 @@ public:
     return m_iconFiles.at(file);
   }
 
-  void bindIcon(QAction* action, Icon file);
-
-  void bindIcon(QAbstractButton* button, Icon file);
-
   QMenu* addThemeMenu(QMenu* parentMenu);
 
   [[nodiscard]] QString treeViewIndicatorStyleSheet() const;
@@ -197,8 +189,6 @@ private:
   [[nodiscard]] QString detectCurrentTheme() const;
 
   [[nodiscard]] QString resolvedTheme() const;
-
-  [[nodiscard]] bool shouldApplyAtlasPalette() const;
 
   void syncQtColorSchemePreference() const;
 

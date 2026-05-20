@@ -314,7 +314,6 @@ void ZSwcDoc::setModified(bool)
 void ZSwcDoc::createActions()
 {
   m_loadSwcAction = new QAction(ZTheme::instance().icon(ZTheme::LoadObjectIcon), tr("&Load Swc..."), this);
-  ZTheme::instance().bindIcon(m_loadSwcAction, ZTheme::LoadObjectIcon);
   m_loadSwcAction->setStatusTip(tr("Load an existing Swc file"));
   connect(m_loadSwcAction, &QAction::triggered, this, &ZSwcDoc::loadSwc);
 

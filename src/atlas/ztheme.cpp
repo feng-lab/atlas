@@ -11,6 +11,7 @@
 #include <QFile>
 #include <QApplication>
 #include <QGuiApplication>
+#include <QIconEngine>
 #include <QSettings>
 #include <QScopedValueRollback>
 #include <QStyle>
@@ -18,7 +19,6 @@
 #include <QStyleHints>
 #include <QAction>
 #include <QActionGroup>
-#include <QAbstractButton>
 #include <QMenu>
 #include <array>
 
@@ -80,6 +80,125 @@ ZTheme::ThemePreference themePreferenceFromSettingsValue(const QString& value)
   return ZTheme::SystemTheme;
 }
 
+QPalette qtDarkOverlayPalette()
+{
+  const QColor window = QColor::fromRgb(0x30, 0x30, 0x30);
+  const QColor base = QColor::fromRgb(0x24, 0x24, 0x24);
+  const QColor alternateBase = QColor::fromRgb(0x2e, 0x2e, 0x2e);
+  const QColor button = QColor::fromRgb(0x3a, 0x3a, 0x3a);
+  const QColor text = QColor::fromRgb(0xe7, 0xe7, 0xe7);
+  const QColor disabledText = QColor::fromRgb(0x8a, 0x8a, 0x8a);
+  const QColor disabledBackground = QColor::fromRgb(0x35, 0x35, 0x35);
+  const QColor highlight = QColor::fromRgb(0x1f, 0x75, 0xcc);
+  const QColor highlightedText = QColor::fromRgb(0xff, 0xff, 0xff);
+  const QColor light = QColor::fromRgb(0x4a, 0x4a, 0x4a);
+  const QColor midlight = QColor::fromRgb(0x3f, 0x3f, 0x3f);
+  const QColor mid = QColor::fromRgb(0x68, 0x68, 0x68);
+  const QColor dark = QColor::fromRgb(0x20, 0x20, 0x20);
+  const QColor shadow = QColor::fromRgb(0x11, 0x11, 0x11);
+
+  QPalette palette = QApplication::style() ? QApplication::style()->standardPalette() : QApplication::palette();
+
+  palette.setColor(QPalette::All, QPalette::Window, window);
+  palette.setColor(QPalette::All, QPalette::Base, base);
+  palette.setColor(QPalette::All, QPalette::AlternateBase, alternateBase);
+  palette.setColor(QPalette::All, QPalette::Button, button);
+  palette.setColor(QPalette::All, QPalette::Light, light);
+  palette.setColor(QPalette::All, QPalette::Midlight, midlight);
+  palette.setColor(QPalette::All, QPalette::Mid, mid);
+  palette.setColor(QPalette::All, QPalette::Dark, dark);
+  palette.setColor(QPalette::All, QPalette::Shadow, shadow);
+  palette.setColor(QPalette::All, QPalette::Highlight, highlight);
+  palette.setColor(QPalette::All, QPalette::HighlightedText, highlightedText);
+  palette.setColor(QPalette::All, QPalette::ToolTipBase, base);
+  palette.setColor(QPalette::All, QPalette::ToolTipText, text);
+
+  palette.setColor(QPalette::Disabled, QPalette::Window, disabledBackground);
+  palette.setColor(QPalette::Disabled, QPalette::Base, disabledBackground);
+  palette.setColor(QPalette::Disabled, QPalette::AlternateBase, disabledBackground);
+  palette.setColor(QPalette::Disabled, QPalette::Button, disabledBackground);
+
+  palette.setColor(QPalette::Active, QPalette::WindowText, text);
+  palette.setColor(QPalette::Inactive, QPalette::WindowText, text);
+  palette.setColor(QPalette::Disabled, QPalette::WindowText, disabledText);
+  palette.setColor(QPalette::Active, QPalette::Text, text);
+  palette.setColor(QPalette::Inactive, QPalette::Text, text);
+  palette.setColor(QPalette::Disabled, QPalette::Text, disabledText);
+  palette.setColor(QPalette::Active, QPalette::ButtonText, text);
+  palette.setColor(QPalette::Inactive, QPalette::ButtonText, text);
+  palette.setColor(QPalette::Disabled, QPalette::ButtonText, disabledText);
+
+  return palette;
+}
+
+class ZThemeIconEngine final : public QIconEngine
+{
+public:
+  explicit ZThemeIconEngine(ZTheme::Icon icon)
+    : m_icon(icon)
+  {}
+
+  void paint(QPainter* painter, const QRect& rect, QIcon::Mode mode, QIcon::State state) override
+  {
+    currentIcon().paint(painter, rect, Qt::AlignCenter, mode, state);
+  }
+
+  QSize actualSize(const QSize& size, QIcon::Mode mode, QIcon::State state) override
+  {
+    return currentIcon().actualSize(size, mode, state);
+  }
+
+  QPixmap pixmap(const QSize& size, QIcon::Mode mode, QIcon::State state) override
+  {
+    return currentIcon().pixmap(size, mode, state);
+  }
+
+  QPixmap scaledPixmap(const QSize& size, QIcon::Mode mode, QIcon::State state, qreal scale) override
+  {
+    return currentIcon().pixmap(size, scale, mode, state);
+  }
+
+  QList<QSize> availableSizes(QIcon::Mode mode, QIcon::State state) override
+  {
+    return currentIcon().availableSizes(mode, state);
+  }
+
+  QString iconName() override
+  {
+    return currentIcon().name();
+  }
+
+  bool isNull() override
+  {
+    return currentIcon().isNull();
+  }
+
+  QString key() const override
+  {
+    return QStringLiteral("ZThemeIconEngine");
+  }
+
+  QIconEngine* clone() const override
+  {
+    return new ZThemeIconEngine(*this);
+  }
+
+private:
+  const QIcon& currentIcon()
+  {
+    const QString& iconFile = ZTheme::instance().iconFile(m_icon);
+    if (iconFile != m_currentIconFile) {
+      m_currentIconFile = iconFile;
+      m_currentIcon = QIcon(m_currentIconFile);
+    }
+    return m_currentIcon;
+  }
+
+  ZTheme::Icon m_icon;
+  QString m_currentIconFile;
+  QIcon m_currentIcon;
+};
+
 } // namespace
 
 ZTheme& ZTheme::instance()
@@ -94,13 +213,22 @@ ZTheme::ZTheme()
   m_colors.resize(m.enumerator(m.indexOfEnumerator("Color")).keyCount());
   m_icons.resize(m.enumerator(m.indexOfEnumerator("Icon")).keyCount());
   m_iconFiles.resize(m_icons.size());
+  for (int i = 0, total = static_cast<int>(m_icons.size()); i < total; ++i) {
+    m_icons[i] = QIcon(new ZThemeIconEngine(static_cast<Icon>(i)));
+  }
   m_themePreference = themePreferenceFromSettingsValue(
     QSettings().value(kThemePreferenceSettingsKey, QStringLiteral("system")).toString());
 
 #if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
   if (auto* styleHints = QGuiApplication::styleHints()) {
     connect(styleHints, &QStyleHints::colorSchemeChanged, this, [this](Qt::ColorScheme) {
-      updateTheme();
+      if (m_updatingTheme || m_themePreference != SystemTheme) {
+        return;
+      }
+      const QString currentTheme = detectCurrentTheme();
+      if (currentTheme != m_currentTheme) {
+        updateTheme();
+      }
     });
   }
 #endif
@@ -130,16 +258,13 @@ void ZTheme::updateTheme()
     LOG(WARNING) << "Theme file not found: " << themePath << ". Falling back to Qt defaults.";
     return;
   }
-  loadTheme(themePath, shouldApplyAtlasPalette());
-  Q_EMIT themeChanged();
-}
-
-bool ZTheme::event(QEvent* event)
-{
-  if (event->type() == QEvent::ApplicationPaletteChange && !m_updatingTheme) {
-    updateTheme();
+  const bool applyAtlasPalette =
+    m_themePreference == DarkTheme || (m_themePreference == SystemTheme && m_currentTheme == QStringLiteral("dark"));
+  loadTheme(themePath, applyAtlasPalette);
+  if (m_themePreference == QtDarkTheme) {
+    QApplication::setPalette(qtDarkOverlayPalette());
   }
-  return QObject::event(event);
+  Q_EMIT themeChanged();
 }
 
 void ZTheme::setThemePreference(ThemePreference preference)
@@ -166,7 +291,6 @@ void ZTheme::loadTheme(const QString& fn, bool applyPaletteOverrides)
   const QMetaObject& m = *metaObject();
   std::map<QString, QColor> paletteNames;
   std::vector<std::pair<QColor, QString>> colors(m_colors.size());
-  std::vector<QIcon> icons(m_icons.size());
   std::vector<QString> iconFiles(m_iconFiles.size());
 
   for (const auto& [key, value] : themeObj) {
@@ -199,7 +323,6 @@ void ZTheme::loadTheme(const QString& fn, bool applyPaletteOverrides)
           throw ZException(fmt::format("theme icon {} missing", e.key(i)));
         }
         iconFiles[i] = asQString(po.at(ekey));
-        QIcon(iconFiles[i]).swap(icons[i]);
       }
     }
   }
@@ -207,7 +330,6 @@ void ZTheme::loadTheme(const QString& fn, bool applyPaletteOverrides)
   m_palette = std::move(paletteNames);
   m_colors = std::move(colors);
   m_iconFiles = std::move(iconFiles);
-  m_icons = std::move(icons);
   QApplication::setPalette(palette());
 }
 
@@ -240,20 +362,9 @@ QString ZTheme::resolvedTheme() const
   return QStringLiteral("dark");
 }
 
-bool ZTheme::shouldApplyAtlasPalette() const
-{
-  if (m_themePreference == QtDarkTheme) {
-    return false;
-  }
-  if (m_themePreference == SystemTheme) {
-    return detectCurrentTheme() == QStringLiteral("dark");
-  }
-  return m_themePreference == DarkTheme;
-}
-
 void ZTheme::syncQtColorSchemePreference() const
 {
-#if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
+#if QT_VERSION >= QT_VERSION_CHECK(6, 8, 0)
   auto* styleHints = QGuiApplication::styleHints();
   CHECK(styleHints != nullptr);
   switch (m_themePreference) {
@@ -268,6 +379,15 @@ void ZTheme::syncQtColorSchemePreference() const
       return;
     case QtDarkTheme:
       styleHints->setColorScheme(Qt::ColorScheme::Dark);
+      return;
+  }
+  LOG(FATAL) << "Unknown theme preference: " << m_themePreference;
+#else
+  switch (m_themePreference) {
+    case SystemTheme:
+    case LightTheme:
+    case DarkTheme:
+    case QtDarkTheme:
       return;
   }
   LOG(FATAL) << "Unknown theme preference: " << m_themePreference;
@@ -308,24 +428,6 @@ void ZTheme::resetApplicationPaletteToStyleDefault() const
   } else {
     QApplication::setPalette(QPalette{});
   }
-}
-
-void ZTheme::bindIcon(QAction* action, Icon file)
-{
-  CHECK(action != nullptr);
-  action->setIcon(icon(file));
-  connect(this, &ZTheme::themeChanged, action, [this, action, file]() {
-    action->setIcon(icon(file));
-  });
-}
-
-void ZTheme::bindIcon(QAbstractButton* button, Icon file)
-{
-  CHECK(button != nullptr);
-  button->setIcon(icon(file));
-  connect(this, &ZTheme::themeChanged, button, [this, button, file]() {
-    button->setIcon(icon(file));
-  });
 }
 
 QMenu* ZTheme::addThemeMenu(QMenu* parentMenu)

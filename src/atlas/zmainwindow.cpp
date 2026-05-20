@@ -627,19 +627,16 @@ void ZMainWindow::createActions()
   //  connect(m_newAction, &QAction::triggered, this, &ZMainWindow::newWindow);
 
   m_openAction = new QAction(ZTheme::instance().icon(ZTheme::OpenFolderIcon), tr("&Open..."), this);
-  ZTheme::instance().bindIcon(m_openAction, ZTheme::OpenFolderIcon);
   m_openAction->setShortcuts(QKeySequence::Open);
   m_openAction->setStatusTip(tr("Open an existing scene file"));
   connect(m_openAction, &QAction::triggered, this, &ZMainWindow::loadScene);
 
   m_saveAction = new QAction(ZTheme::instance().icon(ZTheme::SaveIcon), tr("&Save"), this);
-  ZTheme::instance().bindIcon(m_saveAction, ZTheme::SaveIcon);
   m_saveAction->setShortcuts(QKeySequence::Save);
   m_saveAction->setStatusTip(tr("Save unsaved objects to disk"));
   connect(m_saveAction, &QAction::triggered, this, &ZMainWindow::save);
 
   m_saveAsAction = new QAction(ZTheme::instance().icon(ZTheme::SaveAsIcon), tr("Save &As..."), this);
-  ZTheme::instance().bindIcon(m_saveAsAction, ZTheme::SaveAsIcon);
   m_saveAsAction->setShortcuts(QKeySequence::SaveAs);
   m_saveAsAction->setStatusTip(tr("Save selected objects under a new name"));
   connect(m_saveAsAction, &QAction::triggered, this, &ZMainWindow::saveAs);
@@ -671,17 +668,14 @@ void ZMainWindow::createActions()
   connect(m_open3DViewAction, &QAction::triggered, this, &ZMainWindow::open3DWindow);
 
   m_screenShotAction = new QAction(ZTheme::instance().icon(ZTheme::ScreenshotIcon), tr("&Screenshot"), this);
-  ZTheme::instance().bindIcon(m_screenShotAction, ZTheme::ScreenshotIcon);
   m_screenShotAction->setStatusTip(tr("Screenshot"));
   connect(m_screenShotAction, &QAction::triggered, this, &ZMainWindow::openScreenshotPanel);
 
   m_shortcutsAction = new QAction(ZTheme::instance().icon(ZTheme::HelpIcon), tr("&Shortcuts"), this);
-  ZTheme::instance().bindIcon(m_shortcutsAction, ZTheme::HelpIcon);
   m_shortcutsAction->setStatusTip(tr("Open keyboard and mouse shortcuts reference"));
   connect(m_shortcutsAction, &QAction::triggered, this, &ZMainWindow::openShortcutsReference);
 
   m_traceToolAction = new QAction(ZTheme::instance().icon(ZTheme::TraceIcon), tr("Trace"), this);
-  ZTheme::instance().bindIcon(m_traceToolAction, ZTheme::TraceIcon);
   m_traceToolAction->setStatusTip(tr("Enable trace tool (left-click to trace)"));
   m_traceToolAction->setCheckable(true);
   m_traceToolAction->setChecked(m_doc->traceSettings().traceToolEnabled());
@@ -732,7 +726,6 @@ void ZMainWindow::createActions()
 
   //
   m_openLogFolderAction = new QAction(ZTheme::instance().icon(ZTheme::OpenFolderIcon), tr("&Open Log Folder"), this);
-  ZTheme::instance().bindIcon(m_openLogFolderAction, ZTheme::OpenFolderIcon);
   m_openLogFolderAction->setStatusTip(tr("Open Log Folder"));
   connect(m_openLogFolderAction, &QAction::triggered, this, &ZMainWindow::openLogFolder);
 
@@ -751,14 +744,12 @@ void ZMainWindow::createActions()
 
   m_openDiskCacheFolderAction =
     new QAction(ZTheme::instance().icon(ZTheme::OpenFolderIcon), tr("Open Disk Cache Folder"), this);
-  ZTheme::instance().bindIcon(m_openDiskCacheFolderAction, ZTheme::OpenFolderIcon);
   m_openDiskCacheFolderAction->setStatusTip(tr("Open Disk Cache Folder"));
   connect(m_openDiskCacheFolderAction, &QAction::triggered, this, &ZMainWindow::openDiskCacheFolder);
 
 #if ATLAS_ENABLE_CUSTOM_COMMAND
   m_runCustomCommandAction =
     new QAction(ZTheme::instance().icon(ZTheme::RunCommandIcon), tr("&Run Custom Command"), this);
-  ZTheme::instance().bindIcon(m_runCustomCommandAction, ZTheme::RunCommandIcon);
   m_runCustomCommandAction->setStatusTip(tr("Run Custom Command"));
   connect(m_runCustomCommandAction, &QAction::triggered, this, &ZMainWindow::runCustomCommand);
 #endif
@@ -957,7 +948,7 @@ void ZMainWindow::createDockWindows()
   addDockWidget(Qt::RightDockWidgetArea, m_traceDockWidget);
   tabifyDockWidget(m_globalSettingDockWidget, m_traceDockWidget);
   auto* traceToggle = m_traceDockWidget->toggleViewAction();
-  ZTheme::instance().bindIcon(traceToggle, ZTheme::TraceIcon);
+  traceToggle->setIcon(ZTheme::instance().icon(ZTheme::TraceIcon));
   m_windowMenu->addAction(traceToggle);
   m_traceDockWidget->setVisible(false);
 

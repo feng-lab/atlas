@@ -876,7 +876,6 @@ void ZPunctaDoc::setModified(bool)
 void ZPunctaDoc::createActions()
 {
   m_loadPunctaAction = new QAction(ZTheme::instance().icon(ZTheme::LoadObjectIcon), tr("&Load Puncta..."), this);
-  ZTheme::instance().bindIcon(m_loadPunctaAction, ZTheme::LoadObjectIcon);
   m_loadPunctaAction->setStatusTip(tr("Load one or more existing puncta files"));
   connect(m_loadPunctaAction, &QAction::triggered, this, &ZPunctaDoc::loadPuncta);
 

@@ -300,7 +300,6 @@ void Z2DAnimationDoc::createActions()
 {
   m_loadAnimationsAction =
     new QAction(ZTheme::instance().icon(ZTheme::LoadObjectIcon), tr("&Load 2D Animations..."), this);
-  ZTheme::instance().bindIcon(m_loadAnimationsAction, ZTheme::LoadObjectIcon);
   m_loadAnimationsAction->setStatusTip(tr("Load one or more existing Animation files"));
   connect(m_loadAnimationsAction, &QAction::triggered, this, &Z2DAnimationDoc::loadAnimation);
 }

@@ -354,12 +354,12 @@ void ZTakeScreenShotWidget::createWidget()
   lo->addLayout(hlo);
 
   m_captureButton = new QPushButton(tr("Capture"), this);
-  ZTheme::instance().bindIcon(m_captureButton, ZTheme::ScreenshotIcon);
+  m_captureButton->setIcon(ZTheme::instance().icon(ZTheme::ScreenshotIcon));
   m_captureButton->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
   lo->addWidget(m_captureButton, 0, Qt::AlignHCenter | Qt::AlignVCenter);
 
   m_captureSequenceButton = new QPushButton(tr("Capture Sequence"), this);
-  ZTheme::instance().bindIcon(m_captureSequenceButton, ZTheme::CamcoderIcon);
+  m_captureSequenceButton->setIcon(ZTheme::instance().icon(ZTheme::CamcoderIcon));
   m_captureSequenceButton->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
   lo->addWidget(m_captureSequenceButton, 0, Qt::AlignHCenter | Qt::AlignVCenter);
 
