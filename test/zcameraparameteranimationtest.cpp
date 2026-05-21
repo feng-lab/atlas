@@ -4,7 +4,9 @@
 #include "zglmutils.h"
 #include "ztest.h"
 
-#include <Mathematics/TCBSplineCurve.h>
+#include <string>
+#include <utility>
+#include <vector>
 
 using namespace nim;
 
@@ -105,16 +107,6 @@ struct SquadPoly
   return out;
 }
 
-[[nodiscard]] gte::Vector<3, float> toGte(const glm::vec3& v)
-{
-  return {v.x, v.y, v.z};
-}
-
-[[nodiscard]] glm::vec3 fromGte(const gte::Vector<3, float>& v)
-{
-  return {v[0], v[1], v[2]};
-}
-
 [[nodiscard]] glm::quat evalExpected(const std::vector<SquadPoly>& spline, float t)
 {
   CHECK(!spline.empty());
@@ -162,6 +154,13 @@ public:
   return std::make_unique<ZCameraParameterKey>(time, cam);
 }
 
+void expectVecNear(const glm::vec3& actual, const glm::vec3& expected, float tolerance)
+{
+  EXPECT_NEAR(actual.x, expected.x, tolerance);
+  EXPECT_NEAR(actual.y, expected.y, tolerance);
+  EXPECT_NEAR(actual.z, expected.z, tolerance);
+}
+
 } // namespace
 
 TEST(ZCameraParameterAnimationTest, RotationSplineUsesSignConsistentQuaternions)
@@ -205,7 +204,7 @@ TEST(ZCameraParameterAnimationTest, RotationSplineUsesSignConsistentQuaternions)
   EXPECT_GE(dot, 1.0f - 1e-4f);
 }
 
-TEST(ZCameraParameterAnimationTest, PositionSplineMatchesCurrentGeometricToolsForNonUniformTimes)
+TEST(ZCameraParameterAnimationTest, PositionSplineMatchesRecordedNonUniformTcbRegression)
 {
   TestAnim anim("CameraAnim");
   anim.interpolationMethodPara().select("Position Spline");
@@ -225,34 +224,25 @@ TEST(ZCameraParameterAnimationTest, PositionSplineMatchesCurrentGeometricToolsFo
     {.time = 5.0f, .eye = {4.0f, 3.0f, 1.0f}, .tension = -0.2f, .continuity = 0.1f,   .bias = 0.45f},
   };
 
-  std::vector<gte::Vector<3, float>> points;
-  std::vector<float> times;
-  std::vector<float> tensions;
-  std::vector<float> continuities;
-  std::vector<float> biases;
   for (const auto& src : keys) {
     auto key = makeCameraKey(src.time, src.eye);
     key->setPosTension(src.tension);
     key->setPosContinuity(src.continuity);
     key->setPosBias(src.bias);
     anim.addKey(std::move(key), /*keepRedundant=*/true);
-
-    points.push_back(toGte(src.eye));
-    times.push_back(src.time);
-    tensions.push_back(src.tension);
-    continuities.push_back(src.continuity);
-    biases.push_back(src.bias);
   }
 
-  gte::TCBSplineCurve<3, float> reference(points, times, tensions, continuities, biases, {}, nullptr, nullptr);
-  for (float t : {0.1f, 0.7f, 1.25f, 2.4f, 3.6f, 4.9f}) {
-    gte::Vector<3, float> jet[1];
-    reference.Evaluate(t, 0, jet);
-    const glm::vec3 expected = fromGte(jet[0]);
-    const glm::vec3 actual = anim.positionAt(t);
-    EXPECT_NEAR(actual.x, expected.x, 1e-5f) << "t=" << t;
-    EXPECT_NEAR(actual.y, expected.y, 1e-5f) << "t=" << t;
-    EXPECT_NEAR(actual.z, expected.z, 1e-5f) << "t=" << t;
+  const std::vector<std::pair<float, glm::vec3>> expectedSamples = {
+    {0.1f,  glm::vec3(0.079618161550f, 0.193999228263f, 0.036332790259f)},
+    {0.7f,  glm::vec3(1.000000000000f, 2.000000000000f, 0.500000000000f)},
+    {1.25f, glm::vec3(1.745001922392f, 2.073859145771f, 1.026615597453f)},
+    {2.4f,  glm::vec3(3.000000000000f, 1.000000000000f, 2.000000000000f)},
+    {3.6f,  glm::vec3(3.503274197435f, 1.730251840745f, 1.690133390452f)},
+    {4.9f,  glm::vec3(3.969434004257f, 2.935931182896f, 1.032621773675f)},
+  };
+  for (const auto& [t, expected] : expectedSamples) {
+    SCOPED_TRACE(std::string("t=") + std::to_string(t));
+    expectVecNear(anim.positionAt(t), expected, 1e-5f);
   }
 }
 
@@ -270,17 +260,7 @@ TEST(ZCameraParameterAnimationTest, DeleteKeyRebuildsSplineCache)
   ASSERT_EQ(anim.keys().size(), 2_uz);
   ASSERT_EQ(anim.numPathSegments(), 1_uz);
 
-  std::vector<gte::Vector<3, float>> points = {toGte({0.0f, 0.0f, 0.0f}), toGte({0.0f, 2.0f, 0.0f})};
-  std::vector<float> times = {0.0f, 2.0f};
-  std::vector<float> tcb = {0.0f, 0.0f};
-  gte::TCBSplineCurve<3, float> reference(points, times, tcb, tcb, tcb, {}, nullptr, nullptr);
-  gte::Vector<3, float> jet[1];
-  reference.Evaluate(1.5f, 0, jet);
-  const glm::vec3 expected = fromGte(jet[0]);
-  const glm::vec3 actual = anim.positionAt(1.5f);
-  EXPECT_NEAR(actual.x, expected.x, 1e-5f);
-  EXPECT_NEAR(actual.y, expected.y, 1e-5f);
-  EXPECT_NEAR(actual.z, expected.z, 1e-5f);
+  expectVecNear(anim.positionAt(1.5f), glm::vec3(0.0f, 1.59375f, 0.0f), 1e-5f);
 }
 
 TEST(ZCameraParameterAnimationTest, CameraInterpolationMethodPersistsInTrackJson)

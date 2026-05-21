@@ -6,10 +6,10 @@
 #include "zrandom.h"
 #include "ztest.h"
 
-#include <Mathematics/NaturalSplineCurve.h>
 #include <QFileInfo>
 #include <QPainterPath>
 #include <QPointF>
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <random>
@@ -64,11 +64,6 @@ void expectVecNear(const glm::dvec2& actual, const glm::dvec2& expected, double 
   EXPECT_NEAR(actual.y, expected.y, tolerance);
 }
 
-std::vector<double> chordLengthTimes(const std::vector<glm::dvec2>& points)
-{
-  return ZNaturalCubicSpline2D::chordLengthTimes(points);
-}
-
 std::vector<glm::dvec2> toPoints(const QPolygonF& poly)
 {
   std::vector<glm::dvec2> points;
@@ -79,85 +74,103 @@ std::vector<glm::dvec2> toPoints(const QPolygonF& poly)
   return points;
 }
 
-std::vector<gte::Vector<2, double>> toGtePoints(const std::vector<glm::dvec2>& points)
+[[nodiscard]] glm::dvec2 cubicBezierPoint(const ZNaturalCubicSpline2D::CubicBezier& b, double u)
 {
-  std::vector<gte::Vector<2, double>> gtePoints(points.size());
-  for (size_t i = 0; i < points.size(); ++i) {
-    gtePoints[i][0] = points[i].x;
-    gtePoints[i][1] = points[i].y;
-  }
-  return gtePoints;
+  const double v = 1.0 - u;
+  return v * v * v * b.p0 + 3.0 * v * v * u * b.p1 + 3.0 * v * u * u * b.p2 + u * u * u * b.p3;
 }
 
-std::vector<ZNaturalCubicSpline2D::CubicBezier> geometricToolsBeziers(const std::vector<glm::dvec2>& points)
+[[nodiscard]] glm::dvec2 cubicBezierDerivative(const ZNaturalCubicSpline2D::CubicBezier& b, double u, double dt)
 {
-  const bool isClosed = points.front() == points.back();
-  const std::vector<double> times = chordLengthTimes(points);
-  auto gtePoints = toGtePoints(points);
-  gte::NaturalSplineCurve<2, double> curve(!isClosed,
-                                           static_cast<int32_t>(gtePoints.size()),
-                                           gtePoints.data(),
-                                           times.data());
-
-  std::vector<ZNaturalCubicSpline2D::CubicBezier> beziers;
-  beziers.reserve(points.size() - 1);
-  for (size_t i = 0; i + 1 < points.size(); ++i) {
-    gte::Vector<2, double> values0[4];
-    gte::Vector<2, double> values1[4];
-    curve.Evaluate(times[i], 1, values0);
-    curve.Evaluate(times[i + 1], 1, values1);
-
-    const double dt = times[i + 1] - times[i];
-    const glm::dvec2 m0(dt * values0[1][0], dt * values0[1][1]);
-    const glm::dvec2 m1(dt * values1[1][0], dt * values1[1][1]);
-    beziers.push_back(ZNaturalCubicSpline2D::CubicBezier{
-      points[i],
-      points[i] + m0 / 3.0,
-      points[i + 1] - m1 / 3.0,
-      points[i + 1],
-    });
-  }
-  return beziers;
+  CHECK(dt > 0.0);
+  const double v = 1.0 - u;
+  return (3.0 * v * v * (b.p1 - b.p0) + 6.0 * v * u * (b.p2 - b.p1) + 3.0 * u * u * (b.p3 - b.p2)) / dt;
 }
 
-void expectSplineMatchesGeometricTools(const std::vector<glm::dvec2>& rawPoints, double tolerance)
+[[nodiscard]] glm::dvec2 cubicBezierSecondDerivative(const ZNaturalCubicSpline2D::CubicBezier& b, double u, double dt)
+{
+  CHECK(dt > 0.0);
+  const double v = 1.0 - u;
+  return (6.0 * v * (b.p2 - 2.0 * b.p1 + b.p0) + 6.0 * u * (b.p3 - 2.0 * b.p2 + b.p1)) / (dt * dt);
+}
+
+void expectBezierNear(const ZNaturalCubicSpline2D::CubicBezier& actual,
+                      const ZNaturalCubicSpline2D::CubicBezier& expected,
+                      double tolerance)
+{
+  expectVecNear(actual.p0, expected.p0, tolerance);
+  expectVecNear(actual.p1, expected.p1, tolerance);
+  expectVecNear(actual.p2, expected.p2, tolerance);
+  expectVecNear(actual.p3, expected.p3, tolerance);
+}
+
+void expectFiniteBezier(const ZNaturalCubicSpline2D::CubicBezier& b)
+{
+  for (const glm::dvec2 p : {b.p0, b.p1, b.p2, b.p3}) {
+    EXPECT_TRUE(std::isfinite(p.x));
+    EXPECT_TRUE(std::isfinite(p.y));
+  }
+}
+
+void expectSplineHasConsistentKnotsAndBeziers(const std::vector<glm::dvec2>& rawPoints, double tolerance)
 {
   const std::vector<glm::dvec2> points = ZNaturalCubicSpline2D::compactConsecutiveDuplicatePoints(rawPoints);
   ASSERT_GE(points.size(), 3_uz);
   const bool isClosed = points.front() == points.back();
   ASSERT_TRUE((isClosed && points.size() >= 4_uz) || (!isClosed && points.size() >= 3_uz));
 
-  std::vector<double> times = chordLengthTimes(points);
+  const std::vector<double> times = ZNaturalCubicSpline2D::chordLengthTimes(points);
   ASSERT_TRUE(ZNaturalCubicSpline2D::hasStrictlyIncreasingTimes(times));
 
-  auto gtePoints = toGtePoints(points);
-  gte::NaturalSplineCurve<2, double> reference(!isClosed,
-                                               static_cast<int32_t>(gtePoints.size()),
-                                               gtePoints.data(),
-                                               times.data());
-  ZNaturalCubicSpline2D actual(!isClosed, points, times);
+  ZNaturalCubicSpline2D spline(!isClosed, points, times);
+  for (size_t i = 0; i < points.size(); ++i) {
+    expectVecNear(spline.position(times[i]), points[i], tolerance);
+    const glm::dvec2 derivative = spline.derivative(times[i]);
+    EXPECT_TRUE(std::isfinite(derivative.x));
+    EXPECT_TRUE(std::isfinite(derivative.y));
+  }
 
-  constexpr std::array<double, 7> kSamples = {0.0, 0.1, 0.25, 0.5, 0.75, 0.9, 1.0};
-  for (size_t segment = 0; segment + 1 < points.size(); ++segment) {
-    const double t0 = times[segment];
-    const double dt = times[segment + 1] - t0;
-    for (double u : kSamples) {
-      const double t = t0 + u * dt;
-      gte::Vector<2, double> jet[4];
-      reference.Evaluate(t, 1, jet);
-      expectVecNear(actual.position(t), glm::dvec2(jet[0][0], jet[0][1]), tolerance);
-      expectVecNear(actual.derivative(t), glm::dvec2(jet[1][0], jet[1][1]), tolerance);
+  const auto beziers = spline.toCubicBeziers();
+  ASSERT_EQ(beziers.size() + 1, points.size());
+  for (size_t i = 0; i < beziers.size(); ++i) {
+    SCOPED_TRACE(fmt::format("segment={}", i));
+    const double dt = times[i + 1] - times[i];
+    expectFiniteBezier(beziers[i]);
+    expectVecNear(beziers[i].p0, points[i], tolerance);
+    expectVecNear(beziers[i].p3, points[i + 1], tolerance);
+    for (double u : {0.0, 0.25, 0.5, 0.75, 1.0}) {
+      const double t = times[i] + u * dt;
+      expectVecNear(cubicBezierPoint(beziers[i], u), spline.position(t), tolerance);
+      expectVecNear(cubicBezierDerivative(beziers[i], u, dt), spline.derivative(t), tolerance);
     }
   }
 
-  const auto actualBeziers = ZNaturalCubicSpline2D::fitChordLength(rawPoints);
-  const auto referenceBeziers = geometricToolsBeziers(points);
-  ASSERT_EQ(actualBeziers.size(), referenceBeziers.size());
-  for (size_t i = 0; i < actualBeziers.size(); ++i) {
-    expectVecNear(actualBeziers[i].p0, referenceBeziers[i].p0, tolerance);
-    expectVecNear(actualBeziers[i].p1, referenceBeziers[i].p1, tolerance);
-    expectVecNear(actualBeziers[i].p2, referenceBeziers[i].p2, tolerance);
-    expectVecNear(actualBeziers[i].p3, referenceBeziers[i].p3, tolerance);
+  for (size_t i = 1; i < beziers.size(); ++i) {
+    SCOPED_TRACE(fmt::format("joint={}", i));
+    const double prevDt = times[i] - times[i - 1];
+    const double nextDt = times[i + 1] - times[i];
+    expectVecNear(cubicBezierDerivative(beziers[i - 1], 1.0, prevDt),
+                  cubicBezierDerivative(beziers[i], 0.0, nextDt),
+                  tolerance);
+    expectVecNear(cubicBezierSecondDerivative(beziers[i - 1], 1.0, prevDt),
+                  cubicBezierSecondDerivative(beziers[i], 0.0, nextDt),
+                  tolerance);
+  }
+
+  if (isClosed) {
+    const double lastDt = times.back() - times[times.size() - 2];
+    const double firstDt = times[1] - times[0];
+    expectVecNear(cubicBezierDerivative(beziers.back(), 1.0, lastDt),
+                  cubicBezierDerivative(beziers.front(), 0.0, firstDt),
+                  tolerance);
+    expectVecNear(cubicBezierSecondDerivative(beziers.back(), 1.0, lastDt),
+                  cubicBezierSecondDerivative(beziers.front(), 0.0, firstDt),
+                  tolerance);
+  } else {
+    const double firstDt = times[1] - times[0];
+    const double lastDt = times.back() - times[times.size() - 2];
+    expectVecNear(cubicBezierSecondDerivative(beziers.front(), 0.0, firstDt), glm::dvec2(0.0), tolerance);
+    expectVecNear(cubicBezierSecondDerivative(beziers.back(), 1.0, lastDt), glm::dvec2(0.0), tolerance);
   }
 }
 
@@ -415,40 +428,70 @@ TEST(ZROIMaskRasterizer, SplineScaleAppliedExactlyOnce)
                               << ", union=" << stats.unionPixels << ")";
 }
 
-TEST(ZNaturalCubicSpline2D, MatchesGeometricToolsForRepresentativeSplines)
+TEST(ZNaturalCubicSpline2D, RepresentativeSplineMatchesRecordedBezierRegression)
 {
-  expectSplineMatchesGeometricTools({glm::dvec2(0.0, 0.0),
-                                     glm::dvec2(125.0, 40.0),
-                                     glm::dvec2(260.0, -15.0),
-                                     glm::dvec2(390.0, 95.0),
-                                     glm::dvec2(520.0, 75.0)},
-                                    1e-8);
+  const std::vector<glm::dvec2> points = {
+    glm::dvec2(0.0, 0.0),
+    glm::dvec2(125.0, 40.0),
+    glm::dvec2(260.0, -15.0),
+    glm::dvec2(390.0, 95.0),
+    glm::dvec2(520.0, 75.0),
+  };
+  const std::vector<ZNaturalCubicSpline2D::CubicBezier> expected = {
+    {glm::dvec2(0.0,   0.0),
+     glm::dvec2(41.332633407760,  24.354367301165),
+     glm::dvec2(82.665266815520,  48.708734602330),
+     glm::dvec2(125.0, 40.0) },
+    {glm::dvec2(125.0, 40.0),
+     glm::dvec2(172.021521625539, 30.327139877081),
+     glm::dvec2(220.279305675190, -20.134742913430),
+     glm::dvec2(260.0, -15.0)},
+    {glm::dvec2(260.0, -15.0),
+     glm::dvec2(306.401964041448, -9.001561148889),
+     glm::dvec2(341.153311517232, 72.869919839366),
+     glm::dvec2(390.0, 95.0) },
+    {glm::dvec2(390.0, 95.0),
+     glm::dvec2(427.727600013314, 112.092557110755),
+     glm::dvec2(473.863800006657, 93.546278555377),
+     glm::dvec2(520.0, 75.0) },
+  };
 
-  expectSplineMatchesGeometricTools({glm::dvec2(0.0, 0.0),
-                                     glm::dvec2(400.0, 0.0),
-                                     glm::dvec2(400.0, 400.0),
-                                     glm::dvec2(0.0, 400.0),
-                                     glm::dvec2(0.0, 0.0)},
-                                    1e-8);
-
-  expectSplineMatchesGeometricTools({glm::dvec2(10.0, 15.0),
-                                     glm::dvec2(190.0, -25.0),
-                                     glm::dvec2(360.0, 80.0),
-                                     glm::dvec2(325.0, 240.0),
-                                     glm::dvec2(120.0, 260.0),
-                                     glm::dvec2(10.0, 15.0)},
-                                    1e-8);
-
-  expectSplineMatchesGeometricTools({glm::dvec2(0.0, 0.0),
-                                     glm::dvec2(400.0, 0.0),
-                                     glm::dvec2(400.0, 0.0),
-                                     glm::dvec2(400.0, 400.0),
-                                     glm::dvec2(0.0, 400.0),
-                                     glm::dvec2(0.0, 0.0)},
-                                    1e-8);
+  const auto actual = ZNaturalCubicSpline2D::fitChordLength(points);
+  ASSERT_EQ(actual.size(), expected.size());
+  for (size_t i = 0; i < actual.size(); ++i) {
+    SCOPED_TRACE(fmt::format("segment={}", i));
+    expectBezierNear(actual[i], expected[i], 1e-9);
+  }
 }
 
-TEST(ZNaturalCubicSpline2D, MatchesGeometricToolsForNimroiSplineFixtures)
+TEST(ZNaturalCubicSpline2D, DuplicateControlPointsDoNotChangeClosedSpline)
+{
+  const std::vector<glm::dvec2> clean = {
+    glm::dvec2(0.0, 0.0),
+    glm::dvec2(400.0, 0.0),
+    glm::dvec2(400.0, 400.0),
+    glm::dvec2(0.0, 400.0),
+    glm::dvec2(0.0, 0.0),
+  };
+  const std::vector<glm::dvec2> withDuplicate = {
+    glm::dvec2(0.0, 0.0),
+    glm::dvec2(400.0, 0.0),
+    glm::dvec2(400.0, 0.0),
+    glm::dvec2(400.0, 400.0),
+    glm::dvec2(0.0, 400.0),
+    glm::dvec2(0.0, 0.0),
+  };
+
+  const auto cleanBeziers = ZNaturalCubicSpline2D::fitChordLength(clean);
+  const auto duplicateBeziers = ZNaturalCubicSpline2D::fitChordLength(withDuplicate);
+  ASSERT_EQ(cleanBeziers.size(), duplicateBeziers.size());
+  for (size_t i = 0; i < cleanBeziers.size(); ++i) {
+    SCOPED_TRACE(fmt::format("segment={}", i));
+    expectBezierNear(duplicateBeziers[i], cleanBeziers[i], 1e-12);
+  }
+}
+
+TEST(ZNaturalCubicSpline2D, NimroiSplineFixturesProduceConsistentBeziers)
 {
   const QDir testDataDir = getTestDataDir();
   ASSERT_TRUE(testDataDir.exists()) << "ATLAS test data dir not found: " << testDataDir.absolutePath();
@@ -473,7 +516,7 @@ TEST(ZNaturalCubicSpline2D, MatchesGeometricToolsForNimroiSplineFixtures)
 
           SCOPED_TRACE(fmt::format("file={} slice={} shapeID={} opIndex={}", fileName, slice, shapeID, opIndex));
           ++numSplines;
-          expectSplineMatchesGeometricTools(toPoints(op.poly), 1e-8);
+          expectSplineHasConsistentKnotsAndBeziers(toPoints(op.poly), 1e-8);
         }
       }
     }
@@ -482,7 +525,7 @@ TEST(ZNaturalCubicSpline2D, MatchesGeometricToolsForNimroiSplineFixtures)
   EXPECT_GT(numSplines, 0_uz);
 }
 
-TEST(ZNaturalCubicSpline2D, MatchesGeometricToolsForRandomChordLengthSplines)
+TEST(ZNaturalCubicSpline2D, RandomChordLengthSplinesProduceConsistentBeziers)
 {
   constexpr double kPi = 3.141592653589793238462643383279502884;
   std::mt19937_64 rng(0x41544c41535f524f);
@@ -500,7 +543,7 @@ TEST(ZNaturalCubicSpline2D, MatchesGeometricToolsForRandomChordLengthSplines)
         x += stepDist(rng);
         points.emplace_back(x, yDist(rng));
       }
-      expectSplineMatchesGeometricTools(points, 1e-7);
+      expectSplineHasConsistentKnotsAndBeziers(points, 1e-7);
     }
   }
 
@@ -514,7 +557,7 @@ TEST(ZNaturalCubicSpline2D, MatchesGeometricToolsForRandomChordLengthSplines)
         points.emplace_back(radius * std::cos(angle), 0.7 * radius * std::sin(angle));
       }
       points.push_back(points.front());
-      expectSplineMatchesGeometricTools(points, 1e-7);
+      expectSplineHasConsistentKnotsAndBeziers(points, 1e-7);
     }
   }
 }

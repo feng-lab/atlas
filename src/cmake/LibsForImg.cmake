@@ -194,11 +194,6 @@ find_package(glog REQUIRED
              PATHS ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build NO_DEFAULT_PATH)
 print_target_properties(glog::glog)
 
-add_library(GeometricTools INTERFACE IMPORTED)
-set_target_properties(GeometricTools PROPERTIES
-                      INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_CURRENT_LIST_DIR}/../3rdparty/GeometricTools/GTE")
-print_target_properties(GeometricTools)
-
 find_package(glm CONFIG REQUIRED
              PATHS ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/share NO_DEFAULT_PATH)
 print_target_properties(glm::glm-header-only)

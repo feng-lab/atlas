@@ -102,15 +102,9 @@
 	path = src/3rdparty/pocketfft
 	url = https://github.com/mreineck/pocketfft.git
 	branch = cpp
-[submodule "src/3rdparty/rocksdb"]
-	path = src/3rdparty/rocksdb
-	url = https://github.com/facebook/rocksdb
 [submodule "src/3rdparty/simde"]
 	path = src/3rdparty/simde
 	url = https://github.com/simd-everywhere/simde.git
-[submodule "src/3rdparty/GeometricTools"]
-	path = src/3rdparty/GeometricTools
-	url = https://github.com/davideberly/GeometricTools.git
 [submodule "src/3rdparty/oneTBB"]
 	path = src/3rdparty/oneTBB
 	url = https://github.com/oneapi-src/oneTBB.git

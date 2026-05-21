@@ -1575,7 +1575,19 @@ def build_cpuinfo(src_dir: str, install_dir: str):
 def build_gflags(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
 
+    patches = [
+        FilePatcher(
+            orig_file=os.path.join(src_dir, "src", "gflags.cc"),
+            from_texts=[r'ReportError(DIE, "ERROR: something wrong with'],
+            to_texts=[r'ReportError(DO_NOT_DIE, "ERROR: something wrong with'],
+            patch_condition=is_mac,
+        ),
+    ]
+    patch_manager = PatchManager(patches)
+
     try:
+        patch_manager.apply_patches()
+
         cmakecmd = get_cmake_cmd_common_part(install_dir, universal=True)
         cmakecmd.extend(
             [
@@ -1587,12 +1599,30 @@ def build_gflags(src_dir: str, install_dir: str):
         build_and_install_cmakecmd(cmakecmd, build_dir)
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
+        patch_manager.restore_files()
 
 
 def build_glog(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
 
+    patches = [
+        # Behavior policy: Atlas sets FLAGS_alsologtostderr while also writing log
+        # files. Route mirrored console output through glog's stdout-aware helper
+        # so normal mirrored log traffic does not all go to stderr; the helper
+        # still honors stderrthreshold for severe messages.
+        FilePatcher(
+            orig_file=os.path.join(src_dir, "src", "logging.cc"),
+            from_texts=[
+                r"ColoredWriteToStderr(severity, message, message_len);",
+            ],
+            to_texts=[r"ColoredWriteToStdout(severity, message, message_len);"],
+        ),
+    ]
+    patch_manager = PatchManager(patches)
+
     try:
+        patch_manager.apply_patches()
+
         cmakecmd = get_cmake_cmd_common_part(install_dir, universal=True)
         cmakecmd.extend(
             [
@@ -1603,8 +1633,17 @@ def build_glog(src_dir: str, install_dir: str):
 
         cmakecmd.extend([src_dir])
         build_and_install_cmakecmd(cmakecmd, build_dir)
+
+        # patch_file(os.path.join(ext_build_dir(), 'include', 'glog', 'export.h'),
+        #            from_texts=[r'#define GOOGLE_GLOG_DLL_DECL_H',
+        #                        ],
+        #            to_texts=['#define GOOGLE_GLOG_DLL_DECL_H\n'
+        #                      '#define GLOG_STATIC_DEFINE\n'
+        #                      '#define HAVE_CXX11_ATOMIC\n',
+        #                      ])
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
+        patch_manager.restore_files()
 
 
 def build_benchmark(src_dir: str, install_dir: str):
@@ -5970,8 +6009,17 @@ def parse_inputs(argv: list):
     ]
     libs: OrderedDict[str, bool] = OrderedDict([(lib, False) for lib in lib_list])
 
-    # not used now
-    lib_skip_list = ["ospray", "ants", "skia", "rocksdb", "llfio", "or-tools"]
+    # Historical builders retained for possible future reactivation, but these
+    # libraries are intentionally disabled for both `all` and explicit requests.
+    lib_skip_list = [
+        "ospray",
+        "ants",
+        "skia",
+        "geometrictools",
+        "rocksdb",
+        "llfio",
+        "or-tools",
+    ]
 
     libs_reverse_depends = {
         "eigen": ["opencv", "ceres-solver", "itk", "vtk"],
@@ -6063,6 +6111,8 @@ python build_ext_libs.py [all or libs...] [--exclude-libs] [libs...] [--start-fr
             for vlib in libs:
                 if vlib not in lib_skip_list:
                     libs[vlib] = True
+        elif lib in lib_skip_list:
+            logger.info(f"skipping disabled external library: {lib}")
         else:
             libs[lib] = True
 
@@ -6102,6 +6152,9 @@ python build_ext_libs.py [all or libs...] [--exclude-libs] [libs...] [--start-fr
                 stopping = True
             if stopping:
                 libs[lib] = False
+
+    for lib in lib_skip_list:
+        libs[lib] = False
 
     build_all = True
     for lib in libs:

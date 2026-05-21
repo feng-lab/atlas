@@ -7,12 +7,42 @@
 #include <algorithm>
 #include <optional>
 #include <folly/ScopeGuard.h>
-#include <Mathematics/DistLineRay.h>
 #include <boost/math/constants/constants.hpp>
 #include <utility>
 #include <vector>
 
 namespace nim {
+namespace {
+
+// Returns the signed scalar to apply to `lineDirection` from `lineOrigin`
+// to reach the point closest to the ray `rayOrigin + t * rayDirection`, t >= 0.
+[[nodiscard]] float closestLineRayLineParameter(const glm::vec3& lineOrigin,
+                                                const glm::vec3& lineDirection,
+                                                const glm::vec3& rayOrigin,
+                                                const glm::vec3& rayDirection)
+{
+  const glm::vec3 diff = lineOrigin - rayOrigin;
+  const float a00 = glm::dot(lineDirection, lineDirection);
+  const float a01 = -glm::dot(lineDirection, rayDirection);
+  const float a11 = glm::dot(rayDirection, rayDirection);
+  const float b0 = glm::dot(lineDirection, diff);
+  const float det = std::max(a00 * a11 - a01 * a01, 0.0f);
+
+  DCHECK(a00 > 0.0f);
+  DCHECK(a11 > 0.0f);
+
+  if (det > 0.0f) {
+    const float b1 = -glm::dot(rayDirection, diff);
+    const float rayParameterNumerator = a01 * b0 - a00 * b1;
+    if (rayParameterNumerator >= 0.0f) {
+      return (a01 * b1 - a11 * b0) / det;
+    }
+  }
+
+  return -b0 / a00;
+}
+
+} // namespace
 
 Z3DBoundedFilter::RendererParameters::RendererParameters()
   : coordTransform("Coord Transform", glm::mat4(1.f))
@@ -543,26 +573,18 @@ void Z3DBoundedFilter::handleEvent(QMouseEvent* e, int w, int h)
       glm::vec3 v1, v2;
       rayUnderScreenPoint(v1, v2, e->position().x(), e->position().y(), w, h);
       v2 -= v1;
-      gte::Ray<3, float> ray(gte::Vector<3, float>{v1.x, v1.y, v1.z}, gte::Vector<3, float>{v2.x, v2.y, v2.z});
-      gte::DCPLineRay<3, float> dist;
       if (m_selectedHandle == 2) {
-        gte::Line<3, float> xLine(
-          gte::Vector<3, float>{m_startMouseWorldPos.x, m_startMouseWorldPos.y, m_startMouseWorldPos.z},
-          gte::Vector<3, float>{1, 0, 0});
-        auto result = dist(xLine, ray);
-        m_rendererParameters.coordTransform.setTranslation(m_startTrans + glm::vec3(result.parameter[0], 0, 0));
+        const float lineParameter =
+          closestLineRayLineParameter(m_startMouseWorldPos, glm::vec3(1.0f, 0.0f, 0.0f), v1, v2);
+        m_rendererParameters.coordTransform.setTranslation(m_startTrans + glm::vec3(lineParameter, 0.0f, 0.0f));
       } else if (m_selectedHandle == 3) {
-        gte::Line<3, float> xLine(
-          gte::Vector<3, float>{m_startMouseWorldPos.x, m_startMouseWorldPos.y, m_startMouseWorldPos.z},
-          gte::Vector<3, float>{0, 1, 0});
-        auto result = dist(xLine, ray);
-        m_rendererParameters.coordTransform.setTranslation(m_startTrans + glm::vec3(0, result.parameter[0], 0));
+        const float lineParameter =
+          closestLineRayLineParameter(m_startMouseWorldPos, glm::vec3(0.0f, 1.0f, 0.0f), v1, v2);
+        m_rendererParameters.coordTransform.setTranslation(m_startTrans + glm::vec3(0.0f, lineParameter, 0.0f));
       } else if (m_selectedHandle == 4) {
-        gte::Line<3, float> xLine(
-          gte::Vector<3, float>{m_startMouseWorldPos.x, m_startMouseWorldPos.y, m_startMouseWorldPos.z},
-          gte::Vector<3, float>{0, 0, 1});
-        auto result = dist(xLine, ray);
-        m_rendererParameters.coordTransform.setTranslation(m_startTrans + glm::vec3(0, 0, result.parameter[0]));
+        const float lineParameter =
+          closestLineRayLineParameter(m_startMouseWorldPos, glm::vec3(0.0f, 0.0f, 1.0f), v1, v2);
+        m_rendererParameters.coordTransform.setTranslation(m_startTrans + glm::vec3(0.0f, 0.0f, lineParameter));
       }
     }
     m_lastMousePosition = glm::ivec2(e->position().x(), e->position().y());
@@ -771,7 +793,10 @@ void Z3DBoundedFilter::rayUnderScreenPoint(glm::vec3& v1, glm::vec3& v2, int x, 
 
   v1 = glm::unProject(glm::vec3(x, height - y, 0.f), modelview, projection, viewport);
   v2 = glm::unProject(glm::vec3(x, height - y, 1.f), modelview, projection, viewport);
-  v2 = glm::normalize(v2 - v1) + v1;
+  const glm::vec3 rayDirection = v2 - v1;
+  DCHECK(std::isfinite(glm::dot(rayDirection, rayDirection)));
+  DCHECK(glm::dot(rayDirection, rayDirection) > 0.0f);
+  v2 = glm::normalize(rayDirection) + v1;
 }
 
 void Z3DBoundedFilter::rayUnderScreenPoint(glm::dvec3& v1, glm::dvec3& v2, int x, int y, int width, int height)
@@ -787,7 +812,10 @@ void Z3DBoundedFilter::rayUnderScreenPoint(glm::dvec3& v1, glm::dvec3& v2, int x
 
   v1 = glm::unProject(glm::dvec3(x, height - y, 0.f), modelview, projection, viewport);
   v2 = glm::unProject(glm::dvec3(x, height - y, 1.f), modelview, projection, viewport);
-  v2 = glm::normalize(v2 - v1) + v1;
+  const glm::dvec3 rayDirection = v2 - v1;
+  DCHECK(std::isfinite(glm::dot(rayDirection, rayDirection)));
+  DCHECK(glm::dot(rayDirection, rayDirection) > 0.0);
+  v2 = glm::normalize(rayDirection) + v1;
 }
 
 void Z3DBoundedFilter::updateAxisAlignedBoundBoxImpl()
