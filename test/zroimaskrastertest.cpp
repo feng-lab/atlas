@@ -2,6 +2,7 @@
 
 #include "zroi.h"
 #include "zroiutils.h"
+#include "zregionontology.h"
 #include "znaturalcubicspline2d.h"
 #include "zrandom.h"
 #include "ztest.h"
@@ -72,6 +73,42 @@ std::vector<glm::dvec2> toPoints(const QPolygonF& poly)
     points.emplace_back(p.x(), p.y());
   }
   return points;
+}
+
+ZImg makeBinaryMask(size_t width, size_t height)
+{
+  ZImg img(ZImgInfo(width, height, 1));
+  for (size_t y = 0; y < height; ++y) {
+    for (size_t x = 0; x < width; ++x) {
+      *img.data<uint8_t>(x, y, 0) = 0;
+    }
+  }
+  return img;
+}
+
+void fillRect(ZImg& img, int x0, int y0, int x1, int y1, uint8_t value)
+{
+  CHECK(x0 <= x1);
+  CHECK(y0 <= y1);
+  for (int y = y0; y <= y1; ++y) {
+    for (int x = x0; x <= x1; ++x) {
+      *img.data<uint8_t>(static_cast<size_t>(x), static_cast<size_t>(y), 0) = value;
+    }
+  }
+}
+
+void fillDisk(ZImg& img, int cx, int cy, int radius, uint8_t value)
+{
+  const int radiusSq = radius * radius;
+  for (int y = cy - radius; y <= cy + radius; ++y) {
+    for (int x = cx - radius; x <= cx + radius; ++x) {
+      const int dx = x - cx;
+      const int dy = y - cy;
+      if (dx * dx + dy * dy <= radiusSq) {
+        *img.data<uint8_t>(static_cast<size_t>(x), static_cast<size_t>(y), 0) = value;
+      }
+    }
+  }
 }
 
 [[nodiscard]] glm::dvec2 cubicBezierPoint(const ZNaturalCubicSpline2D::CubicBezier& b, double u)
@@ -426,6 +463,166 @@ TEST(ZROIMaskRasterizer, SplineScaleAppliedExactlyOnce)
     computeStatsWithOffset(qtMask, qtXStart, qtYStart, qtOnPixels, newMask, newXStart, newYStart, newOnPixels);
   EXPECT_GE(stats.iou, 0.999) << "Unexpectedly low IoU for scaled spline (diffPixels=" << stats.diffPixels
                               << ", union=" << stats.unionPixels << ")";
+}
+
+TEST(ZMaskToROI, PolygonOutputUsesApproxPolyDPShape)
+{
+  ZImg img = makeBinaryMask(48, 48);
+  fillRect(img, 10, 12, 32, 34, 1);
+
+  ZMaskToROIOptions options;
+  options.outputType = ZMaskToROIOutputType::Polygon;
+  options.epsilonPx = 1.0;
+
+  ZROI roi;
+  binaryImgToROI(img, roi, options);
+
+  const std::vector<size_t> shapeIds = roi.sliceShapeIDs(0);
+  ASSERT_EQ(shapeIds.size(), 1u);
+  const auto& ops = roi.shapeOperations(0, shapeIds.front());
+  ASSERT_EQ(ops.size(), 1u);
+  EXPECT_EQ(ops.front().type, ROIType::Polygon);
+  EXPECT_TRUE(ops.front().poly.isClosed());
+  EXPECT_LE(ops.front().poly.size(), 6);
+}
+
+TEST(ZMaskToROI, PolygonToleranceIsMeasuredBeforeScale)
+{
+  ZImg img = makeBinaryMask(64, 64);
+  fillDisk(img, 32, 32, 18, 1);
+
+  ZMaskToROIOptions options;
+  options.outputType = ZMaskToROIOutputType::Polygon;
+  options.epsilonPx = 2.0;
+
+  ZROI unscaledROI;
+  binaryImgToROI(img, unscaledROI, options);
+  const std::vector<size_t> unscaledShapeIds = unscaledROI.sliceShapeIDs(0);
+  ASSERT_EQ(unscaledShapeIds.size(), 1u);
+  const auto& unscaledOps = unscaledROI.shapeOperations(0, unscaledShapeIds.front());
+  ASSERT_EQ(unscaledOps.size(), 1u);
+
+  constexpr double kScaleX = 10.0;
+  constexpr double kScaleY = 0.5;
+  ZROI scaledROI;
+  binaryImgToROI(img, scaledROI, options, kScaleX, kScaleY);
+  const std::vector<size_t> scaledShapeIds = scaledROI.sliceShapeIDs(0);
+  ASSERT_EQ(scaledShapeIds.size(), 1u);
+  const auto& scaledOps = scaledROI.shapeOperations(0, scaledShapeIds.front());
+  ASSERT_EQ(scaledOps.size(), 1u);
+
+  ASSERT_EQ(scaledOps.front().poly.size(), unscaledOps.front().poly.size());
+  for (int i = 0; i < unscaledOps.front().poly.size(); ++i) {
+    EXPECT_NEAR(scaledOps.front().poly[i].x(), unscaledOps.front().poly[i].x() * kScaleX, 1e-9);
+    EXPECT_NEAR(scaledOps.front().poly[i].y(), unscaledOps.front().poly[i].y() * kScaleY, 1e-9);
+  }
+}
+
+TEST(ZMaskToROI, SplineOutputKeepsNaturalSplineControlPoints)
+{
+  ZImg img = makeBinaryMask(64, 64);
+  fillDisk(img, 32, 32, 16, 1);
+
+  ZMaskToROIOptions options;
+  options.outputType = ZMaskToROIOutputType::Spline;
+  options.epsilonPx = 100.0;
+
+  ZROI roi;
+  binaryImgToROI(img, roi, options);
+
+  const std::vector<size_t> shapeIds = roi.sliceShapeIDs(0);
+  ASSERT_EQ(shapeIds.size(), 1u);
+  const auto& ops = roi.shapeOperations(0, shapeIds.front());
+  ASSERT_EQ(ops.size(), 1u);
+  EXPECT_EQ(ops.front().type, ROIType::Spline);
+  EXPECT_TRUE(ops.front().poly.isClosed());
+}
+
+TEST(ZMaskToROI, SampledSplineOutputUsesLegacyFixedStrideControlPoints)
+{
+  ZImg img = makeBinaryMask(48, 48);
+  fillRect(img, 10, 12, 32, 34, 1);
+
+  ZMaskToROIOptions options;
+  options.outputType = ZMaskToROIOutputType::SampledSpline;
+  options.sampledSplineTargetPoints = 20;
+  options.sampledSplineMaxPointSpacing = 30;
+
+  ZROI roi;
+  binaryImgToROI(img, roi, options);
+
+  const std::vector<size_t> shapeIds = roi.sliceShapeIDs(0);
+  ASSERT_EQ(shapeIds.size(), 1u);
+  const auto& ops = roi.shapeOperations(0, shapeIds.front());
+  ASSERT_EQ(ops.size(), 1u);
+  EXPECT_EQ(ops.front().type, ROIType::Spline);
+  EXPECT_TRUE(ops.front().poly.isClosed());
+  EXPECT_GT(ops.front().poly.size(), 6);
+}
+
+TEST(ZMaskToROI, SplineFallsBackToPolygonWhenSpacingBlocksTolerance)
+{
+  ZImg img = makeBinaryMask(48, 48);
+  fillRect(img, 10, 12, 32, 34, 1);
+
+  ZMaskToROIOptions options;
+  options.outputType = ZMaskToROIOutputType::Spline;
+  options.epsilonPx = 0.01;
+  options.minKnotSpacingPx = 1000.0;
+  options.splineFallback = ZMaskToROISplineFallback::UsePolygon;
+
+  ZROI roi;
+  binaryImgToROI(img, roi, options);
+
+  const std::vector<size_t> shapeIds = roi.sliceShapeIDs(0);
+  ASSERT_EQ(shapeIds.size(), 1u);
+  const auto& ops = roi.shapeOperations(0, shapeIds.front());
+  ASSERT_EQ(ops.size(), 1u);
+  EXPECT_EQ(ops.front().type, ROIType::Polygon);
+}
+
+TEST(ZMaskToROI, DefaultSplineFallbackKeepsBestSpline)
+{
+  ZImg img = makeBinaryMask(48, 48);
+  fillRect(img, 10, 12, 32, 34, 1);
+
+  ZMaskToROIOptions options;
+  options.outputType = ZMaskToROIOutputType::Spline;
+  options.epsilonPx = 0.01;
+  options.minKnotSpacingPx = 1000.0;
+
+  ZROI roi;
+  binaryImgToROI(img, roi, options);
+
+  const std::vector<size_t> shapeIds = roi.sliceShapeIDs(0);
+  ASSERT_EQ(shapeIds.size(), 1u);
+  const auto& ops = roi.shapeOperations(0, shapeIds.front());
+  ASSERT_EQ(ops.size(), 1u);
+  EXPECT_EQ(ops.front().type, ROIType::Spline);
+}
+
+TEST(ZMaskToROI, PreservesMaskHolesAsSubtractOperations)
+{
+  ZImg img = makeBinaryMask(48, 48);
+  fillRect(img, 6, 6, 40, 40, 1);
+  fillRect(img, 18, 18, 28, 28, 0);
+
+  ZMaskToROIOptions options;
+  options.outputType = ZMaskToROIOutputType::Polygon;
+  options.epsilonPx = 1.0;
+  options.preserveHoles = true;
+
+  ZROI roi;
+  binaryImgToROI(img, roi, options);
+
+  const std::vector<size_t> shapeIds = roi.sliceShapeIDs(0);
+  ASSERT_EQ(shapeIds.size(), 1u);
+  const auto& ops = roi.shapeOperations(0, shapeIds.front());
+  ASSERT_EQ(ops.size(), 2u);
+  EXPECT_TRUE(ops[0].isAdd);
+  EXPECT_FALSE(ops[1].isAdd);
+  EXPECT_EQ(ops[0].type, ROIType::Polygon);
+  EXPECT_EQ(ops[1].type, ROIType::Polygon);
 }
 
 TEST(ZNaturalCubicSpline2D, RepresentativeSplineMatchesRecordedBezierRegression)

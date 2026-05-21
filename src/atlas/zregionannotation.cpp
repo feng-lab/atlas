@@ -220,7 +220,7 @@ void ZRegionAnnotation::importLabelImage(const QString& fn,
     if (createROI && processROI) {
       // create contours
       it->roi = this->createROI();
-      binaryImgToROI(binaryImg, *it->roi, scaleX, scaleY, scaleZ);
+      binaryImgToROI(binaryImg, *it->roi, ZMaskToROIOptions(), scaleX, scaleY, scaleZ);
     }
 
     // update labelImg: change id to parentID (merge current region to parent region)
@@ -498,7 +498,7 @@ void ZRegionAnnotation::importLabelImageForSlicesWithoutAnnotation(const QString
     binaryImg.binaryOperation(labelImg, MarkAsIfOtherEqualsOtherWiseZero(1, it->id));
 
     ZROI roi;
-    binaryImgToROI(binaryImg, roi, scaleX, scaleY);
+    binaryImgToROI(binaryImg, roi, ZMaskToROIOptions(), scaleX, scaleY);
     if (!it->roi) {
       it->roi = createROI();
       Q_EMIT regionROIAdded(it->id, it->roi.get());

@@ -3,6 +3,7 @@
 #include "ztree.hpp"
 #include "zroi.h"
 #include "zmesh.h"
+#include "zmasktoroioptions.h"
 #include <QStringList>
 #include <cstdint>
 #include <memory>
@@ -66,6 +67,11 @@ void binaryImgToMesh(const ZImg& img, ZMesh& msh, double scaleX = 1.0, double sc
 
 // input img, an unsigned 8-bit single-channel image. Non-zero pixels are treated as 1's. Zero pixels remain 0's, so the
 // image is treated as binary.
-void binaryImgToROI(const ZImg& img, ZROI& roi, double scaleX = 1.0, double scaleY = 1.0, double scaleZ = 1.0);
+void binaryImgToROI(const ZImg& img,
+                    ZROI& roi,
+                    const ZMaskToROIOptions& options,
+                    double scaleX = 1.0,
+                    double scaleY = 1.0,
+                    double scaleZ = 1.0);
 
 } // namespace nim

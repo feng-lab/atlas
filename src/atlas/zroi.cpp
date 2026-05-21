@@ -679,12 +679,11 @@ ZROI::ZROI(QUndoStack* undoStack, QObject* parent)
   resetBoundBox();
   if (!m_undoStack) {
     m_undoStack = new QUndoStack(this);
-    m_undoStack = new QUndoStack(this);
   }
   connect(m_undoStack, &QUndoStack::cleanChanged, this, &ZROI::undoStackCleanChanged);
 }
 
-void ZROI::importMaskImage(const QString& fn, FileFormat format)
+void ZROI::importMaskImage(const QString& fn, FileFormat format, const ZMaskToROIOptions& options)
 {
   ZBenchTimer bt;
 
@@ -702,10 +701,10 @@ void ZROI::importMaskImage(const QString& fn, FileFormat format)
 
   if (info.isType<uint8_t>()) {
     ZImg binaryImg = ZImg::readImgPixelsOnly(fn, ZImgRegion(), 0, 1, 1, 1, format);
-    binaryImgToROI(binaryImg, *this);
+    binaryImgToROI(binaryImg, *this, options);
   } else {
     ZImg origMaskImg = ZImg::readImgPixelsOnly(fn, ZImgRegion(), 0, 1, 1, 1, format);
-    binaryImgToROI(origMaskImg.binarized(), *this);
+    binaryImgToROI(origMaskImg.binarized(), *this, options);
   }
 
   LOG(INFO) << "Finish importing mask image";

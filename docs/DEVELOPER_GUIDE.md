@@ -14,6 +14,22 @@ Build, Run, and Layout
   - `docs/` — documentation
   - `util/` — build scripts
 
+ROI Mask Import
+
+- The mask-image-to-ROI path is configured through `ZMaskToROIOptions` and implemented in `src/atlas/zregionontology.cpp`
+  (`binaryImgToROI`). GUI import uses `ZMaskToROIImportDialog`; non-UI callers must pass the same options directly.
+- Polygon output uses OpenCV contour extraction followed by `approxPolyDP` with the user-visible pixel tolerance.
+- Adaptive spline output keeps Atlas' natural-spline editing model. Dense contour points are converted into spline knots by
+  adaptive refinement: fit the existing natural cubic spline, measure bidirectional boundary error against the dense contour,
+  insert the worst offending contour point, and repeat until the requested tolerance is met or the selected fallback policy
+  applies. The default fallback keeps the best spline because mask import is primarily an editable starting point for noisy
+  segmentation, not an exact mask-vectorization endpoint.
+- Sampled spline output preserves the historical quick fixed-stride behavior. It uses the configurable sampled target point
+  count and maximum contour-point spacing; defaults match the previous constants (`20` and `30`).
+- Do not add hidden fixed point-count sampling or hidden caps outside the explicit sampled-spline mode. If a smoothing
+  constraint such as minimum knot spacing prevents the requested tolerance, the converter must follow the explicit fallback
+  policy instead of silently accepting a wrong ROI.
+
 Key References
 
 - Image Paging & Progressive Rendering: [Atlas_Image_Paging_and_Progressive_Rendering.md](Atlas_Image_Paging_and_Progressive_Rendering.md)

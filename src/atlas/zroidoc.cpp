@@ -4,6 +4,7 @@
 #include "zimg.h"
 #include "zimgdoc.h"
 #include "zlog.h"
+#include "zmasktoroiimportdialog.h"
 #include "ztheme.h"
 #include "zroiwidget.h"
 #include <QFileDialog>
@@ -303,29 +304,14 @@ void ZROIDoc::setModified()
 
 void ZROIDoc::importMaskImage()
 {
-  QStringList filters;
-  std::vector<FileFormat> formats;
-  ZImg::getQtReadNameFilter(filters, formats);
+  ZMaskToROIImportDialog dialog(QApplication::activeWindow());
+  dialog.setInitialDirectory(lastOpenedObjPath());
 
-  index_t fmtIdx = -1;
-  QString fn;
-  {
-    QFileDialog dialog(QApplication::activeWindow());
-    dialog.setFileMode(QFileDialog::ExistingFile);
-    dialog.setNameFilters(filters);
-    dialog.setDirectory(lastOpenedObjPath());
-    dialog.setWindowTitle("Import Mask Image File");
-    if (dialog.exec()) {
-      fmtIdx = filters.indexOf(dialog.selectedNameFilter());
-      fn = dialog.selectedFiles().at(0);
-    }
-    dialog.close();
-  }
-
-  if (fmtIdx >= 0 && !fn.isEmpty()) {
+  if (dialog.exec()) {
+    const QString fn = dialog.selectedFile();
     try {
       auto roi = new ZROI();
-      roi->importMaskImage(fn, formats[fmtIdx]);
+      roi->importMaskImage(fn, dialog.selectedFormat(), dialog.selectedOptions());
 
       addROI(roi, QFileInfo(fn).baseName() + "_roi", true);
       ZSystemInfo::instance().addFileToRecentFileList(fn);

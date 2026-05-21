@@ -402,7 +402,10 @@ Steps to load and manage images:
 ### 4.3 Region of Interest (ROI) Masks
 
 1. **Load ROI files** – **File → Load ROI...** and select Atlas `.nimroi` files.
-2. **Import mask image** – **File → Import Mask Image...** converts a mask image into atlas-editable ROI(s).
+2. **Import mask image** – **File → Import Mask Image...** converts a mask image into atlas-editable ROI(s). The import
+   dialog lets you choose adaptive spline, sampled spline, or polygon output; set the boundary tolerance in pixels;
+   preserve holes; tune sampled-spline point spacing; and choose how adaptive spline import should fall back when the
+   requested tolerance cannot be met.
 3. **Edit** – double-click the ROI object to open the ROI editor tabs. Use spline/polygon/rectangle tools in the ROI toolbar.
 4. **Convert to mask** – **File → To Mask Image...** exports the ROI back into a mask image after edits.
 5. **Undo support** – ROI edits push onto a per-object undo stack, so Undo/Redo apply locally.
@@ -1316,7 +1319,10 @@ For reproducible still-image capture from saved workspaces:
 ### 9.2 Create and Refine ROIs with a Mask Image
 
 1. **Load volume**: follow steps in section 9.1.
-2. **Import mask**: **File → Import Mask Image...**, select a binary mask.
+2. **Import mask**: **File → Import Mask Image...**, select a binary mask, then choose the conversion options. Adaptive
+   spline output is the default for editable round boundaries, sampled spline keeps the older quick fixed-stride behavior
+   for noisy segmentations, and polygon output uses a Douglas-Peucker-style tolerance when you need a straight-edge
+   approximation.
 3. **Switch to ROI mode**: ROI toolbar drop-down → ROI.
 4. **Inspect imported ROI**: select the ROI object to view overlays.
 5. **Refine with spline tool**:

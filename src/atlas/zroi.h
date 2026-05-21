@@ -5,6 +5,7 @@
 #include "zlog.h"
 #include "zglmutils.h"
 #include "zbbox.h"
+#include "zmasktoroioptions.h"
 #include "zroitypes.h"
 #include <H5Cpp.h>
 #include <QObject>
@@ -103,7 +104,7 @@ public:
 
   explicit ZROI(QUndoStack* undoStack = nullptr, QObject* parent = nullptr);
 
-  void importMaskImage(const QString& fn, FileFormat format);
+  void importMaskImage(const QString& fn, FileFormat format, const ZMaskToROIOptions& options);
 
   [[nodiscard]] ZImg toMaskImg(int outWidth = 0,
                                int outHeight = 0,

@@ -3,8 +3,8 @@
 #include "zexception.h"
 #include "zjson.h"
 #include "zlog.h"
-#include "zroiutils.h"
 #include "zsysteminfo.h"
+#include "znaturalcubicspline2d.h"
 // #include <CGAL/Surface_mesh_default_triangulation_3.h>
 // #include <CGAL/Surface_mesh_default_criteria_3.h>
 // #include <CGAL/Complex_2_in_triangulation_3.h>
@@ -26,9 +26,13 @@
 #include <vtkCellArray.h>
 #include <vtkQuadricDecimation.h>
 #include <vtkPolyDataNormals.h>
-#include <QTransform>
-#include <QObject>
+#include <algorithm>
+#include <cmath>
 #include <limits>
+#include <map>
+#include <optional>
+#include <set>
+#include <vector>
 
 namespace nim {
 
@@ -494,9 +498,509 @@ struct ContourNode
   int parentIndex;
 };
 
-void binaryImgToROI(const ZImg& img, ZROI& roi, double scaleX, double scaleY, double scaleZ)
+namespace {
+
+constexpr size_t kPreferredInitialClosedSplineKnots = 8;
+constexpr size_t kMinimumInitialClosedSplineKnots = 4;
+constexpr double kSplineValidationFlattenToleranceFactor = 0.25;
+
+struct ContourShape
+{
+  ROIType type = ROIType::Spline;
+  QPolygonF poly;
+};
+
+struct DistanceResult
+{
+  double distanceSq = 0.0;
+  size_t pointIndex = 0;
+};
+
+struct SplineFitEvaluation
+{
+  double maxErrorSq = std::numeric_limits<double>::infinity();
+  size_t worstContourIndex = 0;
+  glm::dvec2 worstSplinePoint{0.0, 0.0};
+  bool hasWorstSplinePoint = false;
+  std::vector<glm::dvec2> splinePolyline;
+};
+
+void validateMaskToROIOptions(const ZMaskToROIOptions& options, double scaleX, double scaleY, double scaleZ)
+{
+  if (!std::isfinite(options.epsilonPx) || options.epsilonPx <= 0.0) {
+    throw ZException("mask-to-ROI boundary tolerance must be positive");
+  }
+  if (!std::isfinite(options.minKnotSpacingPx) || options.minKnotSpacingPx < 0.0) {
+    throw ZException("mask-to-ROI minimum knot spacing must be non-negative");
+  }
+  if (options.sampledSplineTargetPoints <= 0) {
+    throw ZException("sampled spline target point count must be positive");
+  }
+  if (options.sampledSplineMaxPointSpacing <= 0) {
+    throw ZException("sampled spline maximum point spacing must be positive");
+  }
+  if (!std::isfinite(scaleX) || scaleX <= 0.0 || !std::isfinite(scaleY) || scaleY <= 0.0 || !std::isfinite(scaleZ) ||
+      scaleZ <= 0.0) {
+    throw ZException("mask-to-ROI scale values must be positive and finite");
+  }
+}
+
+[[nodiscard]] std::vector<glm::dvec2> contourPoints(const std::vector<cv::Point>& contour)
+{
+  std::vector<glm::dvec2> points;
+  points.reserve(contour.size());
+  for (const cv::Point& p : contour) {
+    points.emplace_back(static_cast<double>(p.x), static_cast<double>(p.y));
+  }
+  ZNaturalCubicSpline2D::compactConsecutiveDuplicatePointsInPlace(points);
+  if (points.size() > 1 && points.front() == points.back()) {
+    points.pop_back();
+  }
+  return points;
+}
+
+[[nodiscard]] QPolygonF
+closedPolygonFromPoints(const std::vector<glm::dvec2>& points, double scaleX = 1.0, double scaleY = 1.0)
+{
+  QPolygonF poly;
+  poly.reserve(static_cast<int>(points.size() + 1));
+  for (const glm::dvec2& p : points) {
+    poly.push_back(QPointF(p.x * scaleX, p.y * scaleY));
+  }
+  if (!poly.isEmpty() && !poly.isClosed()) {
+    poly.push_back(poly.front());
+  }
+  return poly;
+}
+
+[[nodiscard]] double pointSegmentDistanceSq(const glm::dvec2& p, const glm::dvec2& a, const glm::dvec2& b)
+{
+  const glm::dvec2 ab = b - a;
+  const double denom = glm::dot(ab, ab);
+  if (denom <= 0.0) {
+    const glm::dvec2 d = p - a;
+    return glm::dot(d, d);
+  }
+  const double t = std::clamp(glm::dot(p - a, ab) / denom, 0.0, 1.0);
+  const glm::dvec2 projection = a + t * ab;
+  const glm::dvec2 d = p - projection;
+  return glm::dot(d, d);
+}
+
+[[nodiscard]] double pointPolylineDistanceSq(const glm::dvec2& p, const std::vector<glm::dvec2>& polyline)
+{
+  CHECK(polyline.size() >= 2);
+  double best = std::numeric_limits<double>::infinity();
+  for (size_t i = 1; i < polyline.size(); ++i) {
+    best = std::min(best, pointSegmentDistanceSq(p, polyline[i - 1], polyline[i]));
+  }
+  return best;
+}
+
+[[nodiscard]] DistanceResult maxDistanceToPolylineSq(const std::vector<glm::dvec2>& points,
+                                                     const std::vector<glm::dvec2>& polyline)
+{
+  CHECK(!points.empty());
+  CHECK(polyline.size() >= 2);
+  DistanceResult result;
+  for (size_t i = 0; i < points.size(); ++i) {
+    const double d = pointPolylineDistanceSq(points[i], polyline);
+    if (d > result.distanceSq) {
+      result.distanceSq = d;
+      result.pointIndex = i;
+    }
+  }
+  return result;
+}
+
+[[nodiscard]] bool
+cubicFlatEnough(const glm::dvec2& p0, const glm::dvec2& p1, const glm::dvec2& p2, const glm::dvec2& p3, double tol)
+{
+  const double tolSq = tol * tol;
+  return pointSegmentDistanceSq(p1, p0, p3) <= tolSq && pointSegmentDistanceSq(p2, p0, p3) <= tolSq;
+}
+
+void flattenCubicBezier(const glm::dvec2& p0,
+                        const glm::dvec2& p1,
+                        const glm::dvec2& p2,
+                        const glm::dvec2& p3,
+                        double tol,
+                        std::vector<glm::dvec2>& out)
+{
+  struct Segment
+  {
+    glm::dvec2 p0;
+    glm::dvec2 p1;
+    glm::dvec2 p2;
+    glm::dvec2 p3;
+  };
+
+  std::vector<Segment> stack;
+  stack.push_back(Segment{p0, p1, p2, p3});
+  while (!stack.empty()) {
+    const Segment segment = stack.back();
+    stack.pop_back();
+
+    if (cubicFlatEnough(segment.p0, segment.p1, segment.p2, segment.p3, tol)) {
+      out.push_back(segment.p3);
+      continue;
+    }
+
+    const glm::dvec2 p01 = 0.5 * (segment.p0 + segment.p1);
+    const glm::dvec2 p12 = 0.5 * (segment.p1 + segment.p2);
+    const glm::dvec2 p23 = 0.5 * (segment.p2 + segment.p3);
+    const glm::dvec2 p012 = 0.5 * (p01 + p12);
+    const glm::dvec2 p123 = 0.5 * (p12 + p23);
+    const glm::dvec2 p0123 = 0.5 * (p012 + p123);
+
+    stack.push_back(Segment{p0123, p123, p23, segment.p3});
+    stack.push_back(Segment{segment.p0, p01, p012, p0123});
+  }
+}
+
+[[nodiscard]] std::vector<glm::dvec2> flattenSplinePolyline(std::vector<glm::dvec2> closedKnots, double tol)
+{
+  std::vector<glm::dvec2> polyline;
+  const auto beziers = ZNaturalCubicSpline2D::fitChordLength(std::move(closedKnots));
+  if (beziers.empty()) {
+    return polyline;
+  }
+
+  polyline.push_back(beziers.front().p0);
+  for (const auto& b : beziers) {
+    flattenCubicBezier(b.p0, b.p1, b.p2, b.p3, tol, polyline);
+  }
+  if (!polyline.empty() && polyline.front() != polyline.back()) {
+    polyline.push_back(polyline.front());
+  }
+  return polyline;
+}
+
+[[nodiscard]] std::vector<double> contourCumulativeLengths(const std::vector<glm::dvec2>& contour)
+{
+  CHECK(contour.size() >= 2);
+  std::vector<double> cumulative(contour.size() + 1, 0.0);
+  for (size_t i = 0; i < contour.size(); ++i) {
+    cumulative[i + 1] = cumulative[i] + glm::length(contour[(i + 1) % contour.size()] - contour[i]);
+  }
+  return cumulative;
+}
+
+[[nodiscard]] double arcDistance(size_t a, size_t b, const std::vector<double>& cumulative)
+{
+  CHECK(!cumulative.empty());
+  if (a > b) {
+    std::swap(a, b);
+  }
+  const double perimeter = cumulative.back();
+  const double forward = cumulative[b] - cumulative[a];
+  return std::min(forward, perimeter - forward);
+}
+
+[[nodiscard]] bool isAllowedKnotInsertion(size_t index,
+                                          const std::set<size_t>& knotIndices,
+                                          const std::vector<double>& cumulative,
+                                          double minKnotSpacing)
+{
+  if (knotIndices.contains(index)) {
+    return false;
+  }
+  if (minKnotSpacing <= 0.0) {
+    return true;
+  }
+  return std::all_of(knotIndices.begin(), knotIndices.end(), [index, &cumulative, minKnotSpacing](size_t knotIndex) {
+    return arcDistance(index, knotIndex, cumulative) >= minKnotSpacing;
+  });
+}
+
+[[nodiscard]] std::set<size_t> initialClosedSplineKnotIndices(size_t contourPointCount)
+{
+  CHECK(contourPointCount >= 3);
+  // Starting heuristic only: adaptive refinement may still insert every contour
+  // point if that is required to satisfy the requested tolerance.
+  const size_t targetCount = std::min(
+    contourPointCount,
+    std::max(kMinimumInitialClosedSplineKnots, std::min(kPreferredInitialClosedSplineKnots, contourPointCount)));
+
+  std::set<size_t> indices;
+  for (size_t i = 0; i < targetCount; ++i) {
+    indices.insert((i * contourPointCount) / targetCount);
+  }
+  indices.insert(0);
+  return indices;
+}
+
+[[nodiscard]] std::vector<glm::dvec2> closedKnotsFromIndices(const std::vector<glm::dvec2>& contour,
+                                                             const std::set<size_t>& knotIndices)
+{
+  std::vector<glm::dvec2> knots;
+  knots.reserve(knotIndices.size() + 1);
+  for (size_t index : knotIndices) {
+    CHECK(index < contour.size());
+    knots.push_back(contour[index]);
+  }
+  if (!knots.empty()) {
+    knots.push_back(knots.front());
+  }
+  return knots;
+}
+
+[[nodiscard]] SplineFitEvaluation
+evaluateSplineFit(const std::vector<glm::dvec2>& contour, const std::vector<glm::dvec2>& closedKnots, double epsilon)
+{
+  SplineFitEvaluation evaluation;
+  const double flattenTolerance = epsilon * kSplineValidationFlattenToleranceFactor;
+  evaluation.splinePolyline = flattenSplinePolyline(closedKnots, flattenTolerance);
+  if (evaluation.splinePolyline.size() < 2) {
+    return evaluation;
+  }
+
+  const DistanceResult contourToSpline = maxDistanceToPolylineSq(contour, evaluation.splinePolyline);
+  evaluation.maxErrorSq = contourToSpline.distanceSq;
+  evaluation.worstContourIndex = contourToSpline.pointIndex;
+
+  std::vector<glm::dvec2> closedContour = contour;
+  closedContour.push_back(contour.front());
+  for (const glm::dvec2& p : evaluation.splinePolyline) {
+    const double d = pointPolylineDistanceSq(p, closedContour);
+    if (d > evaluation.maxErrorSq) {
+      evaluation.maxErrorSq = d;
+      evaluation.worstSplinePoint = p;
+      evaluation.hasWorstSplinePoint = true;
+    }
+  }
+  return evaluation;
+}
+
+[[nodiscard]] std::optional<size_t> nearestAllowedContourIndex(const std::vector<glm::dvec2>& contour,
+                                                               const glm::dvec2& point,
+                                                               const std::set<size_t>& knotIndices,
+                                                               const std::vector<double>& cumulative,
+                                                               double minKnotSpacing)
+{
+  std::optional<size_t> bestIndex;
+  double bestDistanceSq = std::numeric_limits<double>::infinity();
+  for (size_t i = 0; i < contour.size(); ++i) {
+    if (!isAllowedKnotInsertion(i, knotIndices, cumulative, minKnotSpacing)) {
+      continue;
+    }
+    const glm::dvec2 d = contour[i] - point;
+    const double distanceSq = glm::dot(d, d);
+    if (distanceSq < bestDistanceSq) {
+      bestDistanceSq = distanceSq;
+      bestIndex = i;
+    }
+  }
+  return bestIndex;
+}
+
+[[nodiscard]] std::optional<size_t> chooseSplineKnotInsertionIndex(const std::vector<glm::dvec2>& contour,
+                                                                   const SplineFitEvaluation& evaluation,
+                                                                   const std::set<size_t>& knotIndices,
+                                                                   const std::vector<double>& cumulative,
+                                                                   double minKnotSpacing)
+{
+  if (evaluation.splinePolyline.size() < 2) {
+    for (size_t i = 0; i < contour.size(); ++i) {
+      if (isAllowedKnotInsertion(i, knotIndices, cumulative, minKnotSpacing)) {
+        return i;
+      }
+    }
+    return std::nullopt;
+  }
+
+  if (isAllowedKnotInsertion(evaluation.worstContourIndex, knotIndices, cumulative, minKnotSpacing)) {
+    return evaluation.worstContourIndex;
+  }
+
+  if (evaluation.hasWorstSplinePoint) {
+    if (const auto nearest =
+          nearestAllowedContourIndex(contour, evaluation.worstSplinePoint, knotIndices, cumulative, minKnotSpacing)) {
+      return nearest;
+    }
+  }
+
+  std::optional<size_t> bestIndex;
+  double bestDistanceSq = -1.0;
+  for (size_t i = 0; i < contour.size(); ++i) {
+    if (!isAllowedKnotInsertion(i, knotIndices, cumulative, minKnotSpacing)) {
+      continue;
+    }
+    const double d = pointPolylineDistanceSq(contour[i], evaluation.splinePolyline);
+    if (d > bestDistanceSq) {
+      bestDistanceSq = d;
+      bestIndex = i;
+    }
+  }
+  return bestIndex;
+}
+
+[[nodiscard]] ContourShape
+polygonShapeFromContour(const std::vector<cv::Point>& contour, double scaleX, double scaleY, double epsilon)
+{
+  std::vector<cv::Point2f> sourcePoints;
+  sourcePoints.reserve(contour.size());
+  for (const cv::Point& p : contour) {
+    sourcePoints.emplace_back(static_cast<float>(p.x), static_cast<float>(p.y));
+  }
+
+  std::vector<cv::Point2f> simplified;
+  cv::approxPolyDP(sourcePoints, simplified, epsilon, true);
+
+  std::vector<glm::dvec2> points;
+  points.reserve(simplified.size());
+  if (simplified.size() >= 3) {
+    for (const cv::Point2f& p : simplified) {
+      points.emplace_back(static_cast<double>(p.x), static_cast<double>(p.y));
+    }
+  } else {
+    points = contourPoints(contour);
+  }
+
+  ContourShape shape;
+  shape.type = ROIType::Polygon;
+  shape.poly = closedPolygonFromPoints(points, scaleX, scaleY);
+  return shape;
+}
+
+[[nodiscard]] ContourShape sampledSplineShapeFromContour(const std::vector<cv::Point>& contour,
+                                                         const ZMaskToROIOptions& options,
+                                                         double scaleX,
+                                                         double scaleY)
+{
+  const int stride = std::max(1,
+                              std::min(options.sampledSplineMaxPointSpacing,
+                                       static_cast<int>(contour.size()) / options.sampledSplineTargetPoints));
+
+  QPolygonF poly;
+  poly.reserve(static_cast<int>((contour.size() / static_cast<size_t>(stride)) + 2));
+  for (size_t p = 0; p < contour.size(); p += static_cast<size_t>(stride)) {
+    poly.push_back(QPointF(static_cast<double>(contour[p].x) * scaleX, static_cast<double>(contour[p].y) * scaleY));
+  }
+  if (!poly.isEmpty() && !poly.isClosed()) {
+    poly.push_back(poly.front());
+  }
+
+  ContourShape shape;
+  shape.type = ROIType::Spline;
+  shape.poly = std::move(poly);
+  return shape;
+}
+
+[[nodiscard]] ContourShape splineShapeFromContour(const std::vector<cv::Point>& contour,
+                                                  const ZMaskToROIOptions& options,
+                                                  double scaleX,
+                                                  double scaleY)
+{
+  const std::vector<glm::dvec2> points = contourPoints(contour);
+  if (points.size() < 3) {
+    return ContourShape{};
+  }
+
+  const std::vector<double> cumulative = contourCumulativeLengths(points);
+  std::set<size_t> knotIndices = initialClosedSplineKnotIndices(points.size());
+  const double targetErrorSq = options.epsilonPx * options.epsilonPx;
+
+  QPolygonF bestPoly;
+  double bestErrorSq = std::numeric_limits<double>::infinity();
+
+  while (true) {
+    const std::vector<glm::dvec2> closedKnots = closedKnotsFromIndices(points, knotIndices);
+    const SplineFitEvaluation evaluation = evaluateSplineFit(points, closedKnots, options.epsilonPx);
+    if (evaluation.maxErrorSq < bestErrorSq) {
+      bestErrorSq = evaluation.maxErrorSq;
+      bestPoly = closedPolygonFromPoints(closedKnots, scaleX, scaleY);
+    }
+
+    if (evaluation.maxErrorSq <= targetErrorSq) {
+      return ContourShape{ROIType::Spline, closedPolygonFromPoints(closedKnots, scaleX, scaleY)};
+    }
+
+    if (knotIndices.size() == points.size()) {
+      break;
+    }
+
+    const auto nextIndex =
+      chooseSplineKnotInsertionIndex(points, evaluation, knotIndices, cumulative, options.minKnotSpacingPx);
+    if (!nextIndex) {
+      break;
+    }
+    knotIndices.insert(*nextIndex);
+  }
+
+  if (options.splineFallback == ZMaskToROISplineFallback::KeepBestSpline && !bestPoly.isEmpty()) {
+    LOG(WARNING) << "Mask-to-ROI spline import kept best spline with max boundary error " << std::sqrt(bestErrorSq)
+                 << " px, above requested tolerance " << options.epsilonPx << " px";
+    return ContourShape{ROIType::Spline, bestPoly};
+  }
+
+  ContourShape fallback = polygonShapeFromContour(contour, scaleX, scaleY, options.epsilonPx);
+  const double bestErrorPx =
+    std::isfinite(bestErrorSq) ? std::sqrt(bestErrorSq) : std::numeric_limits<double>::infinity();
+  LOG(WARNING) << "Mask-to-ROI spline import fell back to polygon; best spline max boundary error was " << bestErrorPx
+               << " px, requested tolerance " << options.epsilonPx << " px";
+  return fallback;
+}
+
+[[nodiscard]] ContourShape contourShapeFromMaskContour(const std::vector<cv::Point>& contour,
+                                                       const ZMaskToROIOptions& options,
+                                                       double scaleX,
+                                                       double scaleY)
+{
+  switch (options.outputType) {
+    case ZMaskToROIOutputType::Polygon:
+      return polygonShapeFromContour(contour, scaleX, scaleY, options.epsilonPx);
+    case ZMaskToROIOutputType::SampledSpline:
+      return sampledSplineShapeFromContour(contour, options, scaleX, scaleY);
+    case ZMaskToROIOutputType::Spline:
+      return splineShapeFromContour(contour, options, scaleX, scaleY);
+  }
+  CHECK(false);
+  return ContourShape{};
+}
+
+void appendContourShapeToROI(ZROI& roi, int slice, int depth, const ContourShape& shape)
+{
+  if (shape.poly.size() < 4 || !shape.poly.isClosed()) {
+    return;
+  }
+
+  if (depth == 0) {
+    if (shape.type == ROIType::Polygon) {
+      roi.newPolygon(slice, shape.poly);
+    } else {
+      roi.newSpline(slice, shape.poly);
+    }
+    return;
+  }
+
+  const bool isAdd = (depth % 2) == 0;
+  if (shape.type == ROIType::Polygon) {
+    if (isAdd) {
+      roi.addPolygon(slice, shape.poly);
+    } else {
+      roi.subtractPolygon(slice, shape.poly);
+    }
+  } else {
+    if (isAdd) {
+      roi.addSpline(slice, shape.poly);
+    } else {
+      roi.subtractSpline(slice, shape.poly);
+    }
+  }
+}
+
+} // namespace
+
+void binaryImgToROI(const ZImg& img,
+                    ZROI& roi,
+                    const ZMaskToROIOptions& options,
+                    double scaleX,
+                    double scaleY,
+                    double scaleZ)
 {
   CHECK(img.isType<uint8_t>() && !img.isTimeSeries() && !img.isMultiChannelsImg());
+  validateMaskToROIOptions(options, scaleX, scaleY, scaleZ);
   roi.clear();
 
   for (size_t tmps = 0; tmps < img.depth(); ++tmps) {
@@ -513,7 +1017,11 @@ void binaryImgToROI(const ZImg& img, ZROI& roi, double scaleX, double scaleY, do
       cv::Mat mat(simg.height(), simg.width(), CV_8UC1, simg.channelData(0));
       std::vector<std::vector<cv::Point>> contours;
       std::vector<cv::Vec4i> hierarchy;
-      cv::findContours(mat, contours, hierarchy, cv::RETR_TREE, cv::CHAIN_APPROX_NONE);
+      cv::findContours(mat,
+                       contours,
+                       hierarchy,
+                       options.preserveHoles ? cv::RETR_TREE : cv::RETR_EXTERNAL,
+                       cv::CHAIN_APPROX_NONE);
 
       ZTree<ContourNode> contoursTree;
       std::map<int, ContourNode> nodeMap;
@@ -546,7 +1054,7 @@ void binaryImgToROI(const ZImg& img, ZROI& roi, double scaleX, double scaleY, do
       for (auto rit = contoursTree.cbeginRoot(); rit != contoursTree.cendRoot(); ++rit) {
         for (auto it = contoursTree.cbeginBreadthFirst(rit); it != contoursTree.cendBreadthFirst(rit); ++it) {
           // VLOG(1) << it->index << " " << contours[it->index].size();
-          size_t c = it->index;
+          const size_t c = static_cast<size_t>(it->index);
 
           if (contours[c].size() < 3) {
             if (contoursTree.numAncestors(it) == 0) {
@@ -556,33 +1064,9 @@ void binaryImgToROI(const ZImg& img, ZROI& roi, double scaleX, double scaleY, do
             }
           }
 
-          size_t dst = std::max<size_t>(1, std::min<size_t>(30, contours[c].size() / 20));
-          QPolygonF poly;
-          for (size_t p = 0; p < contours[c].size(); p += dst) {
-            poly.push_back(QPointF(contours[c][p].x, contours[c][p].y));
-          }
-          if (!poly.isClosed()) {
-            poly.push_back(poly[0]);
-          }
-          QTransform tfm;
-          tfm.scale(scaleX, scaleY);
-          poly = tfm.map(poly);
-
-          if (ZROIUtils::splineToQPainterPath(poly).isEmpty()) {
-            if (contoursTree.numAncestors(it) == 0) {
-              break;
-            } else {
-              continue;
-            }
-          }
-
-          if (contoursTree.numAncestors(it) == 0) {
-            roi.newSpline(s, poly);
-          } else if (contoursTree.numAncestors(it) % 2 == 0) {
-            roi.addSpline(s, poly);
-          } else {
-            roi.subtractSpline(s, poly);
-          }
+          const int depth = contoursTree.numAncestors(it);
+          const ContourShape shape = contourShapeFromMaskContour(contours[c], options, scaleX, scaleY);
+          appendContourShapeToROI(roi, static_cast<int>(s), depth, shape);
         }
       }
     }

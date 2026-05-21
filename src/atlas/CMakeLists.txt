@@ -680,6 +680,8 @@ set(SOURCES
     zimgqtutils.h zimgqtutils.cpp
     zlogcache.h zlogcache.cpp
     zlogqtgui.h zlogqtgui.cpp
+    zmasktoroioptions.h
+    zmasktoroiimportdialog.h zmasktoroiimportdialog.cpp
     zroi.h zroi.cpp
     zroitypes.h zroitypes.cpp
     zroiutils.h zroiutils.cpp
