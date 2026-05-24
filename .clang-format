@@ -84,7 +84,6 @@ PackConstructorInitializers: Never
 PointerAlignment: Left
 QualifierAlignment: Leave
 # QualifierOrder: ['constexpr', 'inline', 'static', 'type', 'const', 'volatile']
-ReferenceAlignment: Pointer
 ReflowComments: true
 RequiresClausePosition: OwnLine
 SeparateDefinitionBlocks: Leave
