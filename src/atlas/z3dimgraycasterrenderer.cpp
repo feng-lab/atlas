@@ -3,6 +3,7 @@
 
 #include "z3dtexture.h"
 #include "z3drendertarget.h"
+#include "z3dblockidcollector.h"
 #include "z3dimg.h"
 #include "z3dimgpagingstats.h"
 #include "zmesh.h"
@@ -11,15 +12,12 @@
 #include "zimgregioncache.h"
 #include "zlog.h"
 #include "zcancellation.h"
-#include "zstatisticsutils.h"
 #include "z3dscratchresourcepool.h"
 #include "z3drenderglobalstate.h"
 #include "z3drenderervulkanbackend.h"
 #include "zvulkantexture.h"
 #include <folly/OperationCancelled.h>
 #include <absl/strings/str_cat.h>
-#include <tbb/parallel_for.h>
-#include <tbb/concurrent_unordered_set.h>
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -1789,8 +1787,7 @@ Z3DImgRaycasterRenderer::render2DSliceOf3DImage(Z3DEye eye, const std::vector<si
       // VLOG(1) << m_blockIDs.size();
     }
 
-    std::vector<uint32_t> missingBlockIDs;
-    tbb::concurrent_unordered_set<uint32_t> ccSet;
+    Z3DBlockIdCollector blockIdCollector(m_img->maxPagedBlockID());
     { // scope for block id shader
       m_image3DSliceWithTransferfunBlockIDsShader->bind();
       auto guard = folly::makeGuard([=, this]() {
@@ -1820,18 +1817,18 @@ Z3DImgRaycasterRenderer::render2DSliceOf3DImage(Z3DEye eye, const std::vector<si
 
         blockLease.renderTarget->attachment(GL_COLOR_ATTACHMENT0)
           ->downloadTextureToBuffer(GL_RGBA_INTEGER, GL_UNSIGNED_INT, m_blockIDs.data());
-        tbb::parallel_for(tbb::blocked_range<std::vector<uint32_t>::iterator>(m_blockIDs.begin(), m_blockIDs.end()),
-                          [&](const tbb::blocked_range<std::vector<uint32_t>::iterator>& range) {
-                            ccSet.insert(range.begin(), range.end()); // inserts a sequence
-                          });
+        blockIdCollector.addBuffer(std::span<const uint32_t>(m_blockIDs.data(), m_blockIDs.size()));
 
         maybeCancel(cancellationToken);
       }
       // glFinish();
     }
-    ccSet.unsafe_erase(0_u32);
-    ccSet.unsafe_erase(std::numeric_limits<uint32_t>::max());
-    missingBlockIDs.insert(missingBlockIDs.end(), ccSet.begin(), ccSet.end());
+    std::vector<uint32_t> missingBlockIDs;
+    blockIdCollector.fillSortedBlockIds(missingBlockIDs, Z3DBlockIdSortOrder::Ascending);
+    if (shouldBenchmarkZ3DBlockIdCollectors()) {
+      blockIdCollector.benchmarkCollectors(absl::StrCat("GL 2D slice-of-3D channel ", c),
+                                           Z3DBlockIdSortOrder::Ascending);
+    }
     bt.recordEvent("render and collect blockids");
 
     maybeCancel(cancellationToken);
@@ -2400,20 +2397,19 @@ bool Z3DImgRaycasterRenderer::render3DImageForOneRound(Z3DEye eye,
           }
 #endif
 
-  tbb::concurrent_unordered_set<uint32_t> ccSet;
-
-  tbb::parallel_for(tbb::blocked_range<std::vector<uint32_t>::iterator>(m_blockIDs.begin(), m_blockIDs.end()),
-                    [&](const tbb::blocked_range<std::vector<uint32_t>::iterator>& range) {
-                      ccSet.insert(range.begin(), range.end()); // inserts a sequence
-                    });
+  Z3DBlockIdCollector blockIdCollector(m_img->maxPagedBlockID());
+  blockIdCollector.addBuffer(std::span<const uint32_t>(m_blockIDs.data(), m_blockIDs.size()));
 
   maybeCancelFirstProgressiveRound();
   maybeCancel(cancellationToken);
 
-  CHECK(!ccSet.empty());
-  bool lastRound = ccSet.size() == 1 && ccSet.contains(0_u32); // ccSet contains only 0
+  bool lastRound = blockIdCollector.stats().uniqueIdsIncludingSentinels == 1u && blockIdCollector.stats().sawZero;
   if (lastRound) {
     LOG(INFO) << "no (non-empty) blocks to render";
+    if (shouldBenchmarkZ3DBlockIdCollectors()) {
+      blockIdCollector.benchmarkCollectors(absl::StrCat("GL raycaster channel ", c, " round ", round),
+                                           Z3DBlockIdSortOrder::Ascending);
+    }
     if (round > 0) {
       // otherwise still need to render empty blocks
       return lastRound;
@@ -2421,25 +2417,22 @@ bool Z3DImgRaycasterRenderer::render3DImageForOneRound(Z3DEye eye,
     bt.recordEvent("collect blockids");
   } else {
     // need to upload some image blocks to GPU
-    bool hasEnoughMissingIDs = ccSet.size() > m_img->numCachedImages(c);
+    bool hasEnoughMissingIDs = blockIdCollector.stats().uniqueIdsIncludingSentinels > m_img->numCachedImages(c);
 
     for (auto att = 1u; !hasEnoughMissingIDs && !lastRound && att < effectiveAttachments; ++att) {
-      auto numberBlock = ccSet.size();
+      auto numberBlock = blockIdCollector.stats().uniqueIdsIncludingSentinels;
       maybeCancelFirstProgressiveRound();
       blockLease.renderTarget->attachment(drawBuffers[att])
         ->downloadTextureToBuffer(GL_RGBA_INTEGER, GL_UNSIGNED_INT, m_blockIDs.data());
       maybeCancelFirstProgressiveRound();
 
-      tbb::parallel_for(tbb::blocked_range<std::vector<uint32_t>::iterator>(m_blockIDs.begin(), m_blockIDs.end()),
-                        [&](const tbb::blocked_range<std::vector<uint32_t>::iterator>& range) {
-                          ccSet.insert(range.begin(), range.end()); // inserts a sequence
-                        });
+      blockIdCollector.addBuffer(std::span<const uint32_t>(m_blockIDs.data(), m_blockIDs.size()));
 
-      hasEnoughMissingIDs = ccSet.size() > m_img->numCachedImages(c);
+      hasEnoughMissingIDs = blockIdCollector.stats().uniqueIdsIncludingSentinels > m_img->numCachedImages(c);
 
-      lastRound = !hasEnoughMissingIDs && numberBlock == ccSet.size();
+      lastRound = !hasEnoughMissingIDs && numberBlock == blockIdCollector.stats().uniqueIdsIncludingSentinels;
       if (lastRound) { // confirm
-        lastRound = *parallel_max_element(m_blockIDs) == 0;
+        lastRound = blockIdCollector.stats().lastBufferAllZero;
       }
       if (lastRound) {
         VLOG(1) << "last att: " << att;
@@ -2451,20 +2444,19 @@ bool Z3DImgRaycasterRenderer::render3DImageForOneRound(Z3DEye eye,
 
     std::vector<uint32_t> missingBlockIDs;
 
-    ccSet.unsafe_erase(0_u32);
-    if (ccSet.contains(std::numeric_limits<uint32_t>::max())) {
+    if (blockIdCollector.stats().sawInvalid) {
       VLOG(1) << "use last block";
     }
-    ccSet.unsafe_erase(std::numeric_limits<uint32_t>::max());
-    if (!ccSet.empty()) {
-      CHECK(ccSet.size() < m_img->numCachedImages(c) * 10);
-      missingBlockIDs.reserve(ccSet.size());
-      missingBlockIDs.insert(missingBlockIDs.end(), ccSet.begin(), ccSet.end());
-      if ((round % 2 == 1) && hasEnoughMissingIDs) {
-        std::ranges::sort(missingBlockIDs, std::ranges::greater{});
-      } else {
-        std::ranges::sort(missingBlockIDs);
-      }
+    Z3DBlockIdSortOrder blockIdOrder = Z3DBlockIdSortOrder::Ascending;
+    if ((round % 2 == 1) && hasEnoughMissingIDs) {
+      blockIdOrder = Z3DBlockIdSortOrder::Descending;
+    }
+    if (blockIdCollector.stats().uniqueBlockIds > 0u) {
+      CHECK(blockIdCollector.stats().uniqueBlockIds < m_img->numCachedImages(c) * 10);
+      blockIdCollector.fillSortedBlockIds(missingBlockIDs, blockIdOrder);
+    }
+    if (shouldBenchmarkZ3DBlockIdCollectors()) {
+      blockIdCollector.benchmarkCollectors(absl::StrCat("GL raycaster channel ", c, " round ", round), blockIdOrder);
     }
     // VLOG(1) << missingBlockIDs.size() << " " << usedBlockIDs.size();
     bt.recordEvent("collect blockids");

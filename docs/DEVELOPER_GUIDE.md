@@ -1129,7 +1129,11 @@ Notes
   - `Z3DImg` owns:
     - Page directory and page table cache textures (3D integer textures) per channel.
     - The image block cache texture per channel (3D texture storing block bricks).
-    - Mapping logic (`m_levelScales`, `m_posToBlockIDs`, `m_pageTableBlockSize`, etc.).
+    - Mapping logic (`m_levelScales`, `m_posToBlockIDs`, `m_maxPagedBlockID`, `m_pageTableBlockSize`, etc.).
+  - OpenGL block-ID readback compaction uses `Z3DBlockIdCollector`. Candidate implementations live as small state types in `z3dblockidcollector.cpp`; each one has the same shape: construct/reset with the max block ID, `addBuffer()` for each downloaded readback buffer, then emit sorted IDs in the requested order. The current production state alias points to the dense bitset path: block IDs are dense and one-based, so it records IDs in per-thread bitsets, ORs those bitsets into persistent state after each buffer, and scans the final bitset directly in the renderer-required order.
+  - `Z3DImg::maxPagedBlockID()` returns the stored max block ID generated with the paging hierarchy. Keep it updated at the same time as `m_posToBlockIDs`; do not recompute it later from derived page-table arrays.
+  - To compare real scene inputs, run Atlas with `--atlas_benchmark_blockid_collectors` and optionally set `--atlas_benchmark_blockid_collectors_runs=N`. The OpenGL block-ID paths then replay the same downloaded buffers through the production-default state, dense bitset, current TBB concurrent set, filtered TBB concurrent set, Boost concurrent flat set, thread-local vector/sort, thread-local Abseil/Folly hash-set merge, and sequential integer-sort states, validate identical results, and log sorted end-to-end timings for each render pass. With the flag off, replay buffers are not copied.
+  - Synthetic CPU-only collector timing lives in `zbenchmark`. Use a filter such as `--benchmark_filter=BlockIdCollector` to run the generated 1024x1024 RGBA32UI-equivalent stress cases plus real-log-shaped sparse readback cases without adding benchmark noise to normal `ctest` runs.
 
 - Progressive Accumulation
   - Raycaster maintains per-eye `m_channelIdx[eye]` and `m_round[eye]` and persistent `m_progressiveLayerLease` across rounds.

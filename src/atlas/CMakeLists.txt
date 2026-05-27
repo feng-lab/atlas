@@ -771,6 +771,7 @@ set(SOURCES
     z3dtextureglowrenderer.h z3dtextureglowrenderer.cpp
     z3dcameracontrolwidget.h z3dcameracontrolwidget.cpp
     z3dtextureandeyecoordinaterenderer.h z3dtextureandeyecoordinaterenderer.cpp
+    z3dblockidcollector.h z3dblockidcollector.cpp
     z3dimgraycasterrenderer.h z3dimgraycasterrenderer.cpp
     z3dimg.h z3dimg.cpp
     z3dimgpagingstats.h z3dimgpagingstats.cpp
@@ -988,7 +989,8 @@ if (ATLAS_USE_MSVC_LIBRARY_SPLIT)
     proxygen::proxygen
     VTK::sqlite
     assimp::draco
-    gRPC::grpc++ protobuf::libprotobuf)
+    gRPC::grpc++ protobuf::libprotobuf
+    absl::flat_hash_set)
   if (WIN32)
     # Required for importing the Windows system certificate store for HTTPS.
     target_link_libraries(atlas_core_deps INTERFACE crypt32 dxgi)
@@ -1109,7 +1111,8 @@ else ()
     proxygen::proxygen
     VTK::sqlite
     assimp::draco
-    gRPC::grpc++ protobuf::libprotobuf)
+    gRPC::grpc++ protobuf::libprotobuf
+    absl::flat_hash_set)
   if (WIN32)
     # Required for importing the Windows system certificate store for HTTPS.
     target_link_libraries(atlas_lib PUBLIC crypt32 dxgi)

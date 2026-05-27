@@ -3,6 +3,7 @@
 #include "zbioformatsbridgeclient.h"
 #include "zcpuinfo.h"
 #include "zconcurrentlrucache.h"
+#include "z3dblockidcollector.h"
 #include "zimgbioformats.h"
 #include "zimginit.h"
 #include "zimgregion.h"
@@ -34,6 +35,7 @@
 #include <random>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <thread>
 #include <tuple>
 #include <vector>
@@ -418,6 +420,244 @@ static void addConcurrentLRUCacheBench()
     ->Args({64, threadCount})
     ->UseRealTime()
     ->ArgNames({"segments", "threads"});
+}
+
+enum class BlockIdSyntheticCase
+{
+  MostlyEmpty4KDomain3PctReal,
+  Mixed64KDomain25PctReal,
+  Heavy1MDomain80PctReal,
+  AllZero,
+  RealLogEmpty13MSingleBuffer,
+  RealLogSparse338Unique26MTwoBuffers,
+  RealLogSparse1421Unique26MTwoBuffers,
+  Count
+};
+
+struct BlockIdSyntheticCaseInfo
+{
+  BlockIdSyntheticCase id;
+  std::string_view name;
+  uint32_t maxBlockId;
+  size_t bufferCount;
+  size_t wordsPerBuffer;
+  uint32_t randomRealPermille;
+  uint32_t randomInvalidPermille;
+  uint32_t targetUniqueBlockIds;
+  uint32_t occurrencesPerUniqueBlock;
+};
+
+struct BlockIdSyntheticDataset
+{
+  Z3DBlockIdBufferList buffers;
+  std::vector<uint32_t> ascendingReference;
+  uint32_t maxBlockId = 0;
+  size_t wordCount = 0;
+  size_t wordsPerBuffer = 0;
+  size_t validWordCount = 0;
+  size_t invalidWordCount = 0;
+};
+
+constexpr size_t kBlockIdSyntheticDefaultReadbackWords = 1024u * 1024u * 4u;
+constexpr size_t kBlockIdRealLogReadbackWords = 13008128u;
+constexpr uint32_t kBlockIdRealLogMaxBlockId = 551672u;
+constexpr std::array<BlockIdSyntheticCaseInfo, static_cast<size_t>(BlockIdSyntheticCase::Count)>
+  kBlockIdSyntheticCases = {
+    {
+     {BlockIdSyntheticCase::MostlyEmpty4KDomain3PctReal,
+       "mostly_empty_4k_id_domain_3pct_real",
+       4096u,
+       1u,
+       kBlockIdSyntheticDefaultReadbackWords,
+       30u,
+       1u,
+       0u,
+       0u},
+     {BlockIdSyntheticCase::Mixed64KDomain25PctReal,
+       "mixed_64k_id_domain_25pct_real",
+       65536u,
+       1u,
+       kBlockIdSyntheticDefaultReadbackWords,
+       250u,
+       1u,
+       0u,
+       0u},
+     {BlockIdSyntheticCase::Heavy1MDomain80PctReal,
+       "heavy_1m_id_domain_80pct_real",
+       1048576u,
+       1u,
+       kBlockIdSyntheticDefaultReadbackWords,
+       800u,
+       1u,
+       0u,
+       0u},
+     {BlockIdSyntheticCase::AllZero, "all_zero", 4096u, 1u, kBlockIdSyntheticDefaultReadbackWords, 0u, 0u, 0u, 0u},
+     {BlockIdSyntheticCase::RealLogEmpty13MSingleBuffer,
+       "real_log_empty_13m_1buffer",
+       kBlockIdRealLogMaxBlockId,
+       1u,
+       kBlockIdRealLogReadbackWords,
+       0u,
+       0u,
+       0u,
+       0u},
+     {BlockIdSyntheticCase::RealLogSparse338Unique26MTwoBuffers,
+       "real_log_sparse_338_unique_26m_2buffers",
+       kBlockIdRealLogMaxBlockId,
+       2u,
+       kBlockIdRealLogReadbackWords,
+       0u,
+       0u,
+       338u,
+       3072u},
+     {BlockIdSyntheticCase::RealLogSparse1421Unique26MTwoBuffers,
+       "real_log_sparse_1421_unique_26m_2buffers",
+       kBlockIdRealLogMaxBlockId,
+       2u,
+       kBlockIdRealLogReadbackWords,
+       0u,
+       0u,
+       1421u,
+       5120u},
+     }
+};
+
+const BlockIdSyntheticCaseInfo& blockIdSyntheticCaseInfo(BlockIdSyntheticCase id)
+{
+  const size_t index = static_cast<size_t>(id);
+  CHECK_LT(index, kBlockIdSyntheticCases.size());
+  CHECK(kBlockIdSyntheticCases[index].id == id);
+  return kBlockIdSyntheticCases[index];
+}
+
+BlockIdSyntheticDataset makeBlockIdSyntheticDataset(BlockIdSyntheticCase id)
+{
+  const BlockIdSyntheticCaseInfo& info = blockIdSyntheticCaseInfo(id);
+  CHECK_GT(info.bufferCount, 0u);
+  CHECK_GT(info.wordsPerBuffer, 0u);
+  CHECK_LE(info.randomRealPermille + info.randomInvalidPermille, 1000u);
+  CHECK_LE(info.targetUniqueBlockIds, info.maxBlockId);
+
+  BlockIdSyntheticDataset dataset;
+  dataset.maxBlockId = info.maxBlockId;
+  dataset.wordCount = info.bufferCount * info.wordsPerBuffer;
+  dataset.wordsPerBuffer = info.wordsPerBuffer;
+  dataset.buffers.resize(info.bufferCount);
+  for (auto& buffer : dataset.buffers) {
+    buffer.resize(info.wordsPerBuffer);
+  }
+
+  auto setFlatWord = [&dataset](size_t flatIndex, uint32_t word) {
+    CHECK_LT(flatIndex, dataset.wordCount);
+    dataset.buffers[flatIndex / dataset.wordsPerBuffer][flatIndex % dataset.wordsPerBuffer] = word;
+  };
+
+  if (info.targetUniqueBlockIds > 0u) {
+    const size_t validWordCount =
+      static_cast<size_t>(info.targetUniqueBlockIds) * static_cast<size_t>(info.occurrencesPerUniqueBlock);
+    CHECK_LE(validWordCount, dataset.wordCount);
+    dataset.validWordCount = validWordCount;
+
+    const size_t spacing = std::max<size_t>(1u, dataset.wordCount / validWordCount);
+    const size_t start = static_cast<size_t>(static_cast<uint32_t>(id)) % spacing;
+    for (size_t occurrence = 0; occurrence < validWordCount; ++occurrence) {
+      const size_t flatIndex = start + occurrence * spacing;
+      CHECK_LT(flatIndex, dataset.wordCount);
+      const uint32_t idOrdinal = static_cast<uint32_t>(occurrence % info.targetUniqueBlockIds);
+      const uint32_t blockId =
+        1u + static_cast<uint32_t>((static_cast<uint64_t>(idOrdinal) * info.maxBlockId) / info.targetUniqueBlockIds);
+      setFlatWord(flatIndex, blockId);
+    }
+  } else if (info.randomRealPermille > 0u || info.randomInvalidPermille > 0u) {
+    std::mt19937 rng(0xA71A500u + static_cast<uint32_t>(static_cast<size_t>(id)));
+    std::uniform_int_distribution<uint32_t> idDist(1u, info.maxBlockId);
+    std::uniform_int_distribution<uint32_t> eventDist(0u, 999u);
+    const uint32_t invalidStart = 1000u - info.randomInvalidPermille;
+    for (auto& buffer : dataset.buffers) {
+      for (uint32_t& word : buffer) {
+        const uint32_t event = eventDist(rng);
+        if (event < info.randomRealPermille) {
+          word = idDist(rng);
+          ++dataset.validWordCount;
+        } else if (event >= invalidStart) {
+          word = std::numeric_limits<uint32_t>::max();
+          ++dataset.invalidWordCount;
+        } else {
+          word = 0u;
+        }
+      }
+    }
+  }
+
+  dataset.ascendingReference = collectZ3DBlockIdsForBenchmark(dataset.buffers,
+                                                              dataset.maxBlockId,
+                                                              Z3DBlockIdSortOrder::Ascending,
+                                                              Z3DBlockIdCollectorMethod::DenseBitset);
+  return dataset;
+}
+
+const BlockIdSyntheticDataset& blockIdSyntheticDataset(BlockIdSyntheticCase id)
+{
+  const size_t index = static_cast<size_t>(id);
+  CHECK_LT(index, kBlockIdSyntheticCases.size());
+
+  static std::array<std::once_flag, static_cast<size_t>(BlockIdSyntheticCase::Count)> onceFlags;
+  static std::array<std::unique_ptr<BlockIdSyntheticDataset>, static_cast<size_t>(BlockIdSyntheticCase::Count)>
+    datasets;
+  std::call_once(onceFlags[index], [id, index]() {
+    datasets[index] = std::make_unique<BlockIdSyntheticDataset>(makeBlockIdSyntheticDataset(id));
+  });
+  CHECK(datasets[index] != nullptr);
+  return *datasets[index];
+}
+
+static void BM_BlockIdCollectorSynthetic(benchmark::State& state,
+                                         BlockIdSyntheticCase syntheticCase,
+                                         Z3DBlockIdCollectorMethod method)
+{
+  const BlockIdSyntheticDataset& dataset = blockIdSyntheticDataset(syntheticCase);
+  const std::vector<uint32_t> warmup =
+    collectZ3DBlockIdsForBenchmark(dataset.buffers, dataset.maxBlockId, Z3DBlockIdSortOrder::Ascending, method);
+  if (warmup != dataset.ascendingReference) {
+    state.SkipWithError("block-ID collector produced a different unique sorted ID list than dense_bitset");
+    return;
+  }
+
+  for (auto _ : state) {
+    std::vector<uint32_t> ids =
+      collectZ3DBlockIdsForBenchmark(dataset.buffers, dataset.maxBlockId, Z3DBlockIdSortOrder::Ascending, method);
+    benchmark::DoNotOptimize(ids.data());
+    benchmark::DoNotOptimize(ids.size());
+  }
+
+  state.SetItemsProcessed(state.iterations() * static_cast<int64_t>(dataset.wordCount));
+  state.counters["buffers"] = static_cast<double>(dataset.buffers.size());
+  state.counters["input_words"] = static_cast<double>(dataset.wordCount);
+  state.counters["max_block_id"] = static_cast<double>(dataset.maxBlockId);
+  state.counters["valid_percent"] =
+    dataset.wordCount == 0u ? 0.0 : 100.0 * static_cast<double>(dataset.validWordCount) / dataset.wordCount;
+  state.counters["valid_words"] = static_cast<double>(dataset.validWordCount);
+  state.counters["unique_ids"] = static_cast<double>(dataset.ascendingReference.size());
+  state.counters["words_per_buffer"] = static_cast<double>(dataset.wordsPerBuffer);
+  state.counters["threads"] = static_cast<double>(std::thread::hardware_concurrency());
+}
+
+static void addBlockIdCollectorBench()
+{
+  for (const BlockIdSyntheticCaseInfo& syntheticCase : kBlockIdSyntheticCases) {
+    for (const Z3DBlockIdCollectorMethodInfo& method : z3DBlockIdCollectorMethods()) {
+      const std::string name = fmt::format("BlockIdCollector/{}/{}", syntheticCase.name, method.name);
+      benchmark::RegisterBenchmark(
+        name.c_str(),
+        [syntheticCaseId = syntheticCase.id, methodId = method.method](benchmark::State& state) {
+          BM_BlockIdCollectorSynthetic(state, syntheticCaseId, methodId);
+        })
+        ->Unit(benchmark::kMillisecond)
+        ->UseRealTime()
+        ->Repetitions(3)
+        ->ReportAggregatesOnly(true);
+    }
+  }
 }
 
 constexpr int kBioFormatsBenchmarkIoTimeoutMs = 10 * 60 * 1000;
@@ -819,6 +1059,7 @@ int main(int argc, char* argv[])
   addVectorLoopBench();
   addLockBench();
   addConcurrentLRUCacheBench();
+  addBlockIdCollectorBench();
   addBioFormatsBench();
 
   benchmark::Initialize(&argc, argv);

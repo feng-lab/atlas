@@ -501,6 +501,7 @@ void Z3DImg::setScale(const glm::vec3& scale)
             << " volumeVoxelWorldSize: " << m_volumeVoxelWorldSize;
 
   m_pageDirectorySize = glm::uvec3(0, 0, 0);
+  m_maxPagedBlockID = 0;
   m_levelScales.resize(m_numLevels);
   m_imageDimensions.resize(m_numLevels);
   m_pageTableDimensions.resize(m_numLevels);
@@ -554,7 +555,8 @@ void Z3DImg::setScale(const glm::vec3& scale)
       m_voxelWorldSizes[l] = m_volumeVoxelWorldSize;
       m_pageTableDimensions[l] = glm::uvec3(0);
       m_pageDirectoryDimensions[l] = glm::uvec3(0);
-      m_posToBlockIDs[l] = glm::uvec3(1 + numImageBlocks, 0, 0);
+      CHECK_LT(numImageBlocks, size_t{std::numeric_limits<uint32_t>::max()});
+      m_posToBlockIDs[l] = glm::uvec3(static_cast<uint32_t>(1 + numImageBlocks), 0, 0);
       m_pageDirectoryBases[l] = glm::uvec3(std::numeric_limits<uint32_t>::max());
       break;
     }
@@ -565,17 +567,22 @@ void Z3DImg::setScale(const glm::vec3& scale)
     m_pageTableDimensions[l] = (m_imageDimensions[l] + m_imageBlockSize - 1_u32) / m_imageBlockSize;
     m_pageDirectoryDimensions[l] = (m_pageTableDimensions[l] + m_pageTableBlockSize - 1_u32) / m_pageTableBlockSize;
 
-    numImageBlocks += size_t(m_pageTableDimensions[l].x) * m_pageTableDimensions[l].y * m_pageTableDimensions[l].z;
+    const uint64_t firstBlockID = uint64_t{numImageBlocks} + 1u;
+    const uint64_t blockIDStrideZ = uint64_t{m_pageTableDimensions[l].x} * m_pageTableDimensions[l].y;
+    const uint64_t levelImageBlocks = blockIDStrideZ * m_pageTableDimensions[l].z;
+    CHECK_LE(firstBlockID, uint64_t{std::numeric_limits<uint32_t>::max()});
+    CHECK_LE(blockIDStrideZ, uint64_t{std::numeric_limits<uint32_t>::max()});
+    CHECK_LE(levelImageBlocks, uint64_t{std::numeric_limits<size_t>::max()});
+
+    numImageBlocks += static_cast<size_t>(levelImageBlocks);
+    CHECK_LT(numImageBlocks, size_t{std::numeric_limits<uint32_t>::max()});
     numPageTableBlocks +=
       size_t(m_pageDirectoryDimensions[l].x) * m_pageDirectoryDimensions[l].y * m_pageDirectoryDimensions[l].z;
 
     // id starts from 1
-    m_posToBlockIDs[l] =
-      glm::uvec3(l == 0 ? 1
-                        : (m_posToBlockIDs[l - 1].x + m_pageTableDimensions[l - 1].x * m_pageTableDimensions[l - 1].y *
-                                                        m_pageTableDimensions[l - 1].z),
-                 m_pageTableDimensions[l].x,
-                 m_pageTableDimensions[l].x * m_pageTableDimensions[l].y);
+    m_posToBlockIDs[l] = glm::uvec3(static_cast<uint32_t>(firstBlockID),
+                                    m_pageTableDimensions[l].x,
+                                    static_cast<uint32_t>(blockIDStrideZ));
     if (l == 0) {
       m_pageDirectoryBases[l] = glm::uvec3(0, 0, 0);
     } else if (l == 1) {
@@ -593,8 +600,9 @@ void Z3DImg::setScale(const glm::vec3& scale)
     }
   }
 
+  m_maxPagedBlockID = static_cast<uint32_t>(numImageBlocks);
   LOG(INFO) << "pageDirectorySize: " << m_pageDirectorySize << " numPageTableBlocks: " << numPageTableBlocks
-            << " numImageBlocks: " << numImageBlocks;
+            << " numImageBlocks: " << numImageBlocks << " maxPagedBlockID: " << m_maxPagedBlockID;
 
   m_pageTableCacheNumBlocks = glm::uvec3(0);
   for (size_t z = 1; z <= 512_u32 / m_pageTableBlockSize.z; ++z) {
@@ -752,6 +760,11 @@ void Z3DImg::bindFullResBlockIDsShader(Z3DShaderProgram& shader, size_t c) const
 
   shader.bindTexture("page_directory", m_channelPageDirectoryTextures[c].get());
   shader.bindTexture("page_table_cache", m_channelPageTableCacheTextures[c].get());
+}
+
+uint32_t Z3DImg::maxPagedBlockID() const
+{
+  return m_maxPagedBlockID;
 }
 
 void Z3DImg::bindFullResRenderShader(Z3DShaderProgram& shader, size_t c) const

@@ -3,6 +3,7 @@
 
 #include "z3dtexture.h"
 #include "z3drendertarget.h"
+#include "z3dblockidcollector.h"
 #include "z3dimg.h"
 #include "z3drendercommands.h"
 #include "zbenchtimer.h"
@@ -15,9 +16,8 @@
 #include <cstdint>
 #include <cstring>
 #include <memory>
+#include <span>
 #include <absl/strings/str_cat.h>
-#include <tbb/parallel_for.h>
-#include <tbb/concurrent_unordered_set.h>
 
 ABSL_DECLARE_FLAG(uint32_t, atlas_volume_rendering_maximum_round);
 ABSL_DECLARE_FLAG(nim::VulkanBlockIdCompactionSource, atlas_vk_blockid_compaction_source);
@@ -854,8 +854,7 @@ double Z3DImgSliceRenderer::renderSlice(Z3DEye eye, bool progressive)
       m_blockIDs.resize(blockLease.renderTarget->attachment(GL_COLOR_ATTACHMENT0)->numPixels() * 4);
     }
 
-    std::vector<uint32_t> missingBlockIDs;
-    tbb::concurrent_unordered_set<uint32_t> ccSet;
+    Z3DBlockIdCollector blockIdCollector(m_img->maxPagedBlockID());
     { // scope for block id shader
       m_image3DSliceWithColorMapBlockIDsShader->bind();
       auto guard = folly::makeGuard([=, this]() {
@@ -885,18 +884,17 @@ double Z3DImgSliceRenderer::renderSlice(Z3DEye eye, bool progressive)
 
         blockLease.renderTarget->attachment(GL_COLOR_ATTACHMENT0)
           ->downloadTextureToBuffer(GL_RGBA_INTEGER, GL_UNSIGNED_INT, m_blockIDs.data());
-        tbb::parallel_for(tbb::blocked_range<std::vector<uint32_t>::iterator>(m_blockIDs.begin(), m_blockIDs.end()),
-                          [&](const tbb::blocked_range<std::vector<uint32_t>::iterator>& range) {
-                            ccSet.insert(range.begin(), range.end()); // inserts a sequence
-                          });
+        blockIdCollector.addBuffer(std::span<const uint32_t>(m_blockIDs.data(), m_blockIDs.size()));
 
         maybeCancel(cancellationToken);
       }
       // glFinish();
     }
-    ccSet.unsafe_erase(0_u32);
-    ccSet.unsafe_erase(std::numeric_limits<uint32_t>::max());
-    missingBlockIDs.insert(missingBlockIDs.end(), ccSet.begin(), ccSet.end());
+    std::vector<uint32_t> missingBlockIDs;
+    blockIdCollector.fillSortedBlockIds(missingBlockIDs, Z3DBlockIdSortOrder::Ascending);
+    if (shouldBenchmarkZ3DBlockIdCollectors()) {
+      blockIdCollector.benchmarkCollectors(absl::StrCat("GL slice channel ", i), Z3DBlockIdSortOrder::Ascending);
+    }
     bt.recordEvent("render and collect blockids");
 
     maybeCancel(cancellationToken);

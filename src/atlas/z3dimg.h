@@ -224,6 +224,8 @@ public:
     return m_posToBlockIDs;
   }
 
+  [[nodiscard]] uint32_t maxPagedBlockID() const;
+
   [[nodiscard]] glm::vec3 imageAddressToNormalizedTextureCoord(size_t channel) const
   {
     (void)channel;
@@ -389,6 +391,7 @@ protected:
   std::vector<glm::uvec3> m_imageDimensions;
   std::vector<glm::uvec3> m_levelScales;
   std::vector<glm::uvec3> m_posToBlockIDs;
+  uint32_t m_maxPagedBlockID = 0;
 
   std::vector<glm::vec3> m_voxelWorldDimensions;
   std::vector<float> m_voxelWorldSizes;

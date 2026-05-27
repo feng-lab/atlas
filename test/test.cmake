@@ -116,6 +116,7 @@ add_atlas_gtest_executable(zimgometiffpacktest)
 
 # Consolidate the heaviest Atlas-linked tests into a single executable to avoid paying
 # the large atlas_lib link cost multiple times. This currently includes:
+# - Block-ID collector generated-input regression coverage
 # - Neuroglancer precomputed integration tests
 # - Neuroglancer state/share-link parsing tests
 # - ROI mask rasterization integration tests (historically `zroimaskrastertest`)
@@ -129,6 +130,7 @@ endif ()
 # add_atlas_gtest_executable(zswcpackundomergetest)
 add_executable(
   zatlasheavytest
+  ${CMAKE_CURRENT_LIST_DIR}/z3dblockidcollectortest.cpp
   ${CMAKE_CURRENT_LIST_DIR}/zroimaskrastertest.cpp
   ${CMAKE_CURRENT_LIST_DIR}/zcameraparameteranimationtest.cpp
   ${CMAKE_CURRENT_LIST_DIR}/zcutspanparametertest.cpp
@@ -160,5 +162,5 @@ find_package(benchmark REQUIRED
 print_target_properties(benchmark::benchmark)
 
 add_executable(zbenchmark ${CMAKE_CURRENT_LIST_DIR}/zbenchmark.cpp)
-target_link_libraries(zbenchmark img benchmark::benchmark)
+target_link_libraries(zbenchmark atlas_lib benchmark::benchmark)
 target_compile_definitions(zbenchmark PRIVATE ATLAS_THIRDPARTY_BUILD_DIR="${CMAKE_CURRENT_LIST_DIR}/../src/3rdparty/build")
