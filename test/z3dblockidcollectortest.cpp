@@ -45,9 +45,6 @@ TEST(Z3DBlockIdCollectorTest, IgnoresSentinelsAndSortsBothDirections)
   EXPECT_EQ(stats.buffersProcessed, 1u);
   EXPECT_EQ(stats.wordsProcessed, buffers.front().size());
   EXPECT_EQ(stats.uniqueBlockIds, 4u);
-  EXPECT_EQ(stats.uniqueIdsIncludingSentinels, 6u);
-  EXPECT_TRUE(stats.sawZero);
-  EXPECT_TRUE(stats.sawInvalid);
   EXPECT_FALSE(stats.lastBufferAllZero);
 
   std::vector<uint32_t> ids;
@@ -74,9 +71,6 @@ TEST(Z3DBlockIdCollectorTest, AccumulatesAcrossBuffersAndTracksLastAllZeroBuffer
   EXPECT_EQ(stats.buffersProcessed, buffers.size());
   EXPECT_EQ(stats.wordsProcessed, 7u);
   EXPECT_EQ(stats.uniqueBlockIds, 2u);
-  EXPECT_EQ(stats.uniqueIdsIncludingSentinels, 3u);
-  EXPECT_TRUE(stats.sawZero);
-  EXPECT_FALSE(stats.sawInvalid);
   EXPECT_TRUE(stats.lastBufferAllZero);
 
   std::vector<uint32_t> ids;

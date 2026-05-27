@@ -22,6 +22,7 @@
 #include <memory>
 #include <sstream>
 #include <string>
+#include <type_traits>
 
 ABSL_FLAG(bool,
           atlas_benchmark_blockid_collectors,
@@ -38,18 +39,7 @@ namespace nim {
 
 namespace {
 
-constexpr uint32_t kZeroBlockId = 0u;
 constexpr uint32_t kInvalidBlockId = std::numeric_limits<uint32_t>::max();
-
-void checkMaxBlockId(uint32_t maxBlockId)
-{
-  CHECK_LT(maxBlockId, kInvalidBlockId) << "Block-ID domain collides with the invalid block-ID sentinel";
-}
-
-[[nodiscard]] size_t bitsetWordCount(uint32_t maxBlockId)
-{
-  return std::max<size_t>(1u, (static_cast<size_t>(maxBlockId) + 64u) / 64u);
-}
 
 void sortBlockIds(std::vector<uint32_t>& ids, Z3DBlockIdSortOrder order)
 {
@@ -57,15 +47,6 @@ void sortBlockIds(std::vector<uint32_t>& ids, Z3DBlockIdSortOrder order)
     std::sort(ids.begin(), ids.end(), std::greater<uint32_t>{});
   } else {
     std::sort(ids.begin(), ids.end());
-  }
-}
-
-void sortAndUniqueBlockIds(std::vector<uint32_t>& ids, Z3DBlockIdSortOrder order)
-{
-  boost::sort::spreadsort::integer_sort(ids.begin(), ids.end());
-  ids.erase(std::unique(ids.begin(), ids.end()), ids.end());
-  if (order == Z3DBlockIdSortOrder::Descending) {
-    std::reverse(ids.begin(), ids.end());
   }
 }
 
@@ -83,54 +64,6 @@ constexpr std::array<Z3DBlockIdCollectorMethodInfo, 9> kCollectorMethods = {
    }
 };
 
-struct BufferScanFlags
-{
-  bool sawZero = false;
-  bool sawInvalid = false;
-  bool sawNonZero = false;
-};
-
-void recordLocalSentinels(BufferScanFlags localFlags,
-                          std::atomic<bool>& sawZero,
-                          std::atomic<bool>& sawInvalid,
-                          std::atomic<bool>& sawNonZero)
-{
-  if (localFlags.sawZero) {
-    sawZero.store(true, std::memory_order_relaxed);
-  }
-  if (localFlags.sawInvalid) {
-    sawInvalid.store(true, std::memory_order_relaxed);
-  }
-  if (localFlags.sawNonZero) {
-    sawNonZero.store(true, std::memory_order_relaxed);
-  }
-}
-
-BufferScanFlags loadBufferScanFlags(const std::atomic<bool>& sawZero,
-                                    const std::atomic<bool>& sawInvalid,
-                                    const std::atomic<bool>& sawNonZero)
-{
-  return BufferScanFlags{
-    .sawZero = sawZero.load(std::memory_order_relaxed),
-    .sawInvalid = sawInvalid.load(std::memory_order_relaxed),
-    .sawNonZero = sawNonZero.load(std::memory_order_relaxed),
-  };
-}
-
-void finishBufferStats(Z3DBlockIdCollectionStats& stats,
-                       size_t wordsProcessed,
-                       size_t uniqueBlockIds,
-                       BufferScanFlags bufferFlags)
-{
-  stats.buffersProcessed += 1;
-  stats.wordsProcessed += wordsProcessed;
-  stats.uniqueBlockIds = uniqueBlockIds;
-  stats.sawZero = stats.sawZero || bufferFlags.sawZero;
-  stats.sawInvalid = stats.sawInvalid || bufferFlags.sawInvalid;
-  stats.lastBufferAllZero = !bufferFlags.sawNonZero;
-  stats.uniqueIdsIncludingSentinels = stats.uniqueBlockIds + (stats.sawZero ? 1u : 0u) + (stats.sawInvalid ? 1u : 0u);
-}
-
 [[nodiscard]] size_t wordIndex(uint32_t blockId)
 {
   return static_cast<size_t>(blockId) >> 6u;
@@ -144,7 +77,6 @@ void finishBufferStats(Z3DBlockIdCollectionStats& stats,
 [[nodiscard]] bool setBitIfNew(std::vector<uint64_t>& bits, uint32_t blockId)
 {
   const size_t index = wordIndex(blockId);
-  CHECK_LT(index, bits.size());
   const uint64_t mask = wordMask(blockId);
   uint64_t& word = bits[index];
   const bool isNew = (word & mask) == 0u;
@@ -168,34 +100,6 @@ template<typename LocalBits>
     }
   }
   return addedIds;
-}
-
-std::vector<uint32_t>
-blockIdsFromBitset(std::span<const uint64_t> bits, size_t uniqueBlockIds, Z3DBlockIdSortOrder order)
-{
-  std::vector<uint32_t> out;
-  out.reserve(uniqueBlockIds);
-  if (order == Z3DBlockIdSortOrder::Descending) {
-    for (size_t word = bits.size(); word > 0; --word) {
-      uint64_t wordBits = bits[word - 1];
-      while (wordBits != 0u) {
-        const uint32_t bit = 63u - static_cast<uint32_t>(std::countl_zero(wordBits));
-        out.push_back(static_cast<uint32_t>(((word - 1) << 6u) + bit));
-        wordBits &= ~(uint64_t{1} << bit);
-      }
-    }
-  } else {
-    for (size_t word = 0; word < bits.size(); ++word) {
-      uint64_t wordBits = bits[word];
-      while (wordBits != 0u) {
-        const uint32_t bit = static_cast<uint32_t>(std::countr_zero(wordBits));
-        out.push_back(static_cast<uint32_t>((word << 6u) + bit));
-        wordBits &= wordBits - 1u;
-      }
-    }
-  }
-  CHECK_EQ(out.size(), uniqueBlockIds);
-  return out;
 }
 
 template<typename F>
@@ -233,9 +137,8 @@ public:
 
   void reset(uint32_t maxBlockId)
   {
-    checkMaxBlockId(maxBlockId);
-    m_maxBlockId = maxBlockId;
-    m_wordCount = bitsetWordCount(maxBlockId);
+    CHECK_LT(maxBlockId, kInvalidBlockId) << "Block-ID domain collides with the invalid block-ID sentinel";
+    m_wordCount = std::max<size_t>(1u, (static_cast<size_t>(maxBlockId) + 64u) / 64u);
     m_bits.assign(m_wordCount, 0u);
     m_localBits = std::make_unique<tbb::enumerable_thread_specific<std::vector<uint64_t>>>([wordCount = m_wordCount]() {
       return std::vector<uint64_t>(wordCount, 0u);
@@ -254,8 +157,6 @@ public:
       }
     }
 
-    std::atomic<bool> sawZero{false};
-    std::atomic<bool> sawInvalid{false};
     std::atomic<bool> sawNonZero{false};
 
     tbb::parallel_for(tbb::blocked_range<size_t>(0, blockIds.size()), [&](const tbb::blocked_range<size_t>& range) {
@@ -264,106 +165,53 @@ public:
         local.assign(m_wordCount, 0u);
       }
 
-      BufferScanFlags localFlags;
+      bool localSawNonZero = false;
       for (size_t i = range.begin(); i != range.end(); ++i) {
         const uint32_t blockId = blockIds[i];
-        if (blockId == kZeroBlockId) {
-          localFlags.sawZero = true;
+        if (blockId == 0u) {
           continue;
         }
-        localFlags.sawNonZero = true;
+        localSawNonZero = true;
         if (blockId == kInvalidBlockId) {
-          localFlags.sawInvalid = true;
           continue;
         }
 
-        CHECK_LE(blockId, m_maxBlockId) << "Block-ID shader emitted an ID outside the image block-ID domain";
         local[wordIndex(blockId)] |= wordMask(blockId);
       }
-      recordLocalSentinels(localFlags, sawZero, sawInvalid, sawNonZero);
+      if (localSawNonZero) {
+        sawNonZero.store(true, std::memory_order_relaxed);
+      }
     });
 
     m_stats.uniqueBlockIds += mergeLocalBitsets(m_bits, *m_localBits);
-    finishBufferStats(m_stats,
-                      blockIds.size(),
-                      m_stats.uniqueBlockIds,
-                      loadBufferScanFlags(sawZero, sawInvalid, sawNonZero));
-  }
-
-  [[nodiscard]] std::vector<uint32_t> blockIds(Z3DBlockIdSortOrder order) const
-  {
-    return blockIdsFromBitset(m_bits, m_stats.uniqueBlockIds, order);
-  }
-
-  [[nodiscard]] const Z3DBlockIdCollectionStats& stats() const
-  {
-    return m_stats;
-  }
-
-private:
-  uint32_t m_maxBlockId = 0;
-  size_t m_wordCount = 1;
-  std::vector<uint64_t> m_bits;
-  std::unique_ptr<tbb::enumerable_thread_specific<std::vector<uint64_t>>> m_localBits;
-  Z3DBlockIdCollectionStats m_stats;
-};
-
-class CurrentTbbConcurrentSetCollectorState
-{
-public:
-  explicit CurrentTbbConcurrentSetCollectorState(uint32_t maxBlockId)
-  {
-    reset(maxBlockId);
-  }
-
-  void reset(uint32_t maxBlockId)
-  {
-    m_maxBlockId = maxBlockId;
-    m_ids.clear();
-    m_stats = {};
-  }
-
-  void addBuffer(std::span<const uint32_t> blockIds)
-  {
-    std::atomic<bool> sawZero{false};
-    std::atomic<bool> sawInvalid{false};
-    std::atomic<bool> sawNonZero{false};
-
-    tbb::parallel_for(tbb::blocked_range<size_t>(0, blockIds.size()), [&](const tbb::blocked_range<size_t>& range) {
-      BufferScanFlags localFlags;
-      for (size_t i = range.begin(); i != range.end(); ++i) {
-        const uint32_t id = blockIds[i];
-        if (id == kZeroBlockId) {
-          localFlags.sawZero = true;
-        } else if (id == kInvalidBlockId) {
-          localFlags.sawInvalid = true;
-          localFlags.sawNonZero = true;
-        } else {
-          CHECK_LE(id, m_maxBlockId) << "Block-ID shader emitted an ID outside the image block-ID domain";
-          localFlags.sawNonZero = true;
-        }
-        m_ids.insert(id);
-      }
-      recordLocalSentinels(localFlags, sawZero, sawInvalid, sawNonZero);
-    });
-
-    const BufferScanFlags bufferFlags = loadBufferScanFlags(sawZero, sawInvalid, sawNonZero);
-    const bool sawZeroAfterBuffer = m_stats.sawZero || bufferFlags.sawZero;
-    const bool sawInvalidAfterBuffer = m_stats.sawInvalid || bufferFlags.sawInvalid;
-    const size_t uniqueBlockIds = m_ids.size() - (sawZeroAfterBuffer ? 1u : 0u) - (sawInvalidAfterBuffer ? 1u : 0u);
-    finishBufferStats(m_stats, blockIds.size(), uniqueBlockIds, bufferFlags);
+    ++m_stats.buffersProcessed;
+    m_stats.wordsProcessed += blockIds.size();
+    m_stats.lastBufferAllZero = !sawNonZero.load(std::memory_order_relaxed);
   }
 
   [[nodiscard]] std::vector<uint32_t> blockIds(Z3DBlockIdSortOrder order) const
   {
     std::vector<uint32_t> out;
     out.reserve(m_stats.uniqueBlockIds);
-    for (uint32_t id : m_ids) {
-      if (id != kZeroBlockId && id != kInvalidBlockId) {
-        out.push_back(id);
+    if (order == Z3DBlockIdSortOrder::Descending) {
+      for (size_t word = m_bits.size(); word > 0; --word) {
+        uint64_t wordBits = m_bits[word - 1];
+        while (wordBits != 0u) {
+          const uint32_t bit = 63u - static_cast<uint32_t>(std::countl_zero(wordBits));
+          out.push_back(static_cast<uint32_t>(((word - 1) << 6u) + bit));
+          wordBits &= ~(uint64_t{1} << bit);
+        }
+      }
+    } else {
+      for (size_t word = 0; word < m_bits.size(); ++word) {
+        uint64_t wordBits = m_bits[word];
+        while (wordBits != 0u) {
+          const uint32_t bit = static_cast<uint32_t>(std::countr_zero(wordBits));
+          out.push_back(static_cast<uint32_t>((word << 6u) + bit));
+          wordBits &= wordBits - 1u;
+        }
       }
     }
-    sortBlockIds(out, order);
     CHECK_EQ(out.size(), m_stats.uniqueBlockIds);
     return out;
   }
@@ -374,52 +222,48 @@ public:
   }
 
 private:
-  uint32_t m_maxBlockId = 0;
-  tbb::concurrent_unordered_set<uint32_t> m_ids;
+  size_t m_wordCount = 1;
+  std::vector<uint64_t> m_bits;
+  std::unique_ptr<tbb::enumerable_thread_specific<std::vector<uint64_t>>> m_localBits;
   Z3DBlockIdCollectionStats m_stats;
 };
 
-class FilteredTbbConcurrentSetCollectorState
+class CurrentTbbConcurrentSetCollectorState
 {
 public:
-  explicit FilteredTbbConcurrentSetCollectorState(uint32_t maxBlockId)
+  CurrentTbbConcurrentSetCollectorState()
   {
-    reset(maxBlockId);
+    reset();
   }
 
-  void reset(uint32_t maxBlockId)
+  void reset()
   {
-    m_maxBlockId = maxBlockId;
     m_ids.clear();
     m_stats = {};
   }
 
   void addBuffer(std::span<const uint32_t> blockIds)
   {
-    std::atomic<bool> sawZero{false};
-    std::atomic<bool> sawInvalid{false};
     std::atomic<bool> sawNonZero{false};
 
     tbb::parallel_for(tbb::blocked_range<size_t>(0, blockIds.size()), [&](const tbb::blocked_range<size_t>& range) {
-      BufferScanFlags localFlags;
+      bool localSawNonZero = false;
       for (size_t i = range.begin(); i != range.end(); ++i) {
-        const uint32_t id = blockIds[i];
-        if (id == kZeroBlockId) {
-          localFlags.sawZero = true;
-          continue;
-        }
-        localFlags.sawNonZero = true;
-        if (id == kInvalidBlockId) {
-          localFlags.sawInvalid = true;
-          continue;
-        }
-        CHECK_LE(id, m_maxBlockId) << "Block-ID shader emitted an ID outside the image block-ID domain";
-        m_ids.insert(id);
+        const uint32_t blockId = blockIds[i];
+        localSawNonZero = localSawNonZero || blockId != 0u;
+        m_ids.insert(blockId);
       }
-      recordLocalSentinels(localFlags, sawZero, sawInvalid, sawNonZero);
+      if (localSawNonZero) {
+        sawNonZero.store(true, std::memory_order_relaxed);
+      }
     });
 
-    finishBufferStats(m_stats, blockIds.size(), m_ids.size(), loadBufferScanFlags(sawZero, sawInvalid, sawNonZero));
+    m_ids.unsafe_erase(0u);
+    m_ids.unsafe_erase(kInvalidBlockId);
+    ++m_stats.buffersProcessed;
+    m_stats.wordsProcessed += blockIds.size();
+    m_stats.uniqueBlockIds = m_ids.size();
+    m_stats.lastBufferAllZero = !sawNonZero.load(std::memory_order_relaxed);
   }
 
   [[nodiscard]] std::vector<uint32_t> blockIds(Z3DBlockIdSortOrder order) const
@@ -438,7 +282,68 @@ public:
   }
 
 private:
-  uint32_t m_maxBlockId = 0;
+  tbb::concurrent_unordered_set<uint32_t> m_ids;
+  Z3DBlockIdCollectionStats m_stats;
+};
+
+class FilteredTbbConcurrentSetCollectorState
+{
+public:
+  FilteredTbbConcurrentSetCollectorState()
+  {
+    reset();
+  }
+
+  void reset()
+  {
+    m_ids.clear();
+    m_stats = {};
+  }
+
+  void addBuffer(std::span<const uint32_t> blockIds)
+  {
+    std::atomic<bool> sawNonZero{false};
+
+    tbb::parallel_for(tbb::blocked_range<size_t>(0, blockIds.size()), [&](const tbb::blocked_range<size_t>& range) {
+      bool localSawNonZero = false;
+      for (size_t i = range.begin(); i != range.end(); ++i) {
+        const uint32_t id = blockIds[i];
+        if (id == 0u) {
+          continue;
+        }
+        localSawNonZero = true;
+        if (id == kInvalidBlockId) {
+          continue;
+        }
+        m_ids.insert(id);
+      }
+      if (localSawNonZero) {
+        sawNonZero.store(true, std::memory_order_relaxed);
+      }
+    });
+
+    ++m_stats.buffersProcessed;
+    m_stats.wordsProcessed += blockIds.size();
+    m_stats.uniqueBlockIds = m_ids.size();
+    m_stats.lastBufferAllZero = !sawNonZero.load(std::memory_order_relaxed);
+  }
+
+  [[nodiscard]] std::vector<uint32_t> blockIds(Z3DBlockIdSortOrder order) const
+  {
+    std::vector<uint32_t> out;
+    out.reserve(m_ids.size());
+    out.insert(out.end(), m_ids.begin(), m_ids.end());
+    sortBlockIds(out, order);
+    CHECK_EQ(out.size(), m_stats.uniqueBlockIds);
+    return out;
+  }
+
+  [[nodiscard]] const Z3DBlockIdCollectionStats& stats() const
+  {
+    return m_stats;
+  }
+
+private:
   tbb::concurrent_unordered_set<uint32_t> m_ids;
   Z3DBlockIdCollectionStats m_stats;
 };
@@ -446,44 +351,43 @@ private:
 class BoostConcurrentFlatSetCollectorState
 {
 public:
-  explicit BoostConcurrentFlatSetCollectorState(uint32_t maxBlockId)
+  BoostConcurrentFlatSetCollectorState()
   {
-    reset(maxBlockId);
+    reset();
   }
 
-  void reset(uint32_t maxBlockId)
+  void reset()
   {
-    m_maxBlockId = maxBlockId;
     m_ids.clear();
     m_stats = {};
   }
 
   void addBuffer(std::span<const uint32_t> blockIds)
   {
-    std::atomic<bool> sawZero{false};
-    std::atomic<bool> sawInvalid{false};
     std::atomic<bool> sawNonZero{false};
 
     tbb::parallel_for(tbb::blocked_range<size_t>(0, blockIds.size()), [&](const tbb::blocked_range<size_t>& range) {
-      BufferScanFlags localFlags;
+      bool localSawNonZero = false;
       for (size_t i = range.begin(); i != range.end(); ++i) {
         const uint32_t id = blockIds[i];
-        if (id == kZeroBlockId) {
-          localFlags.sawZero = true;
+        if (id == 0u) {
           continue;
         }
-        localFlags.sawNonZero = true;
+        localSawNonZero = true;
         if (id == kInvalidBlockId) {
-          localFlags.sawInvalid = true;
           continue;
         }
-        CHECK_LE(id, m_maxBlockId) << "Block-ID shader emitted an ID outside the image block-ID domain";
         m_ids.insert(id);
       }
-      recordLocalSentinels(localFlags, sawZero, sawInvalid, sawNonZero);
+      if (localSawNonZero) {
+        sawNonZero.store(true, std::memory_order_relaxed);
+      }
     });
 
-    finishBufferStats(m_stats, blockIds.size(), m_ids.size(), loadBufferScanFlags(sawZero, sawInvalid, sawNonZero));
+    ++m_stats.buffersProcessed;
+    m_stats.wordsProcessed += blockIds.size();
+    m_stats.uniqueBlockIds = m_ids.size();
+    m_stats.lastBufferAllZero = !sawNonZero.load(std::memory_order_relaxed);
   }
 
   [[nodiscard]] std::vector<uint32_t> blockIds(Z3DBlockIdSortOrder order) const
@@ -504,7 +408,6 @@ public:
   }
 
 private:
-  uint32_t m_maxBlockId = 0;
   boost::concurrent_flat_set<uint32_t> m_ids;
   Z3DBlockIdCollectionStats m_stats;
 };
@@ -519,8 +422,8 @@ public:
 
   void reset(uint32_t maxBlockId)
   {
-    m_maxBlockId = maxBlockId;
-    m_seenBits.assign(bitsetWordCount(maxBlockId), 0u);
+    CHECK_LT(maxBlockId, kInvalidBlockId) << "Block-ID domain collides with the invalid block-ID sentinel";
+    m_seenBits.assign(std::max<size_t>(1u, (static_cast<size_t>(maxBlockId) + 64u) / 64u), 0u);
     m_ids.clear();
     m_stats = {};
   }
@@ -532,8 +435,6 @@ public:
     tbb::enumerable_thread_specific<std::vector<uint64_t>> localBits([wordCount]() {
       return std::vector<uint64_t>(wordCount, 0u);
     });
-    std::atomic<bool> sawZero{false};
-    std::atomic<bool> sawInvalid{false};
     std::atomic<bool> sawNonZero{false};
 
     tbb::parallel_for(tbb::blocked_range<size_t>(0, blockIds.size()), [&](const tbb::blocked_range<size_t>& range) {
@@ -541,23 +442,22 @@ public:
       auto& bits = localBits.local();
       CHECK_EQ(bits.size(), wordCount);
 
-      BufferScanFlags localFlags;
+      bool localSawNonZero = false;
       for (size_t i = range.begin(); i != range.end(); ++i) {
         const uint32_t id = blockIds[i];
-        if (id == kZeroBlockId) {
-          localFlags.sawZero = true;
+        if (id == 0u) {
           continue;
         }
-        localFlags.sawNonZero = true;
+        localSawNonZero = true;
         if (id == kInvalidBlockId) {
-          localFlags.sawInvalid = true;
           continue;
         }
-        CHECK_LE(id, m_maxBlockId) << "Block-ID shader emitted an ID outside the image block-ID domain";
         ids.push_back(id);
         bits[wordIndex(id)] |= wordMask(id);
       }
-      recordLocalSentinels(localFlags, sawZero, sawInvalid, sawNonZero);
+      if (localSawNonZero) {
+        sawNonZero.store(true, std::memory_order_relaxed);
+      }
     });
 
     size_t addedWords = 0;
@@ -570,10 +470,9 @@ public:
     }
 
     m_stats.uniqueBlockIds += mergeLocalBitsets(m_seenBits, localBits);
-    finishBufferStats(m_stats,
-                      blockIds.size(),
-                      m_stats.uniqueBlockIds,
-                      loadBufferScanFlags(sawZero, sawInvalid, sawNonZero));
+    ++m_stats.buffersProcessed;
+    m_stats.wordsProcessed += blockIds.size();
+    m_stats.lastBufferAllZero = !sawNonZero.load(std::memory_order_relaxed);
   }
 
   [[nodiscard]] std::vector<uint32_t> blockIds(Z3DBlockIdSortOrder order) const
@@ -594,7 +493,6 @@ public:
   }
 
 private:
-  uint32_t m_maxBlockId = 0;
   std::vector<uint32_t> m_ids;
   std::vector<uint64_t> m_seenBits;
   Z3DBlockIdCollectionStats m_stats;
@@ -604,14 +502,13 @@ template<typename Set>
 class ThreadLocalHashSetMergeCollectorState
 {
 public:
-  explicit ThreadLocalHashSetMergeCollectorState(uint32_t maxBlockId)
+  ThreadLocalHashSetMergeCollectorState()
   {
-    reset(maxBlockId);
+    reset();
   }
 
-  void reset(uint32_t maxBlockId)
+  void reset()
   {
-    m_maxBlockId = maxBlockId;
     m_ids.clear();
     m_stats = {};
   }
@@ -619,29 +516,26 @@ public:
   void addBuffer(std::span<const uint32_t> blockIds)
   {
     tbb::enumerable_thread_specific<Set> localIds;
-    std::atomic<bool> sawZero{false};
-    std::atomic<bool> sawInvalid{false};
     std::atomic<bool> sawNonZero{false};
 
     tbb::parallel_for(tbb::blocked_range<size_t>(0, blockIds.size()), [&](const tbb::blocked_range<size_t>& range) {
       auto& ids = localIds.local();
 
-      BufferScanFlags localFlags;
+      bool localSawNonZero = false;
       for (size_t i = range.begin(); i != range.end(); ++i) {
         const uint32_t id = blockIds[i];
-        if (id == kZeroBlockId) {
-          localFlags.sawZero = true;
+        if (id == 0u) {
           continue;
         }
-        localFlags.sawNonZero = true;
+        localSawNonZero = true;
         if (id == kInvalidBlockId) {
-          localFlags.sawInvalid = true;
           continue;
         }
-        CHECK_LE(id, m_maxBlockId) << "Block-ID shader emitted an ID outside the image block-ID domain";
         ids.insert(id);
       }
-      recordLocalSentinels(localFlags, sawZero, sawInvalid, sawNonZero);
+      if (localSawNonZero) {
+        sawNonZero.store(true, std::memory_order_relaxed);
+      }
     });
 
     size_t totalLocalUnique = 0;
@@ -653,7 +547,10 @@ public:
       m_ids.insert(ids.begin(), ids.end());
     }
 
-    finishBufferStats(m_stats, blockIds.size(), m_ids.size(), loadBufferScanFlags(sawZero, sawInvalid, sawNonZero));
+    ++m_stats.buffersProcessed;
+    m_stats.wordsProcessed += blockIds.size();
+    m_stats.uniqueBlockIds = m_ids.size();
+    m_stats.lastBufferAllZero = !sawNonZero.load(std::memory_order_relaxed);
   }
 
   [[nodiscard]] std::vector<uint32_t> blockIds(Z3DBlockIdSortOrder order) const
@@ -672,7 +569,6 @@ public:
   }
 
 private:
-  uint32_t m_maxBlockId = 0;
   Set m_ids;
   Z3DBlockIdCollectionStats m_stats;
 };
@@ -687,27 +583,24 @@ public:
 
   void reset(uint32_t maxBlockId)
   {
-    m_maxBlockId = maxBlockId;
-    m_seenBits.assign(bitsetWordCount(maxBlockId), 0u);
+    CHECK_LT(maxBlockId, kInvalidBlockId) << "Block-ID domain collides with the invalid block-ID sentinel";
+    m_seenBits.assign(std::max<size_t>(1u, (static_cast<size_t>(maxBlockId) + 64u) / 64u), 0u);
     m_ids.clear();
     m_stats = {};
   }
 
   void addBuffer(std::span<const uint32_t> blockIds)
   {
-    BufferScanFlags bufferFlags;
+    bool sawNonZero = false;
     size_t addedIds = 0;
     for (const uint32_t id : blockIds) {
-      if (id == kZeroBlockId) {
-        bufferFlags.sawZero = true;
+      if (id == 0u) {
         continue;
       }
-      bufferFlags.sawNonZero = true;
+      sawNonZero = true;
       if (id == kInvalidBlockId) {
-        bufferFlags.sawInvalid = true;
         continue;
       }
-      CHECK_LE(id, m_maxBlockId) << "Block-ID shader emitted an ID outside the image block-ID domain";
       m_ids.push_back(id);
       if (setBitIfNew(m_seenBits, id)) {
         ++addedIds;
@@ -715,13 +608,19 @@ public:
     }
 
     m_stats.uniqueBlockIds += addedIds;
-    finishBufferStats(m_stats, blockIds.size(), m_stats.uniqueBlockIds, bufferFlags);
+    ++m_stats.buffersProcessed;
+    m_stats.wordsProcessed += blockIds.size();
+    m_stats.lastBufferAllZero = !sawNonZero;
   }
 
   [[nodiscard]] std::vector<uint32_t> blockIds(Z3DBlockIdSortOrder order) const
   {
     std::vector<uint32_t> out = m_ids;
-    sortAndUniqueBlockIds(out, order);
+    boost::sort::spreadsort::integer_sort(out.begin(), out.end());
+    out.erase(std::unique(out.begin(), out.end()), out.end());
+    if (order == Z3DBlockIdSortOrder::Descending) {
+      std::reverse(out.begin(), out.end());
+    }
     CHECK_EQ(out.size(), m_stats.uniqueBlockIds);
     return out;
   }
@@ -732,7 +631,6 @@ public:
   }
 
 private:
-  uint32_t m_maxBlockId = 0;
   std::vector<uint32_t> m_ids;
   std::vector<uint64_t> m_seenBits;
   Z3DBlockIdCollectionStats m_stats;
@@ -744,12 +642,20 @@ template<typename State>
 std::vector<uint32_t>
 collectWithState(const Z3DBlockIdBufferList& buffers, uint32_t maxBlockId, Z3DBlockIdSortOrder order)
 {
-  checkMaxBlockId(maxBlockId);
-  State state(maxBlockId);
-  for (const auto& buffer : buffers) {
-    state.addBuffer(buffer);
+  CHECK_LT(maxBlockId, kInvalidBlockId) << "Block-ID domain collides with the invalid block-ID sentinel";
+  if constexpr (std::is_constructible_v<State, uint32_t>) {
+    State state(maxBlockId);
+    for (const auto& buffer : buffers) {
+      state.addBuffer(buffer);
+    }
+    return state.blockIds(order);
+  } else {
+    State state;
+    for (const auto& buffer : buffers) {
+      state.addBuffer(buffer);
+    }
+    return state.blockIds(order);
   }
-  return state.blockIds(order);
 }
 
 std::vector<uint32_t> collectWithMethodState(const Z3DBlockIdBufferList& buffers,
@@ -873,7 +779,7 @@ Z3DBlockIdCollector::~Z3DBlockIdCollector() = default;
 
 void Z3DBlockIdCollector::reset(uint32_t maxBlockId)
 {
-  checkMaxBlockId(maxBlockId);
+  CHECK_LT(maxBlockId, kInvalidBlockId) << "Block-ID domain collides with the invalid block-ID sentinel";
   m_maxBlockId = maxBlockId;
   m_state = std::make_unique<State>(maxBlockId);
   m_recordBenchmarkBuffers = shouldBenchmarkZ3DBlockIdCollectors();

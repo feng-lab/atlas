@@ -2403,7 +2403,7 @@ bool Z3DImgRaycasterRenderer::render3DImageForOneRound(Z3DEye eye,
   maybeCancelFirstProgressiveRound();
   maybeCancel(cancellationToken);
 
-  bool lastRound = blockIdCollector.stats().uniqueIdsIncludingSentinels == 1u && blockIdCollector.stats().sawZero;
+  bool lastRound = blockIdCollector.stats().lastBufferAllZero;
   if (lastRound) {
     LOG(INFO) << "no (non-empty) blocks to render";
     if (shouldBenchmarkZ3DBlockIdCollectors()) {
@@ -2417,10 +2417,10 @@ bool Z3DImgRaycasterRenderer::render3DImageForOneRound(Z3DEye eye,
     bt.recordEvent("collect blockids");
   } else {
     // need to upload some image blocks to GPU
-    bool hasEnoughMissingIDs = blockIdCollector.stats().uniqueIdsIncludingSentinels > m_img->numCachedImages(c);
+    bool hasEnoughMissingIDs = blockIdCollector.stats().uniqueBlockIds >= m_img->numCachedImages(c);
 
     for (auto att = 1u; !hasEnoughMissingIDs && !lastRound && att < effectiveAttachments; ++att) {
-      auto numberBlock = blockIdCollector.stats().uniqueIdsIncludingSentinels;
+      auto numberBlock = blockIdCollector.stats().uniqueBlockIds;
       maybeCancelFirstProgressiveRound();
       blockLease.renderTarget->attachment(drawBuffers[att])
         ->downloadTextureToBuffer(GL_RGBA_INTEGER, GL_UNSIGNED_INT, m_blockIDs.data());
@@ -2428,9 +2428,9 @@ bool Z3DImgRaycasterRenderer::render3DImageForOneRound(Z3DEye eye,
 
       blockIdCollector.addBuffer(std::span<const uint32_t>(m_blockIDs.data(), m_blockIDs.size()));
 
-      hasEnoughMissingIDs = blockIdCollector.stats().uniqueIdsIncludingSentinels > m_img->numCachedImages(c);
+      hasEnoughMissingIDs = blockIdCollector.stats().uniqueBlockIds >= m_img->numCachedImages(c);
 
-      lastRound = !hasEnoughMissingIDs && numberBlock == blockIdCollector.stats().uniqueIdsIncludingSentinels;
+      lastRound = !hasEnoughMissingIDs && numberBlock == blockIdCollector.stats().uniqueBlockIds;
       if (lastRound) { // confirm
         lastRound = blockIdCollector.stats().lastBufferAllZero;
       }
@@ -2444,9 +2444,6 @@ bool Z3DImgRaycasterRenderer::render3DImageForOneRound(Z3DEye eye,
 
     std::vector<uint32_t> missingBlockIDs;
 
-    if (blockIdCollector.stats().sawInvalid) {
-      VLOG(1) << "use last block";
-    }
     Z3DBlockIdSortOrder blockIdOrder = Z3DBlockIdSortOrder::Ascending;
     if ((round % 2 == 1) && hasEnoughMissingIDs) {
       blockIdOrder = Z3DBlockIdSortOrder::Descending;

@@ -22,9 +22,6 @@ struct Z3DBlockIdCollectionStats
   size_t buffersProcessed = 0;
   size_t wordsProcessed = 0;
   size_t uniqueBlockIds = 0;
-  size_t uniqueIdsIncludingSentinels = 0;
-  bool sawZero = false;
-  bool sawInvalid = false;
   bool lastBufferAllZero = true;
 };
 
