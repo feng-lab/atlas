@@ -1,8 +1,6 @@
 #pragma once
 
 #include "zimg.h"
-// #include "zthreadsafescalablecache.h"
-// #include "zhashutils.h"
 #include "zconcurrentlrucache.h"
 
 #include <array>
@@ -37,10 +35,6 @@ using ImageRegionCacheHashKeyType = std::tuple<std::array<uint8_t, 32>,
                                                uint32_t,
                                                double,
                                                double>;
-
-// using ZParentImgRegionCache = ZThreadSafeScalableCache<ImageRegionCacheHashKeyType,
-//                                                        std::shared_ptr<ZImg>,
-//                                                        ZHashCompare<ImageRegionCacheHashKeyType>>;
 
 using ZParentImgRegionCache = ZConcurrentLRUCache<ImageRegionCacheHashKeyType, std::shared_ptr<ZImg>>;
 

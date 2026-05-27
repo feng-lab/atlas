@@ -2,6 +2,7 @@
 
 #include "zbioformatsbridgeclient.h"
 #include "zcpuinfo.h"
+#include "zconcurrentlrucache.h"
 #include "zimgbioformats.h"
 #include "zimginit.h"
 #include "zimgregion.h"
@@ -20,6 +21,7 @@
 #include <QReadWriteLock>
 #include <QString>
 #include <algorithm>
+#include <atomic>
 #include <array>
 #include <chrono>
 #include <cmath>
@@ -29,6 +31,7 @@
 #include <limits>
 #include <mutex>
 #include <optional>
+#include <random>
 #include <stdexcept>
 #include <string>
 #include <thread>
@@ -331,6 +334,90 @@ static void addLockBench()
   BENCHMARK(BM_QReadWriteLock)->Range(8, 8 << 12);
   BENCHMARK(BM_QMutex)->Range(8, 8 << 12);
   BENCHMARK(BM_stdMutex)->Range(8, 8 << 12);
+}
+
+constexpr int kCacheBenchmarkOperationsPerThread = 1000000;
+constexpr int kCacheBenchmarkKeyRange = 100000;
+constexpr size_t kCacheBenchmarkMaxSize = 1000000;
+
+int cacheBenchmarkThreadCount()
+{
+  const unsigned int hardwareThreads = std::thread::hardware_concurrency();
+  if (hardwareThreads == 0) {
+    return 4;
+  }
+  return static_cast<int>(hardwareThreads);
+}
+
+static void BM_ConcurrentLRUCacheMixed(benchmark::State& state)
+{
+  const size_t numSegments = static_cast<size_t>(state.range(0));
+  const int threadCount = static_cast<int>(state.range(1));
+  const int64_t operationsPerRun = static_cast<int64_t>(threadCount) * kCacheBenchmarkOperationsPerThread;
+  int64_t totalHits = 0;
+
+  for (auto _ : state) {
+    ZConcurrentLRUCache<int, int> cache(kCacheBenchmarkMaxSize, numSegments);
+    std::atomic<int> hits{0};
+    std::vector<std::thread> threads;
+    threads.reserve(threadCount);
+
+    for (int threadId = 0; threadId < threadCount; ++threadId) {
+      threads.emplace_back([&cache, &hits, threadId]() {
+        std::mt19937 rng(threadId);
+        std::uniform_int_distribution<int> opDist(0, 2);
+        std::uniform_int_distribution<int> keyDist(0, kCacheBenchmarkKeyRange - 1);
+
+        for (int i = 0; i < kCacheBenchmarkOperationsPerThread; ++i) {
+          const int key = keyDist(rng);
+          const int value = key * 10;
+          switch (opDist(rng)) {
+            case 0:
+              cache.insert(key, value, sizeof(value));
+              break;
+            case 1:
+              if (const auto result = cache.find(key, ZConcurrentLRUCache<int, int>::FindStrategy::MaybeUpdateLRUList);
+                  result.has_value()) {
+                ++hits;
+                int foundValue = result.value();
+                benchmark::DoNotOptimize(foundValue);
+              }
+              break;
+            case 2:
+              cache.remove(key);
+              break;
+            default:
+              break;
+          }
+        }
+      });
+    }
+
+    for (auto& thread : threads) {
+      thread.join();
+    }
+    totalHits += hits.load(std::memory_order_relaxed);
+    benchmark::DoNotOptimize(cache.size());
+  }
+
+  state.SetItemsProcessed(state.iterations() * operationsPerRun);
+  state.counters["hits_per_run"] = static_cast<double>(totalHits) / state.iterations();
+  state.counters["ops_per_run"] = static_cast<double>(operationsPerRun);
+  state.counters["segments"] = static_cast<double>(numSegments);
+  state.counters["threads"] = static_cast<double>(threadCount);
+}
+
+static void addConcurrentLRUCacheBench()
+{
+  const int threadCount = cacheBenchmarkThreadCount();
+  BENCHMARK(BM_ConcurrentLRUCacheMixed)
+    ->Args({0, threadCount})
+    ->Args({8, threadCount})
+    ->Args({16, threadCount})
+    ->Args({32, threadCount})
+    ->Args({64, threadCount})
+    ->UseRealTime()
+    ->ArgNames({"segments", "threads"});
 }
 
 constexpr int kBioFormatsBenchmarkIoTimeoutMs = 10 * 60 * 1000;
@@ -731,6 +818,7 @@ int main(int argc, char* argv[])
   addSaturateMulBench();
   addVectorLoopBench();
   addLockBench();
+  addConcurrentLRUCacheBench();
   addBioFormatsBench();
 
   benchmark::Initialize(&argc, argv);

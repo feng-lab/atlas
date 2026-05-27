@@ -5,9 +5,7 @@
 // if it happens you have to convert the ambiguous type (e.g. size_t can be long or long long) into one of
 // the sized type to make the overload work
 
-#ifndef __GNUG__ // not clang or gcc
-#include <boost/multiprecision/cpp_int.hpp>
-#endif
+#include "zint128.h"
 
 #include <cmath>
 #include <cstdint>
@@ -699,32 +697,11 @@ inline uint32_t saturate_mul(uint32_t x, uint32_t y)
   return (-(res >> 32 != 0)) | static_cast<uint32_t>(res);
 }
 
-#ifdef __GNUG__ // clang or gcc
-
 inline uint64_t saturate_mul(uint64_t x, uint64_t y)
 {
-  __uint128_t res = static_cast<__uint128_t>(x) * static_cast<__uint128_t>(y);
-  return (-(res >> 64 != 0)) | static_cast<uint64_t>(res);
+  detail::uint128 res = static_cast<detail::uint128>(x) * static_cast<detail::uint128>(y);
+  return (-((res >> 64) != 0)) | static_cast<uint64_t>(res);
 }
-
-#else
-inline uint64_t saturate_mul(uint64_t x, uint64_t y)
-{
-#if 1
-  boost::multiprecision::uint128_t res =
-    static_cast<boost::multiprecision::uint128_t>(x) * static_cast<boost::multiprecision::uint128_t>(y);
-  return (-int64_t((res >> 64) != 0)) | static_cast<uint64_t>(res);
-#else
-  if (x == 0 || y == 0) {
-    return 0;
-  }
-  if (UINT64_MAX / x < y) {
-    return UINT64_MAX;
-  }
-  return x * y;
-#endif
-}
-#endif // __GNUG__
 
 inline int8_t saturate_mul(int8_t x, int8_t y)
 {
@@ -763,49 +740,18 @@ inline int32_t saturate_mul(int32_t x, int32_t y)
   return res;
 }
 
-#ifdef __GNUG__ // clang or gcc
-
 inline int64_t saturate_mul(int64_t x, int64_t y)
 {
-  static_assert((static_cast<__int128_t>(-1) >> 1) == static_cast<__int128_t>(-1), "need arithmetic right shift.");
+  static_assert((static_cast<detail::int128>(-1) >> 1) == static_cast<detail::int128>(-1),
+                "need arithmetic right shift.");
   static_assert((static_cast<int64_t>(-1) >> 1) == static_cast<int64_t>(-1), "need arithmetic right shift.");
 
-  __int128_t res = static_cast<__int128_t>(x) * static_cast<__int128_t>(y);
+  detail::int128 res = static_cast<detail::int128>(x) * static_cast<detail::int128>(y);
   if (static_cast<int64_t>(res >> 64) != (static_cast<int64_t>(res) >> 63)) {
     res = (static_cast<uint64_t>(x ^ y) >> 63) + INT64_MAX;
   }
-  return res;
+  return static_cast<int64_t>(res);
 }
-
-#else
-inline int64_t saturate_mul(int64_t x, int64_t y)
-{
-#if 1
-  boost::multiprecision::int128_t res =
-    static_cast<boost::multiprecision::int128_t>(x) * static_cast<boost::multiprecision::int128_t>(y);
-  return res <= static_cast<boost::multiprecision::int128_t>(INT64_MIN)   ? INT64_MIN
-         : res >= static_cast<boost::multiprecision::int128_t>(INT64_MAX) ? INT64_MAX
-                                                                          : static_cast<int64_t>(res);
-#else
-  static_assert(-std::numeric_limits<int64_t>::max() > std::numeric_limits<int64_t>::min(),
-                "integer representation is not two's complement");
-  if (x == 0 || y == 0) {
-    return 0;
-  }
-  if (x > 0 && y < 0) {
-    return -static_cast<int64_t>(std::min(static_cast<uint64_t>(INT64_MAX) + 1,
-                                          saturate_mul(static_cast<uint64_t>(x), static_cast<uint64_t>(-y))));
-  } else if (x < 0 && y > 0) {
-    return -static_cast<int64_t>(std::min(static_cast<uint64_t>(INT64_MAX) + 1,
-                                          saturate_mul(static_cast<uint64_t>(-x), static_cast<uint64_t>(y))));
-  } else if (x > 0) {
-    return std::min<uint64_t>(INT64_MAX, saturate_mul(static_cast<uint64_t>(x), static_cast<uint64_t>(y)));
-  } else {
-    return std::min<uint64_t>(INT64_MAX, saturate_mul(static_cast<uint64_t>(-x), static_cast<uint64_t>(-y)));
-  }
-#endif
-}
-#endif // __GNUG__
 
 inline uint64_t saturate_mul(uint64_t x, int64_t y)
 {

@@ -92,6 +92,7 @@ set(IMG_SOURCES
         zimgregion.h zimgregion.cpp
         zimgsliceprovider.h zimgsliceprovider.cpp
         zimgtiff.h zimgtiff.cpp
+        zint128.h
         zimgv3draw.h zimgv3draw.cpp
         zimgzeissczi.h zimgzeissczi.cpp
         zimgzeisslsm.h zimgzeisslsm.cpp
@@ -487,6 +488,7 @@ target_link_libraries(${LIBRARY_NAME} PUBLIC ${ITK_LIBRARIES} ${JPEGTURBO_LIBRAR
         png_static ${JPEGXR_LIBRARIES} cpuinfo::cpuinfo
         hdf5_cpp-static hdf5-static Ceres::ceres Folly::folly Eigen3::Eigen
         Boost::headers Boost::charconv
+        absl::bits absl::int128
         absl::flags_parse absl::flags_reflection absl::flags_usage
         absl::check absl::failure_signal_handler absl::log absl::log_globals
         absl::log_initialize absl::log_sink absl::log_sink_registry absl::symbolize

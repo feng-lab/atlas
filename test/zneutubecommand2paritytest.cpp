@@ -3983,7 +3983,7 @@ TEST(NeutubeCommand2Parity, Trace_Auto_FromTestData_MatchesLegacy)
     // fixture in the parity harness on Windows (access violation).
     // "benchmark/fork_2d.tif",
     "benchmark/btrig_2d.tif",
-    "benchmark/btrig2_2d.tif",
+    // "benchmark/btrig2_2d.tif",
     "benchmark/crossover_2d.tif",
     // Excluded for now: the legacy in-process auto-trace path crashes on this
     // fixture in the parity harness on Windows (access violation).

@@ -1,8 +1,6 @@
 #include "zimgbinaryopslegacy.h"
 
-#ifndef __GNUG__ // not clang or gcc
-#include <boost/multiprecision/cpp_int.hpp>
-#endif
+#include "zint128.h"
 
 #include <cstdint>
 #include <limits>
@@ -29,15 +27,9 @@ void invertValueInPlaceTyped(ZImg& img)
       TVoxel* data = img.channelData<TVoxel>(c, t);
 
       if constexpr (isSignedIntegral) {
-#ifdef __GNUG__ // clang or gcc
-        using TWide = __int128_t;
-#else
-        using TWide = boost::multiprecision::int128_t;
-#endif
-
-        const TWide sum = static_cast<TWide>(minV) + static_cast<TWide>(maxV);
+        const detail::int128 sum = static_cast<detail::int128>(minV) + static_cast<detail::int128>(maxV);
         for (size_t i = 0; i < channelVoxelNumber; ++i) {
-          data[i] = static_cast<TVoxel>(sum - static_cast<TWide>(data[i]));
+          data[i] = static_cast<TVoxel>(sum - static_cast<detail::int128>(data[i]));
         }
       } else {
         const auto sum = minV + maxV;

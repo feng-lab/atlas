@@ -821,7 +821,6 @@ set(SOURCES
     zroipack.cpp zroipack.h
     zregionannotationpack.cpp zregionannotationpack.h
     zswccolorparameters.cpp zswccolorparameters.h
-    zthreadsafelrucache.h zthreadsafescalablecache.h
     zimgdiskcacheentry.cpp zimgdiskcacheentry.h
     zimgregioncache.cpp zimgregioncache.h
     zimgpreviewdiskcache.cpp zimgpreviewdiskcache.h

@@ -21,7 +21,7 @@
 
 #if __cplusplus < 202302L
 
-#include <boost/endian/conversion.hpp>
+#include <absl/numeric/bits.h>
 
 namespace std {
 
@@ -74,7 +74,7 @@ template<class T, class U>
 template<class T>
 constexpr T byteswap(T n) noexcept
 {
-  return boost::endian::endian_reverse(n);
+  return absl::byteswap(n);
 }
 
 } // namespace std
