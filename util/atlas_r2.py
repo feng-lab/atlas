@@ -71,6 +71,8 @@ _RETRYABLE_HTTP_STATUS_CODES: Final[frozenset[int]] = frozenset(
     {429, 500, 502, 503, 504}
 )
 _BYTE_PRESERVED_CONTENT_TYPE_BY_SUFFIX: Final[tuple[tuple[str, str], ...]] = (
+    (".zip", "application/zip"),
+    (".7z", "application/x-7z-compressed"),
     (".tar.gz", "application/gzip"),
     (".tgz", "application/gzip"),
     (".gz", "application/gzip"),
@@ -337,9 +339,9 @@ def _upload_extra_args(local_path: Path, *, expected_sha256: str) -> dict:
 
 
 def _guess_upload_content_type(local_path: Path) -> Optional[str]:
-    # The mimetypes module reports .tar.gz as ("application/x-tar", "gzip").
-    # In this repository those suffixes are archive bytes, not HTTP transfer
-    # encodings, so publish them without Content-Encoding.
+    # Keep archive metadata deterministic across host OS MIME databases. These
+    # suffixes are archive bytes, not HTTP transfer encodings, so publish them
+    # without Content-Encoding.
     path = local_path.as_posix()
     path_lower = path.lower()
     for suffix, content_type in _BYTE_PRESERVED_CONTENT_TYPE_BY_SUFFIX:
