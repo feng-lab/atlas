@@ -2085,20 +2085,26 @@ def pack_atlas_package():
     if common_dirs.is_mac():
         app_name = "Atlas.app"
         suffix = "macOS"
+        artifact_suffix = "macOS-universal"
     elif common_dirs.is_linux():
         app_name = "Atlas.AppDir"
         suffix = "Linux"
+        artifact_suffix = suffix
     else:
         app_name = "Atlas"
         suffix = "Windows"
+        artifact_suffix = suffix
 
-    zip_name = f"atlas-{suffix}-{version_token}.zip"
+    zip_name = f"atlas-{artifact_suffix}-{version_token}.zip"
 
-    # Remove any previous atlas-{suffix}-*.zip to keep deploy dir tidy
+    # Also remove the legacy macOS filename so self-hosted release jobs do not
+    # upload stale archives beside the renamed universal package.
     deploy_dir = common_dirs.deploy_target_dir()
     try:
         for fname in os.listdir(deploy_dir):
-            if fname.startswith(f"atlas-{suffix}-") and fname.endswith(".zip"):
+            is_current_name = fname.startswith(f"atlas-{artifact_suffix}-")
+            is_legacy_name = fname.startswith(f"atlas-{suffix}-")
+            if (is_current_name or is_legacy_name) and fname.endswith(".zip"):
                 try:
                     os.remove(os.path.join(deploy_dir, fname))
                 except Exception:
@@ -2126,31 +2132,34 @@ def build_atlas_installer():
 
     if common_dirs.is_mac():
         suffix = "macOS"
+        artifact_suffix = "macOS-universal"
         app_name = "Atlas.app"
         repo_package_name = "atlas.7z"
         mt_app_name = "MaintenanceTool.app"
         mt_repo_package_name = "MaintenanceTool.7z"
         installer_base_name = "AtlasInstaller"
         installer_app_name = "AtlasInstaller.app"
-        installer_zip_name = f"AtlasInstaller-{suffix}.zip"
+        installer_zip_name = f"AtlasInstaller-{artifact_suffix}.zip"
     elif common_dirs.is_linux():
         suffix = "Linux"
+        artifact_suffix = suffix
         app_name = "Atlas.AppDir"
         repo_package_name = "atlas.7z"
         mt_app_name = ".tempMaintenanceTool"
         mt_repo_package_name = "MaintenanceTool.7z"
         installer_base_name = "AtlasInstaller"
         installer_app_name = "AtlasInstaller"
-        installer_zip_name = f"AtlasInstaller-{suffix}.zip"
+        installer_zip_name = f"AtlasInstaller-{artifact_suffix}.zip"
     else:
         suffix = "Windows"
+        artifact_suffix = suffix
         app_name = "Atlas"
         repo_package_name = "atlas.7z"
         mt_app_name = "tempMaintenanceTool.exe"
         mt_repo_package_name = "MaintenanceTool.7z"
         installer_base_name = "AtlasInstaller"
         installer_app_name = "AtlasInstaller.exe"
-        installer_zip_name = f"AtlasInstaller-{suffix}.zip"
+        installer_zip_name = f"AtlasInstaller-{artifact_suffix}.zip"
 
     generated_ifw_config_path = _render_ifw_config_for_suffix(suffix)
 
@@ -2159,10 +2168,10 @@ def build_atlas_installer():
     shutil.rmtree(
         os.path.join(common_dirs.deploy_target_dir(), suffix), ignore_errors=True
     )
-    if os.path.exists(
-        os.path.join(common_dirs.deploy_target_dir(), installer_zip_name)
-    ):
-        os.remove(os.path.join(common_dirs.deploy_target_dir(), installer_zip_name))
+    for zip_name in {installer_zip_name, f"AtlasInstaller-{suffix}.zip"}:
+        zip_path = os.path.join(common_dirs.deploy_target_dir(), zip_name)
+        if os.path.exists(zip_path):
+            os.remove(zip_path)
 
     if common_dirs.is_mac():
         shutil.rmtree(

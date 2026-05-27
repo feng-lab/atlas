@@ -333,7 +333,8 @@ def _publish_ifw_to_r2_target(*, os_name: str, dry_run: bool, r2_target: str) ->
         dry_run=dry_run,
     )
 
-    installer_name = f"AtlasInstaller-{os_name}.zip"
+    artifact_os_name = "macOS-universal" if os_name == "macOS" else os_name
+    installer_name = f"AtlasInstaller-{artifact_os_name}.zip"
     installer_path = deploy_dir / installer_name
     installer_object_key = atlas_r2.build_static_object_key(
         config, "installers", installer_name
