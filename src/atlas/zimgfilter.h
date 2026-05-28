@@ -8,7 +8,8 @@
 #include "zstringparameter.h"
 #include "zgraphicsitemtype.h"
 #include "zgraphicsitemgroup.h"
-#include <folly/coro/Task.h>
+#include "zfolly.h"
+
 #include <QGraphicsPixmapItem>
 #include <QGraphicsSimpleTextItem>
 #include <QPen>

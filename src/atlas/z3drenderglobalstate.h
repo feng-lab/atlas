@@ -1,10 +1,10 @@
 #pragma once
 
 #include "z3drendererstates.h"
+#include "zfolly.h"
 
 #include <chrono>
 #include <cstdint>
-#include <folly/CancellationToken.h>
 #include <memory>
 #include <mutex>
 

@@ -2,8 +2,8 @@
 
 #include "zhttpclient.h"
 #include "zlog.h"
+#include "zfolly.h"
 
-#include <folly/io/async/ScopedEventBaseThread.h>
 #include <proxygen/lib/http/coro/client/HTTPClientConnectionCache.h>
 
 #include <chrono>

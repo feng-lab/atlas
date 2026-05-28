@@ -2,9 +2,9 @@
 
 #include "zcpuinfo.h"
 #include "zglobal.h"
+#include "zfolly.h"
 
 #include <cstddef>
-#include <folly/CancellationToken.h>
 #include <functional>
 #include <map>
 #include <memory>

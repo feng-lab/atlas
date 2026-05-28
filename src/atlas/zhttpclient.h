@@ -1,6 +1,6 @@
 #pragma once
 
-#include <folly/coro/Task.h>
+#include "zfolly.h"
 
 #include <chrono>
 #include <compare>

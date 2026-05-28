@@ -4,10 +4,10 @@
 
 #include "zimg.h"
 #include "zswc.h"
+#include "zfolly.h"
 
 #include <array>
 #include <cstddef>
-#include <folly/CancellationToken.h>
 #include <memory>
 
 namespace nim {

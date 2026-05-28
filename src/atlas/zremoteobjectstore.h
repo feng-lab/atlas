@@ -1,8 +1,7 @@
 #pragma once
 
 #include "zhttpclient.h"
-
-#include <folly/coro/Task.h>
+#include "zfolly.h"
 
 #include <chrono>
 #include <memory>

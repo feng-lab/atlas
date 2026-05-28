@@ -1,7 +1,8 @@
 #pragma once
 
 #include "zjson.h"
-#include <folly/Executor.h>
+#include "zfolly.h"
+
 #include <QObject>
 #include <QUndoGroup>
 #include <memory>

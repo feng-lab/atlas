@@ -1,13 +1,13 @@
 #pragma once
 
+#include "zfolly.h"
+
 #include <QString>
 
 #include <atomic>
 #include <cstdint>
 #include <optional>
 #include <span>
-
-#include <folly/ThreadLocal.h>
 
 #include "zsqlitelrucache.h"
 

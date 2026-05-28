@@ -1,6 +1,6 @@
 #pragma once
 
-#include <folly/Executor.h>
+#include "zfolly.h"
 
 #include <QPointer>
 

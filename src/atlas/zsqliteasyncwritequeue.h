@@ -1,12 +1,9 @@
 #pragma once
 
 #include "zlog.h"
+#include "zfolly.h"
 
 #include <QString>
-
-#include <folly/Function.h>
-#include <folly/executors/CPUThreadPoolExecutor.h>
-#include <folly/executors/thread_factory/NamedThreadFactory.h>
 
 #include <atomic>
 #include <chrono>

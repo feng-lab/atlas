@@ -2,6 +2,8 @@
 
 #include <memory>
 
+#define ATLAS_ALLOW_GLOG_LOGGING_H
+
 #ifndef GLOG_NO_ABBREVIATED_SEVERITIES
 #define GLOG_NO_ABBREVIATED_SEVERITIES
 #endif
@@ -15,8 +17,16 @@
 #ifdef CHECK
 #undef CHECK
 #endif
+#ifdef CHECK_NOTNULL
+#undef CHECK_NOTNULL
+#endif
+#ifdef DCHECK_NOTNULL
+#undef DCHECK_NOTNULL
+#endif
 
 #include "zlog.h"
+
+#undef ATLAS_ALLOW_GLOG_LOGGING_H
 
 namespace nim {
 namespace {

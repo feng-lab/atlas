@@ -4,8 +4,7 @@
 #include "zimgprocess.h"
 #include "zswc.h"
 #include "zneutubetraceconfig.h"
-
-#include <folly/CancellationToken.h>
+#include "zfolly.h"
 
 #include <array>
 #include <cmath>

@@ -2,12 +2,7 @@
 
 #include "zexception.h"
 #include "zlog.h"
-
-#include <folly/Executor.h>
-#include <folly/Function.h>
-#include <folly/OperationCancelled.h>
-#include <folly/coro/Collect.h>
-#include <folly/coro/Task.h>
+#include "zfolly.h"
 
 #include <exception>
 #include <limits>

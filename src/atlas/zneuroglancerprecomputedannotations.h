@@ -3,9 +3,7 @@
 #include "zneuroglancerprecomputed.h"
 
 #include "zglmutils.h"
-
-#include <folly/coro/AsyncGenerator.h>
-#include <folly/coro/Task.h>
+#include "zfolly.h"
 
 #include <QUrl>
 

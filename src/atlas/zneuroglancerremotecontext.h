@@ -2,8 +2,7 @@
 
 #include "zremoteobjectreader.h"
 #include "zremoteobjectstore.h"
-
-#include <folly/coro/Task.h>
+#include "zfolly.h"
 
 #include <chrono>
 #include <cstdint>

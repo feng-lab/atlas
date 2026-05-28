@@ -1,5 +1,7 @@
 #pragma once
 
+#include "zfolly.h"
+
 #include <QObject>
 #include <QTimer>
 
@@ -9,11 +11,6 @@
 #include <optional>
 #include <string_view>
 #include <vector>
-
-#include <folly/Executor.h>
-#include <folly/CancellationToken.h>
-#include <folly/coro/AsyncScope.h>
-#include <folly/coro/Task.h>
 
 namespace nim {
 

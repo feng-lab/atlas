@@ -1,12 +1,9 @@
 #pragma once
 
+#include "zfolly.h"
+
 #include <QPointer>
 #include <QString>
-
-#include <folly/CancellationToken.h>
-#include <folly/Executor.h>
-#include <folly/Function.h>
-#include <folly/coro/Task.h>
 
 #include <functional>
 #include <optional>

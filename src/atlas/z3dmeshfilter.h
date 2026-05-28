@@ -9,12 +9,11 @@
 #include "zneuroglancerexternalsource.h"
 #include "zneuroglancerprecomputedmesh.h"
 #include "zjson.h"
+#include "zfolly.h"
+
 #include <QObject>
 #include <QPoint>
 #include <QTimer>
-#include <folly/CancellationToken.h>
-#include <folly/coro/AsyncScope.h>
-#include <folly/coro/Task.h>
 #include <map>
 #include <memory>
 #include <optional>

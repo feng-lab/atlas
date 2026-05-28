@@ -6,9 +6,9 @@
 
 #include "zimg.h"
 #include "zvoxelvolume.h"
+#include "zfolly.h"
 
 #include <array>
-#include <folly/CancellationToken.h>
 #include <memory>
 
 namespace nim {

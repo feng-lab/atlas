@@ -8,8 +8,22 @@
 #undef ERROR
 #endif
 
+// Atlas owns the LOG/CHECK macro namespace through Abseil. Some vendored Folly
+// headers include <glog/logging.h>; predefine the stable include guard from our
+// frozen glog copy so those includes cannot replace Abseil logging macros.
+#ifndef GLOG_NO_ABBREVIATED_SEVERITIES
+#define GLOG_NO_ABBREVIATED_SEVERITIES
+#endif
+
+#if defined(GOOGLE_LOG_INFO) && !defined(ATLAS_ALLOW_GLOG_LOGGING_H)
+#error "glog/logging.h must not be included before zlog.h; include zlog.h or zfolly.h first."
+#endif
+
+#define GLOG_LOGGING_H
+
 #include <absl/base/log_severity.h>
 #include <absl/log/check.h>
+#include <absl/log/die_if_null.h>
 #include <absl/log/log.h>
 #include <absl/log/log_entry.h>
 #include <absl/log/log_sink.h>
@@ -40,6 +54,18 @@
 #include <string_view>
 #include <type_traits>
 #include <vector>
+
+#ifndef CHECK_NOTNULL
+#define CHECK_NOTNULL(val) ABSL_DIE_IF_NULL(val)
+#endif
+
+#ifndef DCHECK_NOTNULL
+#ifndef NDEBUG
+#define DCHECK_NOTNULL(val) CHECK_NOTNULL(val)
+#else
+#define DCHECK_NOTNULL(val) (val)
+#endif
+#endif
 
 namespace nim {
 

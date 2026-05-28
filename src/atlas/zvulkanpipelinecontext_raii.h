@@ -2,6 +2,7 @@
 
 #include "zvulkan.h"
 #include "zlog.h"
+#include "zfolly.h"
 
 #include <array>
 #include <cstdint>
@@ -10,8 +11,6 @@
 #include <span>
 #include <vector>
 #include <string>
-
-#include <folly/coro/Task.h>
 
 namespace nim {
 

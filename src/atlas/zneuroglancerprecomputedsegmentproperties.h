@@ -1,10 +1,10 @@
 #pragma once
 
+#include "zfolly.h"
+
 #include <QUrl>
 #include <QString>
 #include <QStringList>
-
-#include <folly/coro/Task.h>
 
 #include <chrono>
 #include <cstdint>

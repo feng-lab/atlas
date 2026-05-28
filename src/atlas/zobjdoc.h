@@ -4,8 +4,8 @@
 #include "zdoc.h"
 #include "zjson.h"
 #include "zsysteminfo.h"
-#include <folly/Function.h>
-#include <folly/coro/Task.h>
+#include "zfolly.h"
+
 #include <QObject>
 #include <QMenu>
 #include <QAction>

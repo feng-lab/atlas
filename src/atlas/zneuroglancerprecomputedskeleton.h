@@ -4,8 +4,7 @@
 
 #include "zglmutils.h"
 #include "zskeleton.h"
-
-#include <folly/coro/Task.h>
+#include "zfolly.h"
 
 #include <QUrl>
 

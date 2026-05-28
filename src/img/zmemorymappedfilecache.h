@@ -1,7 +1,7 @@
 #pragma once
 
 #include "zmemorymappedfile.h"
-#include <folly/concurrency/ConcurrentHashMap.h>
+#include "zfolly.h"
 
 namespace nim {
 

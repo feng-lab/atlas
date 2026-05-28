@@ -3,11 +3,10 @@
 #include "zneuroglancerprecomputed.h"
 #include "zglmutils.h"
 #include "zbbox.h"
+#include "zfolly.h"
 
 #include <QUrl>
 #include <QString>
-
-#include <folly/CancellationToken.h>
 
 #include <array>
 #include <chrono>

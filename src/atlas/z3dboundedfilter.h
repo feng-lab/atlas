@@ -12,9 +12,9 @@
 #include "z3dtransformparameter.h"
 #include "znumericparameter.h"
 #include "zoptionparameter.h"
+#include "zfolly.h"
 
 #include <array>
-#include <folly/ScopeGuard.h>
 #include <cstdint>
 #include <limits>
 #include <memory>

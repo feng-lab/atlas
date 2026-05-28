@@ -2,7 +2,7 @@
 
 #include "zglobal.h"
 #include "zexception.h"
-#include <folly/CancellationToken.h>
+#include "zfolly.h"
 
 namespace nim {
 

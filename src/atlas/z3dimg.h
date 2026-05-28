@@ -6,7 +6,8 @@
 #include "z3dtexture.h"
 #include "z3dvertexbufferobject.h"
 #include "zbbox.h"
-#include <folly/CancellationToken.h>
+#include "zfolly.h"
+
 #include <set>
 #include <functional>
 #include <cstdint>

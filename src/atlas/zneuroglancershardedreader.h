@@ -3,10 +3,9 @@
 #include "zneuroglancerremotecontext.h"
 #include "zneuroglancerprecomputed.h"
 #include "zneuroglanceruint64sharding.h"
+#include "zfolly.h"
 
 #include <QUrl>
-
-#include <folly/coro/Task.h>
 
 #include <chrono>
 #include <cstdint>

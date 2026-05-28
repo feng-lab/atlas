@@ -6,12 +6,6 @@
 #include "zvulkandevice.h"
 #include "zvulkanframeexecutor.h"
 #include "zcoro_spothooks.h"
-// Expose a small awaiter type for "after fence" logic.
-#include <folly/coro/Baton.h>
-// Track detached post-fence tasks for teardown safety.
-#include <folly/coro/AsyncScope.h>
-// Public hook API uses folly coroutines directly.
-#include <folly/coro/Task.h>
 // Arena allocations for per-frame descriptor sets
 #include "zvulkandescriptorpool.h"
 #include "zvulkandescriptorset.h"
@@ -20,13 +14,14 @@
 #include "zvulkanresidencymanager.h"
 #include "z3dtypes.h"
 #include "zvulkanuniforms.h"
+// Public API uses Folly coroutine/executor types; keep Folly behind the Atlas gateway.
+#include "zfolly.h"
 
 #include <array>
 #include <chrono>
 #include <atomic>
 #include <cstdint>
 #include <functional>
-#include <folly/Executor.h>
 #include <memory>
 #include <mutex>
 #include <optional>

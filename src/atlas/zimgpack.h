@@ -4,10 +4,10 @@
 #include "zimgsliceprovider.h"
 #include "zimgreadstats.h"
 #include "zlog.h"
+#include "zfolly.h"
+
 #include <QRectF>
 #include <QObject>
-#include <folly/CancellationToken.h>
-#include <folly/coro/Task.h>
 #include <boost/geometry.hpp>
 #include <boost/geometry/geometries/box.hpp>
 #include <boost/geometry/geometries/point.hpp>

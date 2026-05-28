@@ -3,8 +3,7 @@
 #include "zneuroglancerremotecontext.h"
 #include "zimg.h"
 #include "zimgreadstats.h"
-
-#include <folly/coro/Task.h>
+#include "zfolly.h"
 
 #include <QPoint>
 #include <QUrl>

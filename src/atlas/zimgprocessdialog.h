@@ -1,10 +1,10 @@
 #pragma once
 
+#include "zfolly.h"
+
 #include <QDialog>
 #include <QDialogButtonBox>
 #include <QStringList>
-#include <folly/CancellationToken.h>
-#include <folly/Function.h>
 #include <functional>
 #include <memory>
 
