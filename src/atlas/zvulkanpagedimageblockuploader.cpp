@@ -26,6 +26,7 @@
 
 ABSL_DECLARE_FLAG(uint32_t, atlas_log_folly_global_executor_status_interval_in_seconds);
 ABSL_DECLARE_FLAG(uint32_t, atlas_3d_paging_queue_poll_interval_ms);
+ABSL_DECLARE_FLAG(int32_t, atlas_dirty_page_table_upload_max_blocks);
 
 namespace nim {
 
@@ -70,6 +71,22 @@ std::unique_ptr<ZVulkanTexture> createUint3DTexture(ZVulkanDevice& device, glm::
   info.residencyClassHint = ZVulkanTexture::ResidencyClassHint::PagedImageMetadataTexture;
   info.samplerInfo = makeNearestSampler();
   return device.createTexture(info);
+}
+
+bool lessUvec3(const glm::uvec3& lhs, const glm::uvec3& rhs)
+{
+  if (lhs.z != rhs.z) {
+    return lhs.z < rhs.z;
+  }
+  if (lhs.y != rhs.y) {
+    return lhs.y < rhs.y;
+  }
+  return lhs.x < rhs.x;
+}
+
+bool equalUvec3(const glm::uvec3& lhs, const glm::uvec3& rhs)
+{
+  return lhs.x == rhs.x && lhs.y == rhs.y && lhs.z == rhs.z;
 }
 
 } // namespace
@@ -164,6 +181,8 @@ size_t ZVulkanPagedImageBlockUploader::readAndUploadImageBlocks(
   Z3DImg& image,
   size_t channel,
   const std::vector<std::tuple<glm::uvec4, glm::uvec4*>>& pendingTasks,
+  std::vector<glm::uvec3>* dirtyPageDirectoryCoords,
+  std::vector<glm::uvec3>* dirtyPageTableBlockOrigins,
   const folly::CancellationToken& cancellationToken,
   ZBenchTimer& timer)
 {
@@ -205,7 +224,11 @@ size_t ZVulkanPagedImageBlockUploader::readAndUploadImageBlocks(
       continue;
     }
 
-    image.mapImageBlockToCache(channel, pageTableEntryKey, *pageTableEntryPtr);
+    image.mapImageBlockToCache(channel,
+                               pageTableEntryKey,
+                               *pageTableEntryPtr,
+                               dirtyPageDirectoryCoords,
+                               dirtyPageTableBlockOrigins);
     const glm::uvec3 cacheOffset(pageTableEntryPtr->x, pageTableEntryPtr->y, pageTableEntryPtr->z);
     ZVulkanTexture::UploadRegion uploadRegion{};
     uploadRegion.offset = vk::Offset3D{static_cast<int32_t>(cacheOffset.x),
@@ -284,7 +307,11 @@ size_t ZVulkanPagedImageBlockUploader::readAndUploadImageBlocks(
         *pageTableEntryPtr = image.emptyPageTableEntry();
       } else {
         const auto& imageBlock = result.imageBlock;
-        image.mapImageBlockToCache(channel, pageTableEntryKey, *pageTableEntryPtr);
+        image.mapImageBlockToCache(channel,
+                                   pageTableEntryKey,
+                                   *pageTableEntryPtr,
+                                   dirtyPageDirectoryCoords,
+                                   dirtyPageTableBlockOrigins);
 
         const glm::uvec3 cacheOffset(pageTableEntryPtr->x, pageTableEntryPtr->y, pageTableEntryPtr->z);
         ZVulkanTexture::UploadRegion uploadRegion{};
@@ -353,9 +380,11 @@ size_t ZVulkanPagedImageBlockUploader::readAndUploadImageBlocks(
   return emptyBlockCount;
 }
 
-void ZVulkanPagedImageBlockUploader::uploadPageCaches(Z3DImg& image, size_t channel, ZBenchTimer& timer)
+ZVulkanPageCacheUploadBytes
+ZVulkanPagedImageBlockUploader::uploadPageCaches(Z3DImg& image, size_t channel, ZBenchTimer& timer)
 {
   VLOG(2) << "Uploading page caches for channel " << channel;
+  ZVulkanPageCacheUploadBytes uploadBytes;
   ZVulkanTexture* pageDirectory = nullptr;
   ZVulkanTexture* pageTableCache = nullptr;
 
@@ -391,6 +420,7 @@ void ZVulkanPagedImageBlockUploader::uploadPageCaches(Z3DImg& image, size_t chan
     pageDirectory->uploadData(pageDirectorySpan.data(),
                               pageDirectorySpan.size_bytes(),
                               vk::ImageLayout::eShaderReadOnlyOptimal);
+    uploadBytes.pageDirectoryBytes = static_cast<uint64_t>(pageDirectorySpan.size_bytes());
     std::scoped_lock lock(m_mutex);
     auto& resources = ensureImageResourcesLocked(image);
     CHECK_LT(channel, resources.channels.size());
@@ -418,6 +448,7 @@ void ZVulkanPagedImageBlockUploader::uploadPageCaches(Z3DImg& image, size_t chan
     pageTableCache->uploadData(pageTableSpan.data(),
                                pageTableSpan.size_bytes(),
                                vk::ImageLayout::eShaderReadOnlyOptimal);
+    uploadBytes.pageTableCacheBytes = static_cast<uint64_t>(pageTableSpan.size_bytes());
     std::scoped_lock lock(m_mutex);
     auto& resources = ensureImageResourcesLocked(image);
     CHECK_LT(channel, resources.channels.size());
@@ -426,6 +457,136 @@ void ZVulkanPagedImageBlockUploader::uploadPageCaches(Z3DImg& image, size_t chan
   }
 
   timer.recordEvent("upload page table");
+  return uploadBytes;
+}
+
+ZVulkanPageCacheUploadBytes
+ZVulkanPagedImageBlockUploader::uploadDirtyPageCaches(Z3DImg& image,
+                                                      size_t channel,
+                                                      const std::vector<glm::uvec3>& dirtyPageDirectoryCoords,
+                                                      const std::vector<glm::uvec3>& dirtyPageTableBlockOrigins,
+                                                      ZBenchTimer& timer)
+{
+  if (dirtyPageDirectoryCoords.empty() && dirtyPageTableBlockOrigins.empty()) {
+    timer.recordEvent("upload page table");
+    return {};
+  }
+
+  ZVulkanTexture* pageDirectory = nullptr;
+  ZVulkanTexture* pageTableCache = nullptr;
+  bool needsFullUpload = false;
+  {
+    std::scoped_lock lock(m_mutex);
+    auto& resources = ensureImageResourcesLocked(image);
+    resources.channels.resize(image.numChannels());
+    CHECK_LT(channel, resources.channels.size());
+    auto& channelResources = resources.channels[channel];
+    ensureChannelResourcesLocked(image, channel, channelResources);
+    pageDirectory = channelResources.pageDirectory.get();
+    pageTableCache = channelResources.pageTableCache.get();
+    needsFullUpload =
+      (pageDirectory != nullptr && (!pageDirectory->resident() || !channelResources.pageDirectoryUploaded)) ||
+      (pageTableCache != nullptr && (!pageTableCache->resident() || !channelResources.pageTableCacheUploaded));
+  }
+
+  if (needsFullUpload) {
+    return uploadPageCaches(image, channel, timer);
+  }
+
+  ZVulkanPageCacheUploadBytes uploadBytes;
+  auto dirtyPageTableBlocks = dirtyPageTableBlockOrigins;
+  std::sort(dirtyPageTableBlocks.begin(), dirtyPageTableBlocks.end(), lessUvec3);
+  dirtyPageTableBlocks.erase(std::unique(dirtyPageTableBlocks.begin(), dirtyPageTableBlocks.end(), equalUvec3),
+                             dirtyPageTableBlocks.end());
+
+  auto pageTableSpan = image.pageTableCacheView(channel);
+  if (pageTableCache && !dirtyPageTableBlocks.empty() && !pageTableSpan.empty()) {
+    const int32_t partialUploadMaxBlocks = absl::GetFlag(FLAGS_atlas_dirty_page_table_upload_max_blocks);
+    if (partialUploadMaxBlocks == 0 ||
+        (partialUploadMaxBlocks > 0 && dirtyPageTableBlocks.size() > static_cast<size_t>(partialUploadMaxBlocks))) {
+      return uploadPageCaches(image, channel, timer);
+    }
+  }
+
+  auto pageDirectorySpan = image.pageDirectoryView(channel);
+  if (pageDirectory && !dirtyPageDirectoryCoords.empty() && !pageDirectorySpan.empty()) {
+    {
+      std::scoped_lock lock(m_mutex);
+      auto& resources = ensureImageResourcesLocked(image);
+      CHECK_LT(channel, resources.channels.size());
+      uint32_t& pinCount = resources.channels[channel].pageDirectoryPinCount;
+      CHECK_LT(pinCount, std::numeric_limits<uint32_t>::max())
+        << "Paged-image directory dirty upload pin count overflow";
+      ++pinCount;
+    }
+    auto uploadPinGuard = folly::makeGuard([this, &image, channel]() {
+      unpinMetadataTexture(&image, channel, false);
+    });
+
+    pageDirectory->uploadData(pageDirectorySpan.data(),
+                              pageDirectorySpan.size_bytes(),
+                              vk::ImageLayout::eShaderReadOnlyOptimal);
+    uploadBytes.pageDirectoryBytes = static_cast<uint64_t>(pageDirectorySpan.size_bytes());
+    std::scoped_lock lock(m_mutex);
+    auto& resources = ensureImageResourcesLocked(image);
+    CHECK_LT(channel, resources.channels.size());
+    resources.channels[channel].pageDirectoryUploaded = true;
+    resources.channels[channel].pageDirectoryLastUsedTick = m_usageTick++;
+  }
+
+  if (pageTableCache && !dirtyPageTableBlocks.empty() && !pageTableSpan.empty()) {
+    {
+      std::scoped_lock lock(m_mutex);
+      auto& resources = ensureImageResourcesLocked(image);
+      CHECK_LT(channel, resources.channels.size());
+      uint32_t& pinCount = resources.channels[channel].pageTableCachePinCount;
+      CHECK_LT(pinCount, std::numeric_limits<uint32_t>::max())
+        << "Paged-image page-table dirty upload pin count overflow";
+      ++pinCount;
+    }
+    auto uploadPinGuard = folly::makeGuard([this, &image, channel]() {
+      unpinMetadataTexture(&image, channel, true);
+    });
+
+    const glm::uvec3 cacheSize = image.pageTableCacheSize();
+    const glm::uvec3 blockSize = image.pageTableBlockSize();
+    const size_t blockEntryCount = static_cast<size_t>(blockSize.x) * blockSize.y * blockSize.z;
+    std::vector<glm::uvec4> blockScratch(blockEntryCount);
+
+    for (const glm::uvec3& origin : dirtyPageTableBlocks) {
+      CHECK_LE(origin.x + blockSize.x, cacheSize.x) << "Dirty page-table block exceeds cache width";
+      CHECK_LE(origin.y + blockSize.y, cacheSize.y) << "Dirty page-table block exceeds cache height";
+      CHECK_LE(origin.z + blockSize.z, cacheSize.z) << "Dirty page-table block exceeds cache depth";
+
+      size_t dstIndex = 0;
+      for (uint32_t z = 0; z < blockSize.z; ++z) {
+        for (uint32_t y = 0; y < blockSize.y; ++y) {
+          const size_t srcIndex = static_cast<size_t>(origin.z + z) * cacheSize.y * cacheSize.x +
+                                  static_cast<size_t>(origin.y + y) * cacheSize.x + origin.x;
+          std::copy_n(pageTableSpan.data() + srcIndex, blockSize.x, blockScratch.data() + dstIndex);
+          dstIndex += blockSize.x;
+        }
+      }
+      CHECK_EQ(dstIndex, blockEntryCount);
+
+      ZVulkanTexture::UploadRegion uploadRegion{};
+      uploadRegion.offset =
+        vk::Offset3D{static_cast<int32_t>(origin.x), static_cast<int32_t>(origin.y), static_cast<int32_t>(origin.z)};
+      uploadRegion.extent = vk::Extent3D{blockSize.x, blockSize.y, blockSize.z};
+      uploadRegion.finalLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
+      pageTableCache->uploadSubImage(blockScratch.data(), blockScratch.size() * sizeof(glm::uvec4), uploadRegion);
+      uploadBytes.pageTableCacheBytes += static_cast<uint64_t>(blockScratch.size() * sizeof(glm::uvec4));
+    }
+
+    std::scoped_lock lock(m_mutex);
+    auto& resources = ensureImageResourcesLocked(image);
+    CHECK_LT(channel, resources.channels.size());
+    resources.channels[channel].pageTableCacheUploaded = true;
+    resources.channels[channel].pageTableCacheLastUsedTick = m_usageTick++;
+  }
+
+  timer.recordEvent("upload page table");
+  return uploadBytes;
 }
 
 ZVulkanTexture* ZVulkanPagedImageBlockUploader::pageDirectoryTexture(Z3DImg& image, size_t channel)

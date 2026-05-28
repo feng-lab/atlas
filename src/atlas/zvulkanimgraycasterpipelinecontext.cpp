@@ -866,23 +866,6 @@ ZVulkanImgRaycasterPipelineContext::ensurePreparedProgressiveRound(Z3DRendererBa
     << "Raycaster analytic ray-setup dynamic offset exceeds uint32 range: " << raySetupSlice.offset;
   prep.raySetupDynOffset = static_cast<uint32_t>(raySetupSlice.offset);
 
-  // Ensure paging caches (page directory + page table) are uploaded before Block-ID / raycast.
-  {
-    ZBenchTimer uploadTimer("vulkan_upload_page_caches");
-    if (auto* statsSink = payload.image->readStatsSink()) {
-      CHECK_GE(payload.roundIndexRaw, 0) << "Negative roundIndexRaw not expected in progressive path.";
-      const auto statsContext =
-        ZImgReadStatsContext{static_cast<uint32_t>(prep.channelIndex), static_cast<uint32_t>(payload.roundIndexRaw)};
-      const uint64_t pageDirectoryBytes =
-        static_cast<uint64_t>(payload.image->pageDirectoryView(prep.channelIndex).size_bytes());
-      const uint64_t pageTableBytes =
-        static_cast<uint64_t>(payload.image->pageTableCacheView(prep.channelIndex).size_bytes());
-      statsSink->onGpuUploadBytes(statsContext, ZImgGpuUploadKind::PageDirectory, pageDirectoryBytes, /*blocks=*/0);
-      statsSink->onGpuUploadBytes(statsContext, ZImgGpuUploadKind::PageTableCache, pageTableBytes, /*blocks=*/0);
-    }
-    m_imageBlockUploader->uploadPageCaches(*payload.image, prep.channelIndex, uploadTimer);
-  }
-
   prep.entryTexture = payload.entryExitLease ? payload.entryExitLease->colorAttachment(0) : nullptr;
   prep.lastColor = payload.lastAccumLease->colorAttachment(0);
   prep.lastDepth = payload.lastAccumLease->colorAttachment(1);

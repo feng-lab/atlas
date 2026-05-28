@@ -252,9 +252,15 @@ public:
 
   void mapImageBlockToCache(size_t channel,
                             const glm::uvec4& pageTableEntryKey,
-                            glm::uvec4& pageTableEntryRef)
+                            glm::uvec4& pageTableEntryRef,
+                            std::vector<glm::uvec3>* dirtyPageDirectoryCoords = nullptr,
+                            std::vector<glm::uvec3>* dirtyPageTableBlockOrigins = nullptr)
   {
-    insertImageBlockToCache(channel, pageTableEntryKey, pageTableEntryRef);
+    insertImageBlockToCache(channel,
+                            pageTableEntryKey,
+                            pageTableEntryRef,
+                            dirtyPageDirectoryCoords,
+                            dirtyPageTableBlockOrigins);
   }
 
   void invalidateVulkanPagedImageCache(size_t c);
@@ -321,10 +327,17 @@ protected:
                                   m_channelDisplayRanges[c].x);
   }
 
-  void
-  insertPageTableBlockToCache(size_t c, const glm::uvec4& pageDirectoryEntryKey, glm::uvec4& pageDirectoryEntryRef);
+  void insertPageTableBlockToCache(size_t c,
+                                   const glm::uvec4& pageDirectoryEntryKey,
+                                   glm::uvec4& pageDirectoryEntryRef,
+                                   std::vector<glm::uvec3>* dirtyPageDirectoryCoords = nullptr,
+                                   std::vector<glm::uvec3>* dirtyPageTableBlockOrigins = nullptr);
 
-  void insertImageBlockToCache(size_t c, const glm::uvec4& pageTableEntryKey, glm::uvec4& pageTableEntryRef);
+  void insertImageBlockToCache(size_t c,
+                               const glm::uvec4& pageTableEntryKey,
+                               glm::uvec4& pageTableEntryRef,
+                               std::vector<glm::uvec3>* dirtyPageDirectoryCoords = nullptr,
+                               std::vector<glm::uvec3>* dirtyPageTableBlockOrigins = nullptr);
 
   folly::coro::Task<void>
   readImageBlockToBufferAsync(size_t c,
@@ -345,7 +358,9 @@ protected:
   size_t readAndUploadImageBlocks(size_t c,
                                   const std::vector<std::tuple<glm::uvec4, glm::uvec4*>>& pendingTasks,
                                   const folly::CancellationToken& cancellationToken,
-                                  ZBenchTimer& bt);
+                                  ZBenchTimer& bt,
+                                  std::vector<glm::uvec3>* dirtyPageDirectoryCoords = nullptr,
+                                  std::vector<glm::uvec3>* dirtyPageTableBlockOrigins = nullptr);
 
   void setVulkanImageBlockUploader(ZVulkanImageBlockUploader* uploader);
 

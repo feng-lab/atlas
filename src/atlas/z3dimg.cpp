@@ -23,6 +23,7 @@
 #include <array>
 #include <cmath>
 #include <chrono>
+#include <cstddef>
 #include <exception>
 #include <memory>
 #include <utility>
@@ -54,6 +55,13 @@ ABSL_FLAG(uint32_t,
           0,
           "Use PBO when number of blocks to upload is larger than this threshold, default is 0");
 
+ABSL_FLAG(int32_t,
+          atlas_dirty_page_table_upload_max_blocks,
+          16,
+          "Max dirty paged-image page-table cache blocks to upload with partial subimage copies. "
+          "0 forces full page-table uploads after paging changes; negative disables the count-based full-upload "
+          "fallback.");
+
 ABSL_FLAG(uint32_t,
           atlas_3d_preview_max_dimension,
           512,
@@ -74,6 +82,22 @@ ABSL_DECLARE_FLAG(uint64_t, atlas_vk_residency_budget_bytes);
 namespace nim {
 
 namespace {
+
+bool lessUvec3(const glm::uvec3& lhs, const glm::uvec3& rhs)
+{
+  if (lhs.z != rhs.z) {
+    return lhs.z < rhs.z;
+  }
+  if (lhs.y != rhs.y) {
+    return lhs.y < rhs.y;
+  }
+  return lhs.x < rhs.x;
+}
+
+bool equalUvec3(const glm::uvec3& lhs, const glm::uvec3& rhs)
+{
+  return lhs.x == rhs.x && lhs.y == rhs.y && lhs.z == rhs.z;
+}
 
 std::unique_ptr<Z3DTexture> createChannelTexture(const ZImg& image)
 {
@@ -915,6 +939,8 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
   // pageDirectoryEntryKey, pageDirectoryEntry*, pageTableEntryKey
   std::vector<std::tuple<glm::uvec4, glm::uvec4*, glm::uvec4>> pendingBlocks;
   std::vector<std::tuple<glm::uvec4, glm::uvec4*>> pendingTasks; // pageTableEntryKey, pageTableEntry*
+  std::vector<glm::uvec3> dirtyPageDirectoryCoords;
+  std::vector<glm::uvec3> dirtyPageTableBlockOrigins;
   // used to make sure used page table block will not be swapped out
   boost::unordered_flat_set<glm::uvec4> usedPageDirectoryEntryKeys;
 
@@ -998,6 +1024,8 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
       } else { // page table mapped but image block is not mapped
         // increase pageDirectoryEntryPtr now, upload image blocks and update page table block later in pendingTasks
         ++pageDirectoryEntryPtr->w;
+        dirtyPageDirectoryCoords.push_back(pageDirectoryEntryCoord);
+        dirtyPageTableBlockOrigins.push_back(pageTableEntryCoord - pageTableEntryCoord % m_pageTableBlockSize);
         if (isImageBlockEmpty(c, pageTableEntryKey, imageBlockSize)) {
           *pageTableEntryPtr = m_emptyPageTableEntry;
           ++emptyBlockCount;
@@ -1030,15 +1058,22 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
       break;
     }
 
+    const glm::uvec3 pageDirectoryEntryCoord =
+      m_pageDirectoryBases[pageDirectoryEntryKey.w] + pageDirectoryEntryKey.xyz();
     if (pageDirectoryEntryPtr->w > 0) {
       // page table mapped in this for loop by earlier blocks, but image block is not mapped, will add a pendingTask
       ++pageDirectoryEntryPtr->w;
+      dirtyPageDirectoryCoords.push_back(pageDirectoryEntryCoord);
     } else {
       // pageDirectoryEntryPtr->w == 0, page table not mapped
       if (numAvailablePageCacheBlock > 0) {
         // we still have space, construct new page table block
         // VLOG(2) << pageDirectoryEntryKey;
-        insertPageTableBlockToCache(c, pageDirectoryEntryKey, *pageDirectoryEntryPtr);
+        insertPageTableBlockToCache(c,
+                                    pageDirectoryEntryKey,
+                                    *pageDirectoryEntryPtr,
+                                    &dirtyPageDirectoryCoords,
+                                    &dirtyPageTableBlockOrigins);
 #ifdef ATLAS_CHECK_CACHE
         CHECK(!usedPageDirectoryEntry.contains(pageDirectoryEntryPtr->xyz())) << *pageDirectoryEntryPtr;
         usedPageDirectoryEntry.insert(pageDirectoryEntryPtr->xyz());
@@ -1056,6 +1091,7 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
     auto pageTableEntryPtr =
       &m_channelPageTableCaches[c][pageTableEntryCoord.z * m_pageTableCacheSize.y * m_pageTableCacheSize.x +
                                    pageTableEntryCoord.y * m_pageTableCacheSize.x + pageTableEntryCoord.x];
+    dirtyPageTableBlockOrigins.push_back(pageTableEntryCoord - pageTableEntryCoord % m_pageTableBlockSize);
     if (isImageBlockEmpty(c, pageTableEntryKey, imageBlockSize)) {
       *pageTableEntryPtr = m_emptyPageTableEntry;
       ++emptyBlockCount;
@@ -1084,32 +1120,81 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
 
   size_t readEmptyBlockCount = 0;
   if (!pendingTasks.empty() || emptyBlockCount > 0) { // we have changed the cache system
-    auto uploadGuard = folly::makeGuard([=, this, &bt]() {
-      checkPageSystemError(c, false);
-      if (m_readStatsSink) {
-        const uint64_t pageDirectoryBytes = static_cast<uint64_t>(pageDirectoryView(c).size_bytes());
-        const uint64_t pageTableBytes = static_cast<uint64_t>(pageTableCacheView(c).size_bytes());
-        m_readStatsSink->onGpuUploadBytes(statsContext,
-                                          ZImgGpuUploadKind::PageDirectory,
-                                          pageDirectoryBytes,
-                                          /*blocks=*/0);
-        m_readStatsSink->onGpuUploadBytes(statsContext,
-                                          ZImgGpuUploadKind::PageTableCache,
-                                          pageTableBytes,
-                                          /*blocks=*/0);
-      }
-      if (m_vulkanImageBlockUploader) {
-        m_vulkanImageBlockUploader->uploadPageCaches(*this, c, bt);
-      } else {
-        m_channelPageDirectoryTextures[c]->updateImage(m_channelPageDirectories[c].data());
-        m_channelPageTableCacheTextures[c]->updateImage(m_channelPageTableCaches[c].data());
-        bt.recordEvent("upload page table");
-      }
-    });
+    auto uploadGuard =
+      folly::makeGuard([this, c, statsContext, &bt, &dirtyPageDirectoryCoords, &dirtyPageTableBlockOrigins]() {
+        checkPageSystemError(c, false);
+        ZVulkanPageCacheUploadBytes uploadBytes;
+        if (m_vulkanImageBlockUploader) {
+          uploadBytes = m_vulkanImageBlockUploader->uploadDirtyPageCaches(*this,
+                                                                          c,
+                                                                          dirtyPageDirectoryCoords,
+                                                                          dirtyPageTableBlockOrigins,
+                                                                          bt);
+        } else {
+          auto dirtyPageTableBlocks = dirtyPageTableBlockOrigins;
+          std::sort(dirtyPageTableBlocks.begin(), dirtyPageTableBlocks.end(), lessUvec3);
+          dirtyPageTableBlocks.erase(std::unique(dirtyPageTableBlocks.begin(), dirtyPageTableBlocks.end(), equalUvec3),
+                                     dirtyPageTableBlocks.end());
+
+          m_channelPageDirectoryTextures[c]->updateImage(m_channelPageDirectories[c].data());
+          uploadBytes.pageDirectoryBytes = static_cast<uint64_t>(pageDirectoryView(c).size_bytes());
+
+          const int32_t partialUploadMaxBlocks = absl::GetFlag(FLAGS_atlas_dirty_page_table_upload_max_blocks);
+          const bool useFullPageTableUpload =
+            dirtyPageTableBlocks.empty() || partialUploadMaxBlocks == 0 ||
+            (partialUploadMaxBlocks > 0 && dirtyPageTableBlocks.size() > static_cast<size_t>(partialUploadMaxBlocks));
+          if (useFullPageTableUpload) {
+            m_channelPageTableCacheTextures[c]->updateImage(m_channelPageTableCaches[c].data());
+            uploadBytes.pageTableCacheBytes = static_cast<uint64_t>(pageTableCacheView(c).size_bytes());
+          } else {
+            const auto pageTableSpan = pageTableCacheView(c);
+            const glm::uvec3 cacheSize = m_pageTableCacheSize;
+            const glm::uvec3 blockSize = m_pageTableBlockSize;
+            const size_t blockEntryCount = static_cast<size_t>(blockSize.x) * blockSize.y * blockSize.z;
+            std::vector<glm::uvec4> blockScratch(blockEntryCount);
+
+            for (const glm::uvec3& origin : dirtyPageTableBlocks) {
+              CHECK_LE(origin.x + blockSize.x, cacheSize.x) << "Dirty page-table block exceeds cache width";
+              CHECK_LE(origin.y + blockSize.y, cacheSize.y) << "Dirty page-table block exceeds cache height";
+              CHECK_LE(origin.z + blockSize.z, cacheSize.z) << "Dirty page-table block exceeds cache depth";
+
+              size_t dstIndex = 0;
+              for (uint32_t z = 0; z < blockSize.z; ++z) {
+                for (uint32_t y = 0; y < blockSize.y; ++y) {
+                  const size_t srcIndex = static_cast<size_t>(origin.z + z) * cacheSize.y * cacheSize.x +
+                                          static_cast<size_t>(origin.y + y) * cacheSize.x + origin.x;
+                  std::copy_n(pageTableSpan.data() + srcIndex, blockSize.x, blockScratch.data() + dstIndex);
+                  dstIndex += blockSize.x;
+                }
+              }
+              CHECK_EQ(dstIndex, blockEntryCount);
+
+              m_channelPageTableCacheTextures[c]->updateSubImage(origin, blockSize, blockScratch.data());
+              uploadBytes.pageTableCacheBytes += static_cast<uint64_t>(blockScratch.size() * sizeof(glm::uvec4));
+            }
+          }
+          bt.recordEvent("upload page table");
+        }
+        if (m_readStatsSink) {
+          m_readStatsSink->onGpuUploadBytes(statsContext,
+                                            ZImgGpuUploadKind::PageDirectory,
+                                            uploadBytes.pageDirectoryBytes,
+                                            /*blocks=*/0);
+          m_readStatsSink->onGpuUploadBytes(statsContext,
+                                            ZImgGpuUploadKind::PageTableCache,
+                                            uploadBytes.pageTableCacheBytes,
+                                            /*blocks=*/0);
+        }
+      });
 
     // read image
     if (!pendingTasks.empty()) {
-      readEmptyBlockCount = readAndUploadImageBlocks(c, pendingTasks, cancellationToken, bt);
+      readEmptyBlockCount = readAndUploadImageBlocks(c,
+                                                     pendingTasks,
+                                                     cancellationToken,
+                                                     bt,
+                                                     &dirtyPageDirectoryCoords,
+                                                     &dirtyPageTableBlockOrigins);
     }
   }
 
@@ -1231,7 +1316,9 @@ void Z3DImg::readVolumes()
 
 void Z3DImg::insertPageTableBlockToCache(size_t c,
                                          const glm::uvec4& pageDirectoryEntryKey,
-                                         glm::uvec4& pageDirectoryEntryRef)
+                                         glm::uvec4& pageDirectoryEntryRef,
+                                         std::vector<glm::uvec3>* dirtyPageDirectoryCoords,
+                                         std::vector<glm::uvec3>* dirtyPageTableBlockOrigins)
 {
 #ifdef ATLAS_CHECK_CACHE
   CHECK(!m_channelPageTableCacheManagers[c]->exists(pageDirectoryEntryKey))
@@ -1242,6 +1329,12 @@ void Z3DImg::insertPageTableBlockToCache(size_t c,
   glm::uvec3 pageTableBlockCachePos = m_channelPageTableCacheManagers[c]->insert(pageDirectoryEntryKey, erasedKey);
   // when page table mapped but no image blocks is mapped yet, pageDirectoryEntry.w == 1
   pageDirectoryEntryRef = glm::uvec4(pageTableBlockCachePos, 1);
+  if (dirtyPageDirectoryCoords != nullptr) {
+    dirtyPageDirectoryCoords->push_back(m_pageDirectoryBases[pageDirectoryEntryKey.w] + pageDirectoryEntryKey.xyz());
+  }
+  if (dirtyPageTableBlockOrigins != nullptr) {
+    dirtyPageTableBlockOrigins->push_back(pageTableBlockCachePos);
+  }
 
   if (erasedKey.x != std::numeric_limits<uint32_t>::max()) {
     CHECK(!m_hasSufficientPageTableCacheSpace) << "page table block swapped out" << pageDirectoryEntryKey << erasedKey;
@@ -1262,6 +1355,9 @@ void Z3DImg::insertPageTableBlockToCache(size_t c,
                                   erasedKeyPageDirectoryEntryCoord.y * m_pageDirectorySize.x +
                                   erasedKeyPageDirectoryEntryCoord.x];
     erasedKeyPageDirectoryEntry.w = 0;
+    if (dirtyPageDirectoryCoords != nullptr) {
+      dirtyPageDirectoryCoords->push_back(erasedKeyPageDirectoryEntryCoord);
+    }
   }
 }
 
@@ -1342,7 +1438,11 @@ void Z3DImg::releaseGLResources()
   }
 }
 
-void Z3DImg::insertImageBlockToCache(size_t c, const glm::uvec4& pageTableEntryKey, glm::uvec4& pageTableEntryRef)
+void Z3DImg::insertImageBlockToCache(size_t c,
+                                     const glm::uvec4& pageTableEntryKey,
+                                     glm::uvec4& pageTableEntryRef,
+                                     std::vector<glm::uvec3>* dirtyPageDirectoryCoords,
+                                     std::vector<glm::uvec3>* dirtyPageTableBlockOrigins)
 {
   // auto hasher = boost::hash<glm::uvec4>();
   // VLOG(1) << hasher(pageTableEntryKey);
@@ -1354,6 +1454,19 @@ void Z3DImg::insertImageBlockToCache(size_t c, const glm::uvec4& pageTableEntryK
   glm::uvec3 imageBlockCachePos = m_channelImageCacheManagers[c]->insert(pageTableEntryKey, erasedKey);
   // VLOG(1) << c << " " <<  pageTableEntryKey << " " << erasedKey << " " << imageBlockCachePos;
   pageTableEntryRef = glm::uvec4(imageBlockCachePos, 1);
+  if (dirtyPageTableBlockOrigins != nullptr) {
+    const auto* pageTableData = m_channelPageTableCaches[c].data();
+    const ptrdiff_t pageTableEntryIndex = &pageTableEntryRef - pageTableData;
+    CHECK_GE(pageTableEntryIndex, 0);
+    CHECK_LT(static_cast<size_t>(pageTableEntryIndex), m_channelPageTableCaches[c].size());
+    const size_t pageTableCacheWidth = m_pageTableCacheSize.x;
+    const size_t pageTableCachePlane = pageTableCacheWidth * m_pageTableCacheSize.y;
+    const glm::uvec3 pageTableEntryCoord(
+      static_cast<uint32_t>(static_cast<size_t>(pageTableEntryIndex) % pageTableCacheWidth),
+      static_cast<uint32_t>((static_cast<size_t>(pageTableEntryIndex) / pageTableCacheWidth) % m_pageTableCacheSize.y),
+      static_cast<uint32_t>(static_cast<size_t>(pageTableEntryIndex) / pageTableCachePlane));
+    dirtyPageTableBlockOrigins->push_back(pageTableEntryCoord - pageTableEntryCoord % m_pageTableBlockSize);
+  }
   // VLOG(1) << blockKey << " " << erasedKey << " " << m_posToBlockIDs[level] << " " << blockID << " " <<
   // level;
   if (erasedKey.x != std::numeric_limits<uint32_t>::max()) { // valid
@@ -1392,6 +1505,13 @@ void Z3DImg::insertImageBlockToCache(size_t c, const glm::uvec4& pageTableEntryK
         erasedKeyPageTableEntry.w = 0;
         --erasedKeyPageDirectoryEntry.w;
         CHECK(erasedKeyPageDirectoryEntry.w >= 1);
+        if (dirtyPageTableBlockOrigins != nullptr) {
+          dirtyPageTableBlockOrigins->push_back(erasedKeyPageTableEntryCoord -
+                                                erasedKeyPageTableEntryCoord % m_pageTableBlockSize);
+        }
+        if (dirtyPageDirectoryCoords != nullptr) {
+          dirtyPageDirectoryCoords->push_back(erasedKeyPageDirectoryEntryCoord);
+        }
       }
     }
   }
@@ -1573,7 +1693,9 @@ Z3DImg::readImageBlocksToQueueAsync(size_t c,
 size_t Z3DImg::readAndUploadImageBlocks(size_t c,
                                         const std::vector<std::tuple<glm::uvec4, glm::uvec4*>>& pendingTasks,
                                         const folly::CancellationToken& cancellationToken,
-                                        ZBenchTimer& bt)
+                                        ZBenchTimer& bt,
+                                        std::vector<glm::uvec3>* dirtyPageDirectoryCoords,
+                                        std::vector<glm::uvec3>* dirtyPageTableBlockOrigins)
 {
   const auto statsContext = ZImgReadStatsContext{static_cast<uint32_t>(c), m_activeReadStatsRound};
 
@@ -1583,8 +1705,13 @@ size_t Z3DImg::readAndUploadImageBlocks(size_t c,
 
   if (m_vulkanImageBlockUploader != nullptr) {
     VLOG(3) << "using Vulkan image block uploader";
-    const size_t emptyBlockCount =
-      m_vulkanImageBlockUploader->readAndUploadImageBlocks(*this, c, pendingTasks, cancellationToken, bt);
+    const size_t emptyBlockCount = m_vulkanImageBlockUploader->readAndUploadImageBlocks(*this,
+                                                                                        c,
+                                                                                        pendingTasks,
+                                                                                        dirtyPageDirectoryCoords,
+                                                                                        dirtyPageTableBlockOrigins,
+                                                                                        cancellationToken,
+                                                                                        bt);
     CHECK_LE(emptyBlockCount, pendingTasks.size());
     if (m_readStatsSink) {
       const uint64_t uploadedBlocks = static_cast<uint64_t>(pendingTasks.size() - emptyBlockCount);
@@ -1771,7 +1898,11 @@ size_t Z3DImg::readAndUploadImageBlocks(size_t c,
           ++emptyBlockCount;
           *pageTableEntryPtr = m_emptyPageTableEntry;
         } else {
-          insertImageBlockToCache(c, pageTableEntryKey, *pageTableEntryPtr);
+          insertImageBlockToCache(c,
+                                  pageTableEntryKey,
+                                  *pageTableEntryPtr,
+                                  dirtyPageDirectoryCoords,
+                                  dirtyPageTableBlockOrigins);
           m_channelImageCacheTextures[c]->updateSubImage(pageTableEntryPtr->xyz(),
                                                          imageBlockSize,
                                                          std::get<1>(elem)->channelData(0));
@@ -1907,7 +2038,11 @@ size_t Z3DImg::readAndUploadImageBlocks(size_t c,
         ++emptyBlockCount;
         continue;
       }
-      insertImageBlockToCache(c, pageTableEntryKey, *pageTableEntryPtr);
+      insertImageBlockToCache(c,
+                              pageTableEntryKey,
+                              *pageTableEntryPtr,
+                              dirtyPageDirectoryCoords,
+                              dirtyPageTableBlockOrigins);
 #ifdef ATLAS_CHECK_CACHE
       CHECK(!m_usedPageTableEntry.contains(pageTableEntryPtr->xyz())) << pageTableEntryPtr->xyz();
       m_usedPageTableEntry.insert(pageTableEntryPtr->xyz());

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <tuple>
+#include <cstdint>
 #include <vector>
 
 #include "zglmutils.h"
@@ -14,6 +15,12 @@ namespace nim {
 class Z3DImg;
 class ZBenchTimer;
 class ZVulkanTexture;
+
+struct ZVulkanPageCacheUploadBytes
+{
+  uint64_t pageDirectoryBytes = 0;
+  uint64_t pageTableCacheBytes = 0;
+};
 
 class ZVulkanImageBlockUploader
 {
@@ -29,10 +36,18 @@ public:
   virtual size_t readAndUploadImageBlocks(Z3DImg& image,
                                           size_t channel,
                                           const std::vector<std::tuple<glm::uvec4, glm::uvec4*>>& pendingTasks,
+                                          std::vector<glm::uvec3>* dirtyPageDirectoryCoords,
+                                          std::vector<glm::uvec3>* dirtyPageTableBlockOrigins,
                                           const folly::CancellationToken& cancellationToken,
                                           ZBenchTimer& timer) = 0;
 
-  virtual void uploadPageCaches(Z3DImg& image, size_t channel, ZBenchTimer& timer) = 0;
+  virtual ZVulkanPageCacheUploadBytes uploadPageCaches(Z3DImg& image, size_t channel, ZBenchTimer& timer) = 0;
+
+  virtual ZVulkanPageCacheUploadBytes uploadDirtyPageCaches(Z3DImg& image,
+                                                            size_t channel,
+                                                            const std::vector<glm::uvec3>& dirtyPageDirectoryCoords,
+                                                            const std::vector<glm::uvec3>& dirtyPageTableBlockOrigins,
+                                                            ZBenchTimer& timer) = 0;
 
   [[nodiscard]] virtual ZVulkanTexture* pageDirectoryTexture(Z3DImg& image, size_t channel) = 0;
 

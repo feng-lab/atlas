@@ -30,10 +30,18 @@ public:
   size_t readAndUploadImageBlocks(Z3DImg& image,
                                   size_t channel,
                                   const std::vector<std::tuple<glm::uvec4, glm::uvec4*>>& pendingTasks,
+                                  std::vector<glm::uvec3>* dirtyPageDirectoryCoords,
+                                  std::vector<glm::uvec3>* dirtyPageTableBlockOrigins,
                                   const folly::CancellationToken& cancellationToken,
                                   ZBenchTimer& timer) override;
 
-  void uploadPageCaches(Z3DImg& image, size_t channel, ZBenchTimer& timer) override;
+  ZVulkanPageCacheUploadBytes uploadPageCaches(Z3DImg& image, size_t channel, ZBenchTimer& timer) override;
+
+  ZVulkanPageCacheUploadBytes uploadDirtyPageCaches(Z3DImg& image,
+                                                    size_t channel,
+                                                    const std::vector<glm::uvec3>& dirtyPageDirectoryCoords,
+                                                    const std::vector<glm::uvec3>& dirtyPageTableBlockOrigins,
+                                                    ZBenchTimer& timer) override;
 
   [[nodiscard]] ZVulkanTexture* pageDirectoryTexture(Z3DImg& image, size_t channel) override;
 

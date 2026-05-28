@@ -559,12 +559,6 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
 
       CHECK(inputs.pageDirectory && inputs.pageTable) << "Slice BlockIdDiscovery paging tables missing";
 
-      CHECK(m_imageBlockUploader != nullptr) << "Slice BlockIdDiscovery expected image block uploader";
-      {
-        ZBenchTimer uploadTimer("vulkan_upload_page_caches(slice_blockid)");
-        m_imageBlockUploader->uploadPageCaches(*payload.image, channelIndex, uploadTimer);
-      }
-
       const vk::DescriptorSet dsIndices = m_backend.sharedImgIndicesDescriptorSet();
       const vk::DescriptorSet dsPageData = m_backend.sharedImgPageDataDescriptorSet();
       CHECK(dsIndices && dsPageData)
@@ -1086,12 +1080,6 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
       CHECK(usePaging);
       CHECK(inputs.pageDirectory && inputs.pageTable && inputs.imageCache)
         << "Slice paging missing paging textures for channel " << channelIndex;
-      CHECK(m_imageBlockUploader != nullptr) << "Slice paging expected image block uploader";
-      {
-        ZBenchTimer uploadTimer("vulkan_upload_page_caches(slice_draw)");
-        m_imageBlockUploader->uploadPageCaches(*payload.image, channelIndex, uploadTimer);
-      }
-
       const vk::DescriptorSet dsIndices = m_backend.sharedImgIndicesDescriptorSet();
       const vk::DescriptorSet dsPageData = m_backend.sharedImgPageDataDescriptorSet();
       CHECK(dsIndices && dsPageData) << "Slice paging draw missing backend-shared descriptor sets (indices/page-data)";
