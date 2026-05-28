@@ -1,0 +1,109 @@
+#version 450
+
+// Storage-image Block-ID compaction with append-style workgroup-local dedupe,
+// then dense GPU uniqueness. This preserves the fast append image scan shape
+// while replacing the raw duplicate append payload with a GPU bitset.
+
+layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+
+#define EMPTY 0xFFFFFFFFu
+#define INVALID_BLOCK_ID_FLAG 0x80000000u
+#define LOCAL_BITS 10u
+#define LOCAL_SIZE (1u << LOCAL_BITS)
+#define LOCAL_MASK (LOCAL_SIZE - 1u)
+
+layout(rgba32ui, set = 1, binding = 1) readonly uniform uimage2D uBlockIdImage;
+
+layout(std430, set = 1, binding = 0) buffer BlockUnique {
+    uint count;
+    uint counts[8];
+    uint payload[];
+};
+
+layout(push_constant) uniform PushConstants {
+    uint width;
+    uint height;
+    uint stride;
+    uint word_count;
+    uint att;
+    uint max_block_id;
+} pc;
+
+uint hash32(uint x) { return x * 2654435761u; }
+
+shared uint lkeys[LOCAL_SIZE];
+shared uint groupCount;
+shared uint groupFlags;
+
+void localInsert(uint id)
+{
+    if (id == 0u || id == EMPTY) return;
+    uint h = hash32(id) & LOCAL_MASK;
+    for (uint p = 0u; p < 8u; ++p) {
+        uint idx = (h + p) & LOCAL_MASK;
+        uint prev = atomicCompSwap(lkeys[idx], EMPTY, id);
+        if (prev == EMPTY || prev == id) return;
+    }
+}
+
+void markUnique(uint id)
+{
+    if (id == 0u || id == EMPTY) return;
+    if (id > pc.max_block_id) {
+        atomicOr(groupFlags, INVALID_BLOCK_ID_FLAG);
+        return;
+    }
+
+    uint word = id >> 5u;
+    if (word >= pc.word_count) {
+        atomicOr(groupFlags, INVALID_BLOCK_ID_FLAG);
+        return;
+    }
+
+    atomicOr(payload[word], 1u << (id & 31u));
+    atomicAdd(groupCount, 1u);
+}
+
+void main()
+{
+    const uint localThreadCount = gl_WorkGroupSize.x * gl_WorkGroupSize.y;
+    for (uint i = gl_LocalInvocationIndex; i < LOCAL_SIZE; i += localThreadCount) {
+        lkeys[i] = EMPTY;
+    }
+    if (gl_LocalInvocationIndex == 0u) {
+        groupCount = 0u;
+        groupFlags = 0u;
+    }
+    barrier();
+
+    uvec3 gid = gl_GlobalInvocationID;
+    if (gid.x < pc.width && gid.y < pc.height) {
+        uvec4 ids4 = imageLoad(uBlockIdImage, ivec2(gid.xy));
+        if (ids4.g == ids4.r) ids4.g = 0u;
+        if (ids4.b == ids4.r || ids4.b == ids4.g) ids4.b = 0u;
+        if (ids4.a == ids4.r || ids4.a == ids4.g || ids4.a == ids4.b) ids4.a = 0u;
+        localInsert(ids4.r);
+        localInsert(ids4.g);
+        localInsert(ids4.b);
+        localInsert(ids4.a);
+    }
+
+    barrier();
+    for (uint i = gl_LocalInvocationIndex; i < LOCAL_SIZE; i += localThreadCount) {
+        uint v = lkeys[i];
+        if (v == EMPTY || v == 0u) continue;
+        markUnique(v);
+    }
+
+    barrier();
+    if (gl_LocalInvocationIndex == 0u) {
+        uint flags = groupFlags;
+        if ((flags & INVALID_BLOCK_ID_FLAG) != 0u) {
+            atomicOr(counts[0], INVALID_BLOCK_ID_FLAG);
+        }
+        if (groupCount != 0u) {
+            atomicOr(count, 1u);
+            atomicAdd(counts[pc.att], groupCount);
+        }
+    }
+}

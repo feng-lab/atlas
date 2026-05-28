@@ -1,0 +1,65 @@
+#version 450
+
+// GPU Block-ID compaction using a dense global bitset.
+// - Input: RGBA32UI uimage2D (readonly)
+// - Output: SSBO { uint count; uint counts[8]; uint bits[] }
+// - bits[id >> 5] stores bit (id & 31). ID 0 and 0xffffffff are sentinels.
+// - count's high bit marks an out-of-domain ID; CPU readback treats that as fatal.
+
+layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+
+#define EMPTY 0xFFFFFFFFu
+#define INVALID_BLOCK_ID_FLAG 0x80000000u
+
+layout(rgba32ui, set = 1, binding = 1) readonly uniform uimage2D uBlockIdImage;
+
+layout(std430, set = 1, binding = 0) buffer BlockBits {
+    uint count;
+    uint counts[8];
+    uint bits[];
+};
+
+layout(push_constant) uniform PushConstants {
+    uint width;
+    uint height;
+    uint stride;
+    uint word_count;
+    uint att;
+    uint max_block_id;
+} pc;
+
+void setBit(uint id)
+{
+    if (id == 0u || id == EMPTY) return;
+    if (id > pc.max_block_id) {
+        atomicOr(count, INVALID_BLOCK_ID_FLAG);
+        return;
+    }
+
+    atomicAdd(count, 1u);
+    atomicAdd(counts[pc.att], 1u);
+    uint word = id >> 5u;
+    if (word >= pc.word_count) {
+        atomicOr(count, INVALID_BLOCK_ID_FLAG);
+        return;
+    }
+    atomicOr(bits[word], 1u << (id & 31u));
+}
+
+void main()
+{
+    uvec3 gid = gl_GlobalInvocationID;
+    if (gid.x >= pc.width || gid.y >= pc.height) {
+        return;
+    }
+
+    uvec4 ids4 = imageLoad(uBlockIdImage, ivec2(gid.xy));
+    if (ids4.g == ids4.r) ids4.g = 0u;
+    if (ids4.b == ids4.r || ids4.b == ids4.g) ids4.b = 0u;
+    if (ids4.a == ids4.r || ids4.a == ids4.g || ids4.a == ids4.b) ids4.a = 0u;
+
+    setBit(ids4.r);
+    setBit(ids4.g);
+    setBit(ids4.b);
+    setBit(ids4.a);
+}

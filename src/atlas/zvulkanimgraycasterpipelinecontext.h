@@ -2,6 +2,7 @@
 
 #include "z3drendercommands.h"
 #include "zvulkan.h"
+#include "zvulkanrenderconversions.h"
 
 #include <map>
 #include <unordered_map>
@@ -91,7 +92,8 @@ public:
 
   void preRecordBindlessWarmup(const BindlessWarmupDesc& desc);
   void preRecordPrimeBlockIdCompaction(const std::shared_ptr<Z3DScratchResourcePool::RenderTargetLease>& blockIdLease,
-                                       uint32_t effectiveAttachmentCount);
+                                       uint32_t effectiveAttachmentCount,
+                                       uint32_t maxBlockId);
 
 private:
   struct EntryVertex
@@ -268,20 +270,19 @@ private:
   std::optional<vk::Format> m_depthRampFormat;
 
   // Block-ID compaction (compute) resources
-  // Two read-source variants: 'sampled(bindless)' (utexture2D via bindless set 0) and 'storage' (uimage2D)
+  // Append methods read from sampled(bindless) or storage images.
+  // Dense-bitset readback currently uses storage-image reads.
   std::optional<vk::raii::DescriptorSetLayout> m_blockIdCompactSetLayoutSampled;
   std::optional<vk::raii::PipelineLayout> m_blockIdCompactPipelineLayoutSampled;
-  std::optional<vk::raii::Pipeline> m_blockIdCompactPipelineSampled;
+  std::optional<vk::raii::Pipeline> m_blockIdCompactPipelineSampledParallelFlush;
   std::optional<vk::raii::DescriptorSetLayout> m_blockIdCompactSetLayoutStorage;
   std::optional<vk::raii::PipelineLayout> m_blockIdCompactPipelineLayoutStorage;
-  std::optional<vk::raii::Pipeline> m_blockIdCompactPipelineStorage;
-  // Buffer-based compaction (image copied to SSBO, compute scans SSBO)
-  std::optional<vk::raii::DescriptorSetLayout> m_blockIdCompactSetLayoutBuffer;
-  std::optional<vk::raii::PipelineLayout> m_blockIdCompactPipelineLayoutBuffer;
-  std::optional<vk::raii::Pipeline> m_blockIdCompactPipelineBuffer;
-  std::optional<vk::raii::Pipeline> m_blockIdCompactPipelineBufferAppend;
-  std::unique_ptr<ZVulkanBuffer> m_blockIdPixelBuffer; // device-local, TRANSFER_DST | STORAGE_BUFFER
-  size_t m_blockIdPixelBufferCapacity = 0;
+  std::optional<vk::raii::Pipeline> m_blockIdCompactPipelineStorageParallelFlush;
+  std::optional<vk::raii::PipelineLayout> m_blockIdCompactPipelineLayoutDenseBitsetStorage;
+  std::optional<vk::raii::Pipeline> m_blockIdCompactPipelineDenseBitsetStorage;
+  std::optional<vk::raii::Pipeline> m_blockIdCompactPipelineDenseBitsetFlagsStorage;
+  std::optional<vk::raii::Pipeline> m_blockIdCompactPipelineAppendStorageGpuUniqueMark;
+  std::optional<vk::raii::Pipeline> m_blockIdCompactPipelineAppendGpuUniqueEmit;
   // Block-ID compaction output is read back on CPU after the submission fence signals.
   // With >1 frames in flight, this must be per frame-slot to avoid CPU/GPU hazards
   // (CPU memset while GPU writes; overwrite-before-parse).
@@ -290,20 +291,24 @@ private:
     std::shared_ptr<ZVulkanBuffer> buffer;
     size_t capacity = 0; // bytes
   };
-  std::unordered_map<void*, BlockIdCompactionOutput> m_blockIdCompactOutputs;
+  std::unordered_map<void*, std::map<VulkanBlockIdCompactionMethod, BlockIdCompactionOutput>> m_blockIdCompactOutputs;
   ZVulkanDevice* m_blockIdCompactDevice = nullptr; // non-owning; used to detect executor rebuilds
   uint32_t m_blockIdCompactMaxFramesInFlight = 0;
   // Pre-record prepared descriptor state for compaction.
   // These descriptor sets are allocated from the per-frame descriptor arena and
   // must be written only before command-buffer recording begins.
-  std::unique_ptr<ZVulkanDescriptorSet> m_blockIdCompactDescriptorBuffer; // set 1 (buffer variant)
-  std::unique_ptr<ZVulkanDescriptorSet> m_blockIdCompactDescriptorSampled; // set 1 (bindless sampled variant)
+  std::map<VulkanBlockIdCompactionMethod, std::unique_ptr<ZVulkanDescriptorSet>>
+    m_blockIdCompactDescriptorSampledByMethod; // set 1 (bindless sampled variants)
   struct BlockIdStorageDescriptorPack
   {
     std::vector<std::unique_ptr<ZVulkanDescriptorSet>> perAttachment; // set 1 (storage variant)
   };
-  std::unordered_map<const Z3DScratchResourcePool::RenderTargetLease*, BlockIdStorageDescriptorPack>
-    m_blockIdCompactDescriptorStorageByLease;
+  using BlockIdStorageDescriptorMap =
+    std::unordered_map<const Z3DScratchResourcePool::RenderTargetLease*, BlockIdStorageDescriptorPack>;
+  std::map<VulkanBlockIdCompactionMethod, BlockIdStorageDescriptorMap>
+    m_blockIdCompactDescriptorStorageByMethodAndLease;
+  std::map<VulkanBlockIdCompactionMethod, BlockIdStorageDescriptorMap>
+    m_blockIdCompactDescriptorDenseStorageByMethodAndLease;
 
   std::vector<ChannelResources> m_channelResources;
   std::unique_ptr<ZVulkanImageBlockUploader> m_imageBlockUploader;
@@ -405,7 +410,7 @@ private:
   void ensureEntryGeometryUploadedThisFrame(const ImgRaycasterPayload& payload);
 
   void ensureBlockIdCompactionPipeline();
-  BlockIdCompactionOutput& ensureBlockIdCompactOutput(size_t bytes);
+  BlockIdCompactionOutput& ensureBlockIdCompactOutput(VulkanBlockIdCompactionMethod method, size_t bytes);
   void recordBlockIdCompaction(Z3DRendererBase& renderer,
                                const RenderBatch& batch,
                                const ImgRaycasterPayload& payload,

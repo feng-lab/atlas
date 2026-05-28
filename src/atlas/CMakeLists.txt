@@ -311,9 +311,12 @@ set(ATLAS_VK_SHADER_SOURCES
     blur.frag
 
     # Compute (append-only)
-    block_id_compact_append.comp
-    block_id_compact_storage_append.comp
-    block_id_compact_buffer_append.comp
+    block_id_compact_append_parallel_flush.comp
+    block_id_compact_storage_append_parallel_flush.comp
+    block_id_compact_dense_bitset_storage.comp
+    block_id_compact_dense_bitset_flags_storage.comp
+    block_id_compact_storage_append_parallel_flush_gpu_unique_mark.comp
+    block_id_compact_append_gpu_unique_emit.comp
 
     # 3D slice and transforms
     transform_with_3dtexture.vert

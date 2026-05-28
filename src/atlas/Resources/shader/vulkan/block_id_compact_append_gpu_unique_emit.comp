@@ -1,0 +1,44 @@
+#version 450
+
+// Emits a unique ID list from the bitset produced by an append-style GPU-unique
+// mark pass. IDs are written after the bitset payload so the bitset can be kept
+// intact while CPU readback fetches only the compacted ID list.
+
+layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+
+layout(std430, set = 1, binding = 0) buffer BlockUnique {
+    uint count;
+    uint counts[8];
+    uint payload[];
+};
+
+layout(push_constant) uniform PushConstants {
+    uint word_count;
+    uint max_block_id;
+    uint id_output_word;
+    uint id_capacity;
+} pc;
+
+void emitId(uint id)
+{
+    if (id == 0u || id > pc.max_block_id) return;
+    uint idx = atomicAdd(count, 1u);
+    if (idx < pc.id_capacity) {
+        payload[pc.id_output_word + idx] = id;
+    }
+}
+
+void main()
+{
+    uint wordIndex = gl_GlobalInvocationID.x;
+    if (wordIndex >= pc.word_count) {
+        return;
+    }
+
+    uint word = payload[wordIndex];
+    while (word != 0u) {
+        uint bit = uint(findLSB(word));
+        emitId(wordIndex * 32u + bit);
+        word &= (word - 1u);
+    }
+}

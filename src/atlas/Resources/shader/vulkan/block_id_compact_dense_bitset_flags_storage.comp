@@ -1,0 +1,82 @@
+#version 450
+
+// Storage-image Block-ID compaction into a dense bitset.
+// Header count/counts are flags for this benchmark candidate:
+// - count bit 0 means at least one valid ID was written.
+// - count high bit means at least one ID was outside max_block_id.
+// - counts[att] bit 0 means this attachment produced at least one valid ID.
+
+layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+
+#define EMPTY 0xFFFFFFFFu
+#define INVALID_BLOCK_ID_FLAG 0x80000000u
+
+layout(rgba32ui, set = 1, binding = 1) readonly uniform uimage2D uBlockIdImage;
+
+layout(std430, set = 1, binding = 0) buffer BlockBits {
+    uint count;
+    uint counts[8];
+    uint bits[];
+};
+
+layout(push_constant) uniform PushConstants {
+    uint width;
+    uint height;
+    uint stride;
+    uint word_count;
+    uint att;
+    uint max_block_id;
+} pc;
+
+shared uint groupFlags;
+
+void setBit(uint id)
+{
+    if (id == 0u || id == EMPTY) return;
+    if (id > pc.max_block_id) {
+        atomicOr(groupFlags, INVALID_BLOCK_ID_FLAG);
+        return;
+    }
+
+    uint word = id >> 5u;
+    if (word >= pc.word_count) {
+        atomicOr(groupFlags, INVALID_BLOCK_ID_FLAG);
+        return;
+    }
+
+    atomicOr(bits[word], 1u << (id & 31u));
+    atomicOr(groupFlags, 1u);
+}
+
+void main()
+{
+    if (gl_LocalInvocationIndex == 0u) {
+        groupFlags = 0u;
+    }
+    barrier();
+
+    uvec3 gid = gl_GlobalInvocationID;
+    if (gid.x < pc.width && gid.y < pc.height) {
+        uvec4 ids4 = imageLoad(uBlockIdImage, ivec2(gid.xy));
+        if (ids4.g == ids4.r) ids4.g = 0u;
+        if (ids4.b == ids4.r || ids4.b == ids4.g) ids4.b = 0u;
+        if (ids4.a == ids4.r || ids4.a == ids4.g || ids4.a == ids4.b) ids4.a = 0u;
+
+        setBit(ids4.r);
+        setBit(ids4.g);
+        setBit(ids4.b);
+        setBit(ids4.a);
+    }
+
+    barrier();
+    if (gl_LocalInvocationIndex == 0u) {
+        uint flags = groupFlags;
+        if ((flags & INVALID_BLOCK_ID_FLAG) != 0u) {
+            atomicOr(count, INVALID_BLOCK_ID_FLAG);
+        }
+        if ((flags & 1u) != 0u) {
+            atomicOr(count, 1u);
+            atomicOr(counts[pc.att], 1u);
+        }
+    }
+}

@@ -1110,6 +1110,7 @@ void ZVulkanLinearScript::flushNodes(std::string_view reason, /*nullable*/ const
       std::shared_ptr<Z3DScratchResourcePool::RenderTargetLease> lease;
       // 0 means "use lease->attachments" (parity with record() semantics).
       uint32_t effectiveAttachmentCount = 0;
+      uint32_t maxBlockId = 0;
     };
     std::unordered_map<const Z3DScratchResourcePool::RenderTargetLease*, RaycasterBlockIdCompactionPrime>
       raycasterBlockIdCompactionPrimes;
@@ -1119,6 +1120,8 @@ void ZVulkanLinearScript::flushNodes(std::string_view reason, /*nullable*/ const
     {
       std::shared_ptr<Z3DScratchResourcePool::RenderTargetLease> lease;
       uint32_t sliceCount = 0;
+      uint32_t maxBlockId = 0;
+      bool hasMaxBlockId = false;
       std::unordered_set<uint32_t> sliceIndices;
     };
     std::unordered_map<const Z3DScratchResourcePool::RenderTargetLease*, SliceBlockIdCompactionPrime>
@@ -1151,6 +1154,7 @@ void ZVulkanLinearScript::flushNodes(std::string_view reason, /*nullable*/ const
                     } else {
                       entry.effectiveAttachmentCount = std::max(entry.effectiveAttachmentCount, request);
                     }
+                    entry.maxBlockId = std::max(entry.maxBlockId, payload.image->maxPagedBlockID());
                   }
                 }
 
@@ -1260,6 +1264,14 @@ void ZVulkanLinearScript::flushNodes(std::string_view reason, /*nullable*/ const
                     } else {
                       CHECK(entry.sliceCount == sliceCountU32)
                         << "Vulkan script: inconsistent sliceCount for blockIdLease";
+                    }
+                    const uint32_t maxBlockId = payload.image->maxPagedBlockID();
+                    if (!entry.hasMaxBlockId) {
+                      entry.maxBlockId = maxBlockId;
+                      entry.hasMaxBlockId = true;
+                    } else {
+                      CHECK(entry.maxBlockId == maxBlockId)
+                        << "Vulkan script: inconsistent maxBlockId for blockIdLease";
                     }
                     entry.sliceIndices.insert(sliceIndexU32);
                   }
@@ -1356,6 +1368,7 @@ void ZVulkanLinearScript::flushNodes(std::string_view reason, /*nullable*/ const
                     } else {
                       entry.effectiveAttachmentCount = std::max(entry.effectiveAttachmentCount, request);
                     }
+                    entry.maxBlockId = std::max(entry.maxBlockId, payload.image->maxPagedBlockID());
                   }
                 }
 
@@ -1465,6 +1478,14 @@ void ZVulkanLinearScript::flushNodes(std::string_view reason, /*nullable*/ const
                     } else {
                       CHECK(entry.sliceCount == sliceCountU32)
                         << "Vulkan script: inconsistent sliceCount for blockIdLease";
+                    }
+                    const uint32_t maxBlockId = payload.image->maxPagedBlockID();
+                    if (!entry.hasMaxBlockId) {
+                      entry.maxBlockId = maxBlockId;
+                      entry.hasMaxBlockId = true;
+                    } else {
+                      CHECK(entry.maxBlockId == maxBlockId)
+                        << "Vulkan script: inconsistent maxBlockId for blockIdLease";
                     }
                     entry.sliceIndices.insert(sliceIndexU32);
                   }
@@ -1734,6 +1755,7 @@ void ZVulkanLinearScript::flushNodes(std::string_view reason, /*nullable*/ const
         const Z3DScratchResourcePool::RenderTargetLease* rawLease = nullptr;
         std::shared_ptr<Z3DScratchResourcePool::RenderTargetLease> lease;
         uint32_t effectiveAttachmentCount = 0;
+        uint32_t maxBlockId = 0;
       };
       std::vector<PrimeGroup> groups;
       groups.reserve(raycasterBlockIdCompactionPrimes.size());
@@ -1746,6 +1768,7 @@ void ZVulkanLinearScript::flushNodes(std::string_view reason, /*nullable*/ const
         g.rawLease = raw;
         g.lease = entry.lease;
         g.effectiveAttachmentCount = entry.effectiveAttachmentCount;
+        g.maxBlockId = entry.maxBlockId;
         groups.emplace_back(std::move(g));
       }
 
@@ -1761,7 +1784,10 @@ void ZVulkanLinearScript::flushNodes(std::string_view reason, /*nullable*/ const
                                                           Z3DRendererBase& renderer) {
           (void)renderer;
           for (const auto& g : *groups) {
-            backend.bindlessPrePrimeImgRaycasterBlockIdCompaction(g.lease, g.effectiveAttachmentCount, "linear_script");
+            backend.bindlessPrePrimeImgRaycasterBlockIdCompaction(g.lease,
+                                                                  g.effectiveAttachmentCount,
+                                                                  g.maxBlockId,
+                                                                  "linear_script");
           }
         };
         m_preRecordNodes.emplace_back(std::move(primeNode));
@@ -1774,6 +1800,7 @@ void ZVulkanLinearScript::flushNodes(std::string_view reason, /*nullable*/ const
         const Z3DScratchResourcePool::RenderTargetLease* rawLease = nullptr;
         std::shared_ptr<Z3DScratchResourcePool::RenderTargetLease> lease;
         uint32_t sliceCount = 0;
+        uint32_t maxBlockId = 0;
         std::vector<uint32_t> sliceIndices;
       };
 
@@ -1781,13 +1808,14 @@ void ZVulkanLinearScript::flushNodes(std::string_view reason, /*nullable*/ const
       groups.reserve(sliceBlockIdCompactionPrimes.size());
 
       for (auto& [raw, entry] : sliceBlockIdCompactionPrimes) {
-        if (!entry.lease || entry.sliceCount == 0u || entry.sliceIndices.empty()) {
+        if (!entry.lease || entry.sliceCount == 0u || !entry.hasMaxBlockId || entry.sliceIndices.empty()) {
           continue;
         }
         PrimeGroup g{};
         g.rawLease = raw;
         g.lease = entry.lease;
         g.sliceCount = entry.sliceCount;
+        g.maxBlockId = entry.maxBlockId;
         g.sliceIndices.assign(entry.sliceIndices.begin(), entry.sliceIndices.end());
         std::sort(g.sliceIndices.begin(), g.sliceIndices.end());
         groups.emplace_back(std::move(g));
@@ -1806,7 +1834,11 @@ void ZVulkanLinearScript::flushNodes(std::string_view reason, /*nullable*/ const
           (void)renderer;
           for (const auto& g : *groups) {
             for (uint32_t sliceIndex : g.sliceIndices) {
-              backend.bindlessPrePrimeImgSliceBlockIdCompaction(g.lease, g.sliceCount, sliceIndex, "linear_script");
+              backend.bindlessPrePrimeImgSliceBlockIdCompaction(g.lease,
+                                                                g.sliceCount,
+                                                                sliceIndex,
+                                                                g.maxBlockId,
+                                                                "linear_script");
             }
           }
         };

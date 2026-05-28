@@ -81,7 +81,8 @@ public:
   // required per-slice descriptor sets already exist.
   void preRecordPrimeBlockIdCompaction(const std::shared_ptr<Z3DScratchResourcePool::RenderTargetLease>& blockIdLease,
                                        uint32_t sliceCount,
-                                       uint32_t sliceIndex);
+                                       uint32_t sliceIndex,
+                                       uint32_t maxBlockId);
 
 private:
   struct SliceVertex
@@ -171,15 +172,12 @@ private:
   // Block-ID compaction (compute) to avoid full RGBA32UI readback.
   std::optional<vk::raii::DescriptorSetLayout> m_blockIdCompactSetLayoutSampled;
   std::optional<vk::raii::PipelineLayout> m_blockIdCompactPipelineLayoutSampled;
-  std::optional<vk::raii::Pipeline> m_blockIdCompactPipelineSampled;
+  std::optional<vk::raii::Pipeline> m_blockIdCompactPipelineSampledParallelFlush;
   std::optional<vk::raii::DescriptorSetLayout> m_blockIdCompactSetLayoutStorage;
   std::optional<vk::raii::PipelineLayout> m_blockIdCompactPipelineLayoutStorage;
-  std::optional<vk::raii::Pipeline> m_blockIdCompactPipelineStorage;
-  std::optional<vk::raii::DescriptorSetLayout> m_blockIdCompactSetLayoutBuffer;
-  std::optional<vk::raii::PipelineLayout> m_blockIdCompactPipelineLayoutBuffer;
-  std::optional<vk::raii::Pipeline> m_blockIdCompactPipelineBufferAppend;
-  std::unique_ptr<ZVulkanBuffer> m_blockIdPixelBuffer;
-  size_t m_blockIdPixelBufferCapacity = 0;
+  std::optional<vk::raii::Pipeline> m_blockIdCompactPipelineStorageParallelFlush;
+  std::optional<vk::raii::Pipeline> m_blockIdCompactPipelineStorageGpuUniqueMark;
+  std::optional<vk::raii::Pipeline> m_blockIdCompactPipelineStorageGpuUniqueEmit;
   // Per-frame-slot compaction outputs for slice block-ID discovery. Per-slot
   // storage avoids overwrite-before-readback hazards when multiple Vulkan
   // frames are in flight.

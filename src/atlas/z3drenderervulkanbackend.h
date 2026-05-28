@@ -424,12 +424,14 @@ public:
   void bindlessPrePrimeImgRaycasterBlockIdCompaction(
     const std::shared_ptr<Z3DScratchResourcePool::RenderTargetLease>& blockIdLease,
     uint32_t effectiveAttachmentCount,
+    uint32_t maxBlockId,
     std::string_view debugLabel = {});
 
   void bindlessPrePrimeImgSliceBlockIdCompaction(
     const std::shared_ptr<Z3DScratchResourcePool::RenderTargetLease>& blockIdLease,
     uint32_t sliceCount,
     uint32_t sliceIndex,
+    uint32_t maxBlockId,
     std::string_view debugLabel = {});
 
   void preBackendSwitch() override;

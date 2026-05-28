@@ -12,12 +12,27 @@ class ZVulkanDevice;
 class ZVulkanBuffer;
 class ZVulkanTexture;
 
-enum class VulkanBlockIdCompactionSource
+enum class VulkanBlockIdCompactionMethod
 {
-  Buffer,
-  Storage,
-  Sampled,
+  AppendStorageParallelFlush,
+  AppendStorageParallelFlushGpuUnique,
+  AppendSampledParallelFlush,
+  DenseBitsetReadback,
+  DenseBitsetFlagsReadback,
 };
+
+enum class VulkanBlockIdCompactionInputKind
+{
+  StorageImage,
+  SampledImage,
+};
+
+[[nodiscard]] std::string_view blockIdCompactionMethodName(VulkanBlockIdCompactionMethod method);
+[[nodiscard]] std::string_view blockIdCompactionShaderFile(VulkanBlockIdCompactionMethod method);
+[[nodiscard]] VulkanBlockIdCompactionInputKind blockIdCompactionInputKind(VulkanBlockIdCompactionMethod method);
+[[nodiscard]] bool blockIdCompactionMethodUsesStorage(VulkanBlockIdCompactionMethod method);
+[[nodiscard]] bool blockIdCompactionMethodUsesSampled(VulkanBlockIdCompactionMethod method);
+[[nodiscard]] bool blockIdCompactionMethodIsDense(VulkanBlockIdCompactionMethod method);
 } // namespace nim
 
 namespace nim::vulkan {

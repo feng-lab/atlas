@@ -993,7 +993,14 @@ void Z3DRenderingEngine::exportFixedSize3DAnimation(const ZAnimation* animation,
         QString filename = QString("%1%2.png").arg(namePrefix).arg(i, fieldWidth, 10, QChar('0'));
         QString filepath = tmpdir.filePath(filename);
 
-        takeFixedSizeScreenShotWithoutResetCanvasSizePrivate(filepath, width, height, sst, false, token);
+        takeFixedSizeScreenShotWithoutResetCanvasSizePrivate(filepath,
+                                                             width,
+                                                             height,
+                                                             sst,
+                                                             false,
+                                                             token,
+                                                             tileSize,
+                                                             tileBorder);
       }
     } else {
       int numCols = (width + tileSize - 1) / tileSize;

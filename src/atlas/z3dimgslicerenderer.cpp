@@ -20,7 +20,7 @@
 #include <absl/strings/str_cat.h>
 
 ABSL_DECLARE_FLAG(uint32_t, atlas_volume_rendering_maximum_round);
-ABSL_DECLARE_FLAG(nim::VulkanBlockIdCompactionSource, atlas_vk_blockid_compaction_source);
+ABSL_DECLARE_FLAG(nim::VulkanBlockIdCompactionMethod, atlas_vk_blockid_compaction_method);
 
 namespace nim {
 
@@ -386,15 +386,13 @@ Z3DImgSliceRenderer::recordVulkanStagesToScript(ZVulkanLinearScript& script,
   };
 
   auto blockIdExternalKind = []() -> ExternalImageUseKind {
-    switch (absl::GetFlag(FLAGS_atlas_vk_blockid_compaction_source)) {
-      case VulkanBlockIdCompactionSource::Buffer:
-        return ExternalImageUseKind::TransferSrc;
-      case VulkanBlockIdCompactionSource::Storage:
+    switch (blockIdCompactionInputKind(absl::GetFlag(FLAGS_atlas_vk_blockid_compaction_method))) {
+      case VulkanBlockIdCompactionInputKind::StorageImage:
         return ExternalImageUseKind::StorageRead;
-      case VulkanBlockIdCompactionSource::Sampled:
+      case VulkanBlockIdCompactionInputKind::SampledImage:
         return ExternalImageUseKind::SampledRead;
     }
-    CHECK(false) << "Unknown --atlas_vk_blockid_compaction_source value";
+    CHECK(false) << "Unknown --atlas_vk_blockid_compaction_method value";
     return ExternalImageUseKind::TransferSrc;
   };
 

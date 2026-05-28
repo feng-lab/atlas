@@ -1,0 +1,82 @@
+#version 450
+
+// Storage-image Block-ID compaction with workgroup-local dedupe and parallel local flush.
+
+layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+
+#define EMPTY 0xFFFFFFFFu
+#define LOCAL_BITS 10u
+#define LOCAL_SIZE (1u << LOCAL_BITS)
+#define LOCAL_MASK (LOCAL_SIZE - 1u)
+
+layout(rgba32ui, set = 1, binding = 1) readonly uniform uimage2D uBlockIdImage;
+
+layout(std430, set = 1, binding = 0) buffer BlockList {
+    uint count;
+    uint counts[8];
+    uint ids[];
+};
+
+layout(push_constant) uniform PushConstants {
+    uint width;
+    uint height;
+    uint stride;
+    uint capacity;
+    uint att;
+} pc;
+
+uint hash32(uint x) { return x * 2654435761u; }
+
+shared uint lkeys[LOCAL_SIZE];
+shared uint groupCount;
+
+void localInsert(uint id)
+{
+    if (id == 0u || id == EMPTY) return;
+    uint h = hash32(id) & LOCAL_MASK;
+    for (uint p = 0u; p < 8u; ++p) {
+        uint idx = (h + p) & LOCAL_MASK;
+        uint prev = atomicCompSwap(lkeys[idx], EMPTY, id);
+        if (prev == EMPTY || prev == id) return;
+    }
+}
+
+void main()
+{
+    const uint localThreadCount = gl_WorkGroupSize.x * gl_WorkGroupSize.y;
+    for (uint i = gl_LocalInvocationIndex; i < LOCAL_SIZE; i += localThreadCount) {
+        lkeys[i] = EMPTY;
+    }
+    if (gl_LocalInvocationIndex == 0u) {
+        groupCount = 0u;
+    }
+    barrier();
+
+    uvec3 gid = gl_GlobalInvocationID;
+    if (gid.x < pc.width && gid.y < pc.height) {
+        uvec4 ids4 = imageLoad(uBlockIdImage, ivec2(gid.xy));
+        if (ids4.g == ids4.r) ids4.g = 0u;
+        if (ids4.b == ids4.r || ids4.b == ids4.g) ids4.b = 0u;
+        if (ids4.a == ids4.r || ids4.a == ids4.g || ids4.a == ids4.b) ids4.a = 0u;
+        localInsert(ids4.r);
+        localInsert(ids4.g);
+        localInsert(ids4.b);
+        localInsert(ids4.a);
+    }
+
+    barrier();
+    for (uint i = gl_LocalInvocationIndex; i < LOCAL_SIZE; i += localThreadCount) {
+        uint v = lkeys[i];
+        if (v == EMPTY || v == 0u) continue;
+        uint idx = atomicAdd(count, 1u);
+        atomicAdd(groupCount, 1u);
+        if (idx < pc.capacity) {
+            ids[idx] = v;
+        }
+    }
+
+    barrier();
+    if (gl_LocalInvocationIndex == 0u && groupCount != 0u) {
+        atomicAdd(counts[pc.att], groupCount);
+    }
+}

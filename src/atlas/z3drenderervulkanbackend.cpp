@@ -3292,6 +3292,7 @@ void Z3DRendererVulkanBackend::bindlessPreWarmupImgSlice(Z3DImg* image,
 void Z3DRendererVulkanBackend::bindlessPrePrimeImgRaycasterBlockIdCompaction(
   const std::shared_ptr<Z3DScratchResourcePool::RenderTargetLease>& blockIdLease,
   uint32_t effectiveAttachmentCount,
+  uint32_t maxBlockId,
   std::string_view debugLabel)
 {
   CHECK(m_imgRaycasterContext != nullptr)
@@ -3302,13 +3303,14 @@ void Z3DRendererVulkanBackend::bindlessPrePrimeImgRaycasterBlockIdCompaction(
   CHECK(!isRecording()) << "bindlessPrePrimeImgRaycasterBlockIdCompaction must run before command recording begins"
                         << (debugLabel.empty() ? "" : " (") << debugLabel << (debugLabel.empty() ? "" : ")");
 
-  m_imgRaycasterContext->preRecordPrimeBlockIdCompaction(blockIdLease, effectiveAttachmentCount);
+  m_imgRaycasterContext->preRecordPrimeBlockIdCompaction(blockIdLease, effectiveAttachmentCount, maxBlockId);
 }
 
 void Z3DRendererVulkanBackend::bindlessPrePrimeImgSliceBlockIdCompaction(
   const std::shared_ptr<Z3DScratchResourcePool::RenderTargetLease>& blockIdLease,
   uint32_t sliceCount,
   uint32_t sliceIndex,
+  uint32_t maxBlockId,
   std::string_view debugLabel)
 {
   CHECK(m_imgSliceContext != nullptr)
@@ -3318,7 +3320,7 @@ void Z3DRendererVulkanBackend::bindlessPrePrimeImgSliceBlockIdCompaction(
   CHECK(!isRecording()) << "bindlessPrePrimeImgSliceBlockIdCompaction must run before command recording begins"
                         << (debugLabel.empty() ? "" : " (") << debugLabel << (debugLabel.empty() ? "" : ")");
 
-  m_imgSliceContext->preRecordPrimeBlockIdCompaction(blockIdLease, sliceCount, sliceIndex);
+  m_imgSliceContext->preRecordPrimeBlockIdCompaction(blockIdLease, sliceCount, sliceIndex, maxBlockId);
 }
 
 void Z3DRendererVulkanBackend::ensureSharedSamplers()

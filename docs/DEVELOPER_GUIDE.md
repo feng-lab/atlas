@@ -738,16 +738,21 @@ recorder.recordComputePass(compute);
 
 Vulkan Block-ID Compaction
 
-- Append-only model: compaction uses a per-workgroup local dedupe + global append buffer. Hash/CAS variants are deprecated.
-- Read sources (append only):
-  - `--atlas_vk_blockid_compaction_source=buffer|storage|sampled`
-    - `buffer` (default): Copy image → SSBO in-cmd then read from SSBO.
-    - `storage`: Read via `uimage2D + imageLoad` (layout `GENERAL`).
-    - `sampled`: Read via `usampler2D + texelFetch`.
-- Synchronization: ColorAttachmentWrite → Compute barrier; for buffer source, image transitions to `TRANSFER_SRC_OPTIMAL`, copy to SSBO, and transitions back. A Transfer→Compute buffer barrier makes the SSBO visible to compute.
+- Raycaster candidates are grouped into append payload methods, dense-bitset readback methods, and an append-storage GPU-unique method. Hash/CAS global-set variants are deprecated.
+- Methods:
+  - `--atlas_vk_blockid_compaction_method=append_storage_parallel_flush_gpu_unique|append_storage_parallel_flush|append_sampled_parallel_flush|dense_bitset_readback|dense_bitset_flags_readback`
+    - `append_storage_parallel_flush_gpu_unique` (default): Read via `uimage2D + imageLoad` with the append-style workgroup-local scan, atomically mark IDs into a GPU bitset, emit a unique ID payload on GPU, and read back only `unique_count * sizeof(uint32_t)`.
+    - `append_sampled_parallel_flush`: Read via `usampler2D + texelFetch`, append workgroup-local unique IDs, and flush the local table cooperatively across the workgroup.
+    - `append_storage_parallel_flush`: Read via `uimage2D + imageLoad`, append workgroup-local unique IDs, and flush the local table cooperatively across the workgroup.
+    - `dense_bitset_readback`: Read via `uimage2D + imageLoad`, atomically OR IDs into a dense SSBO bitset, and read back/scan that bitset on CPU.
+    - `dense_bitset_flags_readback`: Same dense bitset output, but header counts are zero/non-zero flags to avoid per-ID count atomics.
+  - `--atlas_benchmark_vk_blockid_compaction=true` keeps the production method intact, also dispatches the competitive raycaster compaction candidates against the same block-ID attachments, validates identical output IDs, and logs separate per-method payload readback and CPU parse timings.
+- Synchronization: block-ID attachments transition from color-attachment writes to the layout required by the selected compute method, then compute writes are made visible before CPU readback. Storage-image methods use `GENERAL`; sampled-image methods use `SHADER_READ_ONLY_OPTIMAL`.
 - Output buffer format (SSBO header, u32 words):
-  - `[count][counts[8]][overflow][ids...]`
-  - `overflow` is a fail-fast signal (GPU sets it via atomics when capacity is exceeded). CPU parsing `CHECK`s `overflow == 0` and `count <= capacity` — Atlas never silently truncates block IDs.
+  - Append payload methods: `[count][counts[8]][ids...]`
+  - Dense-bitset methods: `[count_or_flags][counts[8]][bitset_words...]`
+  - Append GPU-unique method: `[unique_count][counts[8]][bitset_words...][unique_ids...]`; the mark pass fills the bitset and per-attachment counts, then the emit pass clears/reuses `count` as the unique ID counter.
+  - Payload writes are guarded by capacity, but append counters still increase for every append attempt. CPU parsing `CHECK`s counts against capacity so capacity overflow fails fast; Atlas never silently truncates block IDs.
 - Descriptor/layout conventions:
   - Set 0 is reserved for bindless sampled images.
   - Compaction pipelines bind their per-pass resources at set=1 (output SSBO + input buffer/storage image as needed).
@@ -1134,6 +1139,7 @@ Notes
   - `Z3DImg::maxPagedBlockID()` returns the stored max block ID generated with the paging hierarchy. Keep it updated at the same time as `m_posToBlockIDs`; do not recompute it later from derived page-table arrays.
   - To compare real scene inputs, run Atlas with `--atlas_benchmark_blockid_collectors` and optionally set `--atlas_benchmark_blockid_collectors_runs=N`. The OpenGL block-ID paths then replay the same downloaded buffers through the production-default state, dense bitset, current TBB concurrent set, filtered TBB concurrent set, Boost concurrent flat set, thread-local vector/sort, thread-local Abseil/Folly hash-set merge, and sequential integer-sort states, validate identical results, and log sorted end-to-end timings for each render pass. With the flag off, replay buffers are not copied.
   - Synthetic CPU-only collector timing lives in `zbenchmark`. Use a filter such as `--benchmark_filter=BlockIdCollector` to run the generated 1024x1024 RGBA32UI-equivalent stress cases plus real-log-shaped sparse readback cases without adding benchmark noise to normal `ctest` runs.
+  - Vulkan raycaster block-ID compaction is selected with `--atlas_vk_blockid_compaction_method`. The current production default is `append_storage_parallel_flush_gpu_unique`; benchmark candidates include `append_sampled_parallel_flush`, `append_storage_parallel_flush`, `append_storage_parallel_flush_gpu_unique`, `dense_bitset_readback`, and `dense_bitset_flags_readback`. Run with `--atlas_benchmark_vk_blockid_compaction` to record those candidates against the same real attachments, validate identical compacted IDs, and log GPU time, payload readback time, payload size, and CPU parse time per method.
 
 - Progressive Accumulation
   - Raycaster maintains per-eye `m_channelIdx[eye]` and `m_round[eye]` and persistent `m_progressiveLayerLease` across rounds.

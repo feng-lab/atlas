@@ -1,8 +1,8 @@
 #include "zcommandlineflags.h"
 
+#include "zlog.h"
+
 #include <absl/flags/commandlineflag.h>
-#include <absl/log/check.h>
-#include <absl/log/log.h>
 #include <algorithm>
 #include <optional>
 #include <sstream>

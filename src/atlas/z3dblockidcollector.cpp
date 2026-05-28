@@ -4,7 +4,6 @@
 #include "zlog.h"
 
 #include <absl/container/flat_hash_set.h>
-#include <absl/log/check.h>
 #include <boost/unordered/concurrent_flat_set.hpp>
 #include <boost/sort/spreadsort/integer_sort.hpp>
 #include <folly/container/F14Set.h>

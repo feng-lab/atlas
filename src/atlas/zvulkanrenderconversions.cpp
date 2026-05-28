@@ -1,11 +1,83 @@
 #include "zvulkanrenderconversions.h"
 
 #include "zexception.h"
+#include "zlog.h"
 #include "zvulkandevice.h"
 #include "zvulkanbuffer.h"
 #include "zvulkantexture.h"
 
 #include <algorithm>
+
+namespace nim {
+
+std::string_view blockIdCompactionMethodName(VulkanBlockIdCompactionMethod method)
+{
+  switch (method) {
+    case VulkanBlockIdCompactionMethod::AppendStorageParallelFlush:
+      return "append_storage_parallel_flush";
+    case VulkanBlockIdCompactionMethod::AppendStorageParallelFlushGpuUnique:
+      return "append_storage_parallel_flush_gpu_unique";
+    case VulkanBlockIdCompactionMethod::AppendSampledParallelFlush:
+      return "append_sampled_parallel_flush";
+    case VulkanBlockIdCompactionMethod::DenseBitsetReadback:
+      return "dense_bitset_readback";
+    case VulkanBlockIdCompactionMethod::DenseBitsetFlagsReadback:
+      return "dense_bitset_flags_readback";
+  }
+  CHECK(false) << "Unknown VulkanBlockIdCompactionMethod";
+  return "<unknown>";
+}
+
+std::string_view blockIdCompactionShaderFile(VulkanBlockIdCompactionMethod method)
+{
+  switch (method) {
+    case VulkanBlockIdCompactionMethod::AppendStorageParallelFlush:
+      return "block_id_compact_storage_append_parallel_flush.comp.spv";
+    case VulkanBlockIdCompactionMethod::AppendStorageParallelFlushGpuUnique:
+      return "block_id_compact_storage_append_parallel_flush_gpu_unique_mark.comp.spv";
+    case VulkanBlockIdCompactionMethod::AppendSampledParallelFlush:
+      return "block_id_compact_append_parallel_flush.comp.spv";
+    case VulkanBlockIdCompactionMethod::DenseBitsetReadback:
+      return "block_id_compact_dense_bitset_storage.comp.spv";
+    case VulkanBlockIdCompactionMethod::DenseBitsetFlagsReadback:
+      return "block_id_compact_dense_bitset_flags_storage.comp.spv";
+  }
+  CHECK(false) << "Unknown VulkanBlockIdCompactionMethod";
+  return "";
+}
+
+VulkanBlockIdCompactionInputKind blockIdCompactionInputKind(VulkanBlockIdCompactionMethod method)
+{
+  switch (method) {
+    case VulkanBlockIdCompactionMethod::AppendStorageParallelFlush:
+    case VulkanBlockIdCompactionMethod::AppendStorageParallelFlushGpuUnique:
+    case VulkanBlockIdCompactionMethod::DenseBitsetReadback:
+    case VulkanBlockIdCompactionMethod::DenseBitsetFlagsReadback:
+      return VulkanBlockIdCompactionInputKind::StorageImage;
+    case VulkanBlockIdCompactionMethod::AppendSampledParallelFlush:
+      return VulkanBlockIdCompactionInputKind::SampledImage;
+  }
+  CHECK(false) << "Unknown VulkanBlockIdCompactionMethod";
+  return VulkanBlockIdCompactionInputKind::StorageImage;
+}
+
+bool blockIdCompactionMethodUsesStorage(VulkanBlockIdCompactionMethod method)
+{
+  return blockIdCompactionInputKind(method) == VulkanBlockIdCompactionInputKind::StorageImage;
+}
+
+bool blockIdCompactionMethodUsesSampled(VulkanBlockIdCompactionMethod method)
+{
+  return blockIdCompactionInputKind(method) == VulkanBlockIdCompactionInputKind::SampledImage;
+}
+
+bool blockIdCompactionMethodIsDense(VulkanBlockIdCompactionMethod method)
+{
+  return method == VulkanBlockIdCompactionMethod::DenseBitsetReadback ||
+         method == VulkanBlockIdCompactionMethod::DenseBitsetFlagsReadback;
+}
+
+} // namespace nim
 
 namespace nim::vulkan {
 namespace {

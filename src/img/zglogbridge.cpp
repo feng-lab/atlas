@@ -16,10 +16,7 @@
 #undef CHECK
 #endif
 
-#include <absl/base/log_severity.h>
-#include <absl/log/check.h>
-#include <absl/log/log.h>
-#include <absl/strings/string_view.h>
+#include "zlog.h"
 
 namespace nim {
 namespace {
