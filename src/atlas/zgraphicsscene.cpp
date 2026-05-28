@@ -466,7 +466,7 @@ void ZGraphicsScene::mousePressEvent(QGraphicsSceneMouseEvent* event)
         m_polygon.clear();
         m_polygon << m_startScenePt << m_startScenePt; // pt and next potential pt
         VLOG(1) << "";
-        VLOG(1) << "first: " << m_startScenePt;
+        VLOG(1) << fmt::format("first: {}", m_startScenePt);
         QPainterPath path;
         path.addPolygon(m_polygon);
         m_polygonItem = std::make_unique<QGraphicsPathItem>(path);
@@ -502,7 +502,7 @@ void ZGraphicsScene::mousePressEvent(QGraphicsSceneMouseEvent* event)
           m_polygonItem.reset();
         } else if (!isScenePtOverlap(m_polygon.last(), m_polygon[m_polygon.size() - 2])) {
           if (m_polygon.size() == 2) {
-            VLOG(1) << "second: " << scenePt;
+            VLOG(1) << fmt::format("second: {}", scenePt);
             double xdiff1 = m_polygon[0].x() - m_polygon[1].x();
             double ydiff1 = m_polygon[0].y() - m_polygon[1].y();
             VLOG(1) << "soma Length: " << std::sqrt(xdiff1 * xdiff1 + ydiff1 * ydiff1);
@@ -696,7 +696,7 @@ void ZGraphicsScene::mouseDoubleClickEvent(QGraphicsSceneMouseEvent* event)
     m_ctrlPtsItem.clear();
     m_polygonItem.reset();
   } else {
-    VLOG(1) << "d " << event->scenePos() << " " << m_view->currentSlice();
+    VLOG(1) << fmt::format("d {} {}", event->scenePos(), m_view->currentSlice());
     QGraphicsScene::mouseDoubleClickEvent(event);
   }
 }
