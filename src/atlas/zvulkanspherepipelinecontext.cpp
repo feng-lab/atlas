@@ -16,11 +16,11 @@
 #include "zvulkanuniforms.h"
 #include "zvulkanpipelinecontext_raii.h"
 #include "zvulkanstaticpromotionutils.h"
-#include "zsysteminfo.h"
 #include "zlog.h"
 #include "zexception.h"
 #include "zrenderthreadexecutor_tls.h"
 
+#include <QString>
 #include <algorithm>
 #include <array>
 #include <cstddef>
@@ -762,34 +762,34 @@ ZVulkanSpherePipelineContext::ensurePipeline(const PipelineKey& key, const vulka
   }
 
   auto& device = m_backend.device();
-  static const std::string shaderBase = ZSystemInfo::resourcesDirPath().toStdString() + "/shader/vulkan/spv/";
 
   PipelineInstance instance;
 
-  auto selectFragmentShader = [](Z3DRendererBase::ShaderHookType hook) -> std::string {
+  auto selectFragmentShader = [](Z3DRendererBase::ShaderHookType hook) -> QString {
     switch (hook) {
       case Z3DRendererBase::ShaderHookType::DualDepthPeelingInit:
-        return "dual_peeling_init_sphere.frag.spv";
+        return QStringLiteral("dual_peeling_init_sphere.frag.spv");
       case Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel:
-        return "dual_peeling_peel_sphere.frag.spv";
+        return QStringLiteral("dual_peeling_peel_sphere.frag.spv");
       case Z3DRendererBase::ShaderHookType::PerPixelFragmentListCount:
-        return "ppll_count_sphere.frag.spv";
+        return QStringLiteral("ppll_count_sphere.frag.spv");
       case Z3DRendererBase::ShaderHookType::PerPixelFragmentListStore:
-        return "ppll_store_sphere.frag.spv";
+        return QStringLiteral("ppll_store_sphere.frag.spv");
       case Z3DRendererBase::ShaderHookType::WeightedAverageInit:
-        return "wavg_init_sphere.frag.spv";
+        return QStringLiteral("wavg_init_sphere.frag.spv");
       case Z3DRendererBase::ShaderHookType::WeightedBlendedInit:
-        return "wblended_init_sphere.frag.spv";
+        return QStringLiteral("wblended_init_sphere.frag.spv");
       case Z3DRendererBase::ShaderHookType::Normal:
       default:
-        return "sphere.frag.spv";
+        return QStringLiteral("sphere.frag.spv");
     }
   };
 
-  instance.shader = std::make_unique<ZVulkanShader>(device,
-                                                    shaderBase + "sphere.vert.spv",
-                                                    shaderBase + selectFragmentShader(key.shaderHookType),
-                                                    std::nullopt);
+  instance.shader =
+    std::make_unique<ZVulkanShader>(device,
+                                    ZVulkanShader::spirvResourcePath(QStringLiteral("sphere.vert.spv")),
+                                    ZVulkanShader::spirvResourcePath(selectFragmentShader(key.shaderHookType)),
+                                    std::nullopt);
 
   // Dynamic material specialization (match GL's DYNAMIC_MATERIAL_PROPERTY)
   {

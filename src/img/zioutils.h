@@ -1,6 +1,8 @@
 #pragma once
 
 #include <QIODevice>
+#include <QString>
+#include <filesystem>
 #include <fstream>
 #include <memory>
 
@@ -44,6 +46,10 @@ void writeStream(std::ostream& fs, const T* buf, size_t count)
 }
 
 std::unique_ptr<std::FILE, decltype(&std::fclose)> openFile(const QString& filename, const char* mode);
+
+bool isReadableFile(const QString& filename);
+
+QString filesystemPathToQString(const std::filesystem::path& path);
 
 QString getTemporaryFilename(const QString& filename);
 

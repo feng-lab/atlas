@@ -10,7 +10,6 @@
 #include "zvulkanbuffer.h"
 #include "zvulkanrenderconversions.h"
 #include "zvulkanpipelinecontext_raii.h"
-#include "zsysteminfo.h"
 #include "zexception.h"
 
 #include <algorithm>
@@ -107,15 +106,15 @@ ZVulkanBackgroundPipelineContext::ensurePipeline(const PipelineKey& key, const v
   }
 
   auto& device = m_backend.device();
-  static const std::string shaderBase = ZSystemInfo::resourcesDirPath().toStdString() + "/shader/vulkan/spv/";
 
   // No descriptor sets are used for background; pipelines bind only push constants
 
   PipelineInstance instance;
-  instance.shader = std::make_unique<ZVulkanShader>(device,
-                                                    shaderBase + "pass.vert.spv",
-                                                    shaderBase + "background.frag.spv",
-                                                    std::nullopt);
+  instance.shader =
+    std::make_unique<ZVulkanShader>(device,
+                                    ZVulkanShader::spirvResourcePath(QStringLiteral("pass.vert.spv")),
+                                    ZVulkanShader::spirvResourcePath(QStringLiteral("background.frag.spv")),
+                                    std::nullopt);
 
   auto vertexInput = makeVertexInputState();
   instance.pipeline = device.createPipeline(*instance.shader, vertexInput, vk::PrimitiveTopology::eTriangleStrip);

@@ -24,8 +24,6 @@
 #include "zvulkanuniforms.h"
 #include "zabslflagtypes.h"
 #include "zvulkanpipelinecontext_raii.h"
-#include "zsysteminfo.h"
-#include <fstream>
 #include "z3drenderervulkanbackend.h"
 #include "zvulkanpagedimageblockuploader.h"
 #include "zcancellation.h"
@@ -135,19 +133,6 @@ ABSL_FLAG(int32_t,
 namespace nim {
 
 namespace {
-
-std::vector<uint32_t> readSpirvFile(const std::string& path)
-{
-  VLOG(2) << "opening SPIR-V file: " << path;
-  std::ifstream file(path, std::ios::ate | std::ios::binary);
-  CHECK(file) << "Failed to open SPIR-V file: " << path;
-  const size_t fileSize = static_cast<size_t>(file.tellg());
-  CHECK(fileSize % 4 == 0) << "Invalid SPIR-V size (must be multiple of 4): " << path;
-  std::vector<uint32_t> buffer(fileSize / 4);
-  file.seekg(0);
-  file.read(reinterpret_cast<char*>(buffer.data()), fileSize);
-  return buffer;
-}
 
 ImgCompositingMode sanitizeMode(ImgCompositingMode mode)
 {
@@ -2506,14 +2491,13 @@ bool blockIdCompactionMethodUsesAppendGpuUnique(VulkanBlockIdCompactionMethod me
 void ZVulkanImgRaycasterPipelineContext::ensureBlockIdCompactionPipeline()
 {
   auto& device = m_backend.device().context().device();
-  const std::string shaderBase = nim::ZSystemInfo::resourcesDirPath().toStdString() + "/shader/vulkan/spv/";
   const vk::DescriptorSetLayout bindlessLayout = m_backend.bindlessSampledImageDescriptorSetLayout();
   CHECK(static_cast<VkDescriptorSetLayout>(bindlessLayout) != VK_NULL_HANDLE)
     << "Block-ID compaction requires backend bindless descriptor set layout";
 
   auto loadComputePipeline =
-    [&](const std::string& compPath, vk::PipelineLayout layout, std::optional<vk::raii::Pipeline>& pipeline) {
-      auto spirv = readSpirvFile(compPath);
+    [&](const QString& compPath, vk::PipelineLayout layout, std::optional<vk::raii::Pipeline>& pipeline) {
+      auto spirv = ZVulkanShader::readSPIRVFile(compPath);
       vk::raii::ShaderModule compModule(
         device,
         vk::ShaderModuleCreateInfo{.codeSize = spirv.size() * sizeof(uint32_t), .pCode = spirv.data()});
@@ -2556,10 +2540,10 @@ void ZVulkanImgRaycasterPipelineContext::ensureBlockIdCompactionPipeline()
                                      .pushConstantRangeCount = 1,
                                      .pPushConstantRanges = &pc});
     }
-    loadComputePipeline(
-      shaderBase + std::string(blockIdCompactionShaderFile(VulkanBlockIdCompactionMethod::AppendStorageParallelFlush)),
-      **m_blockIdCompactPipelineLayoutStorage,
-      m_blockIdCompactPipelineStorageParallelFlush);
+    loadComputePipeline(ZVulkanShader::spirvResourcePath(
+                          blockIdCompactionShaderFile(VulkanBlockIdCompactionMethod::AppendStorageParallelFlush)),
+                        **m_blockIdCompactPipelineLayoutStorage,
+                        m_blockIdCompactPipelineStorageParallelFlush);
     if (VLOG_IS_ON(1)) {
       VLOG(1) << "ensureBlockIdCompactionPipeline: method=append_storage_parallel_flush";
     }
@@ -2594,10 +2578,10 @@ void ZVulkanImgRaycasterPipelineContext::ensureBlockIdCompactionPipeline()
                                      .pushConstantRangeCount = 1,
                                      .pPushConstantRanges = &pc});
     }
-    loadComputePipeline(
-      shaderBase + std::string(blockIdCompactionShaderFile(VulkanBlockIdCompactionMethod::AppendSampledParallelFlush)),
-      **m_blockIdCompactPipelineLayoutSampled,
-      m_blockIdCompactPipelineSampledParallelFlush);
+    loadComputePipeline(ZVulkanShader::spirvResourcePath(
+                          blockIdCompactionShaderFile(VulkanBlockIdCompactionMethod::AppendSampledParallelFlush)),
+                        **m_blockIdCompactPipelineLayoutSampled,
+                        m_blockIdCompactPipelineSampledParallelFlush);
     if (VLOG_IS_ON(1)) {
       VLOG(1) << "ensureBlockIdCompactionPipeline: method=append_sampled_parallel_flush";
     }
@@ -2636,10 +2620,10 @@ void ZVulkanImgRaycasterPipelineContext::ensureBlockIdCompactionPipeline()
                                      .pushConstantRangeCount = 1,
                                      .pPushConstantRanges = &pc});
     }
-    loadComputePipeline(shaderBase +
-                          std::string(blockIdCompactionShaderFile(VulkanBlockIdCompactionMethod::DenseBitsetReadback)),
-                        **m_blockIdCompactPipelineLayoutDenseBitsetStorage,
-                        m_blockIdCompactPipelineDenseBitsetStorage);
+    loadComputePipeline(
+      ZVulkanShader::spirvResourcePath(blockIdCompactionShaderFile(VulkanBlockIdCompactionMethod::DenseBitsetReadback)),
+      **m_blockIdCompactPipelineLayoutDenseBitsetStorage,
+      m_blockIdCompactPipelineDenseBitsetStorage);
     if (VLOG_IS_ON(1)) {
       VLOG(1) << "ensureBlockIdCompactionPipeline: method=dense_bitset_readback";
     }
@@ -2678,10 +2662,10 @@ void ZVulkanImgRaycasterPipelineContext::ensureBlockIdCompactionPipeline()
                                      .pushConstantRangeCount = 1,
                                      .pPushConstantRanges = &pc});
     }
-    loadComputePipeline(
-      shaderBase + std::string(blockIdCompactionShaderFile(VulkanBlockIdCompactionMethod::DenseBitsetFlagsReadback)),
-      **m_blockIdCompactPipelineLayoutDenseBitsetStorage,
-      m_blockIdCompactPipelineDenseBitsetFlagsStorage);
+    loadComputePipeline(ZVulkanShader::spirvResourcePath(
+                          blockIdCompactionShaderFile(VulkanBlockIdCompactionMethod::DenseBitsetFlagsReadback)),
+                        **m_blockIdCompactPipelineLayoutDenseBitsetStorage,
+                        m_blockIdCompactPipelineDenseBitsetFlagsStorage);
     if (VLOG_IS_ON(1)) {
       VLOG(1) << "ensureBlockIdCompactionPipeline: method=dense_bitset_flags_readback";
     }
@@ -2721,15 +2705,16 @@ void ZVulkanImgRaycasterPipelineContext::ensureBlockIdCompactionPipeline()
                                      .pPushConstantRanges = &pc});
     }
     if (!m_blockIdCompactPipelineAppendStorageGpuUniqueMark) {
-      loadComputePipeline(shaderBase + std::string(blockIdCompactionShaderFile(
-                                         VulkanBlockIdCompactionMethod::AppendStorageParallelFlushGpuUnique)),
+      loadComputePipeline(ZVulkanShader::spirvResourcePath(blockIdCompactionShaderFile(
+                            VulkanBlockIdCompactionMethod::AppendStorageParallelFlushGpuUnique)),
                           **m_blockIdCompactPipelineLayoutDenseBitsetStorage,
                           m_blockIdCompactPipelineAppendStorageGpuUniqueMark);
     }
     if (!m_blockIdCompactPipelineAppendGpuUniqueEmit) {
-      loadComputePipeline(shaderBase + "block_id_compact_append_gpu_unique_emit.comp.spv",
-                          **m_blockIdCompactPipelineLayoutDenseBitsetStorage,
-                          m_blockIdCompactPipelineAppendGpuUniqueEmit);
+      loadComputePipeline(
+        ZVulkanShader::spirvResourcePath(QStringLiteral("block_id_compact_append_gpu_unique_emit.comp.spv")),
+        **m_blockIdCompactPipelineLayoutDenseBitsetStorage,
+        m_blockIdCompactPipelineAppendGpuUniqueEmit);
     }
     if (VLOG_IS_ON(1)) {
       VLOG(1) << "ensureBlockIdCompactionPipeline: method=append_storage_parallel_flush_gpu_unique";
@@ -3490,7 +3475,6 @@ void ZVulkanImgRaycasterPipelineContext::recordBlockIdCompaction(Z3DRendererBase
 void ZVulkanImgRaycasterPipelineContext::ensureEntryPipelines(vk::Format colorFormat)
 {
   auto& device = m_backend.device();
-  static const std::string shaderBase = ZSystemInfo::resourcesDirPath().toStdString() + "/shader/vulkan/spv/";
 
   auto buildPipeline = [&](PipelineInstance& instance, vk::CullModeFlagBits cullMode) {
     const bool needsRebuild =
@@ -3500,11 +3484,11 @@ void ZVulkanImgRaycasterPipelineContext::ensureEntryPipelines(vk::Format colorFo
     }
 
     if (!instance.shader) {
-      instance.shader =
-        std::make_unique<ZVulkanShader>(device,
-                                        shaderBase + "transform_with_3dtexture_and_eye_coordinate.vert.spv",
-                                        shaderBase + "render_3dtexture_coordinate_and_eye_coordinate.frag.spv",
-                                        std::nullopt);
+      instance.shader = std::make_unique<ZVulkanShader>(
+        device,
+        ZVulkanShader::spirvResourcePath(QStringLiteral("transform_with_3dtexture_and_eye_coordinate.vert.spv")),
+        ZVulkanShader::spirvResourcePath(QStringLiteral("render_3dtexture_coordinate_and_eye_coordinate.frag.spv")),
+        std::nullopt);
     }
 
     vk::VertexInputBindingDescription binding{.binding = 0,
@@ -3568,13 +3552,12 @@ ZVulkanImgRaycasterPipelineContext::ensureBlockIdPipeline(const BlockIdPipelineK
   CHECK(pageDataLayout) << "Block-ID pipeline requires backend page-data descriptor set layout";
 
   auto& device = m_backend.device();
-  static const std::string shaderBase = ZSystemInfo::resourcesDirPath().toStdString() + "/shader/vulkan/spv/";
-
   PipelineInstance instance;
-  instance.shader = std::make_unique<ZVulkanShader>(device,
-                                                    shaderBase + "pass.vert.spv",
-                                                    shaderBase + "image3d_raycaster_blockID.frag.spv",
-                                                    std::nullopt);
+  instance.shader = std::make_unique<ZVulkanShader>(
+    device,
+    ZVulkanShader::spirvResourcePath(QStringLiteral("pass.vert.spv")),
+    ZVulkanShader::spirvResourcePath(QStringLiteral("image3d_raycaster_blockID.frag.spv")),
+    std::nullopt);
 
   vk::VertexInputBindingDescription binding{.binding = 0,
                                             .stride = sizeof(glm::vec3),
@@ -3654,13 +3637,12 @@ ZVulkanImgRaycasterPipelineContext::ensureProgressivePipeline(const ProgressiveP
   CHECK(pageDataLayout) << "Progressive raycaster pipeline requires backend page-data descriptor set layout";
 
   auto& device = m_backend.device();
-  static const std::string shaderBase = ZSystemInfo::resourcesDirPath().toStdString() + "/shader/vulkan/spv/";
-
   PipelineInstance instance;
-  instance.shader = std::make_unique<ZVulkanShader>(device,
-                                                    shaderBase + "pass.vert.spv",
-                                                    shaderBase + "image3d_raycaster.frag.spv",
-                                                    std::nullopt);
+  instance.shader =
+    std::make_unique<ZVulkanShader>(device,
+                                    ZVulkanShader::spirvResourcePath(QStringLiteral("pass.vert.spv")),
+                                    ZVulkanShader::spirvResourcePath(QStringLiteral("image3d_raycaster.frag.spv")),
+                                    std::nullopt);
 
   vk::VertexInputBindingDescription binding{.binding = 0,
                                             .stride = sizeof(glm::vec3),
@@ -3752,13 +3734,12 @@ ZVulkanImgRaycasterPipelineContext::ensureCopyPipeline(const CopyPipelineKey& ke
   CHECK(bindlessLayout) << "Copy pipeline requires backend bindless descriptor set layout";
 
   auto& device = m_backend.device();
-  static const std::string shaderBase = ZSystemInfo::resourcesDirPath().toStdString() + "/shader/vulkan/spv/";
-
   PipelineInstance instance;
-  instance.shader = std::make_unique<ZVulkanShader>(device,
-                                                    shaderBase + "pass.vert.spv",
-                                                    shaderBase + "copy_raycaster_image.frag.spv",
-                                                    std::nullopt);
+  instance.shader =
+    std::make_unique<ZVulkanShader>(device,
+                                    ZVulkanShader::spirvResourcePath(QStringLiteral("pass.vert.spv")),
+                                    ZVulkanShader::spirvResourcePath(QStringLiteral("copy_raycaster_image.frag.spv")),
+                                    std::nullopt);
 
   vk::VertexInputBindingDescription binding{.binding = 0,
                                             .stride = sizeof(glm::vec3),
@@ -3816,13 +3797,12 @@ ZVulkanImgRaycasterPipelineContext::ensureMergePipeline(const MergePipelineKey& 
   CHECK(bindlessLayout) << "Merge pipeline requires backend bindless descriptor set layout";
 
   auto& device = m_backend.device();
-  static const std::string shaderBase = ZSystemInfo::resourcesDirPath().toStdString() + "/shader/vulkan/spv/";
-
   PipelineInstance instance;
-  instance.shader = std::make_unique<ZVulkanShader>(device,
-                                                    shaderBase + "pass.vert.spv",
-                                                    shaderBase + "image2d_array_compositor.frag.spv",
-                                                    std::nullopt);
+  instance.shader = std::make_unique<ZVulkanShader>(
+    device,
+    ZVulkanShader::spirvResourcePath(QStringLiteral("pass.vert.spv")),
+    ZVulkanShader::spirvResourcePath(QStringLiteral("image2d_array_compositor.frag.spv")),
+    std::nullopt);
 
   vk::VertexInputBindingDescription binding{.binding = 0,
                                             .stride = sizeof(glm::vec3),
@@ -3899,12 +3879,11 @@ void ZVulkanImgRaycasterPipelineContext::ensureDepthOnlyRampPipeline(vk::Format 
   }
 
   auto& device = m_backend.device();
-  static const std::string shaderBase = ZSystemInfo::resourcesDirPath().toStdString() + "/shader/vulkan/spv/";
-
-  m_depthRampPipeline.shader = std::make_unique<ZVulkanShader>(device,
-                                                               shaderBase + "pass.vert.spv",
-                                                               shaderBase + "depth_ramp.frag.spv",
-                                                               std::nullopt);
+  m_depthRampPipeline.shader =
+    std::make_unique<ZVulkanShader>(device,
+                                    ZVulkanShader::spirvResourcePath(QStringLiteral("pass.vert.spv")),
+                                    ZVulkanShader::spirvResourcePath(QStringLiteral("depth_ramp.frag.spv")),
+                                    std::nullopt);
 
   // Screen-space quad as triangle strip with vec3 positions (z=0) at location 0
   vk::VertexInputBindingDescription binding{.binding = 0,
@@ -4034,7 +4013,6 @@ ZVulkanImgRaycasterPipelineContext::ensureFastPipeline(const FastPipelineKey& ke
   CHECK(raySetupLayout) << "Fast pipeline requires backend ray-setup descriptor set layout";
 
   auto& device = m_backend.device();
-  static const std::string shaderBase = ZSystemInfo::resourcesDirPath().toStdString() + "/shader/vulkan/spv/";
 
   PipelineInstance instance;
 
@@ -4080,10 +4058,11 @@ ZVulkanImgRaycasterPipelineContext::ensureFastPipeline(const FastPipelineKey& ke
 
   switch (key.variant) {
     case FastPipelineVariant::Volume: {
-      instance.shader = std::make_unique<ZVulkanShader>(device,
-                                                        shaderBase + "pass.vert.spv",
-                                                        shaderBase + "volume_raycaster_single_channel.frag.spv",
-                                                        std::nullopt);
+      instance.shader = std::make_unique<ZVulkanShader>(
+        device,
+        ZVulkanShader::spirvResourcePath(QStringLiteral("pass.vert.spv")),
+        ZVulkanShader::spirvResourcePath(QStringLiteral("volume_raycaster_single_channel.frag.spv")),
+        std::nullopt);
       vk::VertexInputBindingDescription binding{.binding = 0,
                                                 .stride = sizeof(glm::vec3),
                                                 .inputRate = vk::VertexInputRate::eVertex};
@@ -4142,10 +4121,11 @@ ZVulkanImgRaycasterPipelineContext::ensureFastPipeline(const FastPipelineKey& ke
     }
 
     case FastPipelineVariant::Image2D: {
-      instance.shader = std::make_unique<ZVulkanShader>(device,
-                                                        shaderBase + "transform_with_2dtexture.vert.spv",
-                                                        shaderBase + "image2d_with_transfun_single_channel.frag.spv",
-                                                        std::nullopt);
+      instance.shader = std::make_unique<ZVulkanShader>(
+        device,
+        ZVulkanShader::spirvResourcePath(QStringLiteral("transform_with_2dtexture.vert.spv")),
+        ZVulkanShader::spirvResourcePath(QStringLiteral("image2d_with_transfun_single_channel.frag.spv")),
+        std::nullopt);
 
       vk::VertexInputBindingDescription binding{.binding = 0,
                                                 .stride = static_cast<uint32_t>(sizeof(EntryVertex)),
@@ -4198,11 +4178,11 @@ ZVulkanImgRaycasterPipelineContext::ensureFastPipeline(const FastPipelineKey& ke
     }
 
     case FastPipelineVariant::Slice2D: {
-      instance.shader =
-        std::make_unique<ZVulkanShader>(device,
-                                        shaderBase + "transform_with_3dtexture_and_eye_coordinate.vert.spv",
-                                        shaderBase + "volume_slice_with_transfun_single_channel.frag.spv",
-                                        std::nullopt);
+      instance.shader = std::make_unique<ZVulkanShader>(
+        device,
+        ZVulkanShader::spirvResourcePath(QStringLiteral("transform_with_3dtexture_and_eye_coordinate.vert.spv")),
+        ZVulkanShader::spirvResourcePath(QStringLiteral("volume_slice_with_transfun_single_channel.frag.spv")),
+        std::nullopt);
 
       vk::VertexInputBindingDescription binding{.binding = 0,
                                                 .stride = static_cast<uint32_t>(sizeof(EntryVertex)),

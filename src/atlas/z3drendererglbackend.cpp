@@ -4,7 +4,6 @@
 #include "z3drendererbase.h"
 #include "z3dshaderprogram.h"
 
-#include <absl/strings/str_cat.h>
 #include <algorithm>
 
 namespace nim {
@@ -111,10 +110,10 @@ public:
     header.reserve(256);
 
     fmt::format_to(std::back_inserter(header), "#version {}\n", glslVer);
-    absl::StrAppend(&header, "#define lowp\n#define mediump\n#define highp\n");
+    header.append("#define lowp\n#define mediump\n#define highp\n");
     fmt::format_to(std::back_inserter(header), "#define GLSL_VERSION {}\n", glslVer);
     if (!renderer.clipPlanes().empty()) {
-      absl::StrAppend(&header, "#define HAS_CLIP_PLANE\n");
+      header.append("#define HAS_CLIP_PLANE\n");
     }
     const size_t clipPlaneCount = renderer.clipPlanes().size();
     const int deviceMaxClipDistances = std::max(0, Z3DGpuInfo::instance().maxClipDistances());
@@ -128,18 +127,18 @@ public:
     // Runtime uniform that mirrors Z3DRendererBase::clipEnabled(). When extra clip
     // planes overflow the fixed-function clip distance limit, shaders fall back
     // to fragment-stage discard using interpolated distances.
-    absl::StrAppend(&header, "uniform bool clip_planes_enabled;\n");
+    header.append("uniform bool clip_planes_enabled;\n");
 
     auto appendFogMacro = [&](FogMode mode) {
       switch (mode) {
         case FogMode::Linear:
-          absl::StrAppend(&header, "#define USE_LINEAR_FOG\n");
+          header.append("#define USE_LINEAR_FOG\n");
           break;
         case FogMode::Exponential:
-          absl::StrAppend(&header, "#define USE_EXPONENTIAL_FOG\n");
+          header.append("#define USE_EXPONENTIAL_FOG\n");
           break;
         case FogMode::ExponentialSquared:
-          absl::StrAppend(&header, "#define USE_SQUARED_EXPONENTIAL_FOG\n");
+          header.append("#define USE_SQUARED_EXPONENTIAL_FOG\n");
           break;
         case FogMode::None:
           break;
@@ -166,7 +165,7 @@ public:
     fmt::format_to(std::back_inserter(header), "#define GLSL_VERSION {}\n", glslVer);
 
     if (!renderer.clipPlanes().empty()) {
-      absl::StrAppend(&header, "#define HAS_CLIP_PLANE\n");
+      header.append("#define HAS_CLIP_PLANE\n");
     }
     const size_t clipPlaneCount = renderer.clipPlanes().size();
     const int deviceMaxClipDistances = std::max(0, Z3DGpuInfo::instance().maxClipDistances());
@@ -177,7 +176,7 @@ public:
     fmt::format_to(std::back_inserter(header),
                    "#define EXTRA_CLIP_PLANE_COUNT {}\n",
                    clipPlaneCount - clipDistanceCount);
-    absl::StrAppend(&header, "uniform bool clip_planes_enabled;\n");
+    header.append("uniform bool clip_planes_enabled;\n");
 
     return header;
   }

@@ -1,5 +1,6 @@
 #include "zneuroglancerprecomputedannotations.h"
 #include "zneuroglancerremotecontext.h"
+#include "zexception.h"
 #include "zremoteobjectstore.h"
 
 #include <folly/coro/BlockingWait.h>
@@ -9,7 +10,6 @@
 #include <cstring>
 #include <deque>
 #include <optional>
-#include <stdexcept>
 #include <string>
 #include <utility>
 #include <vector>
@@ -58,7 +58,7 @@ public:
                                .headers = std::move(request.headers),
                                .exactByteRange = request.exactByteRange});
     if (responses.empty()) {
-      throw std::runtime_error("FakeRemoteObjectStore called without a queued response");
+      throw ZException("FakeRemoteObjectStore called without a queued response");
     }
     auto next = std::move(responses.front());
     responses.pop_front();

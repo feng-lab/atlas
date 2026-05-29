@@ -1,41 +1,51 @@
 #include "zvulkanshader.h"
 
+#include "zioutils.h"
 #include "zvulkandevice.h"
 #include "zvulkancontext.h"
 #include "zexception.h"
 #include "zlog.h"
+#include "zsysteminfo.h"
 
-#include <fstream>
+#include <QDir>
 
 namespace nim {
 
-namespace {
-static std::vector<uint32_t> readSpirvFile(const std::string& path)
+QString ZVulkanShader::spirvResourcePath(const QString& spvName)
 {
-  VLOG(2) << "opening SPIR-V file: " << path;
-  std::ifstream file(path, std::ios::ate | std::ios::binary);
-  if (!file) {
-    throw ZException(fmt::format("Failed to open SPIR-V file: {}", path));
+  QString relativePath = QStringLiteral("shader/vulkan/spv/");
+  relativePath += spvName;
+  return QDir(ZSystemInfo::resourcesDirPath()).filePath(relativePath);
+}
+
+std::vector<uint32_t> ZVulkanShader::readSPIRVFile(const QString& spvPath)
+{
+  VLOG(2) << "opening SPIR-V file: " << spvPath;
+  std::ifstream file = openIFStream(spvPath, std::ios::ate | std::ios::binary);
+  const std::streampos end = file.tellg();
+  if (end < std::streampos{0}) {
+    throw ZException(fmt::format("Failed to determine SPIR-V file size: {}", spvPath));
   }
-  const size_t fileSize = static_cast<size_t>(file.tellg());
+  const size_t fileSize = static_cast<size_t>(end);
   if (fileSize % 4 != 0) {
-    throw ZException(fmt::format("Invalid SPIR-V size (must be multiple of 4): {}", path));
+    throw ZException(fmt::format("Invalid SPIR-V size (must be multiple of 4): {}", spvPath));
   }
   std::vector<uint32_t> buffer(fileSize / 4);
-  file.seekg(0);
-  file.read(reinterpret_cast<char*>(buffer.data()), fileSize);
+  if (!buffer.empty()) {
+    file.seekg(0, std::ios::beg);
+    readStream(file, buffer.data(), fileSize);
+  }
   return buffer;
 }
-} // namespace
 
 ZVulkanShader::ZVulkanShader(ZVulkanDevice& device)
   : m_device(device)
 {}
 
 ZVulkanShader::ZVulkanShader(ZVulkanDevice& device,
-                             const std::string& vertexSpvPath,
-                             const std::string& fragmentSpvPath,
-                             const std::optional<std::string>& geometrySpvPath)
+                             const QString& vertexSpvPath,
+                             const QString& fragmentSpvPath,
+                             const std::optional<QString>& geometrySpvPath)
   : m_device(device)
 {
   loadFromSPIRVFiles(vertexSpvPath, fragmentSpvPath, geometrySpvPath);
@@ -47,10 +57,10 @@ vk::raii::ShaderModule ZVulkanShader::createShaderModule(const std::vector<uint3
   return vk::raii::ShaderModule(m_device.context().device(), createInfo);
 }
 
-void ZVulkanShader::addStageFromSPIRVFile(const std::string& spvPath, vk::ShaderStageFlagBits stage)
+void ZVulkanShader::addStageFromSPIRVFile(const QString& spvPath, vk::ShaderStageFlagBits stage)
 {
   VLOG(2) << "add SPIR-V stage=" << static_cast<int>(stage) << " path=" << spvPath;
-  auto spirv = readSpirvFile(spvPath);
+  auto spirv = readSPIRVFile(spvPath);
   addStageFromSPIRV(spirv, stage);
 }
 
@@ -102,19 +112,21 @@ void ZVulkanShader::addStageFromSPIRV(const std::vector<uint32_t>& spirv, vk::Sh
   }
 }
 
-void ZVulkanShader::loadFromSPIRVFiles(const std::string& vertexSpvPath,
-                                       const std::string& fragmentSpvPath,
-                                       const std::optional<std::string>& geometrySpvPath)
+void ZVulkanShader::loadFromSPIRVFiles(const QString& vertexSpvPath,
+                                       const QString& fragmentSpvPath,
+                                       const std::optional<QString>& geometrySpvPath)
 {
   VLOG(2) << "load SPIR-V files vert=" << vertexSpvPath
-          << (geometrySpvPath ? ", geom=" + *geometrySpvPath : std::string{}) << ", frag=" << fragmentSpvPath;
+          << (geometrySpvPath ? QStringLiteral(", geom=") + *geometrySpvPath : QString{})
+          << ", frag=" << fragmentSpvPath;
   addStageFromSPIRVFile(vertexSpvPath, vk::ShaderStageFlagBits::eVertex);
-  if (geometrySpvPath && !geometrySpvPath->empty()) {
+  if (geometrySpvPath && !geometrySpvPath->isEmpty()) {
     addStageFromSPIRVFile(*geometrySpvPath, vk::ShaderStageFlagBits::eGeometry);
   }
   addStageFromSPIRVFile(fragmentSpvPath, vk::ShaderStageFlagBits::eFragment);
   LOG(INFO) << "Loaded SPIR-V modules: vert=" << vertexSpvPath
-            << (geometrySpvPath ? ", geom=" + *geometrySpvPath : std::string{}) << ", frag=" << fragmentSpvPath;
+            << (geometrySpvPath ? QStringLiteral(", geom=") + *geometrySpvPath : QString{})
+            << ", frag=" << fragmentSpvPath;
 }
 
 void ZVulkanShader::setSpecializationConstants(vk::ShaderStageFlagBits stage,

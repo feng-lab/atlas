@@ -17,7 +17,6 @@
 #include <cstring>
 #include <memory>
 #include <span>
-#include <absl/strings/str_cat.h>
 
 ABSL_DECLARE_FLAG(uint32_t, atlas_volume_rendering_maximum_round);
 ABSL_DECLARE_FLAG(nim::VulkanBlockIdCompactionMethod, atlas_vk_blockid_compaction_method);
@@ -754,10 +753,10 @@ std::string Z3DImgSliceRenderer::generateHeader()
   if (m_img && m_img->numChannels() > 0) {
     fmt::format_to(std::back_inserter(header), "#define NUM_VOLUMES {}\n", m_img->numChannels());
   } else {
-    absl::StrAppend(&header, "#define NUM_VOLUMES 0\n", "#define DISABLE_TEXTURE_COORD_OUTPUT\n");
+    header.append("#define NUM_VOLUMES 0\n#define DISABLE_TEXTURE_COORD_OUTPUT\n");
   }
 
-  absl::StrAppend(&header, "#define MAX_PROJ_MERGE\n");
+  header.append("#define MAX_PROJ_MERGE\n");
   return header;
 }
 
@@ -891,7 +890,7 @@ double Z3DImgSliceRenderer::renderSlice(Z3DEye eye, bool progressive)
     std::vector<uint32_t> missingBlockIDs;
     blockIdCollector.fillSortedBlockIds(missingBlockIDs, Z3DBlockIdSortOrder::Ascending);
     if (shouldBenchmarkZ3DBlockIdCollectors()) {
-      blockIdCollector.benchmarkCollectors(absl::StrCat("GL slice channel ", i), Z3DBlockIdSortOrder::Ascending);
+      blockIdCollector.benchmarkCollectors(fmt::format("GL slice channel {}", i), Z3DBlockIdSortOrder::Ascending);
     }
     bt.recordEvent("render and collect blockids");
 

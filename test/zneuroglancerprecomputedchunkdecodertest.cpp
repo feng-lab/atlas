@@ -9,7 +9,6 @@
 #include <array>
 #include <cstdint>
 #include <cstring>
-#include <stdexcept>
 #include <vector>
 
 namespace nim {
@@ -22,7 +21,7 @@ struct PngWriteState
 
 void pngWriteErrorFunction(png_structp, const char* message)
 {
-  throw std::runtime_error(message ? message : "libpng write error");
+  throw ZException(message ? message : "libpng write error");
 }
 
 void pngWriteWarningFunction(png_structp, const char* /*message*/) {}
@@ -43,22 +42,22 @@ void pngFlushCallback(png_structp) {}
 std::vector<uint8_t> encodeRgb8PngToMemory(size_t width, size_t height, const std::vector<uint8_t>& interleavedRgb)
 {
   if (width == 0 || height == 0) {
-    throw std::runtime_error("invalid png dims");
+    throw ZException("invalid png dims");
   }
   if (interleavedRgb.size() != width * height * 3) {
-    throw std::runtime_error("invalid rgb size");
+    throw ZException("invalid rgb size");
   }
 
   PngWriteState state{};
 
   png_structp pngPtr = png_create_write_struct(PNG_LIBPNG_VER_STRING, nullptr, pngWriteErrorFunction, pngWriteWarningFunction);
   if (!pngPtr) {
-    throw std::runtime_error("libpng: png_create_write_struct failed");
+    throw ZException("libpng: png_create_write_struct failed");
   }
   png_infop infoPtr = png_create_info_struct(pngPtr);
   if (!infoPtr) {
     png_destroy_write_struct(&pngPtr, nullptr);
-    throw std::runtime_error("libpng: png_create_info_struct failed");
+    throw ZException("libpng: png_create_info_struct failed");
   }
 
   try {

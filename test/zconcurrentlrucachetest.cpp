@@ -1,4 +1,5 @@
 #include "zconcurrentlrucache.h"
+#include "zexception.h"
 
 #include <gtest/gtest.h>
 
@@ -9,7 +10,6 @@
 #include <memory>
 #include <optional>
 #include <random>
-#include <stdexcept>
 #include <thread>
 #include <vector>
 
@@ -59,17 +59,17 @@ class ThrowingDiskBackend final : public Cache::DiskBackend
 public:
   [[nodiscard]] std::optional<Cache::DiskLookupResult> tryGet(const int&) override
   {
-    throw std::runtime_error("disk get failed");
+    throw nim::ZException("disk get failed");
   }
 
   void put(const int&, const int&, size_t) override
   {
-    throw std::runtime_error("disk put failed");
+    throw nim::ZException("disk put failed");
   }
 
   void erase(const int&) override
   {
-    throw std::runtime_error("disk erase failed");
+    throw nim::ZException("disk erase failed");
   }
 };
 

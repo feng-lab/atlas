@@ -15,6 +15,7 @@
 
 #include <QDir>
 #include <QFileInfo>
+#include <QString>
 
 #include <array>
 #include <optional>
@@ -183,7 +184,8 @@ runSeededTraceLegacyLike(const std::string& signalPath, const std::string& outpu
 
   nim::ZSwc hostSwc;
   std::string swcError;
-  if (!loadSwcLegacyOrder(hostSwcPath, hostSwc, &swcError)) {
+  const QString hostSwcFilename = QString::fromStdString(hostSwcPath);
+  if (!loadSwcLegacyOrder(hostSwcFilename, hostSwc, &swcError)) {
     LOG(ERROR) << "Failed to read host SWC: " << hostSwcPath << " (" << swcError << ")";
     return 1;
   }

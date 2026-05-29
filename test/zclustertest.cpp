@@ -71,13 +71,6 @@ TEST(cluster, MeanAndCovariance)
   epLWShCov *= 100;
   MatrixXd lwshcov = ZEigenUtils::featureLWShrunkCovariance(mat, &LWShrunkShrinkage);
 
-  //  double shk;
-  //  MatrixXd oashcov = ZEigenUtils::featureOAShrunkCovariance(mat, &shk);
-  //  std::cout << "shrunk cov: " << oashcov << std::endl;
-  //  std::cout << "shrinkage: " << shk << std::endl;
-  //  MatrixXd lwdshcov = ZEigenUtils::featureLWDiagShrunkCovariance(mat, &shk);
-  //  std::cout << "shrunk cov: " << lwdshcov << std::endl;
-  //  std::cout << "shrinkage: " << shk << std::endl;
   double epLWDiagUnbiasShrinkage = 0.002426302799654;
   MatrixXd epLWDiagShrunkUnbiasCov(2, 2);
   epLWDiagShrunkUnbiasCov << 0.013027283328495, 0.139438934524433, 0.139438934524433, 1.848233123507706;
@@ -202,37 +195,7 @@ TEST(cluster, KMeans)
   ZKMeans<double, double> kmtest(mat, weight, 3, 10);
   double bestCompactness = kmtest.run();
   LOG(INFO) <<  "final centroids: " << kmtest.centroids();
-  LOG(INFO) <<  "final potential: " << bestCompactness;
-
-  // std::cout << "clamp matrix: " << ZEigenUtils::clampMatrix(mat, 6, 20) << std::endl;
-
-  //  QDir dir("~/Library/Application Support/Brain Explorer 2/Atlases/Allen Mouse Brain
-  //  Atlas/Spaces/P56/Meshes/"); QString outFolder("~/Documents/image/P56Meshes/"); QStringList filters;
-  //  filters << "*.msh";
-  //  QFileInfoList list = dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
-  //  int nSuc = 0;
-  //  for (int i=0; i<list.size(); ++i) {
-  //     QFileInfo fileInfo = list.at(i);
-  //     QString outname = outFolder + fileInfo.fileName() + ".obj";
-  //     if (ZMesh::convertAllenAtlasMeshToWavefrontObj(fileInfo.absoluteFilePath(), outname))
-  //       nSuc++;
-  //     else
-  //       std::cout << "file " << fileInfo.absoluteFilePath() << " failed." << std::endl;
-  //  }
-  //  std::cout << "convert " << list.size() << " files, " << list.size()-nSuc << " failed." << std::endl;
-  // QStringList list;
-  // list.push_back("~/code/grey.obj");
-  // list.push_back("~/code/CA3.obj");
-  // std::cout << ZMesh::convertWavefrontObjToHxSurface(list[0], "~/code/grey1.surf") << std::endl;
-  // std::cout << ZMesh::convertWavefrontObjToHxSurface(list[1], "~/code/CA31.surf") << std::endl;
-  // list.push_back("~/Library/Application Support/Brain Explorer 2/Atlases/Allen Mouse Brain
-  // Atlas/Spaces/P56/Meshes/grey.msh"); list.push_back("~/Library/Application Support/Brain Explorer
-  // 2/Atlases/Allen Mouse Brain Atlas/Spaces/P56/Meshes/CA3.msh"); list.push_back("~/Library/Application
-  // Support/Brain Explorer 2/Atlases/Allen Mouse Brain Atlas/Spaces/P56/Meshes/CA1.msh"); std::cout <<
-  // ZMesh::convertAllenAtlasMeshToHxSurface(list, "~/code/combine.surf") << std::endl; std::cout <<
-  // ZMesh::convertAllenAtlasMeshToHxSurface(list[0], "~/code/grey.surf") << std::endl; std::cout <<
-  // ZMesh::convertAllenAtlasMeshToHxSurface(list[1], "~/code/CA3.surf") << std::endl; std::cout <<
-  // ZMesh::convertAllenAtlasMeshToHxSurface(list[2], "~/code/CA1.surf") << std::endl;
+  LOG(INFO) << "final potential: " << bestCompactness;
 }
 
 TEST(cluster, GMM)

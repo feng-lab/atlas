@@ -29,6 +29,7 @@
 #include <absl/log/log_sink.h>
 #include <absl/log/log_sink_registry.h>
 #include <absl/log/vlog_is_on.h>
+#include <absl/strings/has_absl_stringify.h>
 #include <absl/strings/string_view.h>
 #include <fmt/format.h>
 #include <fmt/ranges.h>
@@ -46,10 +47,8 @@
 #endif
 
 #include <functional>
-#include <iosfwd>
 #include <iterator>
 #include <memory>
-#include <ostream>
 #include <string>
 #include <string_view>
 #include <type_traits>
@@ -300,22 +299,6 @@ concept HaveToStringFunction = requires(const T& a) {
   { a.toString() } -> std::same_as<std::string>;
 };
 
-template<typename T>
-concept IsEigenDenseLike = requires {
-  typename std::remove_cvref_t<T>::Scalar;
-  typename std::remove_cvref_t<T>::StorageKind;
-  typename std::remove_cvref_t<T>::StorageIndex;
-  { std::remove_cvref_t<T>::RowsAtCompileTime } -> std::convertible_to<int>;
-  { std::remove_cvref_t<T>::ColsAtCompileTime } -> std::convertible_to<int>;
-};
-
-template<typename T>
-concept IsFmtTupleLoggable = (!IsEigenDenseLike<T>) && fmt::is_tuple_like<T>::value;
-
-template<typename T>
-concept IsFmtRangeLoggable =
-  (!CanConvertToUtf8QByteArray<T>) && (!IsEigenDenseLike<T>) && fmt::is_range<T, char>::value;
-
 template<class T>
 concept IsUtf8ArrayType = IsAnyOf<T,
                                   QByteArray
@@ -331,6 +314,21 @@ concept IsSupportedQtTypeForPrint =
   std::same_as<T, QRect> || std::same_as<T, QRectF> || std::same_as<T, QContiguousCache<typename T::value_type>> ||
   std::same_as<T, QSharedPointer<typename T::value_type>> || std::same_as<T, QFlags<typename T::enum_type>>
   ;
+
+template<typename T>
+concept FmtFormattableForAbslStringify = fmt::is_formattable<std::remove_cvref_t<T>>::value;
+
+template<typename T>
+concept GlobalQtFmtBackedAbslStringifyType =
+  CanConvertToUtf8QByteArray<T> || IsUtf8ArrayType<T> || IsSupportedQtTypeForPrint<T>;
+
+template<typename Sink, FmtFormattableForAbslStringify T>
+void appendFmtToAbslSink(Sink& sink, const T& value)
+{
+  fmt::memory_buffer buffer;
+  fmt::format_to(std::back_inserter(buffer), FMT_STRING("{}"), value);
+  sink.Append(absl::string_view(buffer.data(), buffer.size()));
+}
 
 inline void logLongString(const std::string& q)
 {
@@ -348,22 +346,13 @@ TEnum stringToEnum(const T& s)
   return stringToEnum<TEnum>(std::string_view(u8.data(), u8.size()));
 }
 
-template<HaveToStringFunction T>
-std::ostream& operator<<(std::ostream& s, const T& v)
+// Abseil logging and CHECK macros are stream-shaped APIs. Keep fmt as Atlas'
+// canonical formatting implementation, and expose AbslStringify as a narrow
+// adapter for Atlas-owned types that fmt already knows how to format.
+template<typename Sink, FmtFormattableForAbslStringify T>
+void AbslStringify(Sink& sink, const T& value)
 {
-  return (s << v.toString());
-}
-
-template<IsFmtTupleLoggable T>
-std::ostream& operator<<(std::ostream& s, const T& v)
-{
-  return (s << fmt::format("{}", v));
-}
-
-template<IsFmtRangeLoggable T>
-std::ostream& operator<<(std::ostream& s, const T& v)
-{
-  return (s << fmt::format("{}", v));
+  appendFmtToAbslSink(sink, value);
 }
 
 } // namespace nim
@@ -394,18 +383,6 @@ struct fmt::formatter<nim::EnumOrUnderlying<TEnum>, Char>
     return fmt::format_to(ctx.out(), FMT_STRING("{}"), v);
   }
 };
-
-// ostream << support for nim::EnumOrUnderlying<TEnum>
-namespace nim {
-template<typename TEnum>
-inline std::ostream& operator<<(std::ostream& os, const EnumOrUnderlying<TEnum>& w)
-{
-  // Reuse the fmt::formatter specialization to avoid duplication.
-  fmt::format_to(std::ostream_iterator<char>(os), FMT_STRING("{}"), w);
-  return os;
-}
-
-} // namespace nim
 
 namespace fmt {
 
@@ -459,34 +436,16 @@ struct formatter<T, std::enable_if_t<IsStringViewFormattableQtType<T>, char>> : 
 
 } // namespace fmt
 
-// qt type iostream support
-template<nim::CanConvertToUtf8QByteArray T>
-std::ostream& operator<<(std::ostream& s, const T& v)
+template<typename Sink, typename T>
+  requires nim::GlobalQtFmtBackedAbslStringifyType<T> && nim::FmtFormattableForAbslStringify<T>
+void AbslStringify(Sink& sink, const T& value)
 {
-  auto u8 = v.toUtf8();
-  return (s << std::string_view(u8.data(), u8.size()));
+  nim::appendFmtToAbslSink(sink, value);
 }
 
-template<nim::IsUtf8ArrayType T>
-std::ostream& operator<<(std::ostream& s, const T& v)
+template<typename Sink, typename T>
+  requires nim::FmtFormattableForAbslStringify<QList<T>>
+void AbslStringify(Sink& sink, const QList<T>& value)
 {
-  return (s << std::string_view(v.data(), v.size()));
+  nim::appendFmtToAbslSink(sink, value);
 }
-
-template<nim::IsSupportedQtTypeForPrint T>
-std::ostream& operator<<(std::ostream& s, const T& v)
-{
-  auto u8 = nim::qtTypeToQString(v).toUtf8();
-  return (s << std::string_view(u8.data(), u8.size()));
-}
-
-template<typename T>
-  requires fmt::is_formattable<QList<T>>::value
-std::ostream& operator<<(std::ostream& s, const QList<T>& v)
-{
-  return (s << fmt::format("{}", v));
-}
-
-static_assert(
-  requires(std::ostream& s, const QList<QString>& v) { s << v; },
-  "QList<QString> should be streamable from non-nim logging contexts");

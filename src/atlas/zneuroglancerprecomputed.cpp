@@ -155,7 +155,7 @@ void throwSharedLoadErrorIfAny(const SharedLoadResult<T>& result)
     case SharedLoadErrorKind::ZException:
       throw ZException(result.errorMessage);
     case SharedLoadErrorKind::StdException:
-      throw std::runtime_error(result.errorMessage);
+      throw ZException(result.errorMessage);
     case SharedLoadErrorKind::Unknown:
       throw ZException(result.errorMessage.empty() ? "Unknown exception" : result.errorMessage);
   }

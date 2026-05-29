@@ -3,7 +3,6 @@
 #include "z3drendererbase.h"
 #include "z3drenderervulkanbackend.h"
 #include "z3dtexturecopyrenderer.h"
-#include "zsysteminfo.h"
 #include "zvulkandevice.h"
 #include "zvulkanpipeline.h"
 #include "zvulkanshader.h"
@@ -16,6 +15,7 @@
 #include "zvulkanpipelinecontext_raii.h"
 #include "zlog.h"
 
+#include <QString>
 #include <algorithm>
 #include <array>
 #include <vector>
@@ -251,7 +251,6 @@ ZVulkanTextureCopyPipelineContext::ensurePipeline(const PipelineKey& key, const 
   }
 
   auto& device = m_backend.device();
-  static const std::string shaderBase = ZSystemInfo::resourcesDirPath().toStdString() + "/shader/vulkan/spv/";
 
   PipelineInstance instance;
   // Select fragment shader for image compositing modes
@@ -260,22 +259,26 @@ ZVulkanTextureCopyPipelineContext::ensurePipeline(const PipelineKey& key, const 
   CHECK(key.copyDepth || !formats.depthFormat.has_value())
     << "Depth-disabled texture copy must not bind a depth attachment";
 
-  std::string frag = shaderBase + std::string(key.copyDepth ? "copyimage.frag.spv" : "copyimage_color.frag.spv");
+  QString frag = ZVulkanShader::spirvResourcePath(key.copyDepth ? QStringLiteral("copyimage.frag.spv")
+                                                                : QStringLiteral("copyimage_color.frag.spv"));
   if (key.ppllCount) {
-    frag = shaderBase + std::string("ppll_count_image.frag.spv");
+    frag = ZVulkanShader::spirvResourcePath(QStringLiteral("ppll_count_image.frag.spv"));
   } else if (key.ppllStore) {
-    frag = shaderBase + std::string("ppll_store_image.frag.spv");
+    frag = ZVulkanShader::spirvResourcePath(QStringLiteral("ppll_store_image.frag.spv"));
   } else if (key.ddpInit) {
-    frag = shaderBase + std::string("dual_peeling_init_image.frag.spv");
+    frag = ZVulkanShader::spirvResourcePath(QStringLiteral("dual_peeling_init_image.frag.spv"));
   } else if (key.ddpPeel) {
-    frag = shaderBase + std::string("dual_peeling_peel_image.frag.spv");
+    frag = ZVulkanShader::spirvResourcePath(QStringLiteral("dual_peeling_peel_image.frag.spv"));
   } else if (key.wbInit) {
-    frag = shaderBase + std::string("wblended_init_image.frag.spv");
+    frag = ZVulkanShader::spirvResourcePath(QStringLiteral("wblended_init_image.frag.spv"));
   } else if (key.waInit) {
-    frag = shaderBase + std::string("wavg_init_image.frag.spv");
+    frag = ZVulkanShader::spirvResourcePath(QStringLiteral("wavg_init_image.frag.spv"));
   }
   instance.shader =
-    std::make_unique<ZVulkanShader>(device, shaderBase + "pass_with_2dtexture.vert.spv", frag, std::nullopt);
+    std::make_unique<ZVulkanShader>(device,
+                                    ZVulkanShader::spirvResourcePath(QStringLiteral("pass_with_2dtexture.vert.spv")),
+                                    frag,
+                                    std::nullopt);
 
   auto vertexInput = makeVertexInputState();
   instance.pipeline = device.createPipeline(*instance.shader, vertexInput, vk::PrimitiveTopology::eTriangleStrip);

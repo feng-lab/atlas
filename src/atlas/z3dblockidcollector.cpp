@@ -17,9 +17,9 @@
 #include <atomic>
 #include <bit>
 #include <chrono>
+#include <iterator>
 #include <limits>
 #include <memory>
-#include <sstream>
 #include <string>
 #include <type_traits>
 
@@ -743,16 +743,14 @@ std::vector<Z3DBlockIdCollectorTiming> benchmarkZ3DBlockIdCollectors(const Z3DBl
 
 std::string formatZ3DBlockIdCollectorTimings(std::span<const Z3DBlockIdCollectorTiming> timings)
 {
-  std::ostringstream stream;
-  bool first = true;
+  fmt::memory_buffer buffer;
   for (const auto& timing : timings) {
-    if (!first) {
-      stream << ", ";
+    if (buffer.size() != 0) {
+      fmt::format_to(std::back_inserter(buffer), ", ");
     }
-    first = false;
-    stream << timing.name << '=' << timing.milliseconds << "ms";
+    fmt::format_to(std::back_inserter(buffer), "{}={}ms", timing.name, timing.milliseconds);
   }
-  return stream.str();
+  return fmt::to_string(buffer);
 }
 
 struct Z3DBlockIdCollector::State

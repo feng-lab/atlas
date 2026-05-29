@@ -9,9 +9,8 @@
 #include <chrono>
 #include <cstring>
 #include <filesystem>
-#include <fstream>
 #include <cstdio>
-#include <sstream>
+#include <iterator>
 #include <span>
 #include <tuple>
 #include <memory>
@@ -23,6 +22,7 @@
 #include <optional>
 
 #include "zcommandlineflags.h"
+#include "zioutils.h"
 
 #if !defined(_WIN32)
 #include <fcntl.h>
@@ -844,16 +844,13 @@ private:
 
 [[nodiscard]] std::string readTextFile(const fs::path& path)
 {
-  std::ifstream in(path, std::ios::binary);
-  CHECK(in);
-  std::string s((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
-  return s;
+  return nim::readFileIntoString(nim::filesystemPathToQString(path));
 }
 
 void writeTextFile(const fs::path& path, std::string_view text)
 {
-  std::ofstream out(path, std::ios::binary);
-  CHECK(out);
+  std::ofstream out =
+    nim::openOFStream(nim::filesystemPathToQString(path), std::ios::out | std::ios::binary | std::ios::trunc);
   out.write(text.data(), static_cast<std::streamsize>(text.size()));
 }
 
@@ -892,7 +889,7 @@ void writeSimpleLineTiff(const fs::path& path, size_t w, size_t h, size_t d, uin
   // The legacy neurolabi TIFF reader used by ZRunNeuTuCommand is not robust
   // against the tiled/LZW files emitted by ZImg::save; use its classic layout.
   nim::ZTiffWriter writer;
-  writer.startWriting(QString::fromStdString(path.string()), nim::Compression::NONE, -1, false);
+  writer.startWriting(nim::filesystemPathToQString(path), nim::Compression::NONE, -1, false);
   for (size_t z = 0; z < d; ++z) {
     writer.writeIFD(img, z, 0, -1, false);
   }
@@ -1490,16 +1487,16 @@ struct LegacyCLabeledStack
     selfScore[i] = compareSwcLikeLegacy(treeArray[i].get(), treeArray[i].get(), matcher);
   }
 
-  std::ostringstream stream;
+  fmt::memory_buffer buffer;
   for (size_t i = 0; i < treeArray.size(); ++i) {
     for (size_t j = i + 1; j < treeArray.size(); ++j) {
       double score = compareSwcLikeLegacy(treeArray[i].get(), treeArray[j].get(), matcher);
       score /= std::max(selfScore[i], selfScore[j]);
-      stream << i << "-" << j << ": " << score << std::endl;
+      fmt::format_to(std::back_inserter(buffer), "{}-{}: {:g}\n", i, j, score);
     }
   }
 
-  return stream.str();
+  return fmt::to_string(buffer);
 }
 
 } // namespace
@@ -4461,7 +4458,7 @@ TEST(NeutubeCommand2Diagnostics, AutoTrace_Slice15_MaskSeedSort_MatchesLegacy_De
 
   nim::ZImg portedSignal;
   const auto portedLoadStart = std::chrono::steady_clock::now();
-  portedSignal.load(QString::fromStdString(input.string()));
+  portedSignal.load(nim::filesystemPathToQString(input));
   const int64_t portedLoadMs =
     std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - portedLoadStart).count();
   ASSERT_FALSE(portedSignal.isEmpty());
@@ -5289,7 +5286,7 @@ TEST(NeutubeCommand2Diagnostics, AutoTrace_Slice15_L34_ZToXYRatio5_MatchesLegacy
   ASSERT_NE(legacySignal, nullptr);
 
   nim::ZImg portedSignal;
-  portedSignal.load(QString::fromStdString(input.string()));
+  portedSignal.load(nim::filesystemPathToQString(input));
   ASSERT_FALSE(portedSignal.isEmpty());
   ASSERT_EQ(portedSignal.numChannels(), 1);
   ASSERT_EQ(portedSignal.numTimes(), 1);

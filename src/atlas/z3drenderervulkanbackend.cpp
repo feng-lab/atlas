@@ -11,9 +11,9 @@
 #include "zvulkandevice.h"
 #include "zvulkanresidencymanager.h"
 #include "zvulkancontext.h"
+#include "zvulkanshader.h"
 #include "zvulkantexture.h"
 #include "z3dscratchresourcepool.h"
-#include "zsysteminfo.h"
 #include "zvulkanlinepipelinecontext.h"
 #include "zvulkanmeshpipelinecontext.h"
 #include "zvulkanellipsoidpipelinecontext.h"
@@ -50,7 +50,6 @@
 #include <array>
 #include <unordered_map>
 #include <chrono>
-#include <fstream>
 #include <limits>
 #include <optional>
 #include <span>
@@ -2054,12 +2053,11 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
       auto& texture = vulkan::textureFromHandle(use.handle, device(), "renderer external image use");
       (void)device().residencyManager().ensureResidentIfManaged(&texture, "renderer_external_image_use");
       pinTextureForActiveSubmission(&texture);
-      CHECK(texture.resident()) << "Vulkan external image backing is not resident before recording: handle=0x"
-                                << std::hex << use.handle.id << std::dec << " kind=" << static_cast<int>(use.kind)
-                                << " pass='"
-                                << (renderer.currentPassLabel().empty() ? "<unlabeled-pass>"
-                                                                        : renderer.currentPassLabel())
-                                << "'";
+      CHECK(texture.resident()) << fmt::format(
+        "Vulkan external image backing is not resident before recording: handle=0x{:x} kind={} pass='{}'",
+        use.handle.id,
+        static_cast<int>(use.kind),
+        renderer.currentPassLabel().empty() ? "<unlabeled-pass>" : renderer.currentPassLabel());
 
       vk::ImageLayout desiredLayout = vk::ImageLayout::eGeneral;
       vk::ImageAspectFlags transitionAspect{};
@@ -4023,18 +4021,11 @@ void Z3DRendererVulkanBackend::ensureDDPComputePipeline()
     device,
     vk::PipelineLayoutCreateInfo{.setLayoutCount = static_cast<uint32_t>(setLayouts.size()),
                                  .pSetLayouts = setLayouts.data()});
-  // Load SPIR-V
-  const std::string shaderBase = ZSystemInfo::resourcesDirPath().toStdString() + "/shader/vulkan/spv/";
-  const std::string compPath = shaderBase + "ddp_count.comp.spv";
-  std::ifstream file(compPath, std::ios::ate | std::ios::binary);
-  if (!file) {
-    throw ZException(fmt::format("Failed to open SPIR-V file: {}", compPath));
-  }
-  const size_t size = static_cast<size_t>(file.tellg());
-  std::vector<uint32_t> code(size / 4);
-  file.seekg(0);
-  file.read(reinterpret_cast<char*>(code.data()), size);
-  vk::raii::ShaderModule compModule(device, vk::ShaderModuleCreateInfo{.codeSize = size, .pCode = code.data()});
+  const std::vector<uint32_t> code =
+    ZVulkanShader::readSPIRVFile(ZVulkanShader::spirvResourcePath(QStringLiteral("ddp_count.comp.spv")));
+  vk::raii::ShaderModule compModule(
+    device,
+    vk::ShaderModuleCreateInfo{.codeSize = code.size() * sizeof(uint32_t), .pCode = code.data()});
   vk::PipelineShaderStageCreateInfo stage{.stage = vk::ShaderStageFlagBits::eCompute,
                                           .module = *compModule,
                                           .pName = "main"};
@@ -4058,18 +4049,11 @@ void Z3DRendererVulkanBackend::ensurePPLLComputePipelines()
   CHECK(emptyLayout != vk::DescriptorSetLayout{})
     << "Empty descriptor set layout missing in ensurePPLLComputePipelines";
 
-  auto loadModule = [&](const std::string& spvName) -> vk::raii::ShaderModule {
-    const std::string shaderBase = ZSystemInfo::resourcesDirPath().toStdString() + "/shader/vulkan/spv/";
-    const std::string path = shaderBase + spvName;
-    std::ifstream file(path, std::ios::ate | std::ios::binary);
-    if (!file) {
-      throw ZException(fmt::format("Failed to open SPIR-V file: {}", path));
-    }
-    const size_t size = static_cast<size_t>(file.tellg());
-    std::vector<uint32_t> code(size / 4);
-    file.seekg(0);
-    file.read(reinterpret_cast<char*>(code.data()), size);
-    return vk::raii::ShaderModule(device, vk::ShaderModuleCreateInfo{.codeSize = size, .pCode = code.data()});
+  auto loadModule = [&](const QString& spvName) -> vk::raii::ShaderModule {
+    const std::vector<uint32_t> code = ZVulkanShader::readSPIRVFile(ZVulkanShader::spirvResourcePath(spvName));
+    return vk::raii::ShaderModule(
+      device,
+      vk::ShaderModuleCreateInfo{.codeSize = code.size() * sizeof(uint32_t), .pCode = code.data()});
   };
 
   if (!m_ppllScanLocalPipeline) {
@@ -4101,7 +4085,7 @@ void Z3DRendererVulkanBackend::ensurePPLLComputePipelines()
       vk::PipelineLayoutCreateInfo{.setLayoutCount = static_cast<uint32_t>(setLayouts.size()),
                                    .pSetLayouts = setLayouts.data()});
 
-    auto module = loadModule("ppll_scan_local.comp.spv");
+    auto module = loadModule(QStringLiteral("ppll_scan_local.comp.spv"));
     vk::PipelineShaderStageCreateInfo stage{.stage = vk::ShaderStageFlagBits::eCompute,
                                             .module = *module,
                                             .pName = "main"};
@@ -4136,7 +4120,7 @@ void Z3DRendererVulkanBackend::ensurePPLLComputePipelines()
       vk::PipelineLayoutCreateInfo{.setLayoutCount = static_cast<uint32_t>(setLayouts.size()),
                                    .pSetLayouts = setLayouts.data()});
 
-    auto module = loadModule("ppll_scan_add.comp.spv");
+    auto module = loadModule(QStringLiteral("ppll_scan_add.comp.spv"));
     vk::PipelineShaderStageCreateInfo stage{.stage = vk::ShaderStageFlagBits::eCompute,
                                             .module = *module,
                                             .pName = "main"};

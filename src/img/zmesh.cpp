@@ -1620,7 +1620,6 @@ ZMesh ZMesh::clipClosedSurface(const ZMesh& mesh,
 
   // PolyData to process
   vtkSmartPointer<vtkPolyData> polyData = meshToVtkPolyData(mesh);
-  // polyData->PrintSelf(std::cout, vtkIndent());
 
   vtkNew<vtkPlaneCollection> planes;
   // std::vector<vtkSmartPointer<vtkPlane>> tmpPlanes;
@@ -1642,11 +1641,9 @@ ZMesh ZMesh::clipClosedSurface(const ZMesh& mesh,
   clipper->SetTriangulationErrorDisplay(true);
   clipper->SetPassPointData(true);
   clipper->Update();
-  // clipper->PrintSelf(std::cout, vtkIndent());
 
   auto pdres = clipper->GetOutput();
   if (pdres->GetNumberOfPolys() > 0) {
-    // pdres->PrintSelf(std::cout, vtkIndent());
     auto res = vtkPolyDataToMesh(clipper->GetOutput());
     if (!hasCompleteClippedPointAttributes(mesh, res)) {
       LOG(WARNING) << "vtkClipClosedSurface returned incomplete point attributes; "
@@ -1697,7 +1694,6 @@ ZMesh ZMesh::planeClosedSurfaceIntersection(const ZMesh& mesh,
 
   auto pdres = clipper->GetOutput();
   if (pdres->GetNumberOfPolys() > 0) {
-    // pdres->PrintSelf(std::cout, vtkIndent());
     auto res = vtkPolyDataToMesh(clipper->GetOutput(), 2);
     for (size_t t = 0; t < res.numTriangles(); ++t) {
       for (size_t v = 0; v < 3; ++v) {

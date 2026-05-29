@@ -1,8 +1,8 @@
 #pragma once
 
 #include "zvulkan.h"
+#include <QString>
 #include <optional>
-#include <string>
 #include <vector>
 
 namespace nim {
@@ -14,16 +14,19 @@ class ZVulkanShader
 public:
   explicit ZVulkanShader(ZVulkanDevice& device);
   ZVulkanShader(ZVulkanDevice& device,
-                const std::string& vertexSpvPath,
-                const std::string& fragmentSpvPath,
-                const std::optional<std::string>& geometrySpvPath = std::nullopt);
+                const QString& vertexSpvPath,
+                const QString& fragmentSpvPath,
+                const std::optional<QString>& geometrySpvPath = std::nullopt);
 
-  void addStageFromSPIRVFile(const std::string& spvPath, vk::ShaderStageFlagBits stage);
+  [[nodiscard]] static QString spirvResourcePath(const QString& spvName);
+  [[nodiscard]] static std::vector<uint32_t> readSPIRVFile(const QString& spvPath);
+
+  void addStageFromSPIRVFile(const QString& spvPath, vk::ShaderStageFlagBits stage);
   void addStageFromSPIRV(const std::vector<uint32_t>& spirv, vk::ShaderStageFlagBits stage);
 
-  void loadFromSPIRVFiles(const std::string& vertexSpvPath,
-                          const std::string& fragmentSpvPath,
-                          const std::optional<std::string>& geometrySpvPath = std::nullopt);
+  void loadFromSPIRVFiles(const QString& vertexSpvPath,
+                          const QString& fragmentSpvPath,
+                          const std::optional<QString>& geometrySpvPath = std::nullopt);
 
   const std::vector<vk::PipelineShaderStageCreateInfo>& shaderStages() const
   {

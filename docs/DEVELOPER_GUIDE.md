@@ -158,6 +158,9 @@ Logging and Debugging
 - Tracing emits high-level stage logs via `LOG(INFO)` and optional detailed progress via `VLOG(1)`/`VLOG(2)` (see `src/img/zlog.*`).
   - Run with `--v=1` to see stage/progress logs (seed sorting progress, per-stage Auto Trace logs, etc.).
   - Run with `--v=2` for per-seed details (useful when diagnosing “stuck” traces).
+- `fmt` is Atlas' canonical custom-formatting surface. When an Atlas-owned type must work with stream-shaped Abseil
+  logging or `CHECK` diagnostics, add `AbslStringify` as a thin adapter that delegates to the existing fmt formatter;
+  do not add new `std::ostream` overloads for logging support.
 
 Testing
 

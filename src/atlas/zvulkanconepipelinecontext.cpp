@@ -16,12 +16,12 @@
 #include "zvulkanbindings.h"
 #include "zvulkanclipplanes.h"
 #include "zvulkanuniforms.h"
-#include "zsysteminfo.h"
 #include "zexception.h"
 #include "zlog.h"
 #include "z3dconerenderer.h"
 #include "zrenderthreadexecutor_tls.h"
 
+#include <QString>
 #include <algorithm>
 #include <array>
 #include <cstddef>
@@ -808,39 +808,39 @@ ZVulkanConePipelineContext::ensurePipeline(const PipelineKey& key, const vulkan:
   }
 
   auto& device = m_backend.device();
-  static const std::string shaderBase = ZSystemInfo::resourcesDirPath().toStdString() + "/shader/vulkan/spv/";
 
   PipelineInstance instance;
 
-  auto selectFragmentShader = [&](Z3DRendererBase::ShaderHookType hook) -> std::string {
-    const char* suffix = key.useConeShader2 ? "_2" : "";
+  auto selectFragmentShader = [&](Z3DRendererBase::ShaderHookType hook) -> QString {
+    const QString suffix = key.useConeShader2 ? QStringLiteral("_2") : QString();
     switch (hook) {
       case Z3DRendererBase::ShaderHookType::DualDepthPeelingInit:
-        return std::string("dual_peeling_init_cone") + suffix + ".frag.spv";
+        return QStringLiteral("dual_peeling_init_cone") + suffix + QStringLiteral(".frag.spv");
       case Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel:
-        return std::string("dual_peeling_peel_cone") + suffix + ".frag.spv";
+        return QStringLiteral("dual_peeling_peel_cone") + suffix + QStringLiteral(".frag.spv");
       case Z3DRendererBase::ShaderHookType::PerPixelFragmentListCount:
-        return std::string("ppll_count_cone") + suffix + ".frag.spv";
+        return QStringLiteral("ppll_count_cone") + suffix + QStringLiteral(".frag.spv");
       case Z3DRendererBase::ShaderHookType::PerPixelFragmentListStore:
-        return std::string("ppll_store_cone") + suffix + ".frag.spv";
+        return QStringLiteral("ppll_store_cone") + suffix + QStringLiteral(".frag.spv");
       case Z3DRendererBase::ShaderHookType::WeightedAverageInit:
-        return std::string("wavg_init_cone") + suffix + ".frag.spv";
+        return QStringLiteral("wavg_init_cone") + suffix + QStringLiteral(".frag.spv");
       case Z3DRendererBase::ShaderHookType::WeightedBlendedInit:
-        return std::string("wblended_init_cone") + suffix + ".frag.spv";
+        return QStringLiteral("wblended_init_cone") + suffix + QStringLiteral(".frag.spv");
       case Z3DRendererBase::ShaderHookType::Normal:
       default:
-        return std::string("cone") + suffix + ".frag.spv";
+        return QStringLiteral("cone") + suffix + QStringLiteral(".frag.spv");
     }
   };
 
-  const std::string vertName = key.useConeShader2 ? "cone_2.vert.spv" : "cone.vert.spv";
-  VLOG(1) << "selecting shaders vert='" << (shaderBase + vertName) << "' frag='"
-          << (shaderBase + selectFragmentShader(key.shaderHookType)) << "' capsMode=" << key.capsMode
+  const QString vertName = key.useConeShader2 ? QStringLiteral("cone_2.vert.spv") : QStringLiteral("cone.vert.spv");
+  VLOG(1) << "selecting shaders vert='" << ZVulkanShader::spirvResourcePath(vertName) << "' frag='"
+          << ZVulkanShader::spirvResourcePath(selectFragmentShader(key.shaderHookType)) << "' capsMode=" << key.capsMode
           << " dynamicMaterial=" << key.dynamicMaterial << " shaderHook=" << static_cast<int>(key.shaderHookType);
-  instance.shader = std::make_unique<ZVulkanShader>(device,
-                                                    shaderBase + vertName,
-                                                    shaderBase + selectFragmentShader(key.shaderHookType),
-                                                    std::nullopt);
+  instance.shader =
+    std::make_unique<ZVulkanShader>(device,
+                                    ZVulkanShader::spirvResourcePath(vertName),
+                                    ZVulkanShader::spirvResourcePath(selectFragmentShader(key.shaderHookType)),
+                                    std::nullopt);
 
   std::array<vk::SpecializationMapEntry, 1> specEntries{
     vk::SpecializationMapEntry{.constantID = 90, .offset = 0, .size = sizeof(int)}

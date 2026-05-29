@@ -33,7 +33,6 @@
 #include <glm/gtx/rotate_vector.hpp>
 #include <glm/gtx/matrix_transform_2d.hpp>
 #include <glm/ext/matrix_clip_space.hpp>
-#include <ostream>
 #include <tuple>
 #include <utility>
 #include <type_traits>
@@ -154,22 +153,22 @@ constexpr decltype(auto) get(T&& v) noexcept
   return std::forward_like<decltype(v)>(v[Index]);
 }
 
-template<length_t L, typename T, qualifier Q>
-std::ostream& operator<<(std::ostream& os, const vec<L, T, Q>& v)
+template<typename Sink, length_t L, typename T, qualifier Q>
+void AbslStringify(Sink& sink, const vec<L, T, Q>& v)
 {
-  return nim::operator<<(os, v);
+  nim::appendFmtToAbslSink(sink, v);
 }
 
-template<length_t C, length_t R, typename T, qualifier Q>
-std::ostream& operator<<(std::ostream& os, const mat<C, R, T, Q>& m)
+template<typename Sink, length_t C, length_t R, typename T, qualifier Q>
+void AbslStringify(Sink& sink, const mat<C, R, T, Q>& m)
 {
-  return nim::operator<<(os, m);
+  nim::appendFmtToAbslSink(sink, m);
 }
 
-template<typename T, qualifier Q>
-std::ostream& operator<<(std::ostream& os, const qua<T, Q>& q)
+template<typename Sink, typename T, qualifier Q>
+void AbslStringify(Sink& sink, const qua<T, Q>& q)
 {
-  return nim::operator<<(os, q);
+  nim::appendFmtToAbslSink(sink, q);
 }
 
 } // namespace glm

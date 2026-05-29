@@ -11,7 +11,6 @@
 #include "zvulkanpipeline.h"
 #include "zvulkanshader.h"
 #include "zvulkanbuffer.h"
-#include "zsysteminfo.h"
 #include "zlog.h"
 #include "zvulkanrenderconversions.h"
 #include "zvulkanpipelinecontext_raii.h"
@@ -20,11 +19,11 @@
 #include "zvulkanclipplanes.h"
 #include "zexception.h"
 
+#include <QString>
 #include <algorithm>
 #include <array>
 #include <cstddef>
 #include <cstring>
-#include <string>
 #include <vector>
 #include <cstring>
 #include <cstdint>
@@ -722,34 +721,34 @@ ZVulkanEllipsoidPipelineContext::ensurePipeline(const PipelineKey& key, const vu
   }
 
   auto& device = m_backend.device();
-  static const std::string shaderBase = ZSystemInfo::resourcesDirPath().toStdString() + "/shader/vulkan/spv/";
 
   PipelineInstance instance;
 
-  auto selectFragmentShader = [](Z3DRendererBase::ShaderHookType hook) -> std::string {
+  auto selectFragmentShader = [](Z3DRendererBase::ShaderHookType hook) -> QString {
     switch (hook) {
       case Z3DRendererBase::ShaderHookType::DualDepthPeelingInit:
-        return "dual_peeling_init_ellipsoid.frag.spv";
+        return QStringLiteral("dual_peeling_init_ellipsoid.frag.spv");
       case Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel:
-        return "dual_peeling_peel_ellipsoid.frag.spv";
+        return QStringLiteral("dual_peeling_peel_ellipsoid.frag.spv");
       case Z3DRendererBase::ShaderHookType::PerPixelFragmentListCount:
-        return "ppll_count_ellipsoid.frag.spv";
+        return QStringLiteral("ppll_count_ellipsoid.frag.spv");
       case Z3DRendererBase::ShaderHookType::PerPixelFragmentListStore:
-        return "ppll_store_ellipsoid.frag.spv";
+        return QStringLiteral("ppll_store_ellipsoid.frag.spv");
       case Z3DRendererBase::ShaderHookType::WeightedAverageInit:
-        return "wavg_init_ellipsoid.frag.spv";
+        return QStringLiteral("wavg_init_ellipsoid.frag.spv");
       case Z3DRendererBase::ShaderHookType::WeightedBlendedInit:
-        return "wblended_init_ellipsoid.frag.spv";
+        return QStringLiteral("wblended_init_ellipsoid.frag.spv");
       case Z3DRendererBase::ShaderHookType::Normal:
       default:
-        return "ellipsoid.frag.spv";
+        return QStringLiteral("ellipsoid.frag.spv");
     }
   };
 
-  instance.shader = std::make_unique<ZVulkanShader>(device,
-                                                    shaderBase + "ellipsoid.vert.spv",
-                                                    shaderBase + selectFragmentShader(key.shaderHookType),
-                                                    std::nullopt);
+  instance.shader =
+    std::make_unique<ZVulkanShader>(device,
+                                    ZVulkanShader::spirvResourcePath(QStringLiteral("ellipsoid.vert.spv")),
+                                    ZVulkanShader::spirvResourcePath(selectFragmentShader(key.shaderHookType)),
+                                    std::nullopt);
 
   const uint32_t useDynamic = key.dynamicMaterial ? 1u : 0u;
   std::array<vk::SpecializationMapEntry, 1> vertEntries{

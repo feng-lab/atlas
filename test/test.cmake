@@ -7,6 +7,15 @@ FetchContent_Declare(
 )
 # For Windows: Prevent overriding the parent project's compiler/linker settings
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+set(GTEST_HAS_ABSL ON CACHE BOOL "Enable GoogleTest AbslStringify support." FORCE)
+if (NOT TARGET absl::base)
+  find_package(absl REQUIRED
+               PATHS ${CMAKE_CURRENT_LIST_DIR}/../src/3rdparty/build NO_DEFAULT_PATH)
+endif ()
+if (NOT TARGET re2::re2)
+  find_package(re2 CONFIG REQUIRED
+               PATHS ${CMAKE_CURRENT_LIST_DIR}/../src/3rdparty/build NO_DEFAULT_PATH)
+endif ()
 FetchContent_MakeAvailable(googletest)
 
 enable_testing()

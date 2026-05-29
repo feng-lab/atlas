@@ -4,8 +4,8 @@
 
 #include <absl/flags/commandlineflag.h>
 #include <algorithm>
+#include <iterator>
 #include <optional>
-#include <sstream>
 #include <vector>
 
 namespace {
@@ -183,11 +183,11 @@ std::string commandLineFlagsToString()
               return a->Name() < b->Name();
             });
 
-  std::ostringstream out;
+  std::string out;
   for (const absl::CommandLineFlag* flag : orderedFlags) {
-    out << "--" << flag->Name() << "=" << flag->CurrentValue() << '\n';
+    fmt::format_to(std::back_inserter(out), "--{}={}\n", flag->Name(), flag->CurrentValue());
   }
-  return out.str();
+  return out;
 }
 
 } // namespace nim

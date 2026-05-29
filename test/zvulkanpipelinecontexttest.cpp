@@ -15,7 +15,7 @@ protected:
   {
     previousFlag_ = absl::GetFlag(FLAGS_atlas_vk_enforce_pipeline_context);
     absl::SetFlag(&FLAGS_atlas_vk_enforce_pipeline_context, true);
-    ::testing::FLAGS_gtest_death_test_style = "threadsafe";
+    GTEST_FLAG_SET(death_test_style, "threadsafe");
   }
 
   void TearDown() override

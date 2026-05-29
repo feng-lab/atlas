@@ -675,8 +675,9 @@ void ZVulkanTexture::transitionLayout(vk::raii::CommandBuffer& cmdBuffer,
 
   // Validate aspect/format compatibility early to trip fast if misused.
   CHECK(isAspectValidForFormat(m_format, aspect))
-    << "Invalid aspect for format in transitionLayout: aspect=0x" << std::hex << static_cast<uint32_t>(aspect)
-    << std::dec << " fmt=" << enumOrUnderlying(m_format, 16);
+    << fmt::format("Invalid aspect for format in transitionLayout: aspect=0x{:x} fmt={}",
+                   static_cast<uint32_t>(aspect),
+                   enumOrUnderlying(m_format, 16));
 
   vk::ImageMemoryBarrier2 barrier{
     .srcStageMask = srcState.stage,
@@ -691,9 +692,13 @@ void ZVulkanTexture::transitionLayout(vk::raii::CommandBuffer& cmdBuffer,
     .subresourceRange = vk::ImageSubresourceRange{aspect, 0, m_mipLevels, 0, m_arrayLayers}
   };
 
-  VLOG(2) << "VK layout transition image=" << static_cast<void*>(m_image) << " old=" << enumOrUnderlying(oldLayout)
-          << " new=" << enumOrUnderlying(newLayout) << " aspect=0x" << std::hex << static_cast<uint32_t>(aspect)
-          << std::dec << " layers=" << m_arrayLayers << " mips=" << m_mipLevels;
+  VLOG(2) << fmt::format("VK layout transition image={} old={} new={} aspect=0x{:x} layers={} mips={}",
+                         static_cast<void*>(m_image),
+                         enumOrUnderlying(oldLayout),
+                         enumOrUnderlying(newLayout),
+                         static_cast<uint32_t>(aspect),
+                         m_arrayLayers,
+                         m_mipLevels);
 
   vk::DependencyInfo dep{.imageMemoryBarrierCount = 1, .pImageMemoryBarriers = &barrier};
   cmdBuffer.pipelineBarrier2(dep);
@@ -724,8 +729,9 @@ vk::DescriptorImageInfo ZVulkanTexture::descriptorInfo(vk::ImageLayout layoutOve
   const vk::ImageAspectFlags resolvedAspect =
     (aspectOverride == vk::ImageAspectFlags{}) ? m_descriptorAspectMask : aspectOverride;
   CHECK(isAspectValidForFormat(m_format, (resolvedAspect == vk::ImageAspectFlags{} ? m_aspectMask : resolvedAspect)))
-    << "Invalid aspect for format in descriptorInfo: requested=0x" << std::hex << static_cast<uint32_t>(resolvedAspect)
-    << std::dec << " fmt=" << enumOrUnderlying(m_format, 16);
+    << fmt::format("Invalid aspect for format in descriptorInfo: requested=0x{:x} fmt={}",
+                   static_cast<uint32_t>(resolvedAspect),
+                   enumOrUnderlying(m_format, 16));
 
   vk::DescriptorImageInfo info{};
   info.imageView = imageViewForAspect(resolvedAspect);

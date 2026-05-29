@@ -1,9 +1,7 @@
 #include "zanalysisworklistmodel.h"
 
 #include "zcsvtable.h"
-#include "zexception.h"
-
-#include <fmt/core.h>
+#include "zlog.h"
 
 #include <QUrl>
 #include <QFileInfo>

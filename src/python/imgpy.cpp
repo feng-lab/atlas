@@ -542,8 +542,8 @@ NB_MODULE(_imgpy, m)
       "Returns a string representation of the color.");
   nb::implicitly_convertible<nb::tuple, col4>();
 
-  nb::exception<ZCancellationException>(m, "ZCancellationException");
-  nb::exception<ZException>(m, "ZException");
+  auto zException = nb::exception<ZException>(m, "ZException", PyExc_RuntimeError);
+  nb::exception<ZCancellationException>(m, "ZCancellationException", zException);
 
   nb::class_<ZImgWriteParameters>(m,
                                   "ZImgWriteParameters",

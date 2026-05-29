@@ -2,6 +2,7 @@
 
 #include "zcancellation.h"
 #include "zdiskcacheutils.h"
+#include "zexception.h"
 #include "zhttpdiskcache.h"
 #include "zhttpsystemproxy.h"
 #include "zhttpretrypolicy.h"
@@ -26,7 +27,6 @@
 #include <exception>
 #include <limits>
 #include <memory>
-#include <stdexcept>
 #include <string_view>
 
 ABSL_DECLARE_FLAG(nim::HttpProxyStrategy, atlas_http_proxy_strategy);
@@ -43,11 +43,11 @@ constexpr ZHttpProxySupport kCurlProxySupport{
   .supportsAuthentication = true,
 };
 
-class CurlRequestException : public std::runtime_error
+class CurlRequestException : public ZException
 {
 public:
   CurlRequestException(CURLcode curlCode, std::string message)
-    : std::runtime_error(std::move(message))
+    : ZException(std::move(message))
     , code(curlCode)
   {}
 

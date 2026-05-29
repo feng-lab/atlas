@@ -14,7 +14,6 @@
 #include <QThread>
 #include <algorithm>
 #include <chrono>
-#include <sstream>
 #include <string>
 #include <utility>
 #include <grpc/support/time.h>
@@ -200,20 +199,6 @@ struct ZRpcWaitResult
   std::string error;
 };
 
-[[nodiscard]] std::string formatIdList(const std::vector<uint64_t>& ids)
-{
-  std::ostringstream oss;
-  oss << "[";
-  for (size_t i = 0; i < ids.size(); ++i) {
-    if (i) {
-      oss << ", ";
-    }
-    oss << ids[i];
-  }
-  oss << "]";
-  return oss.str();
-}
-
 template<class Predicate>
 [[nodiscard]] ZRpcWaitResult
 waitUntil(grpc::ServerContext* grpcContext, uint32_t pollMs, Predicate&& predicate, std::string_view what)
@@ -333,13 +318,13 @@ waitUntil(grpc::ServerContext* grpcContext, uint32_t pollMs, Predicate&& predica
       if (!notFound.empty()) {
         ZRpcWaitResult out;
         out.ok = false;
-        out.error = std::string(what) + ": object(s) not found: " + formatIdList(notFound);
+        out.error = fmt::format("{}: object(s) not found: {}", what, notFound);
         return out;
       }
       if (!errors.empty()) {
         ZRpcWaitResult out;
         out.ok = false;
-        out.error = std::string(what) + ": object(s) in error state: " + formatIdList(errors);
+        out.error = fmt::format("{}: object(s) in error state: {}", what, errors);
         return out;
       }
       if (allReady) {

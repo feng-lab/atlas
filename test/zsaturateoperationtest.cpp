@@ -1,7 +1,6 @@
 #include "zsaturateoperation.h"
 #include "zioutils.h"
 #include "ztest.h"
-#include <iostream>
 #include <vector>
 #include <simde/x86/sse2.h>
 

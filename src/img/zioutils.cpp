@@ -7,6 +7,8 @@
 #include <QFileInfo>
 #include <QDir>
 
+#include <string>
+
 namespace nim {
 
 void openIFStream(std::ifstream& fs, const QString& filename, std::ios_base::openmode mode)
@@ -92,6 +94,21 @@ std::unique_ptr<std::FILE, decltype(&std::fclose)> openFile(const QString& filen
     throw ZException(fmt::format("Could not open file {}", filename), ZException::Option::CheckErrno);
   }
   return std::unique_ptr<std::FILE, decltype(&std::fclose)>(tmpf, std::fclose);
+}
+
+bool isReadableFile(const QString& filename)
+{
+  if (filename.isEmpty()) {
+    return false;
+  }
+
+  QFile file(filename);
+  return file.open(QIODevice::ReadOnly);
+}
+
+QString filesystemPathToQString(const std::filesystem::path& path)
+{
+  return QFileInfo(path).filePath();
 }
 
 QString getTemporaryFilename(const QString& filename)

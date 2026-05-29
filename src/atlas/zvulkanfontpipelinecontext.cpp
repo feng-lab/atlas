@@ -4,7 +4,6 @@
 #include "z3drenderervulkanbackend.h"
 #include "z3dfontrenderer.h"
 #include "z3dsdfont.h"
-#include "zsysteminfo.h"
 #include "zvulkandevice.h"
 #include "zvulkancontext.h"
 #include "zvulkanpipeline.h"
@@ -534,11 +533,12 @@ ZVulkanFontPipelineContext::ensurePipeline(const PipelineKey& key, const vulkan:
   }
 
   auto& device = m_backend.device();
-  static const std::string shaderBase = ZSystemInfo::resourcesDirPath().toStdString() + "/shader/vulkan/spv/";
 
   PipelineInstance instance;
-  instance.shader =
-    std::make_unique<ZVulkanShader>(device, shaderBase + "almag.vert.spv", shaderBase + "almag.frag.spv", std::nullopt);
+  instance.shader = std::make_unique<ZVulkanShader>(device,
+                                                    ZVulkanShader::spirvResourcePath(QStringLiteral("almag.vert.spv")),
+                                                    ZVulkanShader::spirvResourcePath(QStringLiteral("almag.frag.spv")),
+                                                    std::nullopt);
 
   auto vertexInput = makeVertexInputState();
   instance.pipeline = device.createPipeline(*instance.shader, vertexInput, vk::PrimitiveTopology::eTriangleList);

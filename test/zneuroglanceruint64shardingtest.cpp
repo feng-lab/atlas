@@ -2,6 +2,7 @@
 
 #include "zexception.h"
 
+#include <fmt/format.h>
 #include <gtest/gtest.h>
 
 #include <array>
@@ -231,7 +232,7 @@ TEST(ZNeuroglancerUint64Sharding, MurmurHash3X86_128Hash64BitsMatchesReference)
   for (uint64_t input : inputs) {
     const uint64_t ref = murmurHash3X86_128Hash64BitsReference(input, seed);
     const uint64_t got = ZNeuroglancerUint64Sharding::murmurHash3X86_128Hash64Bits(input, seed);
-    EXPECT_EQ(got, ref) << "input=" << std::hex << input;
+    EXPECT_EQ(got, ref) << fmt::format("input={:x}", input);
   }
 }
 

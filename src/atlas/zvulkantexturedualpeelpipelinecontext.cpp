@@ -2,7 +2,6 @@
 
 #include "z3drendererbase.h"
 #include "z3drenderervulkanbackend.h"
-#include "zsysteminfo.h"
 #include "zvulkanbuffer.h"
 #include "zvulkandevice.h"
 #include "zvulkanpipeline.h"
@@ -12,6 +11,7 @@
 #include "zvulkanrenderconversions.h"
 #include "zlog.h"
 
+#include <QString>
 #include <array>
 #include <vector>
 
@@ -181,20 +181,21 @@ ZVulkanTextureDualPeelPipelineContext::ensurePipeline(const PipelineKey& key, co
   }
 
   auto& device = m_backend.device();
-  static const std::string shaderBase = ZSystemInfo::resourcesDirPath().toStdString() + "/shader/vulkan/spv/";
 
   PipelineInstance instance;
   instance.stage = key.stage;
 
-  const char* fragmentShader = "dual_peeling_blend.frag.spv";
+  QString fragmentShader = QStringLiteral("dual_peeling_blend.frag.spv");
   if (key.stage == Stage::Final) {
-    fragmentShader = "dual_peeling_final.frag.spv";
+    fragmentShader = QStringLiteral("dual_peeling_final.frag.spv");
   } else if (key.stage == Stage::Carry) {
-    fragmentShader = "dual_peeling_carry.frag.spv";
+    fragmentShader = QStringLiteral("dual_peeling_carry.frag.spv");
   }
 
-  instance.shader =
-    std::make_unique<ZVulkanShader>(device, shaderBase + "pass.vert.spv", shaderBase + fragmentShader, std::nullopt);
+  instance.shader = std::make_unique<ZVulkanShader>(device,
+                                                    ZVulkanShader::spirvResourcePath(QStringLiteral("pass.vert.spv")),
+                                                    ZVulkanShader::spirvResourcePath(fragmentShader),
+                                                    std::nullopt);
 
   auto vertexInput = makeVertexInputState();
   instance.pipeline = device.createPipeline(*instance.shader, vertexInput, vk::PrimitiveTopology::eTriangleStrip);

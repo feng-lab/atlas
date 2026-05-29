@@ -1,6 +1,7 @@
 #include "zimgitkimage.h"
 
 #include "zimgsliceprovider.h"
+#include "zioutils.h"
 #include "zstringutils.h"
 #include <itkImageIOBase.h>
 #include <itkNiftiImageIOFactory.h>
@@ -16,13 +17,15 @@
 #include <QFileInfo>
 #include <QStringList>
 #include <QDir>
+#include <absl/strings/numbers.h>
+#include <absl/strings/str_split.h>
 #include <boost/regex.hpp>
-#include <fstream>
 #include <cctype>
 #include <cstring>
-#include <sstream>
+#include <exception>
 #include <algorithm>
 #include <array>
+#include <string_view>
 
 namespace nim {
 
@@ -74,6 +77,25 @@ inline std::string toLowerString(std::string s)
   return s;
 }
 
+std::vector<std::string> splitAsciiWhitespace(std::string_view text)
+{
+  return absl::StrSplit(text, absl::ByAnyChar(" \t\r\n"), absl::SkipEmpty());
+}
+
+bool parseUint64List(std::string_view text, std::vector<uint64_t>& out)
+{
+  std::vector<uint64_t> values;
+  for (std::string_view token : absl::StrSplit(text, absl::ByAnyChar(" \t\r\n"), absl::SkipEmpty())) {
+    uint64_t value = 0;
+    if (!absl::SimpleAtoi(token, &value)) {
+      return false;
+    }
+    values.push_back(value);
+  }
+  out = std::move(values);
+  return true;
+}
+
 static bool
 parseNrrdHeaderForRaw(const QString& filename, const itk::ImageIOBase* imageIO, const ZImgInfo& info, NrrdRawSpec& out)
 {
@@ -81,8 +103,11 @@ parseNrrdHeaderForRaw(const QString& filename, const itk::ImageIOBase* imageIO, 
     return false;
   }
 
-  std::ifstream in(QFile::encodeName(filename).constData(), std::ios::in | std::ios::binary);
-  if (!in) {
+  std::ifstream in;
+  try {
+    in = openIFStream(filename, std::ios::in | std::ios::binary);
+  }
+  catch (const std::exception&) {
     return false;
   }
 
@@ -156,12 +181,10 @@ parseNrrdHeaderForRaw(const QString& filename, const itk::ImageIOBase* imageIO, 
       }
     } else if (key == "kinds") {
       sawKinds = true;
-      std::vector<std::string> tokens;
-      std::string cur;
-      std::istringstream iss(value);
-      while (iss >> cur) {
-        // tokens like RGB-color, RGBA-color, vector, complex, domain, time, space
-        tokens.push_back(toLowerString(cur));
+      std::vector<std::string> tokens = splitAsciiWhitespace(value);
+      for (std::string& token : tokens) {
+        // Tokens like RGB-color, RGBA-color, vector, complex, domain, time, space.
+        token = toLowerString(std::move(token));
       }
       if (!tokens.empty()) {
         const std::string& t0 = tokens[0];
@@ -253,8 +276,11 @@ parseNrrdHeaderForRaw(const QString& filename, const itk::ImageIOBase* imageIO, 
 static bool
 computeNrrdDimensionStrides(const QString& filename, const ZImgInfo& info, std::array<size_t, 5>& dimStrides)
 {
-  std::ifstream in(QFile::encodeName(filename).constData(), std::ios::in | std::ios::binary);
-  if (!in) {
+  std::ifstream in;
+  try {
+    in = openIFStream(filename, std::ios::in | std::ios::binary);
+  }
+  catch (const std::exception&) {
     return false;
   }
   // Skip magic and first line
@@ -291,18 +317,16 @@ computeNrrdDimensionStrides(const QString& filename, const ZImgInfo& info, std::
     }
     value.erase(0, i);
     if (key == "sizes") {
-      sizes.clear();
-      std::istringstream iss(value);
-      uint64_t v{};
-      while (iss >> v) {
-        sizes.push_back(v);
+      std::vector<uint64_t> parsedSizes;
+      if (parseUint64List(value, parsedSizes)) {
+        sizes = std::move(parsedSizes);
+      } else {
+        sizes.clear();
       }
     } else if (key == "kinds") {
-      kinds.clear();
-      std::istringstream iss(value);
-      std::string tok;
-      while (iss >> tok) {
-        kinds.push_back(toLowerString(tok));
+      kinds = splitAsciiWhitespace(value);
+      for (std::string& kind : kinds) {
+        kind = toLowerString(std::move(kind));
       }
     }
   }
@@ -975,7 +999,7 @@ void parseInfoFromImageIO(const itk::ImageIOBase* imageIO, ZImgInfo& info, bool 
     if (dictionary.HasKey(key)) {
       if (auto value = dynamic_cast<const MetaDataStringType*>(dictionary.Get(key)); value) {
         static const boost::regex channelInfo(R"(^CH(\d+)\s+{Laser Wavelength}:.*)");
-        std::vector<absl::string_view> lines = absl::StrSplit(value->GetMetaDataObjectValue(), '\n');
+        std::vector<std::string_view> lines = absl::StrSplit(value->GetMetaDataObjectValue(), '\n');
 
         for (auto line : lines) {
           boost::match_results<std::string_view::iterator> match;
@@ -1037,7 +1061,6 @@ void parseMetadataFromImageIO(const itk::ImageIOBase* imageIO, ZImgMetadata& met
     if (entryvalue) {
       std::string tagkey = itr->first;
       std::string tagvalue = entryvalue->GetMetaDataObjectValue();
-      // std::cout << tagkey << " = " << tagvalue << std::endl;
       meta.attachToTopLevel(ZImgMetatag(tagkey, tagvalue));
     }
     ++itr;

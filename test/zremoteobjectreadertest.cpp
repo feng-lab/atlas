@@ -6,6 +6,7 @@
 #include "zneuroglancerprecomputedskeleton.h"
 #include "zneuroglancerremotecontext.h"
 #include "zneuroglancerstate.h"
+#include "zexception.h"
 #include "zimginit.h"
 
 #include <folly/coro/BlockingWait.h>
@@ -20,7 +21,6 @@
 #include <deque>
 #include <memory>
 #include <mutex>
-#include <stdexcept>
 #include <utility>
 
 ABSL_DECLARE_FLAG(uint32_t, atlas_http_max_retries);
@@ -51,7 +51,7 @@ public:
                                  .headers = std::move(request.headers),
                                  .exactByteRange = request.exactByteRange});
       if (responses.empty()) {
-        throw std::runtime_error("FakeRemoteObjectStore called without a queued response");
+        throw ZException("FakeRemoteObjectStore called without a queued response");
       }
       next = std::move(responses.front());
       responses.pop_front();

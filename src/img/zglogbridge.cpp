@@ -99,7 +99,7 @@ public:
             size_t messageLen) override
   {
     const char* messageText = message != nullptr ? message : "";
-    const absl::string_view messageView(messageText, message != nullptr ? messageLen : 0);
+    const std::string_view messageView(messageText, message != nullptr ? messageLen : 0);
     const char* file = logLocationFile(fullFilename, baseFilename);
     if (severity == google::GLOG_FATAL) {
       LOG(FATAL).AtLocation(file, line) << "[glog FATAL] " << messageView;

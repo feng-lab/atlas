@@ -2,6 +2,7 @@
 
 #include "zswc.h"
 
+#include <QString>
 #include <string>
 
 namespace nim {
@@ -18,6 +19,6 @@ namespace nim {
 // Returns false on failure and optionally populates `error`.
 //
 // `error` is optional; pass a non-null pointer to receive a human-readable error message.
-[[nodiscard]] bool loadSwcLegacyOrder(const std::string& path, ZSwc& out, /*nullable*/ std::string* error = nullptr);
+[[nodiscard]] bool loadSwcLegacyOrder(const QString& path, ZSwc& out, /*nullable*/ std::string* error = nullptr);
 
 } // namespace nim

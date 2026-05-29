@@ -2,7 +2,6 @@
 
 #include "z3drendererbase.h"
 #include "z3drenderervulkanbackend.h"
-#include "zsysteminfo.h"
 #include "zvulkanbuffer.h"
 #include "zvulkandevice.h"
 #include "zvulkanpipeline.h"
@@ -124,13 +123,13 @@ ZVulkanTextureWeightedAveragePipelineContext::ensurePipeline(const PipelineKey& 
   }
 
   auto& device = m_backend.device();
-  static const std::string shaderBase = ZSystemInfo::resourcesDirPath().toStdString() + "/shader/vulkan/spv/";
 
   PipelineInstance instance;
-  instance.shader = std::make_unique<ZVulkanShader>(device,
-                                                    shaderBase + "pass.vert.spv",
-                                                    shaderBase + "wavg_final.frag.spv",
-                                                    std::nullopt);
+  instance.shader =
+    std::make_unique<ZVulkanShader>(device,
+                                    ZVulkanShader::spirvResourcePath(QStringLiteral("pass.vert.spv")),
+                                    ZVulkanShader::spirvResourcePath(QStringLiteral("wavg_final.frag.spv")),
+                                    std::nullopt);
 
   auto vertexInput = makeVertexInputState();
   instance.pipeline = device.createPipeline(*instance.shader, vertexInput, vk::PrimitiveTopology::eTriangleStrip);

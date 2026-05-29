@@ -7,6 +7,7 @@
 #include "z3dcanvaspainter.h"
 #include <glbinding-aux/Meta.h>
 #include <QOpenGLContext>
+#include <sstream>
 
 namespace nim {
 

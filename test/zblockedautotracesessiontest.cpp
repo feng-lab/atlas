@@ -7,12 +7,15 @@
 #include <QFileInfo>
 #include <QTemporaryDir>
 
+#include <absl/strings/numbers.h>
+#include <absl/strings/str_split.h>
 #include <cstdint>
-#include <fstream>
-#include <sstream>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <vector>
+
+#include "zioutils.h"
 
 namespace {
 
@@ -268,16 +271,14 @@ TEST(ZBlockedAutoTraceSession, RollingSwcMirrorsLatestSelfContainedCommit)
   const QString rollingPath = QDir(sessionDir).absoluteFilePath("result_tracing.swc");
   ASSERT_TRUE(QFileInfo::exists(rollingPath)) << rollingPath;
 
-  std::ifstream file(rollingPath.toStdString(), std::ios_base::in);
-  ASSERT_TRUE(file.is_open());
+  std::ifstream file = nim::openIFStream(rollingPath, std::ios_base::in);
 
   std::vector<int64_t> ids;
   std::string line;
   while (std::getline(file, line)) {
-    std::istringstream in(line);
+    const std::vector<std::string_view> fields = absl::StrSplit(line, absl::ByAnyChar(" \t\r\n"), absl::SkipEmpty());
     int64_t id = 0;
-    in >> id;
-    if (!in.fail()) {
+    if (!fields.empty() && absl::SimpleAtoi(fields.front(), &id)) {
       ids.push_back(id);
     }
   }

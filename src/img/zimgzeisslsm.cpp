@@ -232,7 +232,7 @@ void ZImgZeissLsm::readLsmInfo(const QString& filename, ZTiff& tiff)
 void ZImgZeissLsm::logLsmInfo(const QString& filename)
 {
   LOG(INFO) << "Start LSM Info for " << filename;
-  LOG(INFO) << "MagicNumber: " << std::hex << m_lsmInfo.u32MagicNumber;
+  LOG(INFO) << fmt::format("MagicNumber: {:x}", m_lsmInfo.u32MagicNumber);
   LOG(INFO) << "DimensionX: " << m_lsmInfo.s32DimensionX;
   LOG(INFO) << "DimensionY: " << m_lsmInfo.s32DimensionY;
   LOG(INFO) << "DimensionZ: " << m_lsmInfo.s32DimensionZ;

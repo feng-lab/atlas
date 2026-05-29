@@ -1,6 +1,7 @@
 #pragma once
 
 #include "zimgformat.h"
+#include "zioutils.h"
 #include <QXmlStreamReader>
 #include <boost/uuid.hpp>
 #include <array>

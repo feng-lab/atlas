@@ -910,8 +910,6 @@ void ZImgLeica::readXml(const QString& filename,
       } while (true);
     }
   }
-
-  // std::cout << xml.toLocal8Bit();
 }
 
 void ZImgLeica::readLeicaInfo(const QString& xmlString, const QDir& xmlDir, std::vector<ImageInfo>& imageInfos)

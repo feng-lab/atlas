@@ -28,22 +28,22 @@ std::string_view blockIdCompactionMethodName(VulkanBlockIdCompactionMethod metho
   return "<unknown>";
 }
 
-std::string_view blockIdCompactionShaderFile(VulkanBlockIdCompactionMethod method)
+QString blockIdCompactionShaderFile(VulkanBlockIdCompactionMethod method)
 {
   switch (method) {
     case VulkanBlockIdCompactionMethod::AppendStorageParallelFlush:
-      return "block_id_compact_storage_append_parallel_flush.comp.spv";
+      return QStringLiteral("block_id_compact_storage_append_parallel_flush.comp.spv");
     case VulkanBlockIdCompactionMethod::AppendStorageParallelFlushGpuUnique:
-      return "block_id_compact_storage_append_parallel_flush_gpu_unique_mark.comp.spv";
+      return QStringLiteral("block_id_compact_storage_append_parallel_flush_gpu_unique_mark.comp.spv");
     case VulkanBlockIdCompactionMethod::AppendSampledParallelFlush:
-      return "block_id_compact_append_parallel_flush.comp.spv";
+      return QStringLiteral("block_id_compact_append_parallel_flush.comp.spv");
     case VulkanBlockIdCompactionMethod::DenseBitsetReadback:
-      return "block_id_compact_dense_bitset_storage.comp.spv";
+      return QStringLiteral("block_id_compact_dense_bitset_storage.comp.spv");
     case VulkanBlockIdCompactionMethod::DenseBitsetFlagsReadback:
-      return "block_id_compact_dense_bitset_flags_storage.comp.spv";
+      return QStringLiteral("block_id_compact_dense_bitset_flags_storage.comp.spv");
   }
   CHECK(false) << "Unknown VulkanBlockIdCompactionMethod";
-  return "";
+  return {};
 }
 
 VulkanBlockIdCompactionInputKind blockIdCompactionInputKind(VulkanBlockIdCompactionMethod method)

@@ -4,7 +4,6 @@
 #include "z3dimgslicerenderer.h"
 #include "zcolormap.h"
 #include "zlog.h"
-#include "zsysteminfo.h"
 #include "zvulkandevice.h"
 #include "zvulkanpipeline.h"
 #include "zvulkancontext.h"
@@ -32,7 +31,6 @@
 #include <QString>
 
 #include <algorithm>
-#include <fstream>
 #include <cmath>
 #include <array>
 #include <cstring>
@@ -175,19 +173,6 @@ buildPageDataBuffer(const Z3DImg& image, size_t channel, float zeToScreenPixelVo
                                        << " expected=" << expectedBytes << " (levels=" << levelCount << ")";
 
   return data;
-}
-
-std::vector<uint32_t> readSpirvFile(const std::string& path)
-{
-  VLOG(2) << "opening SPIR-V file: " << path;
-  std::ifstream file(path, std::ios::ate | std::ios::binary);
-  CHECK(file) << "Failed to open SPIR-V file: " << path;
-  const size_t fileSize = static_cast<size_t>(file.tellg());
-  CHECK(fileSize % 4 == 0) << "Invalid SPIR-V size (must be multiple of 4): " << path;
-  std::vector<uint32_t> buffer(fileSize / 4);
-  file.seekg(0);
-  file.read(reinterpret_cast<char*>(buffer.data()), fileSize);
-  return buffer;
 }
 
 struct ChannelInputs
@@ -1598,17 +1583,18 @@ ZVulkanImgSlicePipelineContext::ensureSlicePipeline(const SlicePipelineKey& key,
   CHECK(bindlessLayout) << "Slice pipeline requires backend bindless descriptor set layout";
 
   auto& device = m_backend.device();
-  static const std::string shaderBase = ZSystemInfo::resourcesDirPath().toStdString() + "/shader/vulkan/spv/";
 
   const bool paged = key.levelCount > 1u;
-  const std::string vertexShader =
-    paged ? "transform_with_3dtexture_and_eye_coordinate.vert.spv" : "transform_with_3dtexture.vert.spv";
-  const std::string fragmentShader =
-    paged ? "image3d_slice_with_colormap.frag.spv" : "volume_slice_with_colormap_single_channel.frag.spv";
+  const QString vertexShader = paged ? QStringLiteral("transform_with_3dtexture_and_eye_coordinate.vert.spv")
+                                     : QStringLiteral("transform_with_3dtexture.vert.spv");
+  const QString fragmentShader = paged ? QStringLiteral("image3d_slice_with_colormap.frag.spv")
+                                       : QStringLiteral("volume_slice_with_colormap_single_channel.frag.spv");
 
   PipelineInstance instance;
-  instance.shader =
-    std::make_unique<ZVulkanShader>(device, shaderBase + vertexShader, shaderBase + fragmentShader, std::nullopt);
+  instance.shader = std::make_unique<ZVulkanShader>(device,
+                                                    ZVulkanShader::spirvResourcePath(vertexShader),
+                                                    ZVulkanShader::spirvResourcePath(fragmentShader),
+                                                    std::nullopt);
 
   auto vertexState = makeSliceVertexInputState();
   instance.pipeline = device.createPipeline(*instance.shader, vertexState, vk::PrimitiveTopology::eTriangleList);
@@ -1679,13 +1665,13 @@ ZVulkanImgSlicePipelineContext::ensureMergePipeline(const MergePipelineKey& key,
   }
 
   auto& device = m_backend.device();
-  static const std::string shaderBase = ZSystemInfo::resourcesDirPath().toStdString() + "/shader/vulkan/spv/";
 
   PipelineInstance instance;
-  instance.shader = std::make_unique<ZVulkanShader>(device,
-                                                    shaderBase + "pass.vert.spv",
-                                                    shaderBase + "image2d_array_compositor.frag.spv",
-                                                    std::nullopt);
+  instance.shader = std::make_unique<ZVulkanShader>(
+    device,
+    ZVulkanShader::spirvResourcePath(QStringLiteral("pass.vert.spv")),
+    ZVulkanShader::spirvResourcePath(QStringLiteral("image2d_array_compositor.frag.spv")),
+    std::nullopt);
 
   auto vertexState = makeQuadVertexInputState();
   instance.pipeline = device.createPipeline(*instance.shader, vertexState, vk::PrimitiveTopology::eTriangleStrip);
@@ -1743,13 +1729,13 @@ ZVulkanImgSlicePipelineContext::ensureBlockIdPipeline(const BlockIdPipelineKey& 
   CHECK(pageDataLayout) << "Slice Block-ID pipeline requires backend page-data descriptor set layout";
 
   auto& device = m_backend.device();
-  static const std::string shaderBase = ZSystemInfo::resourcesDirPath().toStdString() + "/shader/vulkan/spv/";
 
   PipelineInstance instance;
-  instance.shader = std::make_unique<ZVulkanShader>(device,
-                                                    shaderBase + "transform_with_3dtexture_and_eye_coordinate.vert.spv",
-                                                    shaderBase + "image3d_slice_with_transfun_blockID.frag.spv",
-                                                    std::nullopt);
+  instance.shader = std::make_unique<ZVulkanShader>(
+    device,
+    ZVulkanShader::spirvResourcePath(QStringLiteral("transform_with_3dtexture_and_eye_coordinate.vert.spv")),
+    ZVulkanShader::spirvResourcePath(QStringLiteral("image3d_slice_with_transfun_blockID.frag.spv")),
+    std::nullopt);
 
   auto vertexState = makeSliceVertexInputState();
   instance.pipeline = device.createPipeline(*instance.shader, vertexState, vk::PrimitiveTopology::eTriangleList);
@@ -1793,7 +1779,6 @@ void ZVulkanImgSlicePipelineContext::ensureBlockIdCompactionPipeline()
 {
   auto& device = m_backend.device().context().device();
   const VulkanBlockIdCompactionMethod method = vkBlockIdCompactionMethod();
-  static const std::string shaderBase = nim::ZSystemInfo::resourcesDirPath().toStdString() + "/shader/vulkan/spv/";
   const vk::DescriptorSetLayout bindlessLayout = m_backend.bindlessSampledImageDescriptorSetLayout();
   CHECK(static_cast<VkDescriptorSetLayout>(bindlessLayout) != VK_NULL_HANDLE)
     << "Slice block-ID compaction requires backend bindless descriptor set layout";
@@ -1833,9 +1818,9 @@ void ZVulkanImgSlicePipelineContext::ensureBlockIdCompactionPipeline()
                                      .pPushConstantRanges = &pc});
     }
 
-    const std::string compPath =
-      shaderBase + std::string(blockIdCompactionShaderFile(VulkanBlockIdCompactionMethod::AppendStorageParallelFlush));
-    auto spirv = readSpirvFile(compPath);
+    const QString compPath = ZVulkanShader::spirvResourcePath(
+      blockIdCompactionShaderFile(VulkanBlockIdCompactionMethod::AppendStorageParallelFlush));
+    auto spirv = ZVulkanShader::readSPIRVFile(compPath);
     vk::raii::ShaderModule compModule(
       device,
       vk::ShaderModuleCreateInfo{.codeSize = spirv.size() * sizeof(uint32_t), .pCode = spirv.data()});
@@ -1882,11 +1867,11 @@ void ZVulkanImgSlicePipelineContext::ensureBlockIdCompactionPipeline()
                                      .pPushConstantRanges = &pc});
     }
 
-    auto loadCompute = [&](const std::string& compPath, std::optional<vk::raii::Pipeline>& pipeline) {
+    auto loadCompute = [&](const QString& compPath, std::optional<vk::raii::Pipeline>& pipeline) {
       if (pipeline) {
         return;
       }
-      auto spirv = readSpirvFile(compPath);
+      auto spirv = ZVulkanShader::readSPIRVFile(compPath);
       vk::raii::ShaderModule compModule(
         device,
         vk::ShaderModuleCreateInfo{.codeSize = spirv.size() * sizeof(uint32_t), .pCode = spirv.data()});
@@ -1899,10 +1884,10 @@ void ZVulkanImgSlicePipelineContext::ensureBlockIdCompactionPipeline()
         vk::ComputePipelineCreateInfo{.stage = stage, .layout = **m_blockIdCompactPipelineLayoutStorage});
     };
 
-    loadCompute(shaderBase + std::string(blockIdCompactionShaderFile(
-                               VulkanBlockIdCompactionMethod::AppendStorageParallelFlushGpuUnique)),
+    loadCompute(ZVulkanShader::spirvResourcePath(
+                  blockIdCompactionShaderFile(VulkanBlockIdCompactionMethod::AppendStorageParallelFlushGpuUnique)),
                 m_blockIdCompactPipelineStorageGpuUniqueMark);
-    loadCompute(shaderBase + "block_id_compact_append_gpu_unique_emit.comp.spv",
+    loadCompute(ZVulkanShader::spirvResourcePath(QStringLiteral("block_id_compact_append_gpu_unique_emit.comp.spv")),
                 m_blockIdCompactPipelineStorageGpuUniqueEmit);
     created = true;
   };
@@ -1936,9 +1921,9 @@ void ZVulkanImgSlicePipelineContext::ensureBlockIdCompactionPipeline()
                                      .pPushConstantRanges = &pc});
     }
 
-    const std::string compPath =
-      shaderBase + std::string(blockIdCompactionShaderFile(VulkanBlockIdCompactionMethod::AppendSampledParallelFlush));
-    auto spirv = readSpirvFile(compPath);
+    const QString compPath = ZVulkanShader::spirvResourcePath(
+      blockIdCompactionShaderFile(VulkanBlockIdCompactionMethod::AppendSampledParallelFlush));
+    auto spirv = ZVulkanShader::readSPIRVFile(compPath);
     vk::raii::ShaderModule compModule(
       device,
       vk::ShaderModuleCreateInfo{.codeSize = spirv.size() * sizeof(uint32_t), .pCode = spirv.data()});
@@ -1969,7 +1954,7 @@ void ZVulkanImgSlicePipelineContext::ensureBlockIdCompactionPipeline()
   }
 
   if (created && VLOG_IS_ON(1)) {
-    const std::string compPath = shaderBase + std::string(blockIdCompactionShaderFile(method));
+    const QString compPath = ZVulkanShader::spirvResourcePath(blockIdCompactionShaderFile(method));
     VLOG(1) << fmt::format("ensureSliceBlockIdCompactionPipeline: method={} shader='{}'",
                            blockIdCompactionMethodName(method),
                            compPath);

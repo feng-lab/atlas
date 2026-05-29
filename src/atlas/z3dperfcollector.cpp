@@ -1,12 +1,15 @@
 ﻿#include "z3dperfcollector.h"
 
 #include "zabslflagtypes.h"
+#include "zioutils.h"
 #include "zlog.h"
 #include "zcommandlineflags.h"
 
+#include <QFileInfo>
+
 #include <algorithm>
 #include <array>
-#include <fstream>
+#include <cctype>
 #include <limits>
 #include <optional>
 #include <unordered_map>
@@ -437,7 +440,7 @@ void Z3DPerfCollector::flush(uint64_t token)
     }
 
     try {
-      std::ofstream ofs(*tracePath, std::ios::out | std::ios::trunc);
+      std::ofstream ofs = openOFStream(QString::fromStdString(*tracePath), std::ios::out | std::ios::trunc);
       ofs << "{\n\"traceEvents\":[\n";
       for (size_t i = 0; i < events.size(); ++i) {
         const auto& e = events[i];
@@ -518,17 +521,13 @@ void Z3DPerfCollector::flush(uint64_t token)
 
     try {
       // Append by reopening and inserting before closing ]}
-      std::ifstream ifs(*traceAppendPath);
+      const QString traceAppendFilename = QString::fromStdString(*traceAppendPath);
       std::string existing;
-      if (ifs.good()) {
-        existing.assign(std::istreambuf_iterator<char>(ifs), std::istreambuf_iterator<char>());
+      if (QFileInfo::exists(traceAppendFilename)) {
+        existing = readFileIntoString(traceAppendFilename);
       }
-      ifs.close();
 
-      std::ofstream ofs(*traceAppendPath, std::ios::out | std::ios::trunc);
-      if (!ofs.good()) {
-        throw std::runtime_error("Cannot open trace append file for write");
-      }
+      std::ofstream ofs = openOFStream(traceAppendFilename, std::ios::out | std::ios::trunc);
       if (existing.empty()) {
         ofs << "{\n\"traceEvents\":[\n";
         for (size_t i = 0; i < events.size(); ++i) {
@@ -608,16 +607,15 @@ void Z3DPerfCollector::flush(uint64_t token)
       // parse format:path
       const auto sep = perfSummary->find(":");
       if (sep == std::string::npos) {
-        throw std::runtime_error("atlas_perf_summary must be 'csv:path' or 'json:path'");
+        throw ZException("atlas_perf_summary must be 'csv:path' or 'json:path'");
       }
       const std::string fmtKind = perfSummary->substr(0, sep);
       const std::string outPath = perfSummary->substr(sep + 1);
+      const QString outFilename = QString::fromStdString(outPath);
       if (fmtKind == "csv") {
         // Append CSV with header if file new. Top5 labels for stable columns.
-        std::ifstream ifs(outPath);
-        const bool exists = ifs.good();
-        ifs.close();
-        std::ofstream ofs(outPath, std::ios::out | std::ios::app);
+        const bool exists = QFileInfo::exists(outFilename);
+        std::ofstream ofs = openOFStream(outFilename, std::ios::out | std::ios::app);
         if (!exists) {
           ofs
             << "frame,cpu_ms,gpu_ms,top1_label,top1_ms,top1_pct,top2_label,top2_ms,top2_pct,top3_label,top3_ms,top3_pct,top4_label,top4_ms,top4_pct,top5_label,top5_ms,top5_pct,upload_hi,static_staged,readback,all_ms,all_samples,dsets,pipes_created,pipes_bound,segs,clears,loads,dwr,rew\n";
@@ -703,11 +701,11 @@ void Z3DPerfCollector::flush(uint64_t token)
         st["bound_set_rewrites"] = agg.boundSetRewriteAttempts;
         jo["stats"] = std::move(st);
         // Append NDJSON: one JSON object per line
-        std::ofstream ofs(outPath, std::ios::out | std::ios::app);
+        std::ofstream ofs = openOFStream(outFilename, std::ios::out | std::ios::app);
         ofs << jsonToString(jo) << "\n";
         ofs.close();
       } else {
-        throw std::runtime_error("atlas_perf_summary format must be 'csv' or 'json'");
+        throw ZException("atlas_perf_summary format must be 'csv' or 'json'");
       }
     }
     catch (const std::exception& ex) {

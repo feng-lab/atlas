@@ -2,6 +2,7 @@
 
 #include "zexception.h"
 #include "zabslflagtypes.h"
+#include "zioutils.h"
 #include "zlog.h"
 #include "zsysteminfo.h"
 
@@ -14,7 +15,6 @@
 #include <QSaveFile>
 
 #include <array>
-#include <fstream>
 #include <memory>
 #include <optional>
 #include <string>
@@ -75,18 +75,9 @@ namespace {
 
 struct CaBundleCandidate
 {
-  std::string path;
+  QString path;
   std::string sourceDescription;
 };
-
-bool isReadableFile(const std::string& path)
-{
-  if (path.empty()) {
-    return false;
-  }
-  std::ifstream f(path);
-  return f.good();
-}
 
 std::optional<CaBundleCandidate> appLocalPemBundleCandidate()
 {
@@ -100,23 +91,27 @@ std::optional<CaBundleCandidate> appLocalPemBundleCandidate()
     return std::nullopt;
   }
 
-  return CaBundleCandidate{appBundlePath.toStdString(), "app-local curl-ca-bundle.crt"};
+  return CaBundleCandidate{appBundlePath, "app-local curl-ca-bundle.crt"};
 }
 
 std::vector<CaBundleCandidate> systemPemBundleCandidates()
 {
   std::vector<CaBundleCandidate> paths;
 
-  paths.push_back(CaBundleCandidate{"/etc/ssl/cert.pem", "system:/etc/ssl/cert.pem"});
-  paths.push_back(CaBundleCandidate{"/etc/ssl/certs/ca-certificates.crt", "system:/etc/ssl/certs/ca-certificates.crt"});
-  paths.push_back(CaBundleCandidate{"/etc/pki/tls/cert.pem", "system:/etc/pki/tls/cert.pem"});
-  paths.push_back(CaBundleCandidate{"/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem",
+  paths.push_back(CaBundleCandidate{QStringLiteral("/etc/ssl/cert.pem"), "system:/etc/ssl/cert.pem"});
+  paths.push_back(CaBundleCandidate{QStringLiteral("/etc/ssl/certs/ca-certificates.crt"),
+                                    "system:/etc/ssl/certs/ca-certificates.crt"});
+  paths.push_back(CaBundleCandidate{QStringLiteral("/etc/pki/tls/cert.pem"), "system:/etc/pki/tls/cert.pem"});
+  paths.push_back(CaBundleCandidate{QStringLiteral("/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem"),
                                     "system:/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem"});
-  paths.push_back(CaBundleCandidate{"/etc/ssl/certs/ca-bundle.crt", "system:/etc/ssl/certs/ca-bundle.crt"});
-  paths.push_back(CaBundleCandidate{"/usr/local/etc/openssl@3/cert.pem", "system:/usr/local/etc/openssl@3/cert.pem"});
   paths.push_back(
-    CaBundleCandidate{"/opt/homebrew/etc/openssl@3/cert.pem", "system:/opt/homebrew/etc/openssl@3/cert.pem"});
-  paths.push_back(CaBundleCandidate{"/usr/local/etc/openssl/cert.pem", "system:/usr/local/etc/openssl/cert.pem"});
+    CaBundleCandidate{QStringLiteral("/etc/ssl/certs/ca-bundle.crt"), "system:/etc/ssl/certs/ca-bundle.crt"});
+  paths.push_back(
+    CaBundleCandidate{QStringLiteral("/usr/local/etc/openssl@3/cert.pem"), "system:/usr/local/etc/openssl@3/cert.pem"});
+  paths.push_back(CaBundleCandidate{QStringLiteral("/opt/homebrew/etc/openssl@3/cert.pem"),
+                                    "system:/opt/homebrew/etc/openssl@3/cert.pem"});
+  paths.push_back(
+    CaBundleCandidate{QStringLiteral("/usr/local/etc/openssl/cert.pem"), "system:/usr/local/etc/openssl/cert.pem"});
 
   return paths;
 }
@@ -236,7 +231,8 @@ ZHttpTrustStoreConfig resolveHttpTrustStoreConfig(ZHttpTrustBackend backend)
 {
   const std::optional<std::string> caBundle = absl::GetFlag(FLAGS_atlas_http_ca_bundle);
   if (caBundle.has_value()) {
-    if (!isReadableFile(*caBundle)) {
+    const QString caBundlePath = QString::fromStdString(*caBundle);
+    if (!isReadableFile(caBundlePath)) {
       throw ZException(fmt::format("--atlas_http_ca_bundle points to an unreadable file: '{}'", *caBundle));
     }
     return ZHttpTrustStoreConfig{*caBundle, "flag:atlas_http_ca_bundle"};
@@ -260,11 +256,11 @@ ZHttpTrustStoreConfig resolveHttpTrustStoreConfig(ZHttpTrustBackend backend)
   }
 
   if (auto candidate = appLocalPemBundleCandidate()) {
-    return ZHttpTrustStoreConfig{candidate->path, candidate->sourceDescription};
+    return ZHttpTrustStoreConfig{candidate->path.toStdString(), candidate->sourceDescription};
   }
 
   if (auto candidate = findReadableCandidate(systemPemBundleCandidates())) {
-    return ZHttpTrustStoreConfig{candidate->path, candidate->sourceDescription};
+    return ZHttpTrustStoreConfig{candidate->path.toStdString(), candidate->sourceDescription};
   }
 
   throw ZException(
@@ -277,11 +273,11 @@ ZHttpTrustStoreConfig resolveHttpTrustStoreConfig(ZHttpTrustBackend backend)
 #endif
 
   if (auto candidate = appLocalPemBundleCandidate()) {
-    return ZHttpTrustStoreConfig{candidate->path, candidate->sourceDescription};
+    return ZHttpTrustStoreConfig{candidate->path.toStdString(), candidate->sourceDescription};
   }
 
   if (auto candidate = findReadableCandidate(systemPemBundleCandidates())) {
-    return ZHttpTrustStoreConfig{candidate->path, candidate->sourceDescription};
+    return ZHttpTrustStoreConfig{candidate->path.toStdString(), candidate->sourceDescription};
   }
 
   return ZHttpTrustStoreConfig{"", "backend default trust store"};

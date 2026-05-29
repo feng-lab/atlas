@@ -5,6 +5,7 @@
 #include "zimginit.h"
 #include "zimgio.h"
 #include "zcpuinfo.h"
+#include "zexception.h"
 
 #include <QDir>
 #include <QFile>
@@ -25,7 +26,6 @@
 #include <mutex>
 #include <optional>
 #include <set>
-#include <stdexcept>
 #include <string>
 #include <utility>
 #include <vector>
@@ -56,7 +56,7 @@ void configureBioFormatsTestBridge()
     bool ok = false;
     const qlonglong value = QString::fromUtf8(timeoutOverride).toLongLong(&ok);
     if (!ok || value < 0 || value > std::numeric_limits<int32_t>::max()) {
-      throw std::runtime_error("ATLAS_BIOFORMATS_TEST_IO_TIMEOUT_MS must be an integer from 0 to INT32_MAX");
+      throw ZException("ATLAS_BIOFORMATS_TEST_IO_TIMEOUT_MS must be an integer from 0 to INT32_MAX");
     }
     absl::SetFlag(&FLAGS_atlas_bioformats_bridge_io_timeout_ms, static_cast<int32_t>(value));
     return;
@@ -176,7 +176,7 @@ QString createFakeReaderFile(QTemporaryDir& dir, const QString& basename)
   const QString path = dir.filePath(filename);
   QFile file(path);
   if (!file.open(QIODevice::WriteOnly)) {
-    throw std::runtime_error(fmt::format("failed to create FakeReader file '{}': {}", path, file.errorString()));
+    throw ZException(fmt::format("failed to create FakeReader file '{}': {}", path, file.errorString()));
   }
   return path;
 }
@@ -853,46 +853,46 @@ std::vector<CorpusManifestFile> corpusFilesFromManifest(const QString& rootPath,
   const QString manifestPath = QDir(rootPath).filePath(manifestName);
   QFile manifestFile(manifestPath);
   if (!manifestFile.exists()) {
-    throw std::runtime_error(fmt::format("Bio-Formats corpus manifest is missing: {}", manifestPath));
+    throw ZException(fmt::format("Bio-Formats corpus manifest is missing: {}", manifestPath));
   }
   if (!manifestFile.open(QIODevice::ReadOnly)) {
-    throw std::runtime_error(fmt::format("failed to open {}", manifestPath));
+    throw ZException(fmt::format("failed to open {}", manifestPath));
   }
 
   QJsonParseError error;
   const QJsonDocument doc = QJsonDocument::fromJson(manifestFile.readAll(), &error);
   if (error.error != QJsonParseError::NoError || !doc.isObject()) {
-    throw std::runtime_error(fmt::format("failed to parse {}: {}", manifestPath, error.errorString()));
+    throw ZException(fmt::format("failed to parse {}: {}", manifestPath, error.errorString()));
   }
 
   const QJsonValue samplesValue = doc.object().value(QStringLiteral("samples"));
   if (!samplesValue.isArray()) {
-    throw std::runtime_error(fmt::format("Bio-Formats corpus manifest samples must be an array: {}", manifestPath));
+    throw ZException(fmt::format("Bio-Formats corpus manifest samples must be an array: {}", manifestPath));
   }
 
   std::vector<CorpusManifestFile> files;
   const QJsonArray samples = samplesValue.toArray();
   if (samples.isEmpty()) {
-    throw std::runtime_error(fmt::format("Bio-Formats corpus manifest has no samples: {}", manifestPath));
+    throw ZException(fmt::format("Bio-Formats corpus manifest has no samples: {}", manifestPath));
   }
   files.reserve(static_cast<size_t>(samples.size()));
   for (qsizetype index = 0; index < samples.size(); ++index) {
     const QJsonValue& value = samples[index];
     if (!value.isObject()) {
-      throw std::runtime_error(
+      throw ZException(
         fmt::format("Bio-Formats corpus manifest sample {} must be an object in {}", index + 1, manifestPath));
     }
     const QJsonObject object = value.toObject();
     const QString relativePath = object.value(QStringLiteral("relative_path")).toString();
     if (relativePath.isEmpty()) {
-      throw std::runtime_error(
+      throw ZException(
         fmt::format("Bio-Formats corpus manifest sample {} is missing relative_path in {}", index + 1, manifestPath));
     }
     uint64_t sizeBytes = 0;
     if (object.contains(QStringLiteral("size"))) {
       const double sizeValue = object.value(QStringLiteral("size")).toDouble(-1.);
       if (sizeValue < 0.) {
-        throw std::runtime_error(
+        throw ZException(
           fmt::format("Bio-Formats corpus manifest sample {} has invalid size in {}", index + 1, manifestPath));
       }
       sizeBytes = static_cast<uint64_t>(sizeValue);
@@ -929,7 +929,7 @@ std::optional<QString> publicCorpusRootPath()
   }
   const QString rootPath = QString::fromUtf8(root);
   if (!QDir(rootPath).exists()) {
-    throw std::runtime_error(fmt::format("ATLAS_BIOFORMATS_BREADTH_DIR does not exist: {}", rootPath));
+    throw ZException(fmt::format("ATLAS_BIOFORMATS_BREADTH_DIR does not exist: {}", rootPath));
   }
   return rootPath;
 }
@@ -1027,7 +1027,7 @@ bool publicCorpusBooleanEnv(const char* name, bool defaultValue)
       value == QStringLiteral("on")) {
     return true;
   }
-  throw std::runtime_error(fmt::format("{} must be one of 0/1, false/true, no/yes, or off/on", name));
+  throw ZException(fmt::format("{} must be one of 0/1, false/true, no/yes, or off/on", name));
 }
 
 size_t publicCorpusProgressInterval()
@@ -1040,10 +1040,10 @@ size_t publicCorpusProgressInterval()
   bool ok = false;
   const qulonglong value = QString::fromUtf8(raw).toULongLong(&ok);
   if (!ok) {
-    throw std::runtime_error("ATLAS_BIOFORMATS_BREADTH_PROGRESS_INTERVAL must be a non-negative integer");
+    throw ZException("ATLAS_BIOFORMATS_BREADTH_PROGRESS_INTERVAL must be a non-negative integer");
   }
   if (value > std::numeric_limits<size_t>::max()) {
-    throw std::runtime_error("ATLAS_BIOFORMATS_BREADTH_PROGRESS_INTERVAL is too large for this platform");
+    throw ZException("ATLAS_BIOFORMATS_BREADTH_PROGRESS_INTERVAL is too large for this platform");
   }
   return static_cast<size_t>(value);
 }
@@ -1078,7 +1078,7 @@ size_t publicCorpusSizeEnv(const char* name, size_t defaultValue)
   bool ok = false;
   const qulonglong value = QString::fromUtf8(raw).trimmed().toULongLong(&ok);
   if (!ok || value > std::numeric_limits<size_t>::max()) {
-    throw std::runtime_error(fmt::format("{} must be a non-negative integer", name));
+    throw ZException(fmt::format("{} must be a non-negative integer", name));
   }
   return static_cast<size_t>(value);
 }
@@ -1114,7 +1114,7 @@ CorpusScenePolicy publicCorpusScenePolicy()
   if (value == QStringLiteral("sampled")) {
     return CorpusScenePolicy::Sampled;
   }
-  throw std::runtime_error("ATLAS_BIOFORMATS_BREADTH_SCENE_POLICY must be 'all', 'representative', or 'sampled'");
+  throw ZException("ATLAS_BIOFORMATS_BREADTH_SCENE_POLICY must be 'all', 'representative', or 'sampled'");
 }
 
 const char* corpusScenePolicyName(CorpusScenePolicy policy)
@@ -1505,7 +1505,7 @@ std::vector<ZImgInfo> readLeicaCorpusInfos(const QString& corpusRootPath, const 
 {
   const QString path = QDir(corpusRootPath).filePath(relativePath);
   if (!QFileInfo::exists(path)) {
-    throw std::runtime_error(fmt::format("Leica corpus file is missing: {}", path));
+    throw ZException(fmt::format("Leica corpus file is missing: {}", path));
   }
   std::vector<ZImgInfo> infos;
   ZImgIO::instance().readInfos(path, infos, nullptr, FileFormat::Leica);

@@ -38,7 +38,6 @@
 #include <exception>
 #include <memory>
 #include <optional>
-#include <stdexcept>
 
 ABSL_DECLARE_FLAG(uint64_t, atlas_disk_cache_http_max_bytes);
 

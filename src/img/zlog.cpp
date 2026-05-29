@@ -22,7 +22,6 @@
 #include <chrono>
 #include <cctype>
 #include <cstdio>
-#include <iostream>
 #include <mutex>
 #include <utility>
 
@@ -138,7 +137,7 @@ public:
       return;
     }
 
-    const absl::string_view message = entry.text_message_with_prefix_and_newline();
+    const std::string_view message = entry.text_message_with_prefix_and_newline();
     std::scoped_lock lock(m_mutex);
     (void)writeUnlocked(stdout, message.data(), message.size());
     (void)flushUnlocked(stdout);
@@ -189,7 +188,7 @@ public:
     return !m_openFailed && (m_openMode == FileOpenMode::Lazy || m_file != nullptr);
   }
 
-  bool write(absl::string_view message, bool forceFlush, std::chrono::steady_clock::time_point now)
+  bool write(std::string_view message, bool forceFlush, std::chrono::steady_clock::time_point now)
   {
     if (!ensureOpen(now)) {
       return false;
@@ -272,7 +271,7 @@ public:
       return;
     }
 
-    const absl::string_view message = entry.text_message_with_prefix_and_newline();
+    const std::string_view message = entry.text_message_with_prefix_and_newline();
     const bool forceFlush = m_alwaysFlushFiles || entry.log_severity() >= absl::LogSeverity::kWarning;
     const auto now = std::chrono::steady_clock::now();
     std::scoped_lock lock(m_mutex);
@@ -340,7 +339,7 @@ public:
 
   void Send(const absl::LogEntry& entry) override
   {
-    const absl::string_view message = entry.text_message_with_prefix_and_newline();
+    const std::string_view message = entry.text_message_with_prefix_and_newline();
     const size_t maxIndex = severityFileIndex(entry.log_severity());
     const bool forceFlush = m_alwaysFlushFiles || entry.log_severity() >= absl::LogSeverity::kWarning;
     const auto now = std::chrono::steady_clock::now();
@@ -441,15 +440,13 @@ constexpr bool is_formattable()
 }
 
 template<typename T>
-constexpr bool is_streamable()
+constexpr bool has_absl_stringify()
 {
-  return requires(std::ostream& s, const T& v) {
-    { s << NullGuard<T>().Guard(v) } -> std::convertible_to<std::ostream&>;
-  };
+  return ::absl::HasAbslStringify<T>::value;
 }
 
-// fmt::format support. These assertions validate formatter availability only;
-// direct LOG/VLOG stream support is checked separately below.
+// fmt::format remains the canonical formatting surface. AbslStringify support
+// is the logging/CHECK compatibility adapter for direct LOG/VLOG streaming.
 static_assert(nim::IsUtf8ArrayType<QByteArray>, "QByteArray should satisfy IsUtf8ArrayType");
 static_assert(is_formattable<QString>(), "QString should be formattable");
 static_assert(is_formattable<QStringView>(), "QStringView should be formattable");
@@ -484,25 +481,27 @@ enum class TestFlag
 Q_DECLARE_FLAGS(TestFlags, TestFlag)
 
 static_assert(is_formattable<TestFlags>(), "TestFlags (QFlags) should be formattable");
+static_assert(is_formattable<nim::EnumOrUnderlying<TestFlag>>(), "EnumOrUnderlying should be formattable");
 
-static_assert(is_streamable<QString>(), "QString should be streamable");
-static_assert(is_streamable<QStringView>(), "QStringView should be streamable");
-static_assert(is_streamable<QByteArray>(), "QByteArray should be streamable");
+static_assert(has_absl_stringify<QString>(), "QString should support AbslStringify");
+static_assert(has_absl_stringify<QStringView>(), "QStringView should support AbslStringify");
+static_assert(has_absl_stringify<QByteArray>(), "QByteArray should support AbslStringify");
 #if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
-static_assert(is_streamable<QByteArrayView>(), "QByteArrayView should be streamable");
-static_assert(is_streamable<QUtf8StringView>(), "QUtf8StringView should be streamable");
+static_assert(has_absl_stringify<QByteArrayView>(), "QByteArrayView should support AbslStringify");
+static_assert(has_absl_stringify<QUtf8StringView>(), "QUtf8StringView should support AbslStringify");
 #endif
-static_assert(is_streamable<QRect>(), "QRect should be streamable");
-static_assert(is_streamable<QRectF>(), "QRectF should be streamable");
-static_assert(is_streamable<QStringList>(), "QStringList should be streamable");
-static_assert(is_streamable<QContiguousCache<int>>(), "QContiguousCache<int> should be streamable");
-static_assert(is_streamable<QSharedPointer<int>>(), "QSharedPointer<int> should be streamable");
-static_assert(is_streamable<nim::col4>(), "col4 should be streamable");
-static_assert(is_streamable<nim::ZVoxelCoordinate>(), "ZVoxelCoordinate should be streamable");
-static_assert(is_streamable<glm::mat4>(), "glm::mat4 should be streamable");
-static_assert(is_streamable<glm::vec3>(), "glm::vec3 should be streamable");
-static_assert(is_streamable<glm::quat>(), "glm::quat should be streamable");
-static_assert(is_streamable<TestFlags>(), "TestFlags (QFlags) should be streamable");
+static_assert(has_absl_stringify<QRect>(), "QRect should support AbslStringify");
+static_assert(has_absl_stringify<QRectF>(), "QRectF should support AbslStringify");
+static_assert(has_absl_stringify<QStringList>(), "QStringList should support AbslStringify");
+static_assert(has_absl_stringify<QContiguousCache<int>>(), "QContiguousCache<int> should support AbslStringify");
+static_assert(has_absl_stringify<QSharedPointer<int>>(), "QSharedPointer<int> should support AbslStringify");
+static_assert(has_absl_stringify<nim::col4>(), "col4 should support AbslStringify");
+static_assert(has_absl_stringify<nim::ZVoxelCoordinate>(), "ZVoxelCoordinate should support AbslStringify");
+static_assert(has_absl_stringify<glm::mat4>(), "glm::mat4 should support AbslStringify");
+static_assert(has_absl_stringify<glm::vec3>(), "glm::vec3 should support AbslStringify");
+static_assert(has_absl_stringify<glm::quat>(), "glm::quat should support AbslStringify");
+static_assert(has_absl_stringify<TestFlags>(), "TestFlags (QFlags) should support AbslStringify");
+static_assert(has_absl_stringify<nim::EnumOrUnderlying<TestFlag>>(), "EnumOrUnderlying should support AbslStringify");
 
 } // namespace log_internal
 ABSL_NAMESPACE_END

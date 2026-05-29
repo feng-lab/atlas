@@ -2,6 +2,7 @@
 
 #include "zneutubeneighborhood.h"
 
+#include "zexception.h"
 #include "zlog.h"
 
 #include <algorithm>
@@ -27,7 +28,7 @@ namespace {
     return 1.73205080757;
   }
 
-  throw std::invalid_argument("Invalid input indices");
+  throw ZException("Invalid input indices");
 }
 
 [[nodiscard]] double distanceWeight(double v)

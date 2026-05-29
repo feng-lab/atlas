@@ -13,11 +13,10 @@
 #include <array>
 #include <cmath>
 #include <cstddef>
+#include <iterator>
 #include <map>
 #include <optional>
 #include <queue>
-#include <sstream>
-#include <stdexcept>
 #include <string>
 #include <utility>
 #include <vector>
@@ -774,7 +773,7 @@ void resampleSwcLegacy(ZSwc& tree, double step)
 CompareSwcResult computeCompareSwc(const std::vector<std::string>& inputPaths, double scale)
 {
   if (inputPaths.empty()) {
-    throw std::invalid_argument("Compare SWC: please specify input SWC files.");
+    throw ZException("Compare SWC: please specify input SWC files.");
   }
 
   std::vector<ZSwc> trees;
@@ -815,11 +814,11 @@ CompareSwcResult computeCompareSwc(const std::vector<std::string>& inputPaths, d
 
 std::string formatCompareSwcPairs(const CompareSwcResult& result)
 {
-  std::ostringstream stream;
+  fmt::memory_buffer buffer;
   for (const auto& p : result.pairs) {
-    stream << p.i << "-" << p.j << ": " << p.score << std::endl;
+    fmt::format_to(std::back_inserter(buffer), "{}-{}: {:g}\n", p.i, p.j, p.score);
   }
-  return stream.str();
+  return fmt::to_string(buffer);
 }
 
 int runCompareSwc(const std::vector<std::string>& inputPaths, double scale)

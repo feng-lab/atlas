@@ -2239,7 +2239,7 @@ void Z3DImg::resetCacheSystem(size_t c)
   // channel display ranges) and therefore must not unconditionally touch OpenGL.
   // When Atlas starts in Vulkan mode, there may be no active GL context, and
   // attempting to create/update GL textures here will crash (Apple GL driver can
-  // throw std::out_of_range from deep within GL entrypoints).
+  // raise a range exception from deep within GL entrypoints).
   //
   // Instead, mark the GL paging textures dirty and let OpenGL-only call sites
   // (bind shaders / updateAndUploadPageDirectoryCaches) recreate+upload lazily

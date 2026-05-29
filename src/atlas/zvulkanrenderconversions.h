@@ -3,6 +3,7 @@
 #include "z3drendercommands.h"
 #include "zvulkan.h"
 
+#include <QString>
 #include <optional>
 #include <string_view>
 #include <vector>
@@ -28,7 +29,7 @@ enum class VulkanBlockIdCompactionInputKind
 };
 
 [[nodiscard]] std::string_view blockIdCompactionMethodName(VulkanBlockIdCompactionMethod method);
-[[nodiscard]] std::string_view blockIdCompactionShaderFile(VulkanBlockIdCompactionMethod method);
+[[nodiscard]] QString blockIdCompactionShaderFile(VulkanBlockIdCompactionMethod method);
 [[nodiscard]] VulkanBlockIdCompactionInputKind blockIdCompactionInputKind(VulkanBlockIdCompactionMethod method);
 [[nodiscard]] bool blockIdCompactionMethodUsesStorage(VulkanBlockIdCompactionMethod method);
 [[nodiscard]] bool blockIdCompactionMethodUsesSampled(VulkanBlockIdCompactionMethod method);

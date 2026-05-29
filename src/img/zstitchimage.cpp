@@ -4,6 +4,7 @@
 #include "zlog.h"
 #include "zimgnccmatch.h"
 #include "zimgregion.h"
+#include "zioutils.h"
 #include "zstringutils.h"
 #include "zeigenutils.h"
 #include "zvbgmm.h"

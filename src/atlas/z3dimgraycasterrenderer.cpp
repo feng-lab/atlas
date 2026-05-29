@@ -17,7 +17,6 @@
 #include "z3drenderervulkanbackend.h"
 #include "zvulkantexture.h"
 #include <folly/OperationCancelled.h>
-#include <absl/strings/str_cat.h>
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -110,8 +109,7 @@ void appendAnalyticRaySetupHeader(std::string& header)
   fmt::format_to(std::back_inserter(header),
                  "#define ATLAS_ANALYTIC_MAX_CLIP_PLANES {}\n",
                  kZ3DAnalyticRaySetupMaxClipPlanes);
-  absl::StrAppend(&header,
-                  R"(uniform mat4 atlas_ndc_to_tex;
+  header.append(R"(uniform mat4 atlas_ndc_to_tex;
 uniform mat4 atlas_ndc_to_eye;
 uniform vec3 atlas_box_min_tex;
 uniform vec3 atlas_box_max_tex;
@@ -1407,7 +1405,7 @@ std::string Z3DImgRaycasterRenderer::generateHeader()
   if (numVisibleChannels > 0) {
     fmt::format_to(std::back_inserter(header), "#define NUM_VOLUMES {}\n", numVisibleChannels);
   } else {
-    absl::StrAppend(&header, "#define NUM_VOLUMES 0\n", "#define DISABLE_TEXTURE_COORD_OUTPUT\n");
+    header.append("#define NUM_VOLUMES 0\n#define DISABLE_TEXTURE_COORD_OUTPUT\n");
   }
 
   const bool useMIPMerge = m_compositingModeValue == ImgCompositingMode::MaximumIntensityProjection ||
@@ -1417,41 +1415,38 @@ std::string Z3DImgRaycasterRenderer::generateHeader()
 
   switch (m_compositingModeValue) {
     case ImgCompositingMode::DirectVolumeRendering:
-      absl::StrAppend(&header,
-                      "#define COMPOSITING(result, color, currentRayLength, rayDepth) ",
-                      "compositeDVR(result, color, currentRayLength, rayDepth);\n");
+      header.append("#define COMPOSITING(result, color, currentRayLength, rayDepth) "
+                    "compositeDVR(result, color, currentRayLength, rayDepth);\n");
       break;
     case ImgCompositingMode::IsoSurface:
-      absl::StrAppend(&header,
-                      "#define ISO\n",
-                      "#define COMPOSITING(result, color, currentRayLength, rayDepth) ",
-                      "compositeISO(result, color, currentRayLength, rayDepth, iso_value);\n");
+      header.append("#define ISO\n"
+                    "#define COMPOSITING(result, color, currentRayLength, rayDepth) "
+                    "compositeISO(result, color, currentRayLength, rayDepth, iso_value);\n");
       break;
     case ImgCompositingMode::MaximumIntensityProjection:
-      absl::StrAppend(&header, "#define MIP\n");
+      header.append("#define MIP\n");
       break;
     case ImgCompositingMode::LocalMIP:
-      absl::StrAppend(&header, "#define MIP\n", "#define LOCAL_MIP\n");
+      header.append("#define MIP\n#define LOCAL_MIP\n");
       break;
     case ImgCompositingMode::XRay:
-      absl::StrAppend(&header,
-                      "#define COMPOSITING(result, color, currentRayLength, rayDepth) ",
-                      "compositeXRay(result, color, currentRayLength, rayDepth);\n");
+      header.append("#define COMPOSITING(result, color, currentRayLength, rayDepth) "
+                    "compositeXRay(result, color, currentRayLength, rayDepth);\n");
       break;
     case ImgCompositingMode::MIPOpaque:
-      absl::StrAppend(&header, "#define MIP\n", "#define RESULT_OPAQUE\n");
+      header.append("#define MIP\n#define RESULT_OPAQUE\n");
       break;
     case ImgCompositingMode::LocalMIPOpaque:
-      absl::StrAppend(&header, "#define MIP\n", "#define LOCAL_MIP\n", "#define RESULT_OPAQUE\n");
+      header.append("#define MIP\n#define LOCAL_MIP\n#define RESULT_OPAQUE\n");
       break;
   }
 
   if (!m_quads.empty() || useMIPMerge) {
-    absl::StrAppend(&header, "#define MAX_PROJ_MERGE\n");
+    header.append("#define MAX_PROJ_MERGE\n");
   }
 
   if (absl::GetFlag(FLAGS_atlas_volume_rendering_analytic_ray_setup)) {
-    absl::StrAppend(&header, "#define ATLAS_ANALYTIC_RAY_SETUP\n");
+    header.append("#define ATLAS_ANALYTIC_RAY_SETUP\n");
     appendAnalyticRaySetupHeader(header);
   }
 
@@ -1826,7 +1821,7 @@ Z3DImgRaycasterRenderer::render2DSliceOf3DImage(Z3DEye eye, const std::vector<si
     std::vector<uint32_t> missingBlockIDs;
     blockIdCollector.fillSortedBlockIds(missingBlockIDs, Z3DBlockIdSortOrder::Ascending);
     if (shouldBenchmarkZ3DBlockIdCollectors()) {
-      blockIdCollector.benchmarkCollectors(absl::StrCat("GL 2D slice-of-3D channel ", c),
+      blockIdCollector.benchmarkCollectors(fmt::format("GL 2D slice-of-3D channel {}", c),
                                            Z3DBlockIdSortOrder::Ascending);
     }
     bt.recordEvent("render and collect blockids");
@@ -2407,7 +2402,7 @@ bool Z3DImgRaycasterRenderer::render3DImageForOneRound(Z3DEye eye,
   if (lastRound) {
     LOG(INFO) << "no (non-empty) blocks to render";
     if (shouldBenchmarkZ3DBlockIdCollectors()) {
-      blockIdCollector.benchmarkCollectors(absl::StrCat("GL raycaster channel ", c, " round ", round),
+      blockIdCollector.benchmarkCollectors(fmt::format("GL raycaster channel {} round {}", c, round),
                                            Z3DBlockIdSortOrder::Ascending);
     }
     if (round > 0) {
@@ -2453,7 +2448,7 @@ bool Z3DImgRaycasterRenderer::render3DImageForOneRound(Z3DEye eye,
       blockIdCollector.fillSortedBlockIds(missingBlockIDs, blockIdOrder);
     }
     if (shouldBenchmarkZ3DBlockIdCollectors()) {
-      blockIdCollector.benchmarkCollectors(absl::StrCat("GL raycaster channel ", c, " round ", round), blockIdOrder);
+      blockIdCollector.benchmarkCollectors(fmt::format("GL raycaster channel {} round {}", c, round), blockIdOrder);
     }
     // VLOG(1) << missingBlockIDs.size() << " " << usedBlockIDs.size();
     bt.recordEvent("collect blockids");

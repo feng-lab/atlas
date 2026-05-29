@@ -3,9 +3,9 @@
 
 #include <nanobind/nanobind.h>
 #include <nanobind/ndarray.h>
+#include <algorithm>
 #include <stdexcept>
 #include <string>
-#include <algorithm>
 
 namespace nb = nanobind;
 

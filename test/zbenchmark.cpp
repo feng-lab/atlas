@@ -8,6 +8,7 @@
 #include "zimginit.h"
 #include "zimgregion.h"
 #include "zlog.h"
+#include "zexception.h"
 #include "zrandom.h"
 #include "zsaturateoperation.h"
 #include <boost/multiprecision/cpp_int.hpp>
@@ -33,7 +34,6 @@
 #include <mutex>
 #include <optional>
 #include <random>
-#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <thread>
@@ -763,7 +763,7 @@ const std::optional<std::string>& bioFormatsBenchmarkRuntimeError()
 index_t checkedBenchmarkIndex(uint64_t value, const char* name)
 {
   if (value > static_cast<uint64_t>(std::numeric_limits<index_t>::max())) {
-    throw std::runtime_error(fmt::format("{} exceeds Atlas index range: {}", name, value));
+    throw ZException(fmt::format("{} exceeds Atlas index range: {}", name, value));
   }
   return static_cast<index_t>(value);
 }
@@ -771,7 +771,7 @@ index_t checkedBenchmarkIndex(uint64_t value, const char* name)
 int64_t checkedBenchmarkBytes(uint64_t value)
 {
   if (value > static_cast<uint64_t>(std::numeric_limits<int64_t>::max())) {
-    throw std::runtime_error(fmt::format("benchmark byte count exceeds int64 range: {}", value));
+    throw ZException(fmt::format("benchmark byte count exceeds int64 range: {}", value));
   }
   return static_cast<int64_t>(value);
 }
@@ -811,25 +811,25 @@ struct BioFormatsBenchmarkDataset
 BioFormatsBenchmarkDataset makeBioFormatsBenchmarkDataset()
 {
   if (const auto& error = bioFormatsBenchmarkRuntimeError(); error.has_value()) {
-    throw std::runtime_error(*error);
+    throw ZException(*error);
   }
 
   BioFormatsBenchmarkDataset dataset;
   dataset.path = bioFormatsBenchmarkFile();
   const QFileInfo file(dataset.path);
   if (!file.isFile()) {
-    throw std::runtime_error(fmt::format("benchmark file does not exist: {}", dataset.path));
+    throw ZException(fmt::format("benchmark file does not exist: {}", dataset.path));
   }
 
   dataset.info = ZBioFormatsBridgeClient::instance().readDatasetInfo(dataset.path);
   if (dataset.info.series.empty()) {
-    throw std::runtime_error("benchmark dataset has no Bio-Formats series");
+    throw ZException("benchmark dataset has no Bio-Formats series");
   }
 
   const ZBioFormatsSeriesInfo& series = dataset.info.series.front();
   if (series.sizeX == 0 || series.sizeY == 0 || series.sizeZ == 0 || series.sizeT == 0 || series.effectiveSizeC == 0 ||
       series.bytesPerPixel == 0) {
-    throw std::runtime_error("benchmark dataset has invalid zero-sized metadata");
+    throw ZException("benchmark dataset has invalid zero-sized metadata");
   }
 
   const uint64_t tileWidth = std::min<uint64_t>(kBioFormatsBenchmarkTileSize, series.sizeX);
@@ -856,7 +856,7 @@ BioFormatsBenchmarkDataset makeBioFormatsBenchmarkDataset()
   }
 
   if (dataset.regions.empty()) {
-    throw std::runtime_error("benchmark dataset produced no regions");
+    throw ZException("benchmark dataset produced no regions");
   }
   dataset.bytesPerIteration = checkedBenchmarkBytes(bytesPerIteration);
   return dataset;
@@ -915,7 +915,7 @@ std::vector<ZImgRegion> splitBioFormatsRegionsByChannel(const BioFormatsBenchmar
     }
   }
   if (regions.empty()) {
-    throw std::runtime_error("benchmark dataset produced no split-channel regions");
+    throw ZException("benchmark dataset produced no split-channel regions");
   }
   return regions;
 }

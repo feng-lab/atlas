@@ -1,5 +1,7 @@
 #include "zswcloaderlegacy.h"
 
+#include "zioutils.h"
+#include "zexception.h"
 #include "zlog.h"
 #include "zstringutils.h"
 
@@ -10,7 +12,6 @@
 #include <cerrno>
 #include <cstdint>
 #include <cstring>
-#include <fstream>
 #include <limits>
 #include <optional>
 #include <string>
@@ -64,15 +65,12 @@ namespace {
 
 } // namespace
 
-bool loadSwcLegacyOrder(const std::string& path, ZSwc& out, std::string* error)
+bool loadSwcLegacyOrder(const QString& path, ZSwc& out, std::string* error)
 {
   try {
     out.clear();
 
-    std::ifstream file(path, std::ios_base::in);
-    if (!file.is_open()) {
-      throw std::runtime_error("Failed to open SWC file '" + path + "': " + std::strerror(errno));
-    }
+    std::ifstream file = openIFStream(path, std::ios_base::in);
 
     int64_t maxId = -1;
     std::vector<SwcNode> parsedNodes;
@@ -96,7 +94,7 @@ bool loadSwcLegacyOrder(const std::string& path, ZSwc& out, std::string* error)
     }
 
     if (file.bad()) {
-      throw std::runtime_error("Error while reading SWC file '" + path + "': " + std::strerror(errno));
+      throw ZException(fmt::format("Error while reading SWC file '{}': {}", path, std::strerror(errno)));
     }
 
     if (parsedNodes.empty()) {
@@ -104,7 +102,7 @@ bool loadSwcLegacyOrder(const std::string& path, ZSwc& out, std::string* error)
     }
 
     if (maxId < 0 || maxId > static_cast<int64_t>(std::numeric_limits<int>::max())) {
-      throw std::runtime_error("Invalid SWC max id: " + std::to_string(maxId));
+      throw ZException(fmt::format("Invalid SWC max id: {}", maxId));
     }
 
     const size_t mapSize = static_cast<size_t>(maxId) + 2;

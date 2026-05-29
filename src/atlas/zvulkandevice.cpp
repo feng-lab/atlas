@@ -335,7 +335,7 @@ ZVulkanDevice::ZVulkanDevice(ZVulkanContext& context)
     VmaPoolCreateInfo pci{};
     const uint32_t typeIndex = findMemoryTypeIndex(reqFlags);
     if (typeIndex == UINT32_MAX) {
-      LOG(ERROR) << "VMA: no memory type for " << label << " pool flags=" << std::hex << reqFlags;
+      LOG(ERROR) << fmt::format("VMA: no memory type for {} pool flags=0x{:x}", label, reqFlags);
       return nullptr;
     }
     pci.memoryTypeIndex = typeIndex;
@@ -551,12 +551,6 @@ void ZVulkanDevice::enforceTextureAllocationBudgetAfter(const ZVulkanTexture::Cr
   const auto requestClass = classifyTextureAllocation(createInfo);
   const bool enforceBudget = countsAgainstDeviceLocalBudget(createInfo.memoryProperties);
   enforceStrictBudgetAfterAllocation(*this, requestClass, requestedBytes, enforceBudget, reason);
-}
-
-std::unique_ptr<ZVulkanShader> ZVulkanDevice::createShader(const std::string& vertexCode,
-                                                           const std::string& fragmentCode)
-{
-  return std::make_unique<ZVulkanShader>(*this, vertexCode, fragmentCode);
 }
 
 std::unique_ptr<ZVulkanPipeline>

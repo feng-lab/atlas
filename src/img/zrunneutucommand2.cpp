@@ -10,6 +10,7 @@
 
 #include "zlog.h"
 
+#include "zexception.h"
 #include "zjson.h"
 
 #include "zcommandlineflags.h"
@@ -104,7 +105,7 @@ extractIncludePath(const json::object& root, const QString& baseConfigFilePath, 
     return json::parse(text, json::storage_ptr(), opt);
   }
   catch (const std::exception& e) {
-    throw std::runtime_error(fmt::format("Failed to parse JSON ({}): {}", context, e.what()));
+    throw ZException(fmt::format("Failed to parse JSON ({}): {}", context, e.what()));
   }
 }
 
@@ -114,7 +115,7 @@ extractIncludePath(const json::object& root, const QString& baseConfigFilePath, 
     return nim::loadJsonObject(filePath);
   }
   catch (const std::exception& e) {
-    throw std::runtime_error(fmt::format("Failed to load JSON file '{}': {}", filePath, e.what()));
+    throw ZException(fmt::format("Failed to load JSON file '{}': {}", filePath, e.what()));
   }
 }
 
@@ -128,7 +129,7 @@ extractIncludePath(const json::object& root, const QString& baseConfigFilePath, 
 
   json::value v = parseJsonValue(textOrPath, context);
   if (!v.is_object()) {
-    throw std::runtime_error(fmt::format("Expected JSON object for {}, got {}", context, jsonTypeName(v)));
+    throw ZException(fmt::format("Expected JSON object for {}, got {}", context, jsonTypeName(v)));
   }
   return std::move(v.as_object());
 }
@@ -394,7 +395,7 @@ extractIncludePath(const json::object& root, const QString& baseConfigFilePath, 
 {
   const QString q = QString::fromStdString(path);
   if (!fileExists(q)) {
-    throw std::runtime_error(fmt::format("Missing command config file '{}'", path));
+    throw ZException(fmt::format("Missing command config file '{}'", path));
   }
   return loadJsonObjectOrThrow(QFileInfo(q).absoluteFilePath());
 }

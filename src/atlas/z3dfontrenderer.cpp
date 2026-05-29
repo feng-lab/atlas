@@ -8,7 +8,6 @@
 #include "zlog.h"
 #include "z3drendercommands.h"
 #include <QDir>
-#include <absl/strings/str_cat.h>
 #include <algorithm>
 
 namespace nim {
@@ -117,13 +116,13 @@ std::string Z3DFontRenderer::generateHeader()
   std::string header = "#define USE_SOFTEDGE\n";
   if (m_showFontOutline) {
     if (m_fontOutlineMode == FontOutlineMode::Glow) {
-      absl::StrAppend(&header, "#define SHOW_GLOW\n");
+      header.append("#define SHOW_GLOW\n");
     } else {
-      absl::StrAppend(&header, "#define SHOW_OUTLINE\n");
+      header.append("#define SHOW_OUTLINE\n");
     }
   }
   if (m_showFontShadow) {
-    absl::StrAppend(&header, "#define SHOW_SHADOW\n");
+    header.append("#define SHOW_SHADOW\n");
   }
   return header;
 }

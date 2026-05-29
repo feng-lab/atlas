@@ -51,8 +51,6 @@ public:
   reclaimBeforeTextureAllocation(const ZVulkanTexture::CreateInfo& createInfo, bool force, std::string_view reason);
   void enforceTextureAllocationBudgetAfter(const ZVulkanTexture::CreateInfo& createInfo, std::string_view reason);
 
-  std::unique_ptr<ZVulkanShader> createShader(const std::string& vertexCode, const std::string& fragmentCode);
-
   std::unique_ptr<ZVulkanPipeline>
   createPipeline(ZVulkanShader& shader,
                  const vk::PipelineVertexInputStateCreateInfo& vertexInputInfo,

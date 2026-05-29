@@ -17,6 +17,8 @@
 #include <folly/init/Phase.h>
 #include <folly/synchronization/HazptrThreadPoolExecutor.h>
 
+#include <sstream>
+
 namespace nim {
 
 namespace {
@@ -116,7 +118,9 @@ ZImgInit::ZImgInit(const QString& resourcesDIR, const QString& jreDIR, const QSt
 
   if (verbose) {
     itk::MultiThreaderBase::Pointer mt = itk::MultiThreaderBase::New();
-    mt.Print(std::cout);
+    std::ostringstream stream;
+    mt->Print(stream);
+    LOG(INFO) << "ITK MultiThreaderBase:\n" << stream.str();
   }
 
   if (ZCpuInfo::instance().isX86_64 && !ZCpuInfo::instance().bAVX) {

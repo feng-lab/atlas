@@ -31,7 +31,6 @@
 #include <QUrl>
 #include <algorithm>
 #include <cmath>
-#include <sstream>
 
 ABSL_DECLARE_FLAG(bool, atlas_enable_benchmark_raw_mip_export);
 ABSL_DECLARE_FLAG(bool, atlas_enable_benchmark_screen_space_sufficiency_audit);
@@ -339,16 +338,7 @@ ZRpcUiDispatcher::BBoxValuesResult ZRpcUiDispatcher::bboxOfObjects(const std::ve
     if (!invalidIds.empty()) {
       out.ok = false;
       out.errorKind = ErrorKind::InvalidArgument;
-      std::ostringstream oss;
-      oss << "bbox: invalid object ids: [";
-      for (size_t i = 0; i < invalidIds.size(); ++i) {
-        if (i) {
-          oss << ", ";
-        }
-        oss << invalidIds[i];
-      }
-      oss << "]";
-      out.error = oss.str();
+      out.error = fmt::format("bbox: invalid object ids: {}", invalidIds);
       return out;
     }
 
@@ -683,16 +673,7 @@ ZRpcUiDispatcher::BBoxValuesResult ZRpcUiDispatcher::cutSuggestBox(const CutSugg
     if (!invalidIds.empty()) {
       out.ok = false;
       out.errorKind = ErrorKind::InvalidArgument;
-      std::ostringstream oss;
-      oss << "cut_suggest: unknown object ids: [";
-      for (size_t i = 0; i < invalidIds.size(); ++i) {
-        if (i) {
-          oss << ", ";
-        }
-        oss << invalidIds[i];
-      }
-      oss << "]";
-      out.error = oss.str();
+      out.error = fmt::format("cut_suggest: unknown object ids: {}", invalidIds);
       return out;
     }
     ids = filterVisualIds(doc, ids);
@@ -1105,9 +1086,7 @@ ZRpcUiDispatcher::GetParamValuesResult ZRpcUiDispatcher::getParamValues(size_t i
       if (params.empty()) {
         r.ok = false;
         r.errorKind = ErrorKind::FailedPrecondition;
-        std::ostringstream oss;
-        oss << "get_param_values: target_not_ready: id=" << id;
-        r.error = oss.str();
+        r.error = fmt::format("get_param_values: target_not_ready: id={}", id);
         return r;
       }
 
@@ -1189,9 +1168,7 @@ ZRpcUiDispatcher::ListParamsResult ZRpcUiDispatcher::listParams(size_t id)
       if (params.empty()) {
         r.ok = false;
         r.errorKind = ErrorKind::FailedPrecondition;
-        std::ostringstream oss;
-        oss << "list_params: target_not_ready: id=" << id;
-        r.error = oss.str();
+        r.error = fmt::format("list_params: target_not_ready: id={}", id);
         return r;
       }
       r.ok = true;
@@ -1246,16 +1223,7 @@ ZRpcUiDispatcher::CapabilitiesResult ZRpcUiDispatcher::capabilities(const std::v
     if (!invalidIds.empty()) {
       out.ok = false;
       out.errorKind = ErrorKind::InvalidArgument;
-      std::ostringstream oss;
-      oss << "capabilities: invalid ids: [";
-      for (size_t i = 0; i < invalidIds.size(); ++i) {
-        if (i) {
-          oss << ", ";
-        }
-        oss << invalidIds[i];
-      }
-      oss << "]";
-      out.error = oss.str();
+      out.error = fmt::format("capabilities: invalid ids: {}", invalidIds);
       return out;
     }
   }
@@ -1302,9 +1270,7 @@ ZRpcUiDispatcher::CapabilitiesResult ZRpcUiDispatcher::capabilities(const std::v
         if (engine->parametersOfViewSetting(scopeId).empty()) {
           r.ok = false;
           r.errorKind = ErrorKind::FailedPrecondition;
-          std::ostringstream oss;
-          oss << "capabilities: target_not_ready: id=" << scopeId;
-          r.error = oss.str();
+          r.error = fmt::format("capabilities: target_not_ready: id={}", scopeId);
           return r;
         }
       }
@@ -1454,16 +1420,7 @@ ZRpcUiDispatcher::BoolResult ZRpcUiDispatcher::applySceneParams(
   if (!invalidIds.empty()) {
     out.ok = false;
     out.errorKind = ErrorKind::InvalidArgument;
-    std::ostringstream oss;
-    oss << "apply_scene_params: object id not found: [";
-    for (size_t i = 0; i < invalidIds.size(); ++i) {
-      if (i) {
-        oss << ", ";
-      }
-      oss << invalidIds[i];
-    }
-    oss << "]";
-    out.error = oss.str();
+    out.error = fmt::format("apply_scene_params: object id not found: {}", invalidIds);
     return out;
   }
 
@@ -1506,18 +1463,17 @@ ZRpcUiDispatcher::BoolResult ZRpcUiDispatcher::applySceneParams(
       if (!badIndices.empty()) {
         r.ok = false;
         r.errorKind = anyInvalidArg ? ErrorKind::InvalidArgument : ErrorKind::FailedPrecondition;
-        std::ostringstream oss;
-        oss << "apply_scene_params: validation failed: ";
+        std::string error = "apply_scene_params: validation failed: ";
         for (size_t j = 0; j < badIndices.size(); ++j) {
           const size_t i = badIndices[j];
           const auto& sp = setParams[i];
           const auto& rr = vr[i];
           if (j) {
-            oss << "; ";
+            error += "; ";
           }
-          oss << "id=" << sp.id << " json_key=" << rr.jsonKey << " reason=" << rr.reason;
+          error += fmt::format("id={} json_key={} reason={}", sp.id, rr.jsonKey, rr.reason);
         }
-        r.error = oss.str();
+        r.error = std::move(error);
         return r;
       }
 
@@ -1725,16 +1681,7 @@ ZRpcUiDispatcher::BoolResult ZRpcUiDispatcher::setVisibility(const std::vector<s
   if (!invalidIds.empty()) {
     out.ok = false;
     out.errorKind = ErrorKind::InvalidArgument;
-    std::ostringstream oss;
-    oss << "set_visibility: unknown object ids: [";
-    for (size_t i = 0; i < invalidIds.size(); ++i) {
-      if (i) {
-        oss << ", ";
-      }
-      oss << invalidIds[i];
-    }
-    oss << "]";
-    out.error = oss.str();
+    out.error = fmt::format("set_visibility: unknown object ids: {}", invalidIds);
     return out;
   }
 
@@ -1790,32 +1737,16 @@ ZRpcUiDispatcher::BoolResult ZRpcUiDispatcher::removeObjects(const std::vector<s
   if (!invalidIds.empty()) {
     out.ok = false;
     out.errorKind = ErrorKind::InvalidArgument;
-    std::ostringstream oss;
-    oss << "remove_objects: unknown object ids: [";
-    for (size_t i = 0; i < invalidIds.size(); ++i) {
-      if (i) {
-        oss << ", ";
-      }
-      oss << invalidIds[i];
-    }
-    oss << "]";
-    out.error = oss.str();
+    out.error = fmt::format("remove_objects: unknown object ids: {}", invalidIds);
     return out;
   }
 
   if (!unsavedIds.empty()) {
     out.ok = false;
     out.errorKind = ErrorKind::FailedPrecondition;
-    std::ostringstream oss;
-    oss << "remove_objects: refusing to remove objects with unsaved changes: [";
-    for (size_t i = 0; i < unsavedIds.size(); ++i) {
-      if (i) {
-        oss << ", ";
-      }
-      oss << unsavedIds[i];
-    }
-    oss << "]. To discard changes, set allow_unsaved=true.";
-    out.error = oss.str();
+    out.error = fmt::format("remove_objects: refusing to remove objects with unsaved changes: {}. "
+                            "To discard changes, set allow_unsaved=true.",
+                            unsavedIds);
     return out;
   }
 
@@ -1877,34 +1808,15 @@ ZRpcUiDispatcher::MakeAliasResult ZRpcUiDispatcher::makeAliases(const std::vecto
 
   if (!ok) {
     out.errorKind = ErrorKind::InvalidArgument;
-    std::ostringstream oss;
-    oss << "make_alias: ";
-    if (out.aliases.empty()) {
-      oss << "no aliases were created";
-    } else {
-      oss << "partial success";
-    }
+    std::string error =
+      fmt::format("make_alias: {}", out.aliases.empty() ? "no aliases were created" : "partial success");
     if (!invalidIds.empty()) {
-      oss << "; invalid_ids=[";
-      for (size_t i = 0; i < invalidIds.size(); ++i) {
-        if (i) {
-          oss << ", ";
-        }
-        oss << invalidIds[i];
-      }
-      oss << "]";
+      error += fmt::format("; invalid_ids={}", invalidIds);
     }
     if (!unsupportedIds.empty()) {
-      oss << "; unsupported_ids=[";
-      for (size_t i = 0; i < unsupportedIds.size(); ++i) {
-        if (i) {
-          oss << ", ";
-        }
-        oss << unsupportedIds[i];
-      }
-      oss << "]";
+      error += fmt::format("; unsupported_ids={}", unsupportedIds);
     }
-    out.error = oss.str();
+    out.error = std::move(error);
   }
   return out;
 }
@@ -2737,16 +2649,7 @@ ZRpcUiDispatcher::CameraValuesResult ZRpcUiDispatcher::cameraFit(const CameraFit
     if (!invalidIds.empty()) {
       out.ok = false;
       out.errorKind = ErrorKind::InvalidArgument;
-      std::ostringstream oss;
-      oss << "camera_fit: unknown object ids: [";
-      for (size_t i = 0; i < invalidIds.size(); ++i) {
-        if (i) {
-          oss << ", ";
-        }
-        oss << invalidIds[i];
-      }
-      oss << "]";
-      out.error = oss.str();
+      out.error = fmt::format("camera_fit: unknown object ids: {}", invalidIds);
       return out;
     }
   }
@@ -2877,16 +2780,7 @@ ZRpcUiDispatcher::CameraValuesResult ZRpcUiDispatcher::cameraOrbitSuggest(const 
     if (!invalidIds.empty()) {
       out.ok = false;
       out.errorKind = ErrorKind::InvalidArgument;
-      std::ostringstream oss;
-      oss << "camera_orbit_suggest: unknown object ids: [";
-      for (size_t i = 0; i < invalidIds.size(); ++i) {
-        if (i) {
-          oss << ", ";
-        }
-        oss << invalidIds[i];
-      }
-      oss << "]";
-      out.error = oss.str();
+      out.error = fmt::format("camera_orbit_suggest: unknown object ids: {}", invalidIds);
       return out;
     }
   }
@@ -3002,16 +2896,7 @@ ZRpcUiDispatcher::CameraValuesResult ZRpcUiDispatcher::cameraDollySuggest(const 
     if (!invalidIds.empty()) {
       out.ok = false;
       out.errorKind = ErrorKind::InvalidArgument;
-      std::ostringstream oss;
-      oss << "camera_dolly_suggest: unknown object ids: [";
-      for (size_t i = 0; i < invalidIds.size(); ++i) {
-        if (i) {
-          oss << ", ";
-        }
-        oss << invalidIds[i];
-      }
-      oss << "]";
-      out.error = oss.str();
+      out.error = fmt::format("camera_dolly_suggest: unknown object ids: {}", invalidIds);
       return out;
     }
   }
@@ -3127,16 +3012,7 @@ ZRpcUiDispatcher::CameraValuesResult ZRpcUiDispatcher::cameraFocus(const CameraF
     if (!invalidIds.empty()) {
       out.ok = false;
       out.errorKind = ErrorKind::InvalidArgument;
-      std::ostringstream oss;
-      oss << "camera_focus: unknown object ids: [";
-      for (size_t i = 0; i < invalidIds.size(); ++i) {
-        if (i) {
-          oss << ", ";
-        }
-        oss << invalidIds[i];
-      }
-      oss << "]";
-      out.error = oss.str();
+      out.error = fmt::format("camera_focus: unknown object ids: {}", invalidIds);
       return out;
     }
   }
@@ -3253,16 +3129,7 @@ ZRpcUiDispatcher::CameraValuesResult ZRpcUiDispatcher::cameraPointTo(const Camer
   if (!invalidIds.empty()) {
     out.ok = false;
     out.errorKind = ErrorKind::InvalidArgument;
-    std::ostringstream oss;
-    oss << "camera_point_to: unknown object ids: [";
-    for (size_t i = 0; i < invalidIds.size(); ++i) {
-      if (i) {
-        oss << ", ";
-      }
-      oss << invalidIds[i];
-    }
-    oss << "]";
-    out.error = oss.str();
+    out.error = fmt::format("camera_point_to: unknown object ids: {}", invalidIds);
     return out;
   }
 
@@ -3453,16 +3320,7 @@ ZRpcUiDispatcher::CameraValuesResult ZRpcUiDispatcher::cameraResetView(const Cam
     if (!invalidIds.empty()) {
       out.ok = false;
       out.errorKind = ErrorKind::InvalidArgument;
-      std::ostringstream oss;
-      oss << "camera_reset_view: unknown object ids: [";
-      for (size_t i = 0; i < invalidIds.size(); ++i) {
-        if (i) {
-          oss << ", ";
-        }
-        oss << invalidIds[i];
-      }
-      oss << "]";
-      out.error = oss.str();
+      out.error = fmt::format("camera_reset_view: unknown object ids: {}", invalidIds);
       return out;
     }
   }
@@ -3598,16 +3456,7 @@ ZRpcUiDispatcher::CameraValuesResult ZRpcUiDispatcher::cameraMoveLocal(const Cam
       if (!invalidIds.empty()) {
         out.ok = false;
         out.errorKind = ErrorKind::InvalidArgument;
-        std::ostringstream oss;
-        oss << "camera_move_local: unknown object ids: [";
-        for (size_t i = 0; i < invalidIds.size(); ++i) {
-          if (i) {
-            oss << ", ";
-          }
-          oss << invalidIds[i];
-        }
-        oss << "]";
-        out.error = oss.str();
+        out.error = fmt::format("camera_move_local: unknown object ids: {}", invalidIds);
         return out;
       }
     }
@@ -3737,16 +3586,7 @@ ZRpcUiDispatcher::CameraValuesResult ZRpcUiDispatcher::cameraLookAt(const Camera
       if (!invalidIds.empty()) {
         out.ok = false;
         out.errorKind = ErrorKind::InvalidArgument;
-        std::ostringstream oss;
-        oss << "camera_look_at: unknown object ids: [";
-        for (size_t i = 0; i < invalidIds.size(); ++i) {
-          if (i) {
-            oss << ", ";
-          }
-          oss << invalidIds[i];
-        }
-        oss << "]";
-        out.error = oss.str();
+        out.error = fmt::format("camera_look_at: unknown object ids: {}", invalidIds);
         return out;
       }
     }
@@ -3852,16 +3692,7 @@ ZRpcUiDispatcher::CameraSolveResult ZRpcUiDispatcher::cameraSolve(const CameraSo
     if (!invalidIds.empty()) {
       out.ok = false;
       out.errorKind = ErrorKind::InvalidArgument;
-      std::ostringstream oss;
-      oss << "camera_solve: unknown object ids: [";
-      for (size_t i = 0; i < invalidIds.size(); ++i) {
-        if (i) {
-          oss << ", ";
-        }
-        oss << invalidIds[i];
-      }
-      oss << "]";
-      out.error = oss.str();
+      out.error = fmt::format("camera_solve: unknown object ids: {}", invalidIds);
       return out;
     }
     ids = filterVisualIds(doc, req.ids);

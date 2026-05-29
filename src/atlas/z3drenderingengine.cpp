@@ -56,6 +56,7 @@ ABSL_DECLARE_FLAG(bool, atlas_enable_benchmark_screen_space_sufficiency_audit);
 #include <chrono>
 #include <cstdint>
 #include <memory>
+#include <sstream>
 
 ABSL_FLAG(bool,
           atlas_debug_opengl,

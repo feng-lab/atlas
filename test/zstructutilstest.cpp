@@ -1,6 +1,5 @@
 #include "zstructutils.h"
 #include "ztest.h"
-#include <fmt/ostream.h>
 
 namespace nim {
 

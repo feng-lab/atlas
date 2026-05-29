@@ -14,18 +14,17 @@
 #include "zvulkanclipplanes.h"
 #include "zvulkanuniforms.h"
 #include "zvulkanbindings.h"
-#include "zsysteminfo.h"
 #include "z3dlinerenderer.h"
 #include "zvulkanrenderconversions.h"
 #include "zvulkanpipelinecontext_raii.h"
 #include "zvulkanstaticpromotionutils.h"
 #include "zrenderthreadexecutor_tls.h"
 
+#include <QString>
 #include <algorithm>
 #include <array>
 #include <map>
 #include <limits>
-#include <string>
 #include <tuple>
 #include <vector>
 #include <cstring>
@@ -497,7 +496,6 @@ ZVulkanLinePipelineContext::ensurePipeline(const PipelineKey& key,
   }
 
   auto& device = m_backend.device();
-  static const std::string shaderBase = ZSystemInfo::resourcesDirPath().toStdString() + "/shader/vulkan/spv/";
 
   PipelineInstance instance;
 
@@ -507,36 +505,37 @@ ZVulkanLinePipelineContext::ensurePipeline(const PipelineKey& key,
   };
 
   if (key.useSmooth) {
-    std::string fragmentShader = "wideline.frag.spv";
+    QString fragmentShader = QStringLiteral("wideline.frag.spv");
     switch (key.shaderHookType) {
       case Z3DRendererBase::ShaderHookType::DualDepthPeelingInit:
-        fragmentShader = "dual_peeling_init_wideline.frag.spv";
+        fragmentShader = QStringLiteral("dual_peeling_init_wideline.frag.spv");
         break;
       case Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel:
-        fragmentShader = "dual_peeling_peel_wideline.frag.spv";
+        fragmentShader = QStringLiteral("dual_peeling_peel_wideline.frag.spv");
         break;
       case Z3DRendererBase::ShaderHookType::PerPixelFragmentListCount:
-        fragmentShader = "ppll_count_wideline.frag.spv";
+        fragmentShader = QStringLiteral("ppll_count_wideline.frag.spv");
         break;
       case Z3DRendererBase::ShaderHookType::PerPixelFragmentListStore:
-        fragmentShader = "ppll_store_wideline.frag.spv";
+        fragmentShader = QStringLiteral("ppll_store_wideline.frag.spv");
         break;
       case Z3DRendererBase::ShaderHookType::WeightedAverageInit:
-        fragmentShader = "wavg_init_wideline.frag.spv";
+        fragmentShader = QStringLiteral("wavg_init_wideline.frag.spv");
         break;
       case Z3DRendererBase::ShaderHookType::WeightedBlendedInit:
-        fragmentShader = "wblended_init_wideline.frag.spv";
+        fragmentShader = QStringLiteral("wblended_init_wideline.frag.spv");
         break;
       case Z3DRendererBase::ShaderHookType::Normal:
       default:
-        fragmentShader = "wideline.frag.spv";
+        fragmentShader = QStringLiteral("wideline.frag.spv");
         break;
     }
 
-    instance.shader = std::make_unique<ZVulkanShader>(device,
-                                                      shaderBase + "wideline1.vert.spv",
-                                                      shaderBase + fragmentShader,
-                                                      std::nullopt);
+    instance.shader =
+      std::make_unique<ZVulkanShader>(device,
+                                      ZVulkanShader::spirvResourcePath(QStringLiteral("wideline1.vert.spv")),
+                                      ZVulkanShader::spirvResourcePath(fragmentShader),
+                                      std::nullopt);
 
     const uint32_t useTex = key.useTextureColor ? 1u : 0u;
     const uint32_t roundCap = key.roundCap ? 1u : 0u;
@@ -708,34 +707,36 @@ ZVulkanLinePipelineContext::ensurePipeline(const PipelineKey& key,
     instance.pipeline->setPushConstantRanges({pushRange});
     instance.pipeline->create();
   } else {
-    std::string fragmentShader = "line.frag.spv";
+    QString fragmentShader = QStringLiteral("line.frag.spv");
     switch (key.shaderHookType) {
       case Z3DRendererBase::ShaderHookType::PerPixelFragmentListCount:
-        fragmentShader = "ppll_count_line.frag.spv";
+        fragmentShader = QStringLiteral("ppll_count_line.frag.spv");
         break;
       case Z3DRendererBase::ShaderHookType::PerPixelFragmentListStore:
-        fragmentShader = "ppll_store_line.frag.spv";
+        fragmentShader = QStringLiteral("ppll_store_line.frag.spv");
         break;
       case Z3DRendererBase::ShaderHookType::DualDepthPeelingInit:
-        fragmentShader = "dual_peeling_init_line.frag.spv";
+        fragmentShader = QStringLiteral("dual_peeling_init_line.frag.spv");
         break;
       case Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel:
-        fragmentShader = "dual_peeling_peel_line.frag.spv";
+        fragmentShader = QStringLiteral("dual_peeling_peel_line.frag.spv");
         break;
       case Z3DRendererBase::ShaderHookType::WeightedAverageInit:
-        fragmentShader = "wavg_init_line.frag.spv";
+        fragmentShader = QStringLiteral("wavg_init_line.frag.spv");
         break;
       case Z3DRendererBase::ShaderHookType::WeightedBlendedInit:
-        fragmentShader = "wblended_init_line.frag.spv";
+        fragmentShader = QStringLiteral("wblended_init_line.frag.spv");
         break;
       case Z3DRendererBase::ShaderHookType::Normal:
       default:
-        fragmentShader = "line.frag.spv";
+        fragmentShader = QStringLiteral("line.frag.spv");
         break;
     }
 
-    instance.shader =
-      std::make_unique<ZVulkanShader>(device, shaderBase + "line.vert.spv", shaderBase + fragmentShader, std::nullopt);
+    instance.shader = std::make_unique<ZVulkanShader>(device,
+                                                      ZVulkanShader::spirvResourcePath(QStringLiteral("line.vert.spv")),
+                                                      ZVulkanShader::spirvResourcePath(fragmentShader),
+                                                      std::nullopt);
 
     auto vi = makeThinVertexInput();
     const vk::PrimitiveTopology topology =

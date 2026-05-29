@@ -13,7 +13,6 @@
 #include "zvulkantexture.h"
 #include "zvulkanclipplanes.h"
 #include "zvulkanuniforms.h"
-#include "zsysteminfo.h"
 #include "zmesh.h"
 #include "z3dprimitiverenderer.h"
 #include "z3dmeshrenderer.h"
@@ -25,6 +24,7 @@
 #include "zvulkanstaticpromotionutils.h"
 #include "zrenderthreadexecutor_tls.h"
 
+#include <QString>
 #include <algorithm>
 #include <array>
 #include <cstring>
@@ -1342,27 +1342,26 @@ ZVulkanMeshPipelineContext::ensurePipeline(const PipelineKey& key, const vulkan:
   }
 
   auto& device = m_backend.device();
-  static const std::string shaderBase = ZSystemInfo::resourcesDirPath().toStdString() + "/shader/vulkan/spv/";
 
   PipelineInstance instance;
 
-  auto selectFragmentShader = [](Z3DRendererBase::ShaderHookType hook) -> std::string {
+  auto selectFragmentShader = [](Z3DRendererBase::ShaderHookType hook) -> QString {
     switch (hook) {
       case Z3DRendererBase::ShaderHookType::DualDepthPeelingInit:
-        return "dual_peeling_init_mesh.frag.spv";
+        return QStringLiteral("dual_peeling_init_mesh.frag.spv");
       case Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel:
-        return "dual_peeling_peel_mesh.frag.spv";
+        return QStringLiteral("dual_peeling_peel_mesh.frag.spv");
       case Z3DRendererBase::ShaderHookType::PerPixelFragmentListCount:
-        return "ppll_count_mesh.frag.spv";
+        return QStringLiteral("ppll_count_mesh.frag.spv");
       case Z3DRendererBase::ShaderHookType::PerPixelFragmentListStore:
-        return "ppll_store_mesh.frag.spv";
+        return QStringLiteral("ppll_store_mesh.frag.spv");
       case Z3DRendererBase::ShaderHookType::WeightedAverageInit:
-        return "wavg_init_mesh.frag.spv";
+        return QStringLiteral("wavg_init_mesh.frag.spv");
       case Z3DRendererBase::ShaderHookType::WeightedBlendedInit:
-        return "wblended_init_mesh.frag.spv";
+        return QStringLiteral("wblended_init_mesh.frag.spv");
       case Z3DRendererBase::ShaderHookType::Normal:
       default:
-        return "mesh.frag.spv";
+        return QStringLiteral("mesh.frag.spv");
     }
   };
 
@@ -1374,10 +1373,12 @@ ZVulkanMeshPipelineContext::ensurePipeline(const PipelineKey& key, const vulkan:
   // Use the depth-only mesh vertex shader for OIT init/count passes. The corresponding
   // fragment shaders rely on gl_FragCoord and compile (-O) to have no stage inputs,
   // so exporting varyings from mesh.vert would trigger Vulkan interface warnings.
-  const std::string vertexShader = depthOnlyPass ? "mesh_depth.vert.spv" : "mesh.vert.spv";
+  const QString vertexShader = depthOnlyPass ? QStringLiteral("mesh_depth.vert.spv") : QStringLiteral("mesh.vert.spv");
 
-  instance.shader =
-    std::make_unique<ZVulkanShader>(device, shaderBase + vertexShader, shaderBase + fragmentShader, std::nullopt);
+  instance.shader = std::make_unique<ZVulkanShader>(device,
+                                                    ZVulkanShader::spirvResourcePath(vertexShader),
+                                                    ZVulkanShader::spirvResourcePath(fragmentShader),
+                                                    std::nullopt);
 
   if (!depthOnlyPass) {
     const uint32_t useMeshColor = key.colorSource == MeshPayload::ColorSource::MeshColor ? 1u : 0u;
