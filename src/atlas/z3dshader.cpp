@@ -2,6 +2,7 @@
 
 #include "z3dgl.h"
 #include "zlog.h"
+#include <limits>
 #include <vector>
 
 namespace nim {
@@ -35,12 +36,16 @@ Z3DShader::~Z3DShader()
   glDeleteShader(m_id);
 }
 
-void Z3DShader::compileSourceCode(const char* source)
+void Z3DShader::compileSourceCode(std::string_view source)
 {
-  CHECK(source);
   if (m_id) {
-    GLint length = std::strlen(source);
-    glShaderSource(m_id, 1, &source, &length);
+    CHECK(!source.empty()) << "Z3DShader::compileSourceCode requires non-empty source";
+    CHECK(source.data()) << "Z3DShader::compileSourceCode requires source storage";
+    CHECK(source.size() <= static_cast<size_t>(std::numeric_limits<GLint>::max()))
+      << "Shader source length exceeds glShaderSource GLint limit: " << source.size();
+    const GLint length = static_cast<GLint>(source.size());
+    const char* sourceData = source.data();
+    glShaderSource(m_id, 1, &sourceData, &length);
 
     glCompileShader(m_id);
     GLint value = 0;
@@ -105,11 +110,6 @@ void Z3DShader::compileSourceCode(const char* source)
   } else {
     throw ZException("Z3DShader: Share is not created yet");
   }
-}
-
-void Z3DShader::compileSourceCode(const std::string& source)
-{
-  compileSourceCode(source.c_str());
 }
 
 std::string Z3DShader::sourceCode() const

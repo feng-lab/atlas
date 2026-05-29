@@ -2,6 +2,7 @@
 
 #include "z3dcontext.h"
 #include <string>
+#include <string_view>
 
 namespace nim {
 
@@ -32,9 +33,7 @@ public:
     return m_type;
   }
 
-  void compileSourceCode(const char* source);
-
-  void compileSourceCode(const std::string& source);
+  void compileSourceCode(std::string_view source);
 
   [[nodiscard]] std::string sourceCode() const;
 

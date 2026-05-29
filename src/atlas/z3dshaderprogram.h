@@ -5,6 +5,8 @@
 #include "z3dshader.h"
 #include "z3dcontext.h"
 #include <map>
+#include <string>
+#include <string_view>
 #include <vector>
 
 namespace nim {
@@ -23,12 +25,7 @@ public:
 
   void addShader(Z3DShader& shader);
 
-  void addShaderFromSourceCode(Z3DShader::Type type, const char* source);
-
-  void addShaderFromSourceCode(Z3DShader::Type type, const std::string& source)
-  {
-    addShaderFromSourceCode(type, source.c_str());
-  }
+  void addShaderFromSourceCode(Z3DShader::Type type, std::string_view source);
 
   void removeAllShaders();
 

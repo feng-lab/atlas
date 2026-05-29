@@ -33,9 +33,8 @@ void Z3DShaderProgram::addShader(Z3DShader& shader)
   m_shaders.push_back(&shader);
 }
 
-void Z3DShaderProgram::addShaderFromSourceCode(Z3DShader::Type type, const char* source)
+void Z3DShaderProgram::addShaderFromSourceCode(Z3DShader::Type type, std::string_view source)
 {
-  CHECK(source);
   m_anonShaders.emplace_back(std::make_unique<Z3DShader>(type));
   m_anonShaders.back()->compileSourceCode(source);
   addShader(*m_anonShaders.back().get());
