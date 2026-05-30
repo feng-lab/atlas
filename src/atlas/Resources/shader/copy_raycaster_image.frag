@@ -15,16 +15,12 @@ out vec4 FragData0;  // call glBindFragDataLocation before linking
 
 void main()
 {
-  vec4 fragColor = texelFetch(color_texture, ivec2(gl_FragCoord.xy), 0);
-
-  if (fragColor.a == 0.0)
-    discard;
-
   vec2 rayLengthAndDepth = texelFetch(depth_texture, ivec2(gl_FragCoord.xy), 0).xy;
 
   if (rayLengthAndDepth.x < 1.0)
     discard;
 
+  vec4 fragColor = texelFetch(color_texture, ivec2(gl_FragCoord.xy), 0);
   FragData0 = fragColor;
 
   gl_FragDepth = rayLengthAndDepth.y;

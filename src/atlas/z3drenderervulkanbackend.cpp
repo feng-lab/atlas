@@ -32,6 +32,7 @@
 #include "z3dimgraycasterrenderer.h"
 #include "z3dimgslicerenderer.h"
 #include "zvulkanfontpipelinecontext.h"
+#include "zvulkanpagedimageblockuploader.h"
 #include "zvulkanrenderconversions.h"
 #include "zvulkanresourcemetadata.h"
 #include "zvulkanpipelinecontext_raii.h"
@@ -363,6 +364,8 @@ void Z3DRendererVulkanBackend::preBackendSwitch()
   // Switching away from Vulkan: drop the scratch-pool release scheduler that is
   // tied to this backend instance. After flushForTeardown(), immediate release
   // is safe.
+  m_imageBlockUploader.reset();
+  m_imageBlockUploaderDevice = nullptr;
   uninstallMemoryBrokerProviders();
   Z3DRenderGlobalState::instance().scratchPool().setVulkanReleaseScheduler({});
   Z3DRenderGlobalState::instance().scratchPool().setVulkanMemoryPressureHandler({});
@@ -2511,6 +2514,17 @@ const ZVulkanDevice& Z3DRendererVulkanBackend::device() const
 {
   CHECK(m_sharedDevice != nullptr);
   return *m_sharedDevice;
+}
+
+ZVulkanImageBlockUploader& Z3DRendererVulkanBackend::sharedImageBlockUploader()
+{
+  ensureDevice();
+  CHECK(m_sharedDevice != nullptr) << "Shared Vulkan device missing in sharedImageBlockUploader";
+  if (!m_imageBlockUploader || m_imageBlockUploaderDevice != m_sharedDevice) {
+    m_imageBlockUploader = std::make_unique<ZVulkanPagedImageBlockUploader>(*m_sharedDevice);
+    m_imageBlockUploaderDevice = m_sharedDevice;
+  }
+  return *m_imageBlockUploader;
 }
 
 void Z3DRendererVulkanBackend::ensureDefaultPlaceholders()

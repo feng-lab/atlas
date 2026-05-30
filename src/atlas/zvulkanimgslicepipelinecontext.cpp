@@ -17,7 +17,7 @@
 #include "zvulkanresidencymanager.h"
 #include "z3drenderervulkanbackend.h"
 #include "zvulkanpipelinecontext_raii.h"
-#include "zvulkanpagedimageblockuploader.h"
+#include "zvulkanimageblockuploader.h"
 #include "z3drenderglobalstate.h"
 #include "zcancellation.h"
 #include "zbenchtimer.h"
@@ -249,12 +249,10 @@ void ZVulkanImgSlicePipelineContext::preRecordBindlessWarmup(const BindlessWarmu
   }
   m_channelResources.resize(channelCount);
 
+  ZVulkanImageBlockUploader* imageBlockUploader = nullptr;
   if (desc.wantsPaging) {
-    if (!m_imageBlockUploader) {
-      m_imageBlockUploader = std::make_unique<ZVulkanPagedImageBlockUploader>(m_backend.device());
-    }
-    CHECK(m_imageBlockUploader != nullptr) << "Slice paging warmup requested but image block uploader is missing";
-    m_imageBlockUploader->bindToImage(image);
+    imageBlockUploader = &m_backend.sharedImageBlockUploader();
+    imageBlockUploader->bindToImage(image);
   }
 
   for (size_t channelIndex : desc.channels) {
@@ -279,10 +277,10 @@ void ZVulkanImgSlicePipelineContext::preRecordBindlessWarmup(const BindlessWarmu
     }
 
     if (desc.wantsPaging) {
-      CHECK(m_imageBlockUploader != nullptr) << "Slice bindless warmup: paging uploader missing";
-      ZVulkanTexture* imageCache = m_imageBlockUploader->imageCacheTexture(image, channelIndex);
-      ZVulkanTexture* pageDirectory = m_imageBlockUploader->pageDirectoryTexture(image, channelIndex);
-      ZVulkanTexture* pageTable = m_imageBlockUploader->pageTableTexture(image, channelIndex);
+      CHECK(imageBlockUploader != nullptr) << "Slice bindless warmup: paging uploader missing";
+      ZVulkanTexture* imageCache = imageBlockUploader->imageCacheTexture(image, channelIndex);
+      ZVulkanTexture* pageDirectory = imageBlockUploader->pageDirectoryTexture(image, channelIndex);
+      ZVulkanTexture* pageTable = imageBlockUploader->pageTableTexture(image, channelIndex);
       CHECK(pageDirectory && pageTable && imageCache)
         << "Slice bindless warmup: paging textures missing for channel " << channelIndex;
       (void)m_backend.bindlessRegisterSampledImageAuto(*pageDirectory, "slice_page_directory");
@@ -425,13 +423,11 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
   CHECK(isCompute || isRaster) << "Slice pipeline received an unknown backend pass kind";
 
   const bool usePaging = !payload.fastPathOnly && payload.image->isVolumeDownsampled();
+  ZVulkanImageBlockUploader* imageBlockUploader = nullptr;
   if (usePaging) {
     CHECK(payload.streamKey != 0u) << "Vulkan slice paging requires a non-zero streamKey";
-    if (!m_imageBlockUploader) {
-      m_imageBlockUploader = std::make_unique<ZVulkanPagedImageBlockUploader>(m_backend.device());
-    }
-    CHECK(m_imageBlockUploader != nullptr);
-    m_imageBlockUploader->bindToImage(*payload.image);
+    imageBlockUploader = &m_backend.sharedImageBlockUploader();
+    imageBlockUploader->bindToImage(*payload.image);
   }
 
   const size_t channelCount = payload.image->numChannels();
@@ -479,10 +475,10 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
     inputs.colormap = &ensureColormapTexture(channelIndex, colorMap, resources);
 
     if (usePaging) {
-      CHECK(m_imageBlockUploader != nullptr) << "Slice paging expected block uploader";
-      inputs.imageCache = m_imageBlockUploader->imageCacheTexture(*payload.image, channelIndex);
-      inputs.pageDirectory = m_imageBlockUploader->pageDirectoryTexture(*payload.image, channelIndex);
-      inputs.pageTable = m_imageBlockUploader->pageTableTexture(*payload.image, channelIndex);
+      CHECK(imageBlockUploader != nullptr) << "Slice paging expected block uploader";
+      inputs.imageCache = imageBlockUploader->imageCacheTexture(*payload.image, channelIndex);
+      inputs.pageDirectory = imageBlockUploader->pageDirectoryTexture(*payload.image, channelIndex);
+      inputs.pageTable = imageBlockUploader->pageTableTexture(*payload.image, channelIndex);
       CHECK(inputs.pageDirectory && inputs.pageTable && inputs.imageCache)
         << "Slice paging missing page directory/table for channel " << channelIndex;
     }
@@ -941,11 +937,18 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
 
           if (!missingBlocks.empty()) {
             ZBenchTimer timer(fmt::format("vulkan_slice_channel_{}", channelIndexSize));
-            imagePtr->updateAndUploadPageDirectoryCaches(missingBlocks,
-                                                         channelIndexSize,
-                                                         cancellationToken,
-                                                         timer,
-                                                         roundIndexU32);
+            const bool filledAllBlocks = imagePtr->updateAndUploadPageDirectoryCaches(missingBlocks,
+                                                                                      channelIndexSize,
+                                                                                      cancellationToken,
+                                                                                      timer,
+                                                                                      roundIndexU32);
+            if (!filledAllBlocks) {
+              LOG(WARNING)
+                << "Vulkan slice paging did not process all compacted block IDs; rendering this slice with a partial "
+                   "page-cache update. channel="
+                << channelIndexSize << " round=" << roundIndexU32 << " requested_block_ids=" << missingBlocks.size()
+                << " image_cache_capacity=" << imagePtr->numCachedImages(channelIndexSize);
+            }
           }
 
           // Advance to the next progressive stage (round++).

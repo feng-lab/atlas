@@ -25,7 +25,7 @@
 #include "zabslflagtypes.h"
 #include "zvulkanpipelinecontext_raii.h"
 #include "z3drenderervulkanbackend.h"
-#include "zvulkanpagedimageblockuploader.h"
+#include "zvulkanimageblockuploader.h"
 #include "zcancellation.h"
 #include "zrenderthreadexecutor_tls.h"
 #include "zvulkanresidencymanager.h"
@@ -476,16 +476,6 @@ ZVulkanImgRaycasterPipelineContext::ZVulkanImgRaycasterPipelineContext(Z3DRender
 
 ZVulkanImgRaycasterPipelineContext::~ZVulkanImgRaycasterPipelineContext() = default;
 
-void ZVulkanImgRaycasterPipelineContext::ensureUploader()
-{
-  if (m_imageBlockUploader) {
-    return;
-  }
-  // Construct the uploader with the active device. This must be called only
-  // after the backend has ensured the device via beginRender/ensureDevice.
-  m_imageBlockUploader = std::make_unique<ZVulkanPagedImageBlockUploader>(m_backend.device());
-}
-
 void ZVulkanImgRaycasterPipelineContext::preRecordBindlessWarmup(const BindlessWarmupDesc& desc)
 {
   CHECK(!m_backend.isRecording()) << "Raycaster preRecordBindlessWarmup called while recording";
@@ -497,11 +487,11 @@ void ZVulkanImgRaycasterPipelineContext::preRecordBindlessWarmup(const BindlessW
   }
 
   auto& image = *desc.image;
+  ZVulkanImageBlockUploader* imageBlockUploader = nullptr;
 
   if (desc.wantsPaging) {
-    ensureUploader();
-    CHECK(m_imageBlockUploader != nullptr) << "Raycaster paging requested but image block uploader is missing";
-    m_imageBlockUploader->bindToImage(image);
+    imageBlockUploader = &m_backend.sharedImageBlockUploader();
+    imageBlockUploader->bindToImage(image);
   }
 
   for (size_t channelIndex : desc.channels) {
@@ -533,10 +523,10 @@ void ZVulkanImgRaycasterPipelineContext::preRecordBindlessWarmup(const BindlessW
     }
 
     if (desc.wantsPaging) {
-      CHECK(m_imageBlockUploader != nullptr) << "Raycaster bindless warmup: paging uploader missing";
-      ZVulkanTexture* imageCache = m_imageBlockUploader->imageCacheTexture(image, channelIndex);
-      ZVulkanTexture* pageDirectory = m_imageBlockUploader->pageDirectoryTexture(image, channelIndex);
-      ZVulkanTexture* pageTable = m_imageBlockUploader->pageTableTexture(image, channelIndex);
+      CHECK(imageBlockUploader != nullptr) << "Raycaster bindless warmup: paging uploader missing";
+      ZVulkanTexture* imageCache = imageBlockUploader->imageCacheTexture(image, channelIndex);
+      ZVulkanTexture* pageDirectory = imageBlockUploader->pageDirectoryTexture(image, channelIndex);
+      ZVulkanTexture* pageTable = imageBlockUploader->pageTableTexture(image, channelIndex);
       CHECK(pageDirectory && pageTable && imageCache)
         << "Raycaster bindless warmup: paging textures missing for channel " << channelIndex;
       (void)m_backend.bindlessRegisterSampledImageAuto(*pageDirectory, "raycaster_page_directory");
@@ -682,8 +672,6 @@ void ZVulkanImgRaycasterPipelineContext::record(Z3DRendererBase& renderer,
                                                 const vk::Rect2D& scissor,
                                                 vk::raii::CommandBuffer& cmd)
 {
-  // Ensure uploader availability after beginRender() when device is valid.
-  ensureUploader();
   // Cooperative cancellation: mirror GL by polling UI events and
   // throwing when a cancel is requested.
   auto cancellationToken = Z3DRenderGlobalState::instance().currentCancellationToken();
@@ -817,8 +805,8 @@ ZVulkanImgRaycasterPipelineContext::ensurePreparedProgressiveRound(Z3DRendererBa
   CHECK(payload.lastAccumLease && payload.currentAccumLease)
     << "Vulkan raycaster progressive path missing accum leases.";
 
-  CHECK(m_imageBlockUploader) << "Vulkan raycaster progressive path missing image block uploader.";
-  m_imageBlockUploader->bindToImage(*payload.image);
+  ZVulkanImageBlockUploader& imageBlockUploader = m_backend.sharedImageBlockUploader();
+  imageBlockUploader.bindToImage(*payload.image);
 
   const int32_t rawIdx = payload.channelIndexRaw;
   CHECK_GE(rawIdx, 0) << "Negative channelIndexRaw (preview) not expected in progressive preparation.";
@@ -860,9 +848,9 @@ ZVulkanImgRaycasterPipelineContext::ensurePreparedProgressiveRound(Z3DRendererBa
         prep.currentColor && prep.currentDepth)
     << "Vulkan raycaster progressive path missing required textures.";
 
-  prep.imageCache = m_imageBlockUploader->imageCacheTexture(*payload.image, prep.channelIndex);
-  prep.pageDirectory = m_imageBlockUploader->pageDirectoryTexture(*payload.image, prep.channelIndex);
-  prep.pageTable = m_imageBlockUploader->pageTableTexture(*payload.image, prep.channelIndex);
+  prep.imageCache = imageBlockUploader.imageCacheTexture(*payload.image, prep.channelIndex);
+  prep.pageDirectory = imageBlockUploader.pageDirectoryTexture(*payload.image, prep.channelIndex);
+  prep.pageTable = imageBlockUploader.pageTableTexture(*payload.image, prep.channelIndex);
   CHECK(prep.pageDirectory && prep.pageTable && prep.imageCache)
     << "Raycaster progressive path missing paging textures for channel " << prep.channelIndex;
 

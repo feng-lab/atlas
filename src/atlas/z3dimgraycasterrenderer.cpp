@@ -944,11 +944,14 @@ Z3DImgRaycasterRenderer::recordVulkanStagesToScript(ZVulkanLinearScript& script,
           const uint32_t layerIndex = static_cast<uint32_t>(stagePayload.channelIndexRaw);
 
           const auto surface = surfaceFromLeaseWithLayerIndex(*stagePayload.channelLayerLease, layerIndex);
-          // Preserve previous per-layer contents unless the shader overwrites fully (matches existing Vulkan path).
+          const bool preservePreview = stagePayload.interactiveProgressivePaging;
+          // The copy shader discards only unfinished rays. Interactive progressive rendering keeps the seeded
+          // preview for those pixels, while blocking capture/export clears first so any unfinished pixel resolves to
+          // transparent instead of preserving preview contents in final output.
           m_rendererBase.setActiveSurfaceWithLoadStore(surface,
-                                                       LoadOp::Load,
+                                                       preservePreview ? LoadOp::Load : LoadOp::Clear,
                                                        StoreOp::Store,
-                                                       LoadOp::Load,
+                                                       preservePreview ? LoadOp::Load : LoadOp::Clear,
                                                        StoreOp::Store);
           markActiveSurfaceSampled();
           auto currentAccumSamples = accumSurfaceHandles(stagePayload.currentAccumLease);

@@ -246,22 +246,20 @@ public:
     return std::span<const glm::uvec4>(m_channelPageTableCaches[c].data(), m_channelPageTableCaches[c].size());
   }
 
+  [[nodiscard]] uint64_t pageCacheGeneration(size_t c) const
+  {
+    CHECK_LT(c, m_pageCacheGenerations.size());
+    return m_pageCacheGenerations[c];
+  }
+
   void attachVulkanImageBlockUploader(ZVulkanImageBlockUploader* uploader)
   {
     setVulkanImageBlockUploader(uploader);
   }
 
-  void mapImageBlockToCache(size_t channel,
-                            const glm::uvec4& pageTableEntryKey,
-                            glm::uvec4& pageTableEntryRef,
-                            std::vector<glm::uvec3>* dirtyPageDirectoryCoords = nullptr,
-                            std::vector<glm::uvec3>* dirtyPageTableBlockOrigins = nullptr)
+  void mapImageBlockToCache(size_t channel, const glm::uvec4& pageTableEntryKey, glm::uvec4& pageTableEntryRef)
   {
-    insertImageBlockToCache(channel,
-                            pageTableEntryKey,
-                            pageTableEntryRef,
-                            dirtyPageDirectoryCoords,
-                            dirtyPageTableBlockOrigins);
+    insertImageBlockToCache(channel, pageTableEntryKey, pageTableEntryRef);
   }
 
   void invalidateVulkanPagedImageCache(size_t c);
@@ -328,17 +326,12 @@ protected:
                                   m_channelDisplayRanges[c].x);
   }
 
-  void insertPageTableBlockToCache(size_t c,
-                                   const glm::uvec4& pageDirectoryEntryKey,
-                                   glm::uvec4& pageDirectoryEntryRef,
-                                   std::vector<glm::uvec3>* dirtyPageDirectoryCoords = nullptr,
-                                   std::vector<glm::uvec3>* dirtyPageTableBlockOrigins = nullptr);
+  void
+  insertPageTableBlockToCache(size_t c, const glm::uvec4& pageDirectoryEntryKey, glm::uvec4& pageDirectoryEntryRef);
 
-  void insertImageBlockToCache(size_t c,
-                               const glm::uvec4& pageTableEntryKey,
-                               glm::uvec4& pageTableEntryRef,
-                               std::vector<glm::uvec3>* dirtyPageDirectoryCoords = nullptr,
-                               std::vector<glm::uvec3>* dirtyPageTableBlockOrigins = nullptr);
+  void insertImageBlockToCache(size_t c, const glm::uvec4& pageTableEntryKey, glm::uvec4& pageTableEntryRef);
+  void ensurePageCacheGenerations();
+  void bumpPageCacheGeneration(size_t c);
 
   folly::coro::Task<void>
   readImageBlockToBufferAsync(size_t c,
@@ -359,9 +352,7 @@ protected:
   size_t readAndUploadImageBlocks(size_t c,
                                   const std::vector<std::tuple<glm::uvec4, glm::uvec4*>>& pendingTasks,
                                   const folly::CancellationToken& cancellationToken,
-                                  ZBenchTimer& bt,
-                                  std::vector<glm::uvec3>* dirtyPageDirectoryCoords = nullptr,
-                                  std::vector<glm::uvec3>* dirtyPageTableBlockOrigins = nullptr);
+                                  ZBenchTimer& bt);
 
   void setVulkanImageBlockUploader(ZVulkanImageBlockUploader* uploader);
 
@@ -398,6 +389,7 @@ protected:
   std::vector<std::unique_ptr<Z3DTexture>> m_channelImageCacheTextures;
   std::vector<std::unique_ptr<Z3DBlockCache<glm::uvec4>>> m_channelImageCacheManagers;
   std::vector<uint8_t> m_glPagingTexturesDirty;
+  std::vector<uint64_t> m_pageCacheGenerations;
   std::vector<uint64_t> m_volumeGenerations;
 
   size_t m_numLevels = 1;

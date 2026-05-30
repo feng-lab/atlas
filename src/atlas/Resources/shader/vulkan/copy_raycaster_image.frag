@@ -13,12 +13,10 @@ layout(location = 0) out vec4 FragData0;
 void main()
 {
   ivec2 pix = ivec2(gl_FragCoord.xy);
-  vec4 fragColor = texelFetch(atlas_bindlessSampler2DNearest(pc.color_texture), pix, 0);
-  if (fragColor.a == 0.0) discard;
-
   vec2 rayLengthAndDepth = texelFetch(atlas_bindlessSampler2DNearest(pc.depth_texture), pix, 0).xy;
   if (rayLengthAndDepth.x < 1.0) discard;
 
+  vec4 fragColor = texelFetch(atlas_bindlessSampler2DNearest(pc.color_texture), pix, 0);
   FragData0 = fragColor;
   gl_FragDepth = rayLengthAndDepth.y;
 }

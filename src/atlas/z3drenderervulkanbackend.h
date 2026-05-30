@@ -56,6 +56,7 @@ class ZVulkanBindlessDescriptorSet;
 class Z3DImg;
 class Z3DTransferFunction;
 class ZColorMap;
+class ZVulkanImageBlockUploader;
 
 namespace vulkan {
 
@@ -443,6 +444,8 @@ public:
   ZVulkanDevice& device();
 
   const ZVulkanDevice& device() const;
+
+  ZVulkanImageBlockUploader& sharedImageBlockUploader();
 
   vk::raii::CommandBuffer& commandBuffer();
 
@@ -1508,6 +1511,8 @@ public:
   std::unique_ptr<ZVulkanImgSlicePipelineContext> m_imgSliceContext;
   std::unique_ptr<ZVulkanImgRaycasterPipelineContext> m_imgRaycasterContext;
   std::unique_ptr<ZVulkanFontPipelineContext> m_fontContext;
+  std::unique_ptr<ZVulkanImageBlockUploader> m_imageBlockUploader;
+  ZVulkanDevice* m_imageBlockUploaderDevice = nullptr;
 
   // Shared fallback resources
   std::unique_ptr<ZVulkanTexture> m_defaultPlaceholder2D;

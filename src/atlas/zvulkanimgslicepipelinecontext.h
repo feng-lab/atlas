@@ -24,7 +24,6 @@ class ZMesh;
 class ZImg;
 class Z3DImg;
 class ZColorMap;
-class ZVulkanImageBlockUploader;
 
 namespace vulkan {
 struct AttachmentFormats;
@@ -208,7 +207,6 @@ private:
   size_t m_quadVertexCapacity = 0;
   size_t m_quadVertexCount = 0;
   std::vector<ChannelResources> m_channelResources;
-  std::unique_ptr<ZVulkanImageBlockUploader> m_imageBlockUploader;
   std::optional<Finalization> m_pendingFinalization;
 
   vk::PipelineVertexInputStateCreateInfo makeSliceVertexInputState() const;

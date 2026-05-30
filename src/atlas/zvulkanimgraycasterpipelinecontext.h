@@ -33,7 +33,6 @@ class ZVulkanPipeline;
 class ZVulkanTexture;
 class ZVulkanBuffer;
 class Z3DTransferFunction;
-class ZVulkanImageBlockUploader;
 
 namespace vulkan {
 struct AttachmentFormats;
@@ -311,7 +310,6 @@ private:
     m_blockIdCompactDescriptorDenseStorageByMethodAndLease;
 
   std::vector<ChannelResources> m_channelResources;
-  std::unique_ptr<ZVulkanImageBlockUploader> m_imageBlockUploader;
 
   std::optional<Finalization> m_pendingFinalization;
   std::optional<DeferredProgressive> m_deferredProgressive;
@@ -399,9 +397,6 @@ private:
   void ensureEntryPipelines(vk::Format colorFormat);
   PipelineInstance& ensureFastPipeline(const FastPipelineKey& key);
   PipelineInstance& ensureBlockIdPipeline(const BlockIdPipelineKey& key, vk::Format colorFormat);
-  // Lazily create the image block uploader when a Vulkan device is guaranteed
-  // to be available (e.g., during recording after beginRender()).
-  void ensureUploader();
   PipelineInstance& ensureProgressivePipeline(const ProgressivePipelineKey& key,
                                               const vulkan::AttachmentFormats& formats);
   PipelineInstance& ensureCopyPipeline(const CopyPipelineKey& key, const vulkan::AttachmentFormats& formats);

@@ -1855,6 +1855,31 @@ def _refresh_builtin_ifw_package_metadata() -> None:
         updater(template_path, os.path.join(meta_dir, "package.xml"))
 
 
+def _copy_qt_plugins(destination_plugins_root: str) -> None:
+    """Deploy Qt plugins that Qt deploy tools may not infer statically.
+
+    Linux deployment copies the full Qt plugin tree. Keep macOS/Windows aligned
+    with that policy because Atlas selects some plugins at runtime, including
+    the offscreen QPA plugin used by headless Vulkan export automation.
+    """
+
+    source_plugins_root = os.path.join(common_dirs.qt_base_dir(), "plugins")
+    if not os.path.isdir(source_plugins_root):
+        raise RuntimeError(
+            f"Qt plugins directory was not found.\nexpected: {source_plugins_root}"
+        )
+
+    shutil.copytree(
+        source_plugins_root,
+        destination_plugins_root,
+        dirs_exist_ok=True,
+        symlinks=True,
+    )
+    logger.info(
+        "Copied Qt plugins: %s -> %s", source_plugins_root, destination_plugins_root
+    )
+
+
 def build_atlas_package(is_debug_version: bool = False, release_pdb: bool = False):
     logger.info(f"current interpreter: {sys.executable}")
 
@@ -1881,6 +1906,14 @@ def build_atlas_package(is_debug_version: bool = False, release_pdb: bool = Fals
                 cwd=common_dirs.deploy_target_dir(),
                 shell=False,
                 check=True,
+            )
+            _copy_qt_plugins(
+                os.path.join(
+                    common_dirs.deploy_target_dir(),
+                    app_name,
+                    "Contents",
+                    "PlugIns",
+                )
             )
         else:
             raise RuntimeError(
@@ -2056,6 +2089,7 @@ def build_atlas_package(is_debug_version: bool = False, release_pdb: bool = Fals
                 check=True,
                 env=env,
             )
+            _copy_qt_plugins(os.path.join(common_dirs.deploy_target_dir(), "Atlas"))
             # Ensure LLM docs are generated in repo and copied into deploy folder.
             repo_root = Path(common_dirs.atlas_repository_dir())
             repo_llm_dir = atlas_llm_docs.repo_schema_dir(repo_root)
