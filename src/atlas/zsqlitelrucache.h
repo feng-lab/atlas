@@ -8,6 +8,7 @@
 #include <mutex>
 #include <optional>
 #include <span>
+#include <string_view>
 #include <vector>
 
 struct sqlite3;
@@ -73,16 +74,16 @@ private:
   // Tracks persistent SQLite failures and disables the cache (by closing the DB)
   // after repeated errors. This avoids repeatedly paying I/O/SQL overhead when
   // the filesystem/DB is unhealthy (disk full, corruption, I/O errors, etc.).
-  void recordSqlErrorLocked(int rc, const char* context);
+  void recordSqlErrorLocked(int rc, std::string_view context);
   void recordSqlSuccessLocked();
 
   [[nodiscard]] int64_t nowNsLocked() const;
 
   void maybePruneLocked(int64_t nowNs);
 
-  [[nodiscard]] bool execLocked(const char* sql);
+  [[nodiscard]] bool execLocked(std::string_view sql);
 
-  [[nodiscard]] bool prepareLocked(const char* sql, sqlite3_stmt** outStmt);
+  [[nodiscard]] bool prepareLocked(std::string_view sql, sqlite3_stmt** outStmt);
 
 private:
   QString m_dbPath;

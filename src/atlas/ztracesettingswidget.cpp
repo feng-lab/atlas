@@ -433,7 +433,7 @@ ZTraceSettingsWidget::ZTraceSettingsWidget(ZDoc& doc, QWidget* parent)
   connect(m_resetAlgoButton, &QPushButton::clicked, this, [this]() {
     TraceConfig cfg;
     const QString traceCfgPath = QDir(ZSystemInfo::jsonDirPath()).absoluteFilePath("trace_config.json");
-    (void)loadTraceConfigLegacyLike(traceCfgPath.toStdString(), cfg);
+    (void)loadTraceConfigLegacyLike(traceCfgPath, cfg);
     m_doc.traceSettings().setAlgoConfig(algoConfigFromTraceConfig(cfg));
   });
 
@@ -464,7 +464,7 @@ void ZTraceSettingsWidget::initializeAlgoConfigFromLegacyDefaultsIfUnset()
 
   TraceConfig cfg;
   const QString traceCfgPath = QDir(ZSystemInfo::jsonDirPath()).absoluteFilePath("trace_config.json");
-  (void)loadTraceConfigLegacyLike(traceCfgPath.toStdString(), cfg);
+  (void)loadTraceConfigLegacyLike(traceCfgPath, cfg);
   settings.initializeAlgoConfigIfUnset(algoConfigFromTraceConfig(cfg));
 }
 

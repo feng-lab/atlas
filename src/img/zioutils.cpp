@@ -13,11 +13,7 @@ namespace nim {
 
 void openIFStream(std::ifstream& fs, const QString& filename, std::ios_base::openmode mode)
 {
-#ifdef _MSC_VER
-  fs.open(filename.toStdWString().c_str(), mode); // use msvc extension
-#else
-  fs.open(QFile::encodeName(filename).constData(), mode);
-#endif
+  fs.open(QFileInfo(filename).filesystemFilePath(), mode);
   if (!fs.is_open()) {
     throw ZException(fmt::format("Could not open file {} for reading", filename), ZException::Option::CheckErrno);
   }
@@ -32,11 +28,7 @@ std::ifstream openIFStream(const QString& filename, std::ios_base::openmode mode
 
 void openOFStream(std::ofstream& fs, const QString& filename, std::ios_base::openmode mode)
 {
-#ifdef _MSC_VER
-  fs.open(filename.toStdWString().c_str(), mode); // use msvc extension
-#else
-  fs.open(QFile::encodeName(filename).constData(), mode);
-#endif
+  fs.open(QFileInfo(filename).filesystemFilePath(), mode);
   if (!fs.is_open()) {
     throw ZException(fmt::format("Could not open file {} for writing", filename), ZException::Option::CheckErrno);
   }
@@ -79,21 +71,33 @@ void writeStream_impl(std::ostream& fs, const char* buf, size_t count)
   }
 }
 
-std::unique_ptr<std::FILE, decltype(&std::fclose)> openFile(const QString& filename, const char* mode)
+std::unique_ptr<std::FILE, decltype(&std::fclose)> openFile(const QString& filename, std::string_view mode)
 {
-  CHECK(mode != nullptr);
+  CHECK(!mode.empty());
   errno = 0;
+  const std::string modeText(mode);
   std::FILE* tmpf = nullptr;
 #ifdef _MSC_VER
-  const std::wstring wideMode = QString::fromUtf8(mode).toStdWString();
+  const std::wstring wideMode =
+    QString::fromUtf8(modeText.data(), static_cast<qsizetype>(modeText.size())).toStdWString();
   if (_wfopen_s(&tmpf, filename.toStdWString().c_str(), wideMode.c_str()) != 0) {
 #else
-  tmpf = std::fopen(QFile::encodeName(filename).constData(), mode);
+  tmpf = std::fopen(QFile::encodeName(filename).constData(), modeText.c_str());
   if (tmpf == nullptr) {
 #endif
     throw ZException(fmt::format("Could not open file {}", filename), ZException::Option::CheckErrno);
   }
   return std::unique_ptr<std::FILE, decltype(&std::fclose)>(tmpf, std::fclose);
+}
+
+bool fileExists(const QString& path)
+{
+  if (path.isEmpty()) {
+    return false;
+  }
+
+  const QFileInfo fi(path);
+  return fi.exists() && fi.isFile();
 }
 
 bool isReadableFile(const QString& filename)

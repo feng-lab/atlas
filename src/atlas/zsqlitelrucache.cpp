@@ -15,6 +15,7 @@
 #include <array>
 #include <cstring>
 #include <limits>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -129,7 +130,7 @@ ZSqliteLRUCache::~ZSqliteLRUCache()
   closeDbLocked();
 }
 
-void ZSqliteLRUCache::recordSqlErrorLocked(int rc, const char* context)
+void ZSqliteLRUCache::recordSqlErrorLocked(int rc, std::string_view context)
 {
   if (m_disabled) {
     return;
@@ -148,9 +149,7 @@ void ZSqliteLRUCache::recordSqlErrorLocked(int rc, const char* context)
   }
 
   LOG(WARNING) << "SQLite cache disabled after " << m_consecutiveSqlFailures
-               << " consecutive failures: dbPath=" << m_dbPath
-               << " lastRc=" << rc
-               << " context=" << (context ? context : "<null>");
+               << " consecutive failures: dbPath=" << m_dbPath << " lastRc=" << rc << " context=" << context;
 
   m_disabled = true;
   closeDbLocked();
@@ -525,10 +524,10 @@ bool ZSqliteLRUCache::initDbLocked()
     if (const auto cacheKiB =
           sqliteCacheSizeKiBFromBytes(absl::GetFlag(FLAGS_atlas_disk_cache_sqlite_reader_cache_bytes));
         cacheKiB.has_value()) {
-      (void)execLocked(fmt::format("PRAGMA cache_size=-{}", *cacheKiB).c_str());
+      (void)execLocked(fmt::format("PRAGMA cache_size=-{}", *cacheKiB));
     }
     if (const auto mmapBytes = sqliteMmapBytes(); mmapBytes.has_value()) {
-      (void)execLocked(fmt::format("PRAGMA mmap_size={}", *mmapBytes).c_str());
+      (void)execLocked(fmt::format("PRAGMA mmap_size={}", *mmapBytes));
     }
 
     if (!prepareLocked("SELECT value,last_access_ns FROM entries WHERE key_hash=?1", &m_stmtSelectValue)) {
@@ -545,7 +544,7 @@ bool ZSqliteLRUCache::initDbLocked()
   // Cache-friendly defaults. Apply page_size before any schema objects or WAL.
   if (shouldApplyFreshDbPageSize) {
     if (const auto pageSizeBytes = sqliteFreshDbPageSizeBytes(); pageSizeBytes.has_value()) {
-      (void)execLocked(fmt::format("PRAGMA page_size={}", *pageSizeBytes).c_str());
+      (void)execLocked(fmt::format("PRAGMA page_size={}", *pageSizeBytes));
     }
   }
 
@@ -556,13 +555,13 @@ bool ZSqliteLRUCache::initDbLocked()
   if (const auto cacheKiB =
         sqliteCacheSizeKiBFromBytes(absl::GetFlag(FLAGS_atlas_disk_cache_sqlite_writer_cache_bytes));
       cacheKiB.has_value()) {
-    (void)execLocked(fmt::format("PRAGMA cache_size=-{}", *cacheKiB).c_str());
+    (void)execLocked(fmt::format("PRAGMA cache_size=-{}", *cacheKiB));
   }
   if (const auto mmapBytes = sqliteMmapBytes(); mmapBytes.has_value()) {
-    (void)execLocked(fmt::format("PRAGMA mmap_size={}", *mmapBytes).c_str());
+    (void)execLocked(fmt::format("PRAGMA mmap_size={}", *mmapBytes));
   }
   if (const auto journalSizeLimitBytes = sqliteJournalSizeLimitBytes(); journalSizeLimitBytes.has_value()) {
-    (void)execLocked(fmt::format("PRAGMA journal_size_limit={}", *journalSizeLimitBytes).c_str());
+    (void)execLocked(fmt::format("PRAGMA journal_size_limit={}", *journalSizeLimitBytes));
   }
 
   if (!ensureSchemaLocked()) {
@@ -625,21 +624,23 @@ bool ZSqliteLRUCache::ensureSchemaLocked()
                   "last_access_ns INTEGER NOT NULL,"
                   "value BLOB NOT NULL) WITHOUT ROWID") ||
       !execLocked("CREATE INDEX IF NOT EXISTS entries_last_access ON entries(last_access_ns)") ||
-      !execLocked(fmt::format("INSERT OR IGNORE INTO meta(key,value_int) VALUES('{}',0)", std::string(kMetaKeyTotalBytes))
-                    .c_str()) ||
-      !execLocked("CREATE TRIGGER IF NOT EXISTS entries_total_bytes_insert "
-                  "AFTER INSERT ON entries BEGIN "
-                  "UPDATE meta SET value_int=value_int+NEW.size_bytes WHERE key='total_bytes'; "
-                  "END") ||
-      !execLocked("CREATE TRIGGER IF NOT EXISTS entries_total_bytes_delete "
-                  "AFTER DELETE ON entries BEGIN "
-                  "UPDATE meta SET value_int=value_int-OLD.size_bytes WHERE key='total_bytes'; "
-                  "END") ||
-      !execLocked("CREATE TRIGGER IF NOT EXISTS entries_total_bytes_update "
-                  "AFTER UPDATE OF size_bytes ON entries BEGIN "
-                  "UPDATE meta SET value_int=value_int+(NEW.size_bytes-OLD.size_bytes) WHERE key='total_bytes'; "
-                  "END") ||
-      !execLocked(fmt::format("PRAGMA user_version={}", kCacheSchemaVersion).c_str())) {
+      !execLocked(fmt::format("INSERT OR IGNORE INTO meta(key,value_int) VALUES('{}',0)", kMetaKeyTotalBytes)) ||
+      !execLocked(fmt::format("CREATE TRIGGER IF NOT EXISTS entries_total_bytes_insert "
+                              "AFTER INSERT ON entries BEGIN "
+                              "UPDATE meta SET value_int=value_int+NEW.size_bytes WHERE key='{}'; "
+                              "END",
+                              kMetaKeyTotalBytes)) ||
+      !execLocked(fmt::format("CREATE TRIGGER IF NOT EXISTS entries_total_bytes_delete "
+                              "AFTER DELETE ON entries BEGIN "
+                              "UPDATE meta SET value_int=value_int-OLD.size_bytes WHERE key='{}'; "
+                              "END",
+                              kMetaKeyTotalBytes)) ||
+      !execLocked(fmt::format("CREATE TRIGGER IF NOT EXISTS entries_total_bytes_update "
+                              "AFTER UPDATE OF size_bytes ON entries BEGIN "
+                              "UPDATE meta SET value_int=value_int+(NEW.size_bytes-OLD.size_bytes) WHERE key='{}'; "
+                              "END",
+                              kMetaKeyTotalBytes)) ||
+      !execLocked(fmt::format("PRAGMA user_version={}", kCacheSchemaVersion))) {
     return false;
   }
 
@@ -779,13 +780,14 @@ void ZSqliteLRUCache::maybePruneLocked(int64_t nowNs)
   }
 }
 
-bool ZSqliteLRUCache::execLocked(const char* sql)
+bool ZSqliteLRUCache::execLocked(std::string_view sql)
 {
   if (m_disabled || m_db == nullptr) {
     return false;
   }
+  const std::string sqlText(sql);
   char* errMsg = nullptr;
-  const int rc = sqlite3_exec(m_db, sql, nullptr, nullptr, &errMsg);
+  const int rc = sqlite3_exec(m_db, sqlText.c_str(), nullptr, nullptr, &errMsg);
   if (rc != SQLITE_OK) {
     const std::string err = errMsg ? std::string(errMsg) : std::string(sqlite3_errmsg(m_db));
     if (errMsg) {
@@ -801,13 +803,14 @@ bool ZSqliteLRUCache::execLocked(const char* sql)
   return true;
 }
 
-bool ZSqliteLRUCache::prepareLocked(const char* sql, sqlite3_stmt** outStmt)
+bool ZSqliteLRUCache::prepareLocked(std::string_view sql, sqlite3_stmt** outStmt)
 {
   if (m_disabled || m_db == nullptr || outStmt == nullptr) {
     return false;
   }
   *outStmt = nullptr;
-  const int rc = sqlite3_prepare_v2(m_db, sql, -1, outStmt, nullptr);
+  const std::string sqlText(sql);
+  const int rc = sqlite3_prepare_v2(m_db, sqlText.c_str(), -1, outStmt, nullptr);
   if (rc != SQLITE_OK || *outStmt == nullptr) {
     VLOG(1) << "SQLite prepare failed: rc=" << rc << " sql='" << sql << "' err='" << sqlite3_errmsg(m_db) << "'";
     recordSqlErrorLocked(rc, "prepare");

@@ -134,7 +134,7 @@ void ZNeutubeSkeletonizeProcess::writeSwcAtomicOrThrow(ZSwc& tree) const
     (void)QFile::remove(tmpSwcPath);
   });
 
-  writeSwcLegacyNeuTuOrThrow(tree, tmpSwcPath.toStdString(), {});
+  writeSwcLegacyNeuTuOrThrow(tree, tmpSwcPath, {});
 
   if (QFile::exists(m_outputSwcPath) && !QFile::remove(m_outputSwcPath)) {
     throw ZException(fmt::format("Binary -> SWC failed: can not overwrite output SWC: {}", m_outputSwcPath));

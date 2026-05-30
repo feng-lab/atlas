@@ -1,9 +1,6 @@
 #include "zneuroglanceruint64sharding.h"
 
-#include "zexception.h"
-
-#include <fmt/format.h>
-#include <gtest/gtest.h>
+#include "ztest.h"
 
 #include <array>
 #include <cstdint>

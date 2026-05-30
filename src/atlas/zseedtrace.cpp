@@ -166,7 +166,7 @@ struct SeededTraceAsyncResult
 
     TraceConfig cfg;
     if (!traceConfigPath.isEmpty()) {
-      const bool ok = loadTraceConfigLegacyLike(traceConfigPath.toStdString(), cfg);
+      const bool ok = loadTraceConfigLegacyLike(traceConfigPath, cfg);
       if (!ok) {
         cfg = TraceConfig{};
       }

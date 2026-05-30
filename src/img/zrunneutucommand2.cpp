@@ -14,7 +14,9 @@
 #include "zjson.h"
 
 #include "zcommandlineflags.h"
+#include "zioutils.h"
 
+#include <QByteArray>
 #include <charconv>
 #include <cmath>
 #include <optional>
@@ -27,17 +29,17 @@ namespace {
 
 struct Command2Args
 {
-  std::vector<std::string> input;
-  std::string output;
+  std::vector<QString> input;
+  QString output;
 
   // Default Resources/json directory injected by the host app (Atlas).
   // Used only as a fallback when caller does not explicitly provide --config.
-  std::string jsonDirPath;
+  QString jsonDirPath;
 
   // Path to command_config.json (or equivalent). Controls default locations for skeletonize/trace configs.
-  std::string commandConfigPath;
+  QString commandConfigPath;
 
-  std::string generalConfig; // JSON string or JSON file path for --general
+  QString generalConfig; // JSON string or JSON file path for --general
 
   std::optional<std::array<int, 3>> downsampleInterval;
   std::optional<std::array<int, 3>> position;
@@ -60,10 +62,9 @@ struct Command2Args
   bool runGeneral = false;
 };
 
-[[nodiscard]] bool fileExists(const QString& path)
+[[nodiscard]] QString argToQString(std::string_view arg)
 {
-  const QFileInfo fi(path);
-  return fi.exists() && fi.isFile();
+  return QString::fromUtf8(arg.data(), static_cast<qsizetype>(arg.size()));
 }
 
 [[nodiscard]] QString resolvePathRelativeTo(const QString& baseFilePath, const QString& maybeRelativePath)
@@ -75,7 +76,7 @@ struct Command2Args
   return fileInfo.absoluteFilePath();
 }
 
-[[nodiscard]] std::optional<std::string>
+[[nodiscard]] std::optional<QString>
 extractIncludePath(const json::object& root, const QString& baseConfigFilePath, const char* key)
 {
   auto it = root.find(key);
@@ -89,9 +90,9 @@ extractIncludePath(const json::object& root, const QString& baseConfigFilePath, 
     return std::nullopt;
   }
 
-  const auto includeText = QString::fromStdString(std::string(includeIt->value().as_string().c_str()));
+  const auto includeText = json::value_to<QString>(includeIt->value());
   const QString resolved = resolvePathRelativeTo(baseConfigFilePath, includeText);
-  return resolved.toStdString();
+  return resolved;
 }
 
 [[nodiscard]] json::value parseJsonValue(std::string_view text, std::string_view context)
@@ -119,15 +120,15 @@ extractIncludePath(const json::object& root, const QString& baseConfigFilePath, 
   }
 }
 
-[[nodiscard]] json::object loadJsonObjectFromTextOrFileOrThrow(const std::string& textOrPath, std::string_view context)
+[[nodiscard]] json::object loadJsonObjectFromTextOrFileOrThrow(const QString& textOrPath, std::string_view context)
 {
-  const QString q = QString::fromStdString(textOrPath);
-  const QFileInfo fi(q);
+  const QFileInfo fi(textOrPath);
   if (fi.exists() && fi.isFile() && fi.suffix().compare("json", Qt::CaseInsensitive) == 0) {
     return loadJsonObjectOrThrow(fi.absoluteFilePath());
   }
 
-  json::value v = parseJsonValue(textOrPath, context);
+  const QByteArray text = textOrPath.toUtf8();
+  json::value v = parseJsonValue(std::string_view(text.constData(), static_cast<size_t>(text.size())), context);
   if (!v.is_object()) {
     throw ZException(fmt::format("Expected JSON object for {}, got {}", context, jsonTypeName(v)));
   }
@@ -180,16 +181,16 @@ extractIncludePath(const json::object& root, const QString& baseConfigFilePath, 
   return true;
 }
 
-[[nodiscard]] std::optional<std::string> defaultCommandConfigPathFromJsonDir(std::string_view jsonDirPath)
+[[nodiscard]] std::optional<QString> defaultCommandConfigPathFromJsonDir(const QString& jsonDirPath)
 {
-  if (jsonDirPath.empty()) {
+  if (jsonDirPath.isEmpty()) {
     return std::nullopt;
   }
-  const QDir jsonDir(QString::fromUtf8(jsonDirPath.data(), static_cast<qsizetype>(jsonDirPath.size())));
-  return jsonDir.absoluteFilePath("command_config.json").toStdString();
+  const QDir jsonDir(jsonDirPath);
+  return jsonDir.absoluteFilePath("command_config.json");
 }
 
-[[nodiscard]] bool parseArgs(int argc, char* argv[], std::string_view injectedJsonDirPath, Command2Args* out)
+[[nodiscard]] bool parseArgs(int argc, char* argv[], const QString& injectedJsonDirPath, Command2Args* out)
 {
   CHECK(out != nullptr);
   CHECK(argc >= 2);
@@ -202,7 +203,7 @@ extractIncludePath(const json::object& root, const QString& baseConfigFilePath, 
     return false;
   }
 
-  out->jsonDirPath = std::string(injectedJsonDirPath);
+  out->jsonDirPath = injectedJsonDirPath;
 
   bool hasExplicitCommandConfig = false;
   if (auto defaultPath = defaultCommandConfigPathFromJsonDir(out->jsonDirPath)) {
@@ -224,7 +225,7 @@ extractIncludePath(const json::object& root, const QString& baseConfigFilePath, 
         LOG(ERROR) << "Missing value for -o";
         return false;
       }
-      out->output = argv[++i];
+      out->output = argToQString(argv[++i]);
       continue;
     }
 
@@ -233,7 +234,7 @@ extractIncludePath(const json::object& root, const QString& baseConfigFilePath, 
         LOG(ERROR) << "Missing value for --config";
         return false;
       }
-      out->commandConfigPath = argv[++i];
+      out->commandConfigPath = argToQString(argv[++i]);
       hasExplicitCommandConfig = true;
       continue;
     }
@@ -243,7 +244,7 @@ extractIncludePath(const json::object& root, const QString& baseConfigFilePath, 
         LOG(ERROR) << "Missing value for --json_dir";
         return false;
       }
-      out->jsonDirPath = argv[++i];
+      out->jsonDirPath = argToQString(argv[++i]);
       if (!hasExplicitCommandConfig) {
         if (auto defaultPath = defaultCommandConfigPathFromJsonDir(out->jsonDirPath)) {
           out->commandConfigPath = *defaultPath;
@@ -375,7 +376,7 @@ extractIncludePath(const json::object& root, const QString& baseConfigFilePath, 
         return false;
       }
       out->runGeneral = true;
-      out->generalConfig = argv[++i];
+      out->generalConfig = argToQString(argv[++i]);
       continue;
     }
 
@@ -385,29 +386,28 @@ extractIncludePath(const json::object& root, const QString& baseConfigFilePath, 
     }
 
     // Positional input(s).
-    out->input.emplace_back(arg);
+    out->input.push_back(argToQString(arg));
   }
 
   return true;
 }
 
-[[nodiscard]] json::object loadCommandConfigOrThrow(const std::string& path)
+[[nodiscard]] json::object loadCommandConfigOrThrow(const QString& path)
 {
-  const QString q = QString::fromStdString(path);
-  if (!fileExists(q)) {
+  if (!fileExists(path)) {
     throw ZException(fmt::format("Missing command config file '{}'", path));
   }
-  return loadJsonObjectOrThrow(QFileInfo(q).absoluteFilePath());
+  return loadJsonObjectOrThrow(QFileInfo(path).absoluteFilePath());
 }
 
 } // namespace
 
 int ZRunNeuTuCommand2::run(int argc, char* argv[])
 {
-  return run(argc, argv, std::string_view{});
+  return run(argc, argv, QString{});
 }
 
-int ZRunNeuTuCommand2::run(int argc, char* argv[], std::string_view jsonDirPath)
+int ZRunNeuTuCommand2::run(int argc, char* argv[], const QString& jsonDirPath)
 {
   Command2Args args;
   if (!parseArgs(argc, argv, jsonDirPath, &args)) {
@@ -420,7 +420,7 @@ int ZRunNeuTuCommand2::run(int argc, char* argv[], std::string_view jsonDirPath)
     return 1;
   }
 
-  if (args.commandConfigPath.empty()) {
+  if (args.commandConfigPath.isEmpty()) {
     LOG(ERROR) << "Missing command config: provide --config <command_config.json> or set a JSON dir (--json_dir) "
                   "or invoke via Atlas (injects Resources/json).";
     return 1;
@@ -464,12 +464,11 @@ int ZRunNeuTuCommand2::run(int argc, char* argv[], std::string_view jsonDirPath)
     return 1;
   }
 
-  const QString commandConfigPathQ = QString::fromStdString(args.commandConfigPath);
-  const QString commandConfigAbsPathQ = QFileInfo(commandConfigPathQ).absoluteFilePath();
+  const QString commandConfigAbsPathQ = QFileInfo(args.commandConfigPath).absoluteFilePath();
 
   const auto skeletonizeInclude =
-    extractIncludePath(commandConfig, commandConfigAbsPathQ, "skeletonize").value_or(std::string{});
-  const auto traceInclude = extractIncludePath(commandConfig, commandConfigAbsPathQ, "trace").value_or(std::string{});
+    extractIncludePath(commandConfig, commandConfigAbsPathQ, "skeletonize").value_or(QString{});
+  const auto traceInclude = extractIncludePath(commandConfig, commandConfigAbsPathQ, "trace").value_or(QString{});
 
   // Legacy: diagnosis is configured via the trace command config object (after include expansion).
   // We support it from either:
@@ -483,9 +482,9 @@ int ZRunNeuTuCommand2::run(int argc, char* argv[], std::string_view jsonDirPath)
       }
     }
 
-    if (!args.diagnosis && !traceInclude.empty()) {
+    if (!args.diagnosis && !traceInclude.isEmpty()) {
       try {
-        const json::object included = loadJsonObjectOrThrow(QString::fromStdString(traceInclude));
+        const json::object included = loadJsonObjectOrThrow(traceInclude);
         if (auto diagIt = included.find("diagnosis"); diagIt != included.end() && diagIt->value().is_bool()) {
           args.diagnosis = diagIt->value().as_bool();
         }
@@ -594,21 +593,21 @@ int ZRunNeuTuCommand2::run(int argc, char* argv[], std::string_view jsonDirPath)
     CHECK(args.input.size() >= 2);
 
     if (auto it = inputJson.find("swc"); it != inputJson.end() && it->value().is_string()) {
-      args.input[1] = std::string(it->value().as_string().c_str());
+      args.input[1] = json::value_to<QString>(it->value());
     } else {
       args.input[1].clear();
     }
 
     args.input[0].clear();
     if (auto it = inputJson.find("signal"); it != inputJson.end() && it->value().is_string()) {
-      args.input[0] = std::string(it->value().as_string().c_str());
+      args.input[0] = json::value_to<QString>(it->value());
     }
   }
 
   // Dispatch.
   switch (command) {
     case Command::Skeletonize: {
-      if (args.input.empty() || args.input[0].empty()) {
+      if (args.input.empty() || args.input[0].isEmpty()) {
         LOG(ERROR) << "Skeletonize: missing input file.";
         return 1;
       }
@@ -628,7 +627,7 @@ int ZRunNeuTuCommand2::run(int argc, char* argv[], std::string_view jsonDirPath)
       options.jsonDirPath = args.jsonDirPath;
       options.verbose = args.isVerbose;
       options.useBlocked = args.useBlocked;
-      options.outputSessionDir = args.useBlocked ? args.output : std::string{};
+      options.outputSessionDir = args.useBlocked ? args.output : QString{};
       options.selectedChannel = args.selectedChannel;
       options.selectedTime = args.selectedTime;
       if (args.downsampleInterval.has_value()) {
@@ -648,7 +647,7 @@ int ZRunNeuTuCommand2::run(int argc, char* argv[], std::string_view jsonDirPath)
     }
 
     case Command::General: {
-      if (args.generalConfig.empty()) {
+      if (args.generalConfig.isEmpty()) {
         LOG(ERROR) << "General: missing --general config (JSON string or JSON file path).";
         return 1;
       }

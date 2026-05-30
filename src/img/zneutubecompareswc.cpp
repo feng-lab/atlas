@@ -770,7 +770,7 @@ void resampleSwcLegacy(ZSwc& tree, double step)
 
 } // namespace
 
-CompareSwcResult computeCompareSwc(const std::vector<std::string>& inputPaths, double scale)
+CompareSwcResult computeCompareSwc(const std::vector<QString>& inputPaths, double scale)
 {
   if (inputPaths.empty()) {
     throw ZException("Compare SWC: please specify input SWC files.");
@@ -781,7 +781,7 @@ CompareSwcResult computeCompareSwc(const std::vector<std::string>& inputPaths, d
 
   for (const auto& p : inputPaths) {
     ZSwc tree;
-    tree.load(QString::fromStdString(p));
+    tree.load(p);
     if (scale != 1.0) {
       rescaleSwc(tree, scale, scale, scale, true);
     }
@@ -821,7 +821,7 @@ std::string formatCompareSwcPairs(const CompareSwcResult& result)
   return fmt::to_string(buffer);
 }
 
-int runCompareSwc(const std::vector<std::string>& inputPaths, double scale)
+int runCompareSwc(const std::vector<QString>& inputPaths, double scale)
 {
   if (inputPaths.empty()) {
     LOG(ERROR) << "Compare SWC: please specify input SWC files.";

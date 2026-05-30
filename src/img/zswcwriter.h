@@ -2,6 +2,8 @@
 
 #include "zswc.h"
 
+#include <QString>
+
 #include <string>
 #include <vector>
 
@@ -15,13 +17,13 @@ namespace nim {
 // - node lines in depth-first order: "%d %d %g %g %g %g %d\n"
 //
 // This function resorts IDs before writing (matching legacy behavior).
-void writeSwcLegacyNeuTu(ZSwc& tree, const std::string& filePath, const std::vector<std::string>& comments = {});
+void writeSwcLegacyNeuTu(ZSwc& tree, const QString& filePath, const std::vector<std::string>& comments = {});
 
 // Same formatting as writeSwcLegacyNeuTu(), but throws ZException on failure.
 //
 // Notes:
 // - Still resorts IDs before writing (legacy behavior).
 // - Throws on empty trees and I/O failures instead of logging and silently returning.
-void writeSwcLegacyNeuTuOrThrow(ZSwc& tree, const std::string& filePath, const std::vector<std::string>& comments = {});
+void writeSwcLegacyNeuTuOrThrow(ZSwc& tree, const QString& filePath, const std::vector<std::string>& comments = {});
 
 } // namespace nim

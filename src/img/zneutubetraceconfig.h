@@ -2,9 +2,10 @@
 
 #include "zjson.h"
 
+#include <QString>
+
 #include <array>
 #include <optional>
-#include <string>
 
 namespace nim {
 
@@ -52,7 +53,7 @@ void applyTraceConfigOverridesLegacyLike(const json::object& obj, TraceConfig& c
 //
 // Returns true if the file parsed and had a legacy-accepted `"tag"` value.
 // On false, `out` is still populated with legacy defaults.
-[[nodiscard]] bool loadTraceConfigLegacyLike(const std::string& traceConfigPath, TraceConfig& out);
+[[nodiscard]] bool loadTraceConfigLegacyLike(const QString& traceConfigPath, TraceConfig& out);
 
 // Loads a legacy trace config object (the file root object or an already-extracted
 // wrapper payload) into `out`.

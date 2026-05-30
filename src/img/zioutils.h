@@ -2,9 +2,12 @@
 
 #include <QIODevice>
 #include <QString>
+#include <cstdio>
 #include <filesystem>
 #include <fstream>
 #include <memory>
+#include <string>
+#include <string_view>
 
 namespace nim {
 
@@ -45,7 +48,9 @@ void writeStream(std::ostream& fs, const T* buf, size_t count)
   writeStream_impl(fs, reinterpret_cast<const char*>(buf), count);
 }
 
-std::unique_ptr<std::FILE, decltype(&std::fclose)> openFile(const QString& filename, const char* mode);
+std::unique_ptr<std::FILE, decltype(&std::fclose)> openFile(const QString& filename, std::string_view mode);
+
+[[nodiscard]] bool fileExists(const QString& path);
 
 bool isReadableFile(const QString& filename);
 

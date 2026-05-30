@@ -31,6 +31,7 @@
 #include <nanobind/operators.h>
 #include <nanobind/trampoline.h>
 #include <cstring>
+#include <string_view>
 
 namespace nb = nanobind;
 
@@ -78,6 +79,18 @@ nanobind::dlpack::dtype getDType(const ZImg& img)
         throw ZException("Incorrect Img Info");
     }
   }
+}
+
+[[nodiscard]] nb::builtin_exception makeTypeError(std::string message)
+{
+  // nanobind's builtin_exception constructors accept const char*.
+  return nb::type_error(message.c_str());
+}
+
+[[nodiscard]] nb::builtin_exception makeValueError(std::string message)
+{
+  // nanobind's builtin_exception constructors accept const char*.
+  return nb::value_error(message.c_str());
 }
 
 ZImgInfo getImgInfoFromNdarray(const nb::ndarray<>& arr, const ZImgInfo& info_in, const std::string& layout)
@@ -260,10 +273,10 @@ nb::ndarray<nanobind::numpy, const T> vectorToArray(const std::vector<T>& v)
                    : nb::ndarray<nanobind::numpy, const T>(v.data(), {v.size()});
 }
 
-std::vector<glm::dvec2> roiPointsFromArray(const nb::ndarray<nb::numpy, const double>& points, const char* name)
+std::vector<glm::dvec2> roiPointsFromArray(const nb::ndarray<nb::numpy, const double>& points, std::string_view name)
 {
   if (points.ndim() != 2 || points.shape(1) != 2) {
-    throw nb::type_error((std::string(name) + " must have shape (N, 2)").c_str());
+    throw makeTypeError(fmt::format("{} must have shape (N, 2)", name));
   }
 
   std::vector<glm::dvec2> out;
@@ -299,28 +312,28 @@ ZROIMaskShapeType roiShapeTypeFromString(const std::string& type)
   if (type == "Line") {
     return ZROIMaskShapeType::Line;
   }
-  throw nb::value_error(("Unsupported ROI shape type: " + type).c_str());
+  throw makeValueError(fmt::format("Unsupported ROI shape type: {}", type));
 }
 
-void validateROIPoints(const std::vector<glm::dvec2>& points, ZROIMaskShapeType type, const char* ctx)
+void validateROIPoints(const std::vector<glm::dvec2>& points, ZROIMaskShapeType type, std::string_view ctx)
 {
   if (type == ZROIMaskShapeType::Rect || type == ZROIMaskShapeType::Ellipse) {
     if (points.size() != 2) {
-      throw nb::value_error((std::string(ctx) + " requires exactly 2 points").c_str());
+      throw makeValueError(fmt::format("{} requires exactly 2 points", ctx));
     }
     return;
   }
 
   if (type == ZROIMaskShapeType::Polygon) {
     if (points.size() < 4 || points.front() != points.back()) {
-      throw nb::value_error((std::string(ctx) + " must be closed (first point == last point)").c_str());
+      throw makeValueError(fmt::format("{} must be closed (first point == last point)", ctx));
     }
     return;
   }
 
   if (type == ZROIMaskShapeType::Spline || type == ZROIMaskShapeType::Line) {
     if (points.size() < 2) {
-      throw nb::value_error((std::string(ctx) + " requires at least 2 points").c_str());
+      throw makeValueError(fmt::format("{} requires at least 2 points", ctx));
     }
     return;
   }
@@ -380,20 +393,20 @@ json::value pythonObjectToJsonValue(nb::handle obj)
   throw nb::type_error("Expected a JSON-compatible Python object");
 }
 
-json::object pythonObjectToJsonObject(nb::handle obj, const char* name)
+json::object pythonObjectToJsonObject(nb::handle obj, std::string_view name)
 {
   json::value value = pythonObjectToJsonValue(obj);
   if (!value.is_object()) {
-    throw nb::type_error((std::string(name) + " must be a dict-like JSON object").c_str());
+    throw makeTypeError(fmt::format("{} must be a dict-like JSON object", name));
   }
   return value.as_object();
 }
 
 template<typename T>
-std::array<T, 3> vectorToArray3(const std::vector<T>& values, const char* name)
+std::array<T, 3> vectorToArray3(const std::vector<T>& values, std::string_view name)
 {
   if (values.size() != 3) {
-    throw nb::value_error((std::string(name) + " must contain exactly 3 elements").c_str());
+    throw makeValueError(fmt::format("{} must contain exactly 3 elements", name));
   }
   return {values[0], values[1], values[2]};
 }
@@ -1741,7 +1754,7 @@ See also
           op.type = roiShapeTypeFromString(type);
           op.poly = roiPointsFromArray(points, "points");
           const std::string ctx = "shape '" + type + "'";
-          validateROIPoints(op.poly, op.type, ctx.c_str());
+          validateROIPoints(op.poly, op.type, ctx);
           ops.push_back(std::move(op));
         }
         return ZROIMaskRasterizer::shapeToMask(ops);

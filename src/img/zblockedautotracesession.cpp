@@ -1,6 +1,7 @@
 #include "zblockedautotracesession.h"
 
 #include "zexception.h"
+#include "zioutils.h"
 #include "zlog.h"
 
 #include <QDateTime>
@@ -13,10 +14,9 @@
 #include <folly/ScopeGuard.h>
 
 #include <algorithm>
-#include <cerrno>
 #include <cmath>
-#include <cstdio>
 #include <cstring>
+#include <ios>
 #include <limits>
 #include <string_view>
 #include <vector>
@@ -686,29 +686,28 @@ uint64_t ZBlockedAutoTraceSession::latestCommittedIdOrZero() const
 void ZBlockedAutoTraceSession::writeSwcDeltaOrThrow(const QString& filePath,
                                                     const std::vector<ZBlockedAutoTraceSwcDeltaNode>& nodes)
 {
-  errno = 0;
-  std::FILE* fp = std::fopen(filePath.toStdString().c_str(), "w");
-  if (fp == nullptr) {
-    throw ZException(fmt::format("Blocked auto trace: failed to open SWC delta for writing: {}", filePath),
-                     ZException::Option::CheckErrno);
-  }
+  try {
+    std::ofstream fs = openOFStream(filePath, std::ios_base::out | std::ios_base::trunc);
+    fs.exceptions(std::ios::badbit | std::ios::failbit);
 
-  for (const auto& n : nodes) {
-    std::fprintf(fp,
-                 "%lld %lld %.17g %.17g %.17g %.17g %lld\n",
-                 static_cast<long long>(n.id),
-                 static_cast<long long>(n.type),
-                 n.x,
-                 n.y,
-                 n.z,
-                 n.radius,
-                 static_cast<long long>(n.parentId));
-  }
+    for (const auto& n : nodes) {
+      fs << fmt::format("{} {} {:.17g} {:.17g} {:.17g} {:.17g} {}\n",
+                        static_cast<long long>(n.id),
+                        static_cast<long long>(n.type),
+                        n.x,
+                        n.y,
+                        n.z,
+                        n.radius,
+                        static_cast<long long>(n.parentId));
+    }
 
-  errno = 0;
-  if (std::fclose(fp) != 0) {
-    throw ZException(fmt::format("Blocked auto trace: failed to close SWC delta: {}", filePath),
-                     ZException::Option::CheckErrno);
+    fs.flush();
+  }
+  catch (const ZException&) {
+    throw;
+  }
+  catch (const std::exception& e) {
+    throw ZException(fmt::format("Blocked auto trace: failed to write SWC delta: {} ({})", filePath, e.what()));
   }
 }
 

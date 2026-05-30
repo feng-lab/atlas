@@ -1,6 +1,6 @@
 #pragma once
 
-#include <string_view>
+#include <QString>
 
 namespace nim {
 
@@ -11,7 +11,7 @@ class ZRunNeuTuCommand2
 {
 public:
   int run(int argc, char* argv[]);
-  int run(int argc, char* argv[], std::string_view jsonDirPath);
+  int run(int argc, char* argv[], const QString& jsonDirPath);
 };
 
 } // namespace nim

@@ -29,12 +29,12 @@ struct MaskOverrideResult
   std::optional<nim::ZImg> mask;
 };
 
-[[nodiscard]] bool isTiffFilePathLegacyLike(const std::string& path)
+[[nodiscard]] bool isTiffFilePathLegacyLike(const QString& path)
 {
-  if (path.empty()) {
+  if (path.isEmpty()) {
     return false;
   }
-  const QFileInfo fi(QString::fromStdString(path));
+  const QFileInfo fi(path);
   const QString suf = fi.suffix();
   return suf.compare("tif", Qt::CaseInsensitive) == 0 || suf.compare("tiff", Qt::CaseInsensitive) == 0;
 }
@@ -49,13 +49,13 @@ struct MaskOverrideResult
     return res;
   }
 
-  const std::string maskPath = std::string(maskIt->value().as_string().c_str());
-  if (maskPath.empty()) {
+  const QString maskPath = json::value_to<QString>(maskIt->value());
+  if (maskPath.isEmpty()) {
     return res;
   }
 
   LOG(INFO) << "Using a predefined mask: " << maskPath;
-  const QFileInfo fi(QString::fromStdString(maskPath));
+  const QFileInfo fi(maskPath);
   if (!fi.exists() || !fi.isFile()) {
     LOG(ERROR) << "Missing file: Cannot find the mask file " << maskPath;
     res.decision = MaskOverrideDecision::AbortTrace;
@@ -70,7 +70,7 @@ struct MaskOverrideResult
 
   nim::ZImg maskImg;
   try {
-    maskImg.load(QString::fromStdString(maskPath));
+    maskImg.load(maskPath);
   }
   catch (const std::exception& e) {
     LOG(WARNING) << "File error: Failed to read mask file " << maskPath << " (" << e.what() << ")";
@@ -108,25 +108,25 @@ struct MaskOverrideResult
 
 namespace {
 
-[[nodiscard]] std::string resolveDefaultTraceConfigPathLegacyLike(const std::string& traceIncludePath,
-                                                                  const std::string& jsonDirPath)
+[[nodiscard]] QString resolveDefaultTraceConfigPathLegacyLike(const QString& traceIncludePath,
+                                                              const QString& jsonDirPath)
 {
-  if (!traceIncludePath.empty()) {
+  if (!traceIncludePath.isEmpty()) {
     return traceIncludePath;
   }
-  if (jsonDirPath.empty()) {
+  if (jsonDirPath.isEmpty()) {
     return {};
   }
-  return QDir(QString::fromStdString(jsonDirPath)).absoluteFilePath("trace_config.json").toStdString();
+  return QDir(jsonDirPath).absoluteFilePath("trace_config.json");
 }
 
-[[nodiscard]] std::string resolveTraceConfigPathForGeneralLegacyLike(const json::object& generalCfg,
-                                                                     const std::string& traceIncludePath,
-                                                                     const std::string& jsonDirPath)
+[[nodiscard]] QString resolveTraceConfigPathForGeneralLegacyLike(const json::object& generalCfg,
+                                                                 const QString& traceIncludePath,
+                                                                 const QString& jsonDirPath)
 {
   if (auto it = generalCfg.find("path"); it != generalCfg.end() && it->value().is_string()) {
-    const std::string path = std::string(it->value().as_string().c_str());
-    if (path.empty() || path == "default") {
+    const QString path = json::value_to<QString>(it->value());
+    if (path.isEmpty() || path == "default") {
       return resolveDefaultTraceConfigPathLegacyLike(traceIncludePath, jsonDirPath);
     }
     return path;
@@ -139,30 +139,30 @@ namespace {
 
 namespace nim {
 
-int runGeneral(const std::string& generalConfigTextOrPath,
+int runGeneral(const QString& generalConfigTextOrPath,
                const json::object& generalCfg,
                const json::object& inputJson,
-               const std::vector<std::string>& positionalInput,
-               const std::string& outputPath,
+               const std::vector<QString>& positionalInput,
+               const QString& outputPath,
                int level,
                bool diagnosis,
-               const std::string& traceIncludePath,
-               const std::string& jsonDirPath,
+               const QString& traceIncludePath,
+               const QString& jsonDirPath,
                bool verbose)
 {
-  if (generalConfigTextOrPath.empty()) {
+  if (generalConfigTextOrPath.isEmpty()) {
     LOG(ERROR) << "General: missing --general config (JSON string or JSON file path).";
     return 1;
   }
 
   json::object cfg = generalCfg;
   cfg["_input"] = inputJson;
-  cfg["_source"] = generalConfigTextOrPath;
+  cfg["_source"] = json::value_from(generalConfigTextOrPath);
 
   const auto commandIt = cfg.find("command");
-  const std::string commandName = (commandIt != cfg.end() && commandIt->value().is_string())
-                                    ? std::string(commandIt->value().as_string().c_str())
-                                    : std::string{};
+  const QString commandName = (commandIt != cfg.end() && commandIt->value().is_string())
+                                ? json::value_to<QString>(commandIt->value())
+                                : QString{};
 
   LOG(INFO) << "Running command " << commandName << "...";
   if (commandName != "trace_neuron") {
@@ -170,25 +170,25 @@ int runGeneral(const std::string& generalConfigTextOrPath,
     return 1;
   }
 
-  std::vector<std::string> updatedInput = positionalInput;
+  std::vector<QString> updatedInput = positionalInput;
   if (updatedInput.empty()) {
     if (auto it = inputJson.find("signal"); it != inputJson.end() && it->value().is_string()) {
-      const std::string signalPath = std::string(it->value().as_string().c_str());
-      if (!signalPath.empty()) {
+      const QString signalPath = json::value_to<QString>(it->value());
+      if (!signalPath.isEmpty()) {
         updatedInput.push_back(signalPath);
       }
     }
   }
 
-  if (updatedInput.empty() || outputPath.empty()) {
+  if (updatedInput.empty() || outputPath.isEmpty()) {
     LOG(ERROR) << "trace_neuron: missing input signal and/or output (-o).";
     return 1;
   }
 
-  const std::string configPath = resolveTraceConfigPathForGeneralLegacyLike(cfg, traceIncludePath, jsonDirPath);
+  const QString configPath = resolveTraceConfigPathForGeneralLegacyLike(cfg, traceIncludePath, jsonDirPath);
 
   TraceConfig baseTraceCfg;
-  if (!configPath.empty()) {
+  if (!configPath.isEmpty()) {
     if (!loadTraceConfigLegacyLike(configPath, baseTraceCfg)) {
       LOG(WARNING) << "Configuration failed: failed to load " << configPath;
       baseTraceCfg = TraceConfig{};
@@ -210,10 +210,10 @@ int runGeneral(const std::string& generalConfigTextOrPath,
   }
 
   if (auto it = cfg.find("action"); it != cfg.end() && it->value().is_string()) {
-    const std::string action = std::string(it->value().as_string().c_str());
+    const QString action = json::value_to<QString>(it->value());
     if (action == "inspect") {
       LOG(INFO) << "Inspecting trace configuration...";
-      LOG(INFO) << "Resolved trace config path: " << (configPath.empty() ? "<none>" : configPath);
+      LOG(INFO) << "Resolved trace config path: " << (configPath.isEmpty() ? QStringLiteral("<none>") : configPath);
       return 0;
     }
   }
@@ -227,7 +227,7 @@ int runGeneral(const std::string& generalConfigTextOrPath,
 
   nim::ZImg signal;
   try {
-    signal.load(QString::fromStdString(updatedInput[0]));
+    signal.load(updatedInput[0]);
   }
   catch (const std::exception& e) {
     LOG(ERROR) << "Failed to read input image: " << updatedInput[0] << " (" << e.what() << ")";

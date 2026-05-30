@@ -3559,7 +3559,7 @@ TEST(NeutubeCommand2Parity, SkeletonizeAndTrace_TiffMatchesLegacy)
       "--config",
       commandConfig.string(),
     });
-    const int rc = nim::ZRunNeuTuCommand2().run(argv.argc(), argv.argv(), std::string_view{});
+    const int rc = nim::ZRunNeuTuCommand2().run(argv.argc(), argv.argv(), QString{});
     EXPECT_EQ(rc, 0);
   }
 
@@ -3608,7 +3608,7 @@ TEST(NeutubeCommand2Parity, SkeletonizeAndTrace_TiffMatchesLegacy)
       "json",
       inputJson,
     });
-    return nim::ZRunNeuTuCommand2().run(argv.argc(), argv.argv(), std::string_view{});
+    return nim::ZRunNeuTuCommand2().run(argv.argc(), argv.argv(), QString{});
   }();
 
   EXPECT_EQ(legacyRc, v2Rc);
@@ -3694,7 +3694,7 @@ TEST(NeutubeCommand2Parity, Trace_WithHostSwc_MatchesLegacy)
       "json",
       inputJson,
     });
-    return nim::ZRunNeuTuCommand2().run(argv.argc(), argv.argv(), std::string_view{});
+    return nim::ZRunNeuTuCommand2().run(argv.argc(), argv.argv(), QString{});
   }();
 
   EXPECT_EQ(legacyRc, v2Rc);
@@ -3779,7 +3779,7 @@ TEST(NeutubeCommand2Parity, Trace_WithHostSwc_NoConnection_MatchesLegacy)
       "json",
       inputJson,
     });
-    return nim::ZRunNeuTuCommand2().run(argv.argc(), argv.argv(), std::string_view{});
+    return nim::ZRunNeuTuCommand2().run(argv.argc(), argv.argv(), QString{});
   }();
 
   EXPECT_EQ(legacyRc, v2Rc);
@@ -3856,7 +3856,7 @@ TEST(NeutubeCommand2Parity, Trace_DiagnosisSeeded_MatchesLegacy)
       "json",
       inputJson,
     });
-    return nim::ZRunNeuTuCommand2().run(argv.argc(), argv.argv(), std::string_view{});
+    return nim::ZRunNeuTuCommand2().run(argv.argc(), argv.argv(), QString{});
   }();
 
   EXPECT_EQ(legacyRc, v2Rc);
@@ -3943,7 +3943,7 @@ TEST(NeutubeCommand2Parity, Trace_DiagnosisWithHostSwc_MatchesLegacy)
       "json",
       inputJson,
     });
-    return nim::ZRunNeuTuCommand2().run(argv.argc(), argv.argv(), std::string_view{});
+    return nim::ZRunNeuTuCommand2().run(argv.argc(), argv.argv(), QString{});
   }();
 
   EXPECT_EQ(legacyRc, v2Rc);
@@ -4058,7 +4058,7 @@ TEST(NeutubeCommand2Parity, Trace_Auto_FromTestData_MatchesLegacy)
         "--config",
         commandConfig.string(),
       });
-      return nim::ZRunNeuTuCommand2().run(argv.argc(), argv.argv(), std::string_view{});
+      return nim::ZRunNeuTuCommand2().run(argv.argc(), argv.argv(), QString{});
     }();
 
     EXPECT_EQ(legacyRc, v2Rc);
@@ -4158,7 +4158,7 @@ TEST(NeutubeCommand2Parity, Trace_SequentialSeeds_Fork_MatchesLegacy)
 
     const int v2Rc = runTraceStep(
       [&](int argc, char** argv) {
-        return nim::ZRunNeuTuCommand2().run(argc, argv, std::string_view{});
+        return nim::ZRunNeuTuCommand2().run(argc, argv, QString{});
       },
       v2Host,
       v2Out,
@@ -4262,7 +4262,7 @@ TEST(NeutubeCommand2Parity, Trace_SequentialSeeds_Fork2_MatchesLegacy)
 
     const int v2Rc = runTraceStep(
       [&](int argc, char** argv) {
-        return nim::ZRunNeuTuCommand2().run(argc, argv, std::string_view{});
+        return nim::ZRunNeuTuCommand2().run(argc, argv, QString{});
       },
       v2Host,
       v2Out,
@@ -4363,7 +4363,7 @@ TEST(NeutubeCommand2Parity, Skeletonize_FromTestDataBinary_MatchesLegacy)
         "--config",
         commandConfig.string(),
       });
-      return nim::ZRunNeuTuCommand2().run(argv.argc(), argv.argv(), std::string_view{});
+      return nim::ZRunNeuTuCommand2().run(argv.argc(), argv.argv(), QString{});
     }();
 
     EXPECT_EQ(legacyRc, v2Rc);
@@ -4442,7 +4442,7 @@ TEST(NeutubeCommand2Diagnostics, AutoTrace_Slice15_MaskSeedSort_MatchesLegacy_De
   const DevOnlyAutoTraceConfigPaths cfgPaths = writeDevOnlyAutoTraceConfigFiles(dir);
 
   nim::TraceConfig portedCfg;
-  ASSERT_TRUE(nim::loadTraceConfigLegacyLike(cfgPaths.traceCfg.string(), portedCfg));
+  ASSERT_TRUE(nim::loadTraceConfigLegacyLike(nim::filesystemPathToQString(cfgPaths.traceCfg), portedCfg));
   EXPECT_EQ(portedCfg.seedMethod, 1) << "This diagnostic helper currently expects seedMethod=1.";
 
   // Load raw signal through both legacy (ZStack) and ported (ZImg) IO to ensure we are comparing the same input.
@@ -5177,7 +5177,7 @@ TEST(NeutubeCommand2Diagnostics, AutoTrace_Slice15_MaskSeedSort_MatchesLegacy_De
     legacyCopy->save(legacyPath.string());
 
     nim::ZSwc portedCopy = portedTree;
-    nim::writeSwcLegacyNeuTu(portedCopy, portedPath.string(), {});
+    nim::writeSwcLegacyNeuTu(portedCopy, nim::filesystemPathToQString(portedPath), {});
 
     const std::string legacyText = readTextFile(legacyPath);
     const std::string portedText = readTextFile(portedPath);
@@ -5277,7 +5277,7 @@ TEST(NeutubeCommand2Diagnostics, AutoTrace_Slice15_L34_ZToXYRatio5_MatchesLegacy
   const DevOnlyAutoTraceConfigPaths cfgPaths = writeDevOnlyAutoTraceConfigFiles(dir);
 
   nim::TraceConfig portedCfg;
-  ASSERT_TRUE(nim::loadTraceConfigLegacyLike(cfgPaths.traceCfg.string(), portedCfg));
+  ASSERT_TRUE(nim::loadTraceConfigLegacyLike(nim::filesystemPathToQString(cfgPaths.traceCfg), portedCfg));
   ASSERT_EQ(portedCfg.seedMethod, 1) << "This diagnostic helper currently expects seedMethod=1.";
 
   ZStack legacySignalStack;
@@ -6096,7 +6096,7 @@ TEST(NeutubeCommand2Diagnostics, AutoTrace_Slice15_L34_ZToXYRatio5_MatchesLegacy
     legacyCopy->save(legacyPath.string());
 
     nim::ZSwc portedCopy = portedTree;
-    nim::writeSwcLegacyNeuTu(portedCopy, portedPath.string(), {});
+    nim::writeSwcLegacyNeuTu(portedCopy, nim::filesystemPathToQString(portedPath), {});
 
     const std::string legacyText = readTextFile(legacyPath);
     const std::string portedText = readTextFile(portedPath);
@@ -6226,7 +6226,7 @@ void expectDevOnlyAutoTraceMatchesLegacy(const fs::path& input)
       "--config",
       cfgPaths.commandConfig.string(),
     });
-    return nim::ZRunNeuTuCommand2().run(argv.argc(), argv.argv(), std::string_view{});
+    return nim::ZRunNeuTuCommand2().run(argv.argc(), argv.argv(), QString{});
   }();
   const auto v2Ms =
     std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - v2Start).count();
@@ -6287,18 +6287,20 @@ TEST(NeutubeCommand2Parity, CompareSwc_MatchesLegacy)
     GTEST_SKIP() << "Missing SWC compare test data at: " << compareDir.absolutePath();
   }
 
-  std::vector<std::string> inputs;
+  std::vector<std::string> legacyInputs;
+  std::vector<QString> portedInputs;
   for (int i = 1; i <= 5; ++i) {
     const QString name = QString("compare%1.swc").arg(i);
     const QString swcPath = compareDir.filePath(name);
     if (!QFileInfo::exists(swcPath)) {
       GTEST_SKIP() << "Missing SWC compare file: " << swcPath;
     }
-    inputs.push_back(swcPath.toStdString());
+    legacyInputs.push_back(swcPath.toStdString());
+    portedInputs.push_back(swcPath);
   }
 
-  const std::string legacy = legacyCompareSwcPairs(inputs, 1.0);
-  const std::string ported = nim::formatCompareSwcPairs(nim::computeCompareSwc(inputs, 1.0));
+  const std::string legacy = legacyCompareSwcPairs(legacyInputs, 1.0);
+  const std::string ported = nim::formatCompareSwcPairs(nim::computeCompareSwc(portedInputs, 1.0));
 
   EXPECT_EQ(ported, legacy);
 }
@@ -6310,19 +6312,21 @@ TEST(NeutubeCommand2Parity, CompareSwc_Scale2_MatchesLegacy)
     GTEST_SKIP() << "Missing SWC compare test data at: " << compareDir.absolutePath();
   }
 
-  std::vector<std::string> inputs;
+  std::vector<std::string> legacyInputs;
+  std::vector<QString> portedInputs;
   for (int i = 1; i <= 5; ++i) {
     const QString name = QString("compare%1.swc").arg(i);
     const QString swcPath = compareDir.filePath(name);
     if (!QFileInfo::exists(swcPath)) {
       GTEST_SKIP() << "Missing SWC compare file: " << swcPath;
     }
-    inputs.push_back(swcPath.toStdString());
+    legacyInputs.push_back(swcPath.toStdString());
+    portedInputs.push_back(swcPath);
   }
 
   constexpr double Scale = 2.0;
-  const std::string legacy = legacyCompareSwcPairs(inputs, Scale);
-  const std::string ported = nim::formatCompareSwcPairs(nim::computeCompareSwc(inputs, Scale));
+  const std::string legacy = legacyCompareSwcPairs(legacyInputs, Scale);
+  const std::string ported = nim::formatCompareSwcPairs(nim::computeCompareSwc(portedInputs, Scale));
 
   EXPECT_EQ(ported, legacy);
 }

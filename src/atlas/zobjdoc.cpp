@@ -300,15 +300,15 @@ std::map<size_t, size_t> ZObjDoc::read(const std::vector<std::pair<QString, json
       }
 
       if (summary.isEmpty()) {
-        summary = QString::fromUtf8(jsonTypeName(jv).c_str());
+        summary = QString::fromStdString(jsonTypeName(jv));
       }
     } else {
-      summary = QString::fromUtf8(jsonTypeName(jv).c_str());
+      summary = QString::fromStdString(jsonTypeName(jv));
     }
 
     if (summary.trimmed().isEmpty()) {
       if (docType.trimmed().isEmpty()) {
-        return QString::fromUtf8(jsonTypeName(jv).c_str());
+        return QString::fromStdString(jsonTypeName(jv));
       }
       return docType;
     }

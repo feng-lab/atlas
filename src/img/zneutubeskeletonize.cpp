@@ -7,29 +7,17 @@
 #include "zlog.h"
 
 #include "zimg.h"
+#include "zioutils.h"
 
 #include <algorithm>
 #include <chrono>
-#include <filesystem>
 #include <memory>
 #include <optional>
-#include <string>
 #include <vector>
 
 namespace nim {
 
 namespace {
-
-namespace fs = std::filesystem;
-
-[[nodiscard]] bool fileExists(const std::string& path)
-{
-  if (path.empty()) {
-    return false;
-  }
-  std::error_code ec;
-  return fs::exists(fs::path(path), ec) && fs::is_regular_file(fs::path(path), ec);
-}
 
 void applySkeletonizeConfig(const json::object& cfg,
                             const std::optional<std::array<int, 3>>& overrideDownsampleInterval,
@@ -128,26 +116,26 @@ void applySkeletonizeConfig(const json::object& cfg,
 
 } // namespace
 
-int runSkeletonize(const std::string& inputPath,
-                   const std::string& outputPath,
-                   const std::string& skeletonizeConfigPath,
+int runSkeletonize(const QString& inputPath,
+                   const QString& outputPath,
+                   const QString& skeletonizeConfigPath,
                    const std::optional<std::array<int, 3>>& downsampleIntervalOverride,
                    bool verbose)
 {
-  if (inputPath.empty()) {
+  if (inputPath.isEmpty()) {
     LOG(ERROR) << "Skeletonize: missing input file.";
     return 1;
   }
 
-  if (outputPath.empty()) {
+  if (outputPath.isEmpty()) {
     LOG(ERROR) << "Skeletonize: missing output file (-o).";
     return 1;
   }
 
   json::object skeletonizeCfg;
-  if (!skeletonizeConfigPath.empty()) {
+  if (!skeletonizeConfigPath.isEmpty()) {
     try {
-      skeletonizeCfg = loadJsonObject(QString::fromStdString(skeletonizeConfigPath));
+      skeletonizeCfg = loadJsonObject(skeletonizeConfigPath);
     }
     catch (const std::exception& e) {
       LOG(ERROR) << "Failed to load skeletonize config '" << skeletonizeConfigPath << "': " << e.what();
@@ -174,7 +162,7 @@ int runSkeletonize(const std::string& inputPath,
 
   std::unique_ptr<ZSwc> tree;
   try {
-    ZImg img(QString::fromStdString(inputPath));
+    ZImg img(inputPath);
     tree = skeletonizer.makeSkeleton(img);
   }
   catch (const std::exception& e) {

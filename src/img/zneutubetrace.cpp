@@ -11,6 +11,7 @@
 #include "zswcwriter.h"
 
 #include "zimg.h"
+#include "zioutils.h"
 #include "zlog.h"
 
 #include <QDir>
@@ -26,43 +27,33 @@ namespace nim {
 
 namespace {
 
-[[nodiscard]] std::string resolveTraceConfigPathLegacyLike(const std::string& traceConfigPath,
-                                                           const std::string& jsonDirPath)
+[[nodiscard]] QString resolveTraceConfigPathLegacyLike(const QString& traceConfigPath, const QString& jsonDirPath)
 {
-  if (!traceConfigPath.empty()) {
+  if (!traceConfigPath.isEmpty()) {
     return traceConfigPath;
   }
-  if (jsonDirPath.empty()) {
+  if (jsonDirPath.isEmpty()) {
     return {};
   }
-  return QDir(QString::fromStdString(jsonDirPath)).absoluteFilePath("trace_config.json").toStdString();
+  return QDir(jsonDirPath).absoluteFilePath("trace_config.json");
 }
 
-[[nodiscard]] bool fileExists(const std::string& path)
+[[nodiscard]] bool isSwcFilePathLegacyLike(const QString& path)
 {
-  if (path.empty()) {
+  if (path.isEmpty()) {
     return false;
   }
-  const QFileInfo fi(QString::fromStdString(path));
-  return fi.exists() && fi.isFile();
-}
-
-[[nodiscard]] bool isSwcFilePathLegacyLike(const std::string& path)
-{
-  if (path.empty()) {
-    return false;
-  }
-  const QFileInfo fi(QString::fromStdString(path));
+  const QFileInfo fi(path);
   return fi.suffix().compare("swc", Qt::CaseInsensitive) == 0;
 }
 
 [[nodiscard]] TraceConfig
-buildTraceConfigLegacyLike(const std::string& traceConfigPath, const std::string& jsonDirPath, int level)
+buildTraceConfigLegacyLike(const QString& traceConfigPath, const QString& jsonDirPath, int level)
 {
-  const std::string resolvedConfigPath = resolveTraceConfigPathLegacyLike(traceConfigPath, jsonDirPath);
+  const QString resolvedConfigPath = resolveTraceConfigPathLegacyLike(traceConfigPath, jsonDirPath);
 
   TraceConfig baseCfg;
-  if (!resolvedConfigPath.empty()) {
+  if (!resolvedConfigPath.isEmpty()) {
     const bool ok = loadTraceConfigLegacyLike(resolvedConfigPath, baseCfg);
     if (!ok) {
       LOG(WARNING) << "Tracing configuration failed: failed to load " << resolvedConfigPath;
@@ -102,7 +93,7 @@ buildTraceConfigLegacyLike(const std::string& traceConfigPath, const std::string
 }
 
 [[nodiscard]] int
-runSeededTraceLegacyLike(const std::string& signalPath, const std::string& outputPath, const RunTraceOptions& options)
+runSeededTraceLegacyLike(const QString& signalPath, const QString& outputPath, const RunTraceOptions& options)
 {
   if (options.signalDownsampleRatio != std::array<size_t, 3>{1, 1, 1}) {
     LOG(ERROR) << "Seeded CLI tracing does not support downsampled tracing yet.";
@@ -111,11 +102,11 @@ runSeededTraceLegacyLike(const std::string& signalPath, const std::string& outpu
 
   nim::ZImg signal;
   try {
-    const ZImgSource datasetSource(QString::fromStdString(signalPath));
+    const ZImgSource datasetSource(signalPath);
     const ZImgInfo signalInfo = ZImg::readImgInfo(datasetSource);
     const ZImgRegion region =
       selectedChannelTimeRegionOrThrow(signalInfo, options.selectedChannel, options.selectedTime);
-    signal.load(ZImgSource(QString::fromStdString(signalPath), region));
+    signal.load(ZImgSource(signalPath, region));
     CHECK(signal.numChannels() == 1);
     CHECK(signal.numTimes() == 1);
   }
@@ -146,9 +137,9 @@ runSeededTraceLegacyLike(const std::string& signalPath, const std::string& outpu
   return 0;
 }
 
-[[nodiscard]] int runSeededTraceWithHostSwcLegacyLike(const std::string& signalPath,
-                                                      const std::string& hostSwcPath,
-                                                      const std::string& outputPath,
+[[nodiscard]] int runSeededTraceWithHostSwcLegacyLike(const QString& signalPath,
+                                                      const QString& hostSwcPath,
+                                                      const QString& outputPath,
                                                       const RunTraceOptions& options)
 {
   if (options.signalDownsampleRatio != std::array<size_t, 3>{1, 1, 1}) {
@@ -162,11 +153,11 @@ runSeededTraceLegacyLike(const std::string& signalPath, const std::string& outpu
 
   nim::ZImg signal;
   try {
-    const ZImgSource datasetSource(QString::fromStdString(signalPath));
+    const ZImgSource datasetSource(signalPath);
     const ZImgInfo signalInfo = ZImg::readImgInfo(datasetSource);
     const ZImgRegion region =
       selectedChannelTimeRegionOrThrow(signalInfo, options.selectedChannel, options.selectedTime);
-    signal.load(ZImgSource(QString::fromStdString(signalPath), region));
+    signal.load(ZImgSource(signalPath, region));
     CHECK(signal.numChannels() == 1);
     CHECK(signal.numTimes() == 1);
   }
@@ -184,8 +175,7 @@ runSeededTraceLegacyLike(const std::string& signalPath, const std::string& outpu
 
   nim::ZSwc hostSwc;
   std::string swcError;
-  const QString hostSwcFilename = QString::fromStdString(hostSwcPath);
-  if (!loadSwcLegacyOrder(hostSwcFilename, hostSwc, &swcError)) {
+  if (!loadSwcLegacyOrder(hostSwcPath, hostSwc, &swcError)) {
     LOG(ERROR) << "Failed to read host SWC: " << hostSwcPath << " (" << swcError << ")";
     return 1;
   }
@@ -202,35 +192,33 @@ runSeededTraceLegacyLike(const std::string& signalPath, const std::string& outpu
   return 0;
 }
 
-[[nodiscard]] int runBlockedAutoTraceLegacyLike(const std::string& signalPath,
-                                                const std::string& outputPath,
-                                                const RunTraceOptions& options)
+[[nodiscard]] int
+runBlockedAutoTraceLegacyLike(const QString& signalPath, const QString& outputPath, const RunTraceOptions& options)
 {
   if (options.position.has_value()) {
     LOG(ERROR) << "Blocked trace does not support seeded tracing.";
     return 1;
   }
 
-  const QString sessionDir =
-    QString::fromStdString(options.outputSessionDir.empty() ? outputPath : options.outputSessionDir);
+  const QString sessionDir = options.outputSessionDir.isEmpty() ? outputPath : options.outputSessionDir;
   if (sessionDir.isEmpty()) {
     LOG(ERROR) << "Blocked trace requires an output session directory.";
     return 1;
   }
 
-  const std::string resolvedConfigPath = resolveTraceConfigPathLegacyLike(options.traceConfigPath, options.jsonDirPath);
+  const QString resolvedConfigPath = resolveTraceConfigPathLegacyLike(options.traceConfigPath, options.jsonDirPath);
 
   try {
     ZNeutubeBlockedAutoTraceProcess worker;
     worker.setLogFile(QDir(sessionDir).absoluteFilePath(QStringLiteral("log.txt")));
-    worker.setInputImageSource(ZImgSource(QString::fromStdString(signalPath)));
+    worker.setInputImageSource(ZImgSource(signalPath));
     worker.setSelectedChannelTime(options.selectedChannel, options.selectedTime);
     if (options.zToXYRatioOverride.has_value()) {
       worker.setZToXYRatio(*options.zToXYRatioOverride);
     }
     worker.setSignalDownsampleRatio(options.signalDownsampleRatio);
-    if (!resolvedConfigPath.empty()) {
-      worker.setTraceConfigPath(QString::fromStdString(resolvedConfigPath));
+    if (!resolvedConfigPath.isEmpty()) {
+      worker.setTraceConfigPath(resolvedConfigPath);
     }
     worker.setTraceLevel(options.level);
     worker.setDoResampleAfterTracing(true);
@@ -252,26 +240,26 @@ runSeededTraceLegacyLike(const std::string& signalPath, const std::string& outpu
 
 } // namespace
 
-int runTrace(const std::vector<std::string>& input, const std::string& outputPath, const RunTraceOptions& options)
+int runTrace(const std::vector<QString>& input, const QString& outputPath, const RunTraceOptions& options)
 {
   if (input.empty()) {
     LOG(INFO) << "No input specified. Abort.";
     return 1;
   }
 
-  if (input[0].empty()) {
+  if (input[0].isEmpty()) {
     LOG(INFO) << "No input data specified. Abort.";
     return 1;
   }
 
-  if (outputPath.empty()) {
+  if (outputPath.isEmpty()) {
     LOG(INFO) << "No output specified. Abort.";
     return 1;
   }
 
   if (options.useBlocked) {
-    const std::string swcPath = (input.size() > 1) ? input[1] : std::string{};
-    if (!swcPath.empty() && isSwcFilePathLegacyLike(swcPath)) {
+    const QString swcPath = (input.size() > 1) ? input[1] : QString{};
+    if (!swcPath.isEmpty() && isSwcFilePathLegacyLike(swcPath)) {
       LOG(ERROR) << "Blocked trace does not support tracing into an existing SWC.";
       return 1;
     }
@@ -279,22 +267,21 @@ int runTrace(const std::vector<std::string>& input, const std::string& outputPat
   }
 
   if (!options.position.has_value()) {
-    const std::string resolvedConfigPath =
-      resolveTraceConfigPathLegacyLike(options.traceConfigPath, options.jsonDirPath);
+    const QString resolvedConfigPath = resolveTraceConfigPathLegacyLike(options.traceConfigPath, options.jsonDirPath);
 
     try {
       ZNeutubeAutoTraceProcess worker;
-      worker.setInputImageSource(ZImgSource(QString::fromStdString(input[0])));
+      worker.setInputImageSource(ZImgSource(input[0]));
       worker.setSelectedChannelTime(options.selectedChannel, options.selectedTime);
       if (options.zToXYRatioOverride.has_value()) {
         worker.setZToXYRatio(*options.zToXYRatioOverride);
       }
-      if (!resolvedConfigPath.empty()) {
-        worker.setTraceConfigPath(QString::fromStdString(resolvedConfigPath));
+      if (!resolvedConfigPath.isEmpty()) {
+        worker.setTraceConfigPath(resolvedConfigPath);
       }
       worker.setTraceLevel(options.level);
       worker.setDoResampleAfterTracing(true);
-      worker.setOutputSwcPath(QString::fromStdString(outputPath));
+      worker.setOutputSwcPath(outputPath);
       worker.setSignalDownsampleRatio(options.signalDownsampleRatio);
       worker.run();
 
@@ -310,13 +297,13 @@ int runTrace(const std::vector<std::string>& input, const std::string& outputPat
     return 0;
   }
 
-  const std::string resolvedConfig = resolveTraceConfigPathLegacyLike(options.traceConfigPath, options.jsonDirPath);
-  if (!resolvedConfig.empty() && !fileExists(resolvedConfig)) {
+  const QString resolvedConfig = resolveTraceConfigPathLegacyLike(options.traceConfigPath, options.jsonDirPath);
+  if (!resolvedConfig.isEmpty() && !fileExists(resolvedConfig)) {
     LOG(WARNING) << "Tracing configuration failed: failed to load " << resolvedConfig;
   }
 
-  const std::string swcPath = (input.size() > 1) ? input[1] : std::string{};
-  const int rc = (swcPath.empty() || !isSwcFilePathLegacyLike(swcPath))
+  const QString swcPath = (input.size() > 1) ? input[1] : QString{};
+  const int rc = (swcPath.isEmpty() || !isSwcFilePathLegacyLike(swcPath))
                    ? runSeededTraceLegacyLike(input[0], outputPath, options)
                    : runSeededTraceWithHostSwcLegacyLike(input[0], swcPath, outputPath, options);
   if (rc != 0) {

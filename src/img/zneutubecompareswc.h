@@ -1,5 +1,7 @@
 #pragma once
 
+#include <QString>
+
 #include <cstddef>
 #include <string>
 #include <vector>
@@ -15,14 +17,14 @@ struct CompareSwcPairScore
 
 struct CompareSwcResult
 {
-  std::vector<std::string> inputs;
+  std::vector<QString> inputs;
   std::vector<CompareSwcPairScore> pairs;
 };
 
-[[nodiscard]] CompareSwcResult computeCompareSwc(const std::vector<std::string>& inputPaths, double scale);
+[[nodiscard]] CompareSwcResult computeCompareSwc(const std::vector<QString>& inputPaths, double scale);
 
 [[nodiscard]] std::string formatCompareSwcPairs(const CompareSwcResult& result);
 
-int runCompareSwc(const std::vector<std::string>& inputPaths, double scale);
+int runCompareSwc(const std::vector<QString>& inputPaths, double scale);
 
 } // namespace nim

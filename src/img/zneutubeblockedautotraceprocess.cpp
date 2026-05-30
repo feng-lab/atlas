@@ -745,7 +745,7 @@ TraceConfig ZNeutubeBlockedAutoTraceProcess::buildEffectiveTraceConfigOrThrow() 
       cfg = TraceConfig{};
     }
   } else if (!m_traceConfigPath.isEmpty()) {
-    const bool ok = loadTraceConfigLegacyLike(m_traceConfigPath.toStdString(), cfg);
+    const bool ok = loadTraceConfigLegacyLike(m_traceConfigPath, cfg);
     if (!ok) {
       cfg = TraceConfig{};
     }

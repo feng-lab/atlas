@@ -133,7 +133,7 @@ TraceConfig ZNeutubeAutoTraceProcess::buildEffectiveTraceConfigOrThrow() const
       cfg = TraceConfig{};
     }
   } else if (!m_traceConfigPath.isEmpty()) {
-    const bool ok = loadTraceConfigLegacyLike(m_traceConfigPath.toStdString(), cfg);
+    const bool ok = loadTraceConfigLegacyLike(m_traceConfigPath, cfg);
     if (!ok) {
       cfg = TraceConfig{};
     }
@@ -197,7 +197,7 @@ void ZNeutubeAutoTraceProcess::writeSwcAtomicOrThrow(ZSwc& tree) const
     (void)QFile::remove(tmpSwcPath);
   });
 
-  writeSwcLegacyNeuTuOrThrow(tree, tmpSwcPath.toStdString(), {});
+  writeSwcLegacyNeuTuOrThrow(tree, tmpSwcPath, {});
 
   if (QFile::exists(m_outputSwcPath) && !QFile::remove(m_outputSwcPath)) {
     throw ZException(fmt::format("Auto Trace failed: can not overwrite output SWC: {}", m_outputSwcPath));

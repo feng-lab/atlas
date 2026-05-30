@@ -84,7 +84,7 @@ void applyConfigOverridesLegacyLike(const json::object& obj, TraceConfig& cfg)
   }
 }
 
-[[nodiscard]] bool loadTraceConfigObjectLegacyLike(const json::object& root, TraceConfig& out, std::string_view source)
+[[nodiscard]] bool loadTraceConfigObjectLegacyLike(const json::object& root, TraceConfig& out, const QString& source)
 {
   out = TraceConfig{};
 
@@ -104,7 +104,7 @@ void applyConfigOverridesLegacyLike(const json::object& obj, TraceConfig& cfg)
   }();
 
   if (!hasAcceptedLegacyTag(tag)) {
-    if (source.empty()) {
+    if (source.isEmpty()) {
       LOG(WARNING) << "Ignoring trace config object with unexpected tag '" << std::string(tag) << "'.";
     } else {
       LOG(WARNING) << "Ignoring trace config with unexpected tag '" << std::string(tag) << "': " << source;
@@ -145,15 +145,15 @@ void applyTraceConfigOverridesLegacyLike(const json::object& obj, TraceConfig& c
   applyConfigOverridesLegacyLike(obj, cfg);
 }
 
-bool loadTraceConfigLegacyLike(const std::string& traceConfigPath, TraceConfig& out)
+bool loadTraceConfigLegacyLike(const QString& traceConfigPath, TraceConfig& out)
 {
   out = TraceConfig{};
 
-  if (traceConfigPath.empty()) {
+  if (traceConfigPath.isEmpty()) {
     return false;
   }
 
-  const QFileInfo fi(QString::fromStdString(traceConfigPath));
+  const QFileInfo fi(traceConfigPath);
   if (!fi.exists() || !fi.isFile()) {
     return false;
   }
@@ -172,7 +172,7 @@ bool loadTraceConfigLegacyLike(const std::string& traceConfigPath, TraceConfig& 
 
 bool loadTraceConfigLegacyLike(const json::object& traceConfigRoot, TraceConfig& out)
 {
-  return loadTraceConfigObjectLegacyLike(traceConfigRoot, out, {});
+  return loadTraceConfigObjectLegacyLike(traceConfigRoot, out, QString{});
 }
 
 const json::object* selectTraceLevelOverrideLegacyLike(const TraceConfig& cfg, int level)

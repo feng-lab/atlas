@@ -1,14 +1,15 @@
 #pragma once
 
+#include <QString>
+
 #include <array>
 #include <optional>
-#include <string>
 
 namespace nim {
 
-int runSkeletonize(const std::string& inputPath,
-                   const std::string& outputPath,
-                   const std::string& skeletonizeConfigPath,
+int runSkeletonize(const QString& inputPath,
+                   const QString& outputPath,
+                   const QString& skeletonizeConfigPath,
                    const std::optional<std::array<int, 3>>& downsampleIntervalOverride,
                    bool verbose);
 

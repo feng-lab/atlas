@@ -1858,25 +1858,32 @@ def _refresh_builtin_ifw_package_metadata() -> None:
 def _copy_qt_plugins(destination_plugins_root: str) -> None:
     """Deploy Qt plugins that Qt deploy tools may not infer statically.
 
-    Linux deployment copies the full Qt plugin tree. Keep macOS/Windows aligned
-    with that policy because Atlas selects some plugins at runtime, including
-    the offscreen QPA plugin used by headless Vulkan export automation.
+    Qt deploy tools infer the primary platform plugin, but Atlas also selects
+    other QPA plugins at runtime, including the offscreen plugin used by
+    headless Vulkan export automation. Copy only the platforms plugin folder;
+    copying the full plugin tree adds unused binaries and can block macOS
+    signing.
     """
 
-    source_plugins_root = os.path.join(common_dirs.qt_base_dir(), "plugins")
-    if not os.path.isdir(source_plugins_root):
+    source_platforms_dir = os.path.join(
+        common_dirs.qt_base_dir(), "plugins", "platforms"
+    )
+    if not os.path.isdir(source_platforms_dir):
         raise RuntimeError(
-            f"Qt plugins directory was not found.\nexpected: {source_plugins_root}"
+            f"Qt platforms plugins directory was not found.\nexpected: {source_platforms_dir}"
         )
 
+    destination_platforms_dir = os.path.join(destination_plugins_root, "platforms")
     shutil.copytree(
-        source_plugins_root,
-        destination_plugins_root,
+        source_platforms_dir,
+        destination_platforms_dir,
         dirs_exist_ok=True,
         symlinks=True,
     )
     logger.info(
-        "Copied Qt plugins: %s -> %s", source_plugins_root, destination_plugins_root
+        "Copied Qt platform plugins: %s -> %s",
+        source_platforms_dir,
+        destination_platforms_dir,
     )
 
 

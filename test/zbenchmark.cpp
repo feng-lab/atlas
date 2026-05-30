@@ -648,7 +648,7 @@ static void addBlockIdCollectorBench()
     for (const Z3DBlockIdCollectorMethodInfo& method : z3DBlockIdCollectorMethods()) {
       const std::string name = fmt::format("BlockIdCollector/{}/{}", syntheticCase.name, method.name);
       benchmark::RegisterBenchmark(
-        name.c_str(),
+        name,
         [syntheticCaseId = syntheticCase.id, methodId = method.method](benchmark::State& state) {
           BM_BlockIdCollectorSynthetic(state, syntheticCaseId, methodId);
         })
@@ -924,13 +924,13 @@ static void BM_BioFormatsVentanaDatasetInfo(benchmark::State& state)
 {
   try {
     if (const auto& error = bioFormatsBenchmarkRuntimeError(); error.has_value()) {
-      state.SkipWithError(error->c_str());
+      state.SkipWithError(*error);
       return;
     }
     const QString path = bioFormatsBenchmarkFile();
     if (!QFileInfo(path).isFile()) {
       const std::string message = fmt::format("benchmark file does not exist: {}", path);
-      state.SkipWithError(message.c_str());
+      state.SkipWithError(message);
       return;
     }
 

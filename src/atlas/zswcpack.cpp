@@ -455,7 +455,7 @@ void ZSwcPack::extendSelectedNodeSmartLegacyLike(const glm::dvec3& center, doubl
 
   TraceConfig cfg;
   const QString traceCfgPath = QDir(ZSystemInfo::jsonDirPath()).absoluteFilePath(QStringLiteral("trace_config.json"));
-  const bool ok = loadTraceConfigLegacyLike(traceCfgPath.toStdString(), cfg);
+  const bool ok = loadTraceConfigLegacyLike(traceCfgPath, cfg);
   if (!ok) {
     cfg = TraceConfig{};
   }
