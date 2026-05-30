@@ -79,6 +79,11 @@ _MACOS_CODESIGN_TIMESTAMP_RETRY_ATTEMPTS = 5
 _MACOS_CODESIGN_TIMESTAMP_RETRY_BASE_DELAY_SECONDS = 2.0
 _MACOS_JRE_ENTITLEMENTS_FILENAME = "macos_jre.entitlements"
 
+# Qt's Windows debug plugins add a trailing "d" before the extension
+# (for example qwindowsd.dll next to qwindows.dll).  Keep this policy
+# pair-aware so release plugins whose real names end in "d" are preserved.
+_WINDOWS_QT_DEBUG_PLUGIN_SUFFIX = "d"
+
 
 def _patch_qtifw_installerbase() -> None:
     pattern_bytes = b"Mozilla/5.0"
@@ -1855,6 +1860,38 @@ def _refresh_builtin_ifw_package_metadata() -> None:
         updater(template_path, os.path.join(meta_dir, "package.xml"))
 
 
+def _windows_qt_debug_platform_plugin_names(source_platforms_dir: str) -> list[str]:
+    """Return Windows Qt debug platform plugin DLLs that have release pairs."""
+
+    plugin_names = os.listdir(source_platforms_dir)
+    release_plugin_stems: set[str] = set()
+
+    for plugin_name in plugin_names:
+        plugin_path = os.path.join(source_platforms_dir, plugin_name)
+        if not os.path.isfile(plugin_path):
+            continue
+        stem, ext = os.path.splitext(plugin_name)
+        if ext.casefold() == ".dll":
+            release_plugin_stems.add(stem.casefold())
+
+    debug_plugin_names: list[str] = []
+    for plugin_name in plugin_names:
+        plugin_path = os.path.join(source_platforms_dir, plugin_name)
+        if not os.path.isfile(plugin_path):
+            continue
+        stem, ext = os.path.splitext(plugin_name)
+        if ext.casefold() != ".dll" or not stem.casefold().endswith(
+            _WINDOWS_QT_DEBUG_PLUGIN_SUFFIX
+        ):
+            continue
+
+        release_stem = stem[: -len(_WINDOWS_QT_DEBUG_PLUGIN_SUFFIX)]
+        if release_stem.casefold() in release_plugin_stems:
+            debug_plugin_names.append(plugin_name)
+
+    return sorted(debug_plugin_names, key=str.casefold)
+
+
 def _copy_qt_plugins(destination_plugins_root: str) -> None:
     """Deploy Qt plugins that Qt deploy tools may not infer statically.
 
@@ -1862,7 +1899,8 @@ def _copy_qt_plugins(destination_plugins_root: str) -> None:
     other QPA plugins at runtime, including the offscreen plugin used by
     headless Vulkan export automation. Copy only the platforms plugin folder;
     copying the full plugin tree adds unused binaries and can block macOS
-    signing.
+    signing. On Windows, skip Qt debug plugin DLLs when the matching
+    release plugin is present in the same Qt installation.
     """
 
     source_platforms_dir = os.path.join(
@@ -1874,17 +1912,35 @@ def _copy_qt_plugins(destination_plugins_root: str) -> None:
         )
 
     destination_platforms_dir = os.path.join(destination_plugins_root, "platforms")
+    skipped_plugin_names = (
+        _windows_qt_debug_platform_plugin_names(source_platforms_dir)
+        if common_dirs.is_windows()
+        else []
+    )
+    skipped_plugin_name_set = set(skipped_plugin_names)
+
+    def ignore_qt_debug_platform_plugins(directory: str, names: list[str]) -> set[str]:
+        if os.path.abspath(directory) != os.path.abspath(source_platforms_dir):
+            return set()
+        return skipped_plugin_name_set.intersection(names)
+
     shutil.copytree(
         source_platforms_dir,
         destination_platforms_dir,
         dirs_exist_ok=True,
         symlinks=True,
+        ignore=ignore_qt_debug_platform_plugins if skipped_plugin_name_set else None,
     )
     logger.info(
         "Copied Qt platform plugins: %s -> %s",
         source_platforms_dir,
         destination_platforms_dir,
     )
+    if skipped_plugin_names:
+        logger.info(
+            "Skipped Windows Qt debug platform plugin DLLs: %s",
+            ", ".join(skipped_plugin_names),
+        )
 
 
 def build_atlas_package(is_debug_version: bool = False, release_pdb: bool = False):
