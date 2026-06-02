@@ -2,11 +2,14 @@
 
 #include <OpenImageIO/filesystem.h>
 #include <OpenImageIO/imageio.h>
+#include <gif_lib.h>
 
 #include <QFile>
 #include <algorithm>
+#include <array>
 #include <cstring>
 #include <memory>
+#include <optional>
 #include <string_view>
 
 namespace {
@@ -24,6 +27,59 @@ struct OiioMemoryInput
 {
   std::unique_ptr<OIIO::Filesystem::IOMemReader> memReader;
   OIIO::ImageInput::unique_ptr input;
+};
+
+struct GifInputFile
+{
+  GifFileType* file = nullptr;
+
+  GifInputFile() = default;
+  GifInputFile(const GifInputFile&) = delete;
+  GifInputFile& operator=(const GifInputFile&) = delete;
+
+  GifInputFile(GifInputFile&& other) noexcept
+    : file(other.file)
+  {
+    other.file = nullptr;
+  }
+
+  GifInputFile& operator=(GifInputFile&& other) noexcept
+  {
+    if (this != &other) {
+      close();
+      file = other.file;
+      other.file = nullptr;
+    }
+    return *this;
+  }
+
+  ~GifInputFile()
+  {
+    close();
+  }
+
+  void close()
+  {
+    if (file) {
+      int error = 0;
+      DGifCloseFile(file, &error);
+      file = nullptr;
+    }
+  }
+};
+
+struct GifFrameControl
+{
+  int disposal = DISPOSAL_UNSPECIFIED;
+  int transparentColor = NO_TRANSPARENT_COLOR;
+};
+
+struct GifFrameRect
+{
+  int left = 0;
+  int top = 0;
+  int width = 0;
+  int height = 0;
 };
 
 struct OiioInputLayout
@@ -49,6 +105,12 @@ struct OiioInputLayout
 #else
   return QFile::encodeName(filename).toStdString();
 #endif
+}
+
+[[nodiscard]] std::string gifErrorString(int error)
+{
+  const char* errorText = GifErrorString(error);
+  return errorText ? errorText : fmt::format("giflib error {}", error);
 }
 
 [[nodiscard]] OIIO::ImageInput::unique_ptr openOiioInput(const QString& filename)
@@ -209,6 +271,193 @@ struct OiioInputLayout
   return lhs.width == rhs.width && lhs.height == rhs.height && lhs.depth == rhs.depth &&
          lhs.numChannels == rhs.numChannels && lhs.bytesPerVoxel == rhs.bytesPerVoxel &&
          lhs.voxelFormat == rhs.voxelFormat && lhs.lastChannelIsAlphaChannel == rhs.lastChannelIsAlphaChannel;
+}
+
+[[nodiscard]] index_t resolveRegionEnd(index_t regionEnd, size_t sourceSize)
+{
+  return regionEnd == -1 ? static_cast<index_t>(sourceSize) : regionEnd;
+}
+
+void validateBoundedGifRegion(const ZImgRegion& region, const ZImgInfo& sourceInfo, index_t tEnd)
+{
+  if (region.isEmpty() || region.start.x < 0 || region.start.y < 0 || region.start.z < 0 || region.start.c < 0 ||
+      region.start.t < 0 || tEnd <= region.start.t || region.start.x >= sourceInfo.sWidth() ||
+      region.start.y >= sourceInfo.sHeight() || region.start.z >= sourceInfo.sDepth() ||
+      region.start.c >= sourceInfo.sNumChannels() ||
+      resolveRegionEnd(region.end.x, sourceInfo.width) > sourceInfo.sWidth() ||
+      resolveRegionEnd(region.end.y, sourceInfo.height) > sourceInfo.sHeight() ||
+      resolveRegionEnd(region.end.z, sourceInfo.depth) > sourceInfo.sDepth() ||
+      resolveRegionEnd(region.end.c, sourceInfo.numChannels) > sourceInfo.sNumChannels()) {
+    throw ZException(fmt::format("Invalid image region. Image info: '{}', region: '{}'", sourceInfo, region));
+  }
+}
+
+[[nodiscard]] ZImgInfo clipBoundedGifRegion(const ZImgRegion& region, const ZImgInfo& sourceInfo, index_t tEnd)
+{
+  ZImgInfo result = sourceInfo;
+  const index_t xEnd = resolveRegionEnd(region.end.x, sourceInfo.width);
+  const index_t yEnd = resolveRegionEnd(region.end.y, sourceInfo.height);
+  const index_t zEnd = resolveRegionEnd(region.end.z, sourceInfo.depth);
+  const index_t cEnd = resolveRegionEnd(region.end.c, sourceInfo.numChannels);
+  result.width = static_cast<size_t>(xEnd - region.start.x);
+  result.height = static_cast<size_t>(yEnd - region.start.y);
+  result.depth = static_cast<size_t>(zEnd - region.start.z);
+  result.numChannels = static_cast<size_t>(cEnd - region.start.c);
+  result.channelColors =
+    std::vector(sourceInfo.channelColors.begin() + region.start.c, sourceInfo.channelColors.begin() + cEnd);
+  result.channelNames =
+    std::vector(sourceInfo.channelNames.begin() + region.start.c, sourceInfo.channelNames.begin() + cEnd);
+  result.lastChannelIsAlphaChannel =
+    sourceInfo.lastChannelIsAlphaChannel && cEnd == static_cast<index_t>(sourceInfo.numChannels);
+  result.numTimes = static_cast<size_t>(tEnd - region.start.t);
+  result.timeStamps.resize(result.numTimes);
+  for (size_t t = 0; t < result.numTimes; ++t) {
+    result.timeStamps[t] = static_cast<double>(region.start.t + static_cast<index_t>(t));
+  }
+  return result;
+}
+
+[[nodiscard]] int gifInterlacedRow(int row, int height)
+{
+  if (height > 1 && row >= (height + 1) / 2) {
+    return 2 * (row - (height + 1) / 2) + 1;
+  }
+  if (height > 2 && row >= (height + 3) / 4) {
+    return 4 * (row - (height + 3) / 4) + 2;
+  }
+  if (height > 4 && row >= (height + 7) / 8) {
+    return 8 * (row - (height + 7) / 8) + 4;
+  }
+  return row * 8;
+}
+
+[[nodiscard]] std::array<uint8_t, 4> gifBackgroundColor(const GifFileType& gif)
+{
+  if (!gif.SColorMap || gif.SBackGroundColor < 0 || gif.SBackGroundColor >= gif.SColorMap->ColorCount) {
+    return {0, 0, 0, 0};
+  }
+  const GifColorType& color = gif.SColorMap->Colors[gif.SBackGroundColor];
+  return {color.Red, color.Green, color.Blue, 255};
+}
+
+void fillGifCanvasRect(std::vector<uint8_t>& canvas,
+                       int canvasWidth,
+                       int canvasHeight,
+                       const GifFrameRect& rect,
+                       const std::array<uint8_t, 4>& color)
+{
+  const int xBegin = std::max(rect.left, 0);
+  const int yBegin = std::max(rect.top, 0);
+  const int xEnd = std::min(rect.left + rect.width, canvasWidth);
+  const int yEnd = std::min(rect.top + rect.height, canvasHeight);
+  for (int y = yBegin; y < yEnd; ++y) {
+    for (int x = xBegin; x < xEnd; ++x) {
+      std::copy_n(color.data(), color.size(), canvas.data() + static_cast<size_t>((y * canvasWidth + x) * 4));
+    }
+  }
+}
+
+void applyGifDisposal(std::vector<uint8_t>& canvas,
+                      const std::vector<uint8_t>& previousCanvas,
+                      const GifFrameControl& previousControl,
+                      const GifFrameRect& previousRect,
+                      const std::array<uint8_t, 4>& backgroundColor,
+                      int canvasWidth,
+                      int canvasHeight)
+{
+  if (previousControl.disposal == DISPOSE_BACKGROUND) {
+    fillGifCanvasRect(canvas, canvasWidth, canvasHeight, previousRect, backgroundColor);
+  } else if (previousControl.disposal == DISPOSE_PREVIOUS && previousCanvas.size() == canvas.size()) {
+    canvas = previousCanvas;
+  }
+}
+
+void readGifControlExtension(GifFrameControl& control, const GifByteType* extension)
+{
+  if (!extension || extension[0] < 4) {
+    return;
+  }
+  control.disposal = (extension[1] & 0x1c) >> 2;
+  control.transparentColor = (extension[1] & 0x01) ? static_cast<int>(extension[4]) : NO_TRANSPARENT_COLOR;
+}
+
+void drawGifFrame(GifFileType& gif, std::vector<uint8_t>& canvas, const GifFrameControl& control)
+{
+  const ColorMapObject* colorMap = gif.Image.ColorMap ? gif.Image.ColorMap : gif.SColorMap;
+  if (!colorMap) {
+    throw ZException("GIF frame does not have a local or global color map");
+  }
+
+  const int canvasWidth = gif.SWidth;
+  const int canvasHeight = gif.SHeight;
+  const int frameWidth = gif.Image.Width;
+  const int frameHeight = gif.Image.Height;
+  std::vector<GifPixelType> row(static_cast<size_t>(frameWidth));
+  for (int rowIndex = 0; rowIndex < frameHeight; ++rowIndex) {
+    if (DGifGetLine(&gif, row.data(), frameWidth) == GIF_ERROR) {
+      throw ZException(fmt::format("giflib failed to read GIF frame row: {}", gifErrorString(gif.Error)));
+    }
+    const int y = gif.Image.Top + (gif.Image.Interlace ? gifInterlacedRow(rowIndex, frameHeight) : rowIndex);
+    if (y < 0 || y >= canvasHeight) {
+      continue;
+    }
+    for (int xOffset = 0; xOffset < frameWidth; ++xOffset) {
+      const int paletteIndex = row[static_cast<size_t>(xOffset)];
+      if (paletteIndex == control.transparentColor) {
+        continue;
+      }
+      if (paletteIndex < 0 || paletteIndex >= colorMap->ColorCount) {
+        throw ZException(
+          fmt::format("GIF frame palette index {} exceeds color map size {}", paletteIndex, colorMap->ColorCount));
+      }
+      const int x = gif.Image.Left + xOffset;
+      if (x < 0 || x >= canvasWidth) {
+        continue;
+      }
+      const GifColorType& color = colorMap->Colors[paletteIndex];
+      auto* pixel = canvas.data() + static_cast<size_t>((y * canvasWidth + x) * 4);
+      pixel[0] = color.Red;
+      pixel[1] = color.Green;
+      pixel[2] = color.Blue;
+      pixel[3] = 255;
+    }
+  }
+}
+
+void copyGifCanvasRegionToImg(const std::vector<uint8_t>& canvas,
+                              int canvasWidth,
+                              const ZImgRegion& region,
+                              const ZImgInfo& sourceInfo,
+                              index_t sourceTime,
+                              ZImg& img)
+{
+  const index_t xEnd = resolveRegionEnd(region.end.x, sourceInfo.width);
+  const index_t yEnd = resolveRegionEnd(region.end.y, sourceInfo.height);
+  const index_t cEnd = resolveRegionEnd(region.end.c, sourceInfo.numChannels);
+  const size_t localTime = static_cast<size_t>(sourceTime - region.start.t);
+  for (index_t c = region.start.c; c < cEnd; ++c) {
+    for (index_t y = region.start.y; y < yEnd; ++y) {
+      for (index_t x = region.start.x; x < xEnd; ++x) {
+        const auto* pixel = canvas.data() + static_cast<size_t>((y * canvasWidth + x) * 4);
+        *img.data<uint8_t>(static_cast<size_t>(x - region.start.x),
+                           static_cast<size_t>(y - region.start.y),
+                           0,
+                           static_cast<size_t>(c - region.start.c),
+                           localTime) = pixel[c];
+      }
+    }
+  }
+}
+
+[[nodiscard]] GifInputFile openGifInputFile(const QString& filename)
+{
+  int error = 0;
+  GifInputFile result;
+  result.file = DGifOpenFileName(oiioFilename(filename).c_str(), &error);
+  if (!result.file) {
+    throw ZException(fmt::format("giflib failed to open '{}': {}", filename, gifErrorString(error)));
+  }
+  return result;
 }
 
 [[nodiscard]] std::vector<ZImgInfo> readSubimageInfosFromInput(OIIO::ImageInput& input)
@@ -489,12 +738,12 @@ void attachOiioMetadata(ZImg& img, const OIIO::ImageInput& input)
   img.metadataRef().swap(metadata);
 }
 
-[[nodiscard]] ZImg readGifAnimationFromInput(OIIO::ImageInput& input,
-                                             const QString& sourceName,
-                                             const OiioInputLayout& layout,
-                                             const ZImgRegion& region,
-                                             size_t scene,
-                                             bool includeMetadata)
+[[nodiscard]] ZImg readGifAnimationFromLayout(OIIO::ImageInput& input,
+                                              const QString& sourceName,
+                                              const OiioInputLayout& layout,
+                                              const ZImgRegion& region,
+                                              size_t scene,
+                                              bool includeMetadata)
 {
   CHECK(layout.gifFramesAsTime);
   CHECK(layout.sceneInfos.size() == 1);
@@ -535,6 +784,174 @@ void attachOiioMetadata(ZImg& img, const OIIO::ImageInput& input)
   return img;
 }
 
+[[nodiscard]] ZImg readGifAnimationFromInput(OIIO::ImageInput& input,
+                                             const QString& sourceName,
+                                             const ZImgRegion& region,
+                                             size_t scene,
+                                             bool includeMetadata)
+{
+  if (scene != 0) {
+    throw ZException("Invalid OpenImageIO scene for GIF animation: GIF frames are exposed as the time dimension");
+  }
+  if (region.end.t == -1) {
+    const OiioInputLayout layout = readInputLayout(input);
+    return readGifAnimationFromLayout(input, sourceName, layout, region, scene, includeMetadata);
+  }
+
+  OIIO::ImageSpec firstSpec = input.spec(static_cast<int>(region.start.t), 0);
+  if (!firstSpec.format) {
+    throw ZException(fmt::format("Invalid GIF frame {} for '{}'", region.start.t, sourceName));
+  }
+  const ZImgInfo firstFrameInfo = readInfoFromSpec(firstSpec);
+  const index_t tEnd = region.end.t;
+  validateBoundedGifRegion(region, firstFrameInfo, tEnd);
+
+  ZImg img(clipBoundedGifRegion(region, firstFrameInfo, tEnd));
+  const ZImgRegion frameRegion(region.start.x,
+                               region.end.x,
+                               region.start.y,
+                               region.end.y,
+                               region.start.z,
+                               region.end.z,
+                               region.start.c,
+                               region.end.c,
+                               0,
+                               1);
+  for (index_t t = region.start.t; t < tEnd; ++t) {
+    OIIO::ImageSpec spec = t == region.start.t ? firstSpec : input.spec(static_cast<int>(t), 0);
+    if (!spec.format) {
+      throw ZException(fmt::format("Invalid GIF frame {} for '{}'", t, sourceName));
+    }
+    ZImgInfo frameInfo = readInfoFromSpec(spec);
+    if (!hasSameAtlasLayout(firstFrameInfo, frameInfo)) {
+      throw ZException("OpenImageIO GIF frames have incompatible Atlas image layouts");
+    }
+    ZImg frame = readSubimageFromInput(input, sourceName, frameInfo, frameRegion, static_cast<size_t>(t));
+    CHECK(frame.numTimes() == 1);
+    CHECK(frame.byteNumber() == img.timeByteNumber());
+    std::copy_n(frame.timeData<uint8_t>(0),
+                frame.byteNumber(),
+                img.timeData<uint8_t>(static_cast<size_t>(t - region.start.t)));
+  }
+
+  if (includeMetadata) {
+    attachOiioMetadata(img, input);
+  }
+  return img;
+}
+
+[[nodiscard]] ZImg readGifAnimationFromFile(const QString& filename,
+                                            const ZImgRegion& region,
+                                            size_t scene,
+                                            std::optional<size_t> knownFrameCount,
+                                            bool includeMetadata)
+{
+  // OIIO reports GIF frames well, but giflib gives Atlas direct control over
+  // stateless canvas composition for transparency and disposal methods.
+  if (scene != 0) {
+    throw ZException("Invalid OpenImageIO scene for GIF animation: GIF frames are exposed as the time dimension");
+  }
+
+  GifInputFile input = openGifInputFile(filename);
+  CHECK(input.file);
+  GifFileType& gif = *input.file;
+  if (gif.SWidth <= 0 || gif.SHeight <= 0) {
+    throw ZException(fmt::format("GIF reported invalid logical screen size {}x{}", gif.SWidth, gif.SHeight));
+  }
+
+  const index_t tEnd = region.end.t == -1 ? static_cast<index_t>(knownFrameCount.value_or(0)) : region.end.t;
+  if (tEnd <= 0) {
+    throw ZException("GIF frame count is unknown for an unbounded read");
+  }
+  ZImgInfo sourceInfo(static_cast<size_t>(gif.SWidth),
+                      static_cast<size_t>(gif.SHeight),
+                      1,
+                      4,
+                      static_cast<size_t>(tEnd),
+                      1,
+                      VoxelFormat::Unsigned);
+  sourceInfo.lastChannelIsAlphaChannel = true;
+  sourceInfo.createDefaultDescriptions();
+  validateBoundedGifRegion(region, sourceInfo, tEnd);
+
+  ZImg img(clipBoundedGifRegion(region, sourceInfo, tEnd));
+  std::vector<uint8_t> canvas(static_cast<size_t>(gif.SWidth) * static_cast<size_t>(gif.SHeight) * 4, 0);
+  const std::array<uint8_t, 4> backgroundColor = gifBackgroundColor(gif);
+  GifFrameControl currentControl;
+  GifFrameControl previousControl;
+  GifFrameRect previousRect;
+  std::vector<uint8_t> restoreCanvas;
+  index_t frameIndex = 0;
+
+  for (;;) {
+    GifRecordType recordType = UNDEFINED_RECORD_TYPE;
+    if (DGifGetRecordType(&gif, &recordType) == GIF_ERROR) {
+      throw ZException(fmt::format("giflib failed to read GIF record: {}", gifErrorString(gif.Error)));
+    }
+
+    if (recordType == TERMINATE_RECORD_TYPE) {
+      break;
+    }
+
+    if (recordType == EXTENSION_RECORD_TYPE) {
+      int extensionCode = 0;
+      GifByteType* extension = nullptr;
+      if (DGifGetExtension(&gif, &extensionCode, &extension) == GIF_ERROR) {
+        throw ZException(fmt::format("giflib failed to read GIF extension: {}", gifErrorString(gif.Error)));
+      }
+      if (extensionCode == GRAPHICS_EXT_FUNC_CODE) {
+        readGifControlExtension(currentControl, extension);
+      }
+      while (extension) {
+        if (DGifGetExtensionNext(&gif, &extension) == GIF_ERROR) {
+          throw ZException(fmt::format("giflib failed to read GIF extension block: {}", gifErrorString(gif.Error)));
+        }
+      }
+      continue;
+    }
+
+    if (recordType != IMAGE_DESC_RECORD_TYPE) {
+      continue;
+    }
+
+    if (DGifGetImageDesc(&gif) == GIF_ERROR) {
+      throw ZException(fmt::format("giflib failed to read GIF image descriptor: {}", gifErrorString(gif.Error)));
+    }
+
+    applyGifDisposal(canvas, restoreCanvas, previousControl, previousRect, backgroundColor, gif.SWidth, gif.SHeight);
+    if (currentControl.disposal == DISPOSE_PREVIOUS) {
+      restoreCanvas = canvas;
+    } else {
+      restoreCanvas.clear();
+    }
+    GifFrameRect currentRect{gif.Image.Left, gif.Image.Top, gif.Image.Width, gif.Image.Height};
+    drawGifFrame(gif, canvas, currentControl);
+    if (frameIndex >= region.start.t && frameIndex < tEnd) {
+      copyGifCanvasRegionToImg(canvas, gif.SWidth, region, sourceInfo, frameIndex, img);
+    }
+
+    previousControl = currentControl;
+    previousRect = currentRect;
+    currentControl = GifFrameControl{};
+    ++frameIndex;
+    if (frameIndex >= tEnd) {
+      break;
+    }
+  }
+
+  if (frameIndex < tEnd) {
+    throw ZException(
+      fmt::format("Invalid GIF frame range [{}, {}) for {} decoded frames", region.start.t, tEnd, frameIndex));
+  }
+
+  if (includeMetadata) {
+    ZImgMetadata metadata;
+    metadata.attachToTopLevel(ZImgMetatag("OpenImageIO Format", "gif"));
+    img.metadataRef().swap(metadata);
+  }
+  return img;
+}
+
 [[nodiscard]] ZImg readImageFromLayout(OIIO::ImageInput& input,
                                        const QString& sourceName,
                                        const OiioInputLayout& layout,
@@ -547,7 +964,7 @@ void attachOiioMetadata(ZImg& img, const OIIO::ImageInput& input)
   }
 
   if (layout.gifFramesAsTime) {
-    return readGifAnimationFromInput(input, sourceName, layout, region, scene, includeMetadata);
+    return readGifAnimationFromLayout(input, sourceName, layout, region, scene, includeMetadata);
   }
 
   ZImg img = readSubimageFromInput(input, sourceName, layout.sceneInfos[scene], region, scene);
@@ -563,6 +980,17 @@ void attachOiioMetadata(ZImg& img, const OIIO::ImageInput& input)
                                       size_t scene,
                                       bool includeMetadata)
 {
+  if (isGifInput(input)) {
+    if (sourceName != QStringLiteral("<memory>")) {
+      if (region.end.t == -1) {
+        const OiioInputLayout layout = readInputLayout(input);
+        CHECK(!layout.sceneInfos.empty());
+        return readGifAnimationFromFile(sourceName, region, scene, layout.sceneInfos.front().numTimes, includeMetadata);
+      }
+      return readGifAnimationFromFile(sourceName, region, scene, std::nullopt, includeMetadata);
+    }
+    return readGifAnimationFromInput(input, sourceName, region, scene, includeMetadata);
+  }
   const OiioInputLayout layout = readInputLayout(input);
   return readImageFromLayout(input, sourceName, layout, region, scene, includeMetadata);
 }

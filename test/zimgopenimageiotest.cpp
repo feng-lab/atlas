@@ -3,6 +3,7 @@
 #include "zimgopenimageio.h"
 
 #include <OpenImageIO/imageio.h>
+#include <gif_lib.h>
 #include <gtest/gtest.h>
 
 #include <QDir>
@@ -73,6 +74,115 @@ void writeAnimatedGifFixture(const QString& path)
   ASSERT_TRUE(output->open(filename, specs[1], OIIO::ImageOutput::AppendSubimage)) << output->geterror();
   ASSERT_TRUE(output->write_image(OIIO::TypeUInt8, frames[1].data())) << output->geterror();
   ASSERT_TRUE(output->close()) << output->geterror();
+}
+
+void writeDeltaGifFixture(const QString& path)
+{
+  ColorMapObject* colorMap = GifMakeMapObject(2, nullptr);
+  ASSERT_NE(colorMap, nullptr);
+  colorMap->Colors[0] = GifColorType{255, 0, 0};
+  colorMap->Colors[1] = GifColorType{0, 255, 0};
+
+  int error = 0;
+  GifFileType* gif = EGifOpenFileName(oiioTestFilename(path).c_str(), false, &error);
+  ASSERT_NE(gif, nullptr) << GifErrorString(error);
+  EGifSetGifVersion(gif, true);
+  ASSERT_EQ(EGifPutScreenDesc(gif, kAnimatedGifWidth, kAnimatedGifHeight, 2, 0, colorMap), GIF_OK)
+    << GifErrorString(gif->Error);
+
+  const GifByteType doNotDispose[] = {static_cast<GifByteType>(DISPOSE_DO_NOT << 2), 10, 0, 0};
+  ASSERT_EQ(EGifPutExtension(gif, GRAPHICS_EXT_FUNC_CODE, 4, doNotDispose), GIF_OK) << GifErrorString(gif->Error);
+  ASSERT_EQ(EGifPutImageDesc(gif, 0, 0, kAnimatedGifWidth, kAnimatedGifHeight, false, nullptr), GIF_OK)
+    << GifErrorString(gif->Error);
+  std::array<GifPixelType, kAnimatedGifWidth> redRow = {0, 0, 0};
+  for (int y = 0; y < kAnimatedGifHeight; ++y) {
+    ASSERT_EQ(EGifPutLine(gif, redRow.data(), kAnimatedGifWidth), GIF_OK) << GifErrorString(gif->Error);
+  }
+
+  ASSERT_EQ(EGifPutExtension(gif, GRAPHICS_EXT_FUNC_CODE, 4, doNotDispose), GIF_OK) << GifErrorString(gif->Error);
+  ASSERT_EQ(EGifPutImageDesc(gif, 1, 0, 1, 1, false, nullptr), GIF_OK) << GifErrorString(gif->Error);
+  GifPixelType greenPixel = 1;
+  ASSERT_EQ(EGifPutLine(gif, &greenPixel, 1), GIF_OK) << GifErrorString(gif->Error);
+
+  int closeError = 0;
+  ASSERT_EQ(EGifCloseFile(gif, &closeError), GIF_OK) << GifErrorString(closeError);
+  GifFreeMapObject(colorMap);
+}
+
+void writeTransparentGifFixture(const QString& path)
+{
+  ColorMapObject* colorMap = GifMakeMapObject(4, nullptr);
+  ASSERT_NE(colorMap, nullptr);
+  colorMap->Colors[0] = GifColorType{255, 0, 0};
+  colorMap->Colors[1] = GifColorType{0, 255, 0};
+  colorMap->Colors[2] = GifColorType{0, 0, 255};
+  colorMap->Colors[3] = GifColorType{0, 0, 0};
+
+  int error = 0;
+  GifFileType* gif = EGifOpenFileName(oiioTestFilename(path).c_str(), false, &error);
+  ASSERT_NE(gif, nullptr) << GifErrorString(error);
+  EGifSetGifVersion(gif, true);
+  ASSERT_EQ(EGifPutScreenDesc(gif, kAnimatedGifWidth, kAnimatedGifHeight, 2, 0, colorMap), GIF_OK)
+    << GifErrorString(gif->Error);
+
+  const GifByteType doNotDispose[] = {static_cast<GifByteType>(DISPOSE_DO_NOT << 2), 10, 0, 0};
+  ASSERT_EQ(EGifPutExtension(gif, GRAPHICS_EXT_FUNC_CODE, 4, doNotDispose), GIF_OK) << GifErrorString(gif->Error);
+  ASSERT_EQ(EGifPutImageDesc(gif, 0, 0, kAnimatedGifWidth, kAnimatedGifHeight, false, nullptr), GIF_OK)
+    << GifErrorString(gif->Error);
+  std::array<GifPixelType, kAnimatedGifWidth> redRow = {0, 0, 0};
+  for (int y = 0; y < kAnimatedGifHeight; ++y) {
+    ASSERT_EQ(EGifPutLine(gif, redRow.data(), kAnimatedGifWidth), GIF_OK) << GifErrorString(gif->Error);
+  }
+
+  const GifByteType transparentDoNotDispose[] = {static_cast<GifByteType>((DISPOSE_DO_NOT << 2) | 0x01), 10, 0, 2};
+  ASSERT_EQ(EGifPutExtension(gif, GRAPHICS_EXT_FUNC_CODE, 4, transparentDoNotDispose), GIF_OK)
+    << GifErrorString(gif->Error);
+  ASSERT_EQ(EGifPutImageDesc(gif, 0, 0, kAnimatedGifWidth, kAnimatedGifHeight, false, nullptr), GIF_OK)
+    << GifErrorString(gif->Error);
+  std::array<GifPixelType, kAnimatedGifWidth> transparentRow = {2, 2, 2};
+  std::array<GifPixelType, kAnimatedGifWidth> greenOverlayRow = {2, 1, 2};
+  ASSERT_EQ(EGifPutLine(gif, greenOverlayRow.data(), kAnimatedGifWidth), GIF_OK) << GifErrorString(gif->Error);
+  ASSERT_EQ(EGifPutLine(gif, transparentRow.data(), kAnimatedGifWidth), GIF_OK) << GifErrorString(gif->Error);
+
+  int closeError = 0;
+  ASSERT_EQ(EGifCloseFile(gif, &closeError), GIF_OK) << GifErrorString(closeError);
+  GifFreeMapObject(colorMap);
+}
+
+void writeBackgroundDisposedGifFixture(const QString& path)
+{
+  ColorMapObject* colorMap = GifMakeMapObject(4, nullptr);
+  ASSERT_NE(colorMap, nullptr);
+  colorMap->Colors[0] = GifColorType{255, 0, 0};
+  colorMap->Colors[1] = GifColorType{0, 255, 0};
+  colorMap->Colors[2] = GifColorType{0, 0, 255};
+  colorMap->Colors[3] = GifColorType{0, 0, 0};
+
+  int error = 0;
+  GifFileType* gif = EGifOpenFileName(oiioTestFilename(path).c_str(), false, &error);
+  ASSERT_NE(gif, nullptr) << GifErrorString(error);
+  EGifSetGifVersion(gif, true);
+  ASSERT_EQ(EGifPutScreenDesc(gif, kAnimatedGifWidth, kAnimatedGifHeight, 2, 2, colorMap), GIF_OK)
+    << GifErrorString(gif->Error);
+
+  const GifByteType disposeBackground[] = {static_cast<GifByteType>(DISPOSE_BACKGROUND << 2), 10, 0, 0};
+  ASSERT_EQ(EGifPutExtension(gif, GRAPHICS_EXT_FUNC_CODE, 4, disposeBackground), GIF_OK) << GifErrorString(gif->Error);
+  ASSERT_EQ(EGifPutImageDesc(gif, 0, 0, kAnimatedGifWidth, kAnimatedGifHeight, false, nullptr), GIF_OK)
+    << GifErrorString(gif->Error);
+  std::array<GifPixelType, kAnimatedGifWidth> redRow = {0, 0, 0};
+  for (int y = 0; y < kAnimatedGifHeight; ++y) {
+    ASSERT_EQ(EGifPutLine(gif, redRow.data(), kAnimatedGifWidth), GIF_OK) << GifErrorString(gif->Error);
+  }
+
+  const GifByteType doNotDispose[] = {static_cast<GifByteType>(DISPOSE_DO_NOT << 2), 10, 0, 0};
+  ASSERT_EQ(EGifPutExtension(gif, GRAPHICS_EXT_FUNC_CODE, 4, doNotDispose), GIF_OK) << GifErrorString(gif->Error);
+  ASSERT_EQ(EGifPutImageDesc(gif, 1, 0, 1, 1, false, nullptr), GIF_OK) << GifErrorString(gif->Error);
+  GifPixelType greenPixel = 1;
+  ASSERT_EQ(EGifPutLine(gif, &greenPixel, 1), GIF_OK) << GifErrorString(gif->Error);
+
+  int closeError = 0;
+  ASSERT_EQ(EGifCloseFile(gif, &closeError), GIF_OK) << GifErrorString(closeError);
+  GifFreeMapObject(colorMap);
 }
 
 TEST(ZImgOpenImageIO, ReadsPngInfoAndRegion)
@@ -159,6 +269,96 @@ TEST(ZImgOpenImageIO, ReadsAnimatedGifAsTimeDimension)
   EXPECT_EQ(*frame.data<uint8_t>(0, 0, 0, 3, 0), 255u);
 
   EXPECT_THROW((ZImg(path, ZImgRegion(), 1, 1, 1, 1, FileFormat::OpenImageIO)), ZException);
+}
+
+TEST(ZImgOpenImageIO, ReadsDeltaGifAsCompositedFrames)
+{
+  QTemporaryDir tmp;
+  ASSERT_TRUE(tmp.isValid());
+
+  const QString path = QDir(tmp.path()).filePath(QStringLiteral("oiio_delta.gif"));
+  writeDeltaGifFixture(path);
+  ASSERT_TRUE(QFile::exists(path));
+
+  const ZImgRegion secondFrameRegion(0, kAnimatedGifWidth, 0, kAnimatedGifHeight, 0, 1, 0, 4, 1, 2);
+  const ZImg img(path, secondFrameRegion, 0, 1, 1, 1, FileFormat::OpenImageIO);
+  ASSERT_EQ(img.width(), static_cast<size_t>(kAnimatedGifWidth));
+  ASSERT_EQ(img.height(), static_cast<size_t>(kAnimatedGifHeight));
+  ASSERT_EQ(img.numChannels(), 4u);
+  ASSERT_EQ(img.numTimes(), 1u);
+
+  EXPECT_EQ(*img.data<uint8_t>(0, 0, 0, 0), 255u);
+  EXPECT_EQ(*img.data<uint8_t>(0, 0, 0, 1), 0u);
+  EXPECT_EQ(*img.data<uint8_t>(0, 0, 0, 2), 0u);
+  EXPECT_EQ(*img.data<uint8_t>(0, 0, 0, 3), 255u);
+  EXPECT_EQ(*img.data<uint8_t>(1, 0, 0, 0), 0u);
+  EXPECT_EQ(*img.data<uint8_t>(1, 0, 0, 1), 255u);
+  EXPECT_EQ(*img.data<uint8_t>(1, 0, 0, 2), 0u);
+  EXPECT_EQ(*img.data<uint8_t>(1, 0, 0, 3), 255u);
+  EXPECT_EQ(*img.data<uint8_t>(2, 1, 0, 0), 255u);
+  EXPECT_EQ(*img.data<uint8_t>(2, 1, 0, 1), 0u);
+  EXPECT_EQ(*img.data<uint8_t>(2, 1, 0, 2), 0u);
+  EXPECT_EQ(*img.data<uint8_t>(2, 1, 0, 3), 255u);
+}
+
+TEST(ZImgOpenImageIO, ReadsTransparentGifAsCompositedFrames)
+{
+  QTemporaryDir tmp;
+  ASSERT_TRUE(tmp.isValid());
+
+  const QString path = QDir(tmp.path()).filePath(QStringLiteral("oiio_transparent.gif"));
+  writeTransparentGifFixture(path);
+  ASSERT_TRUE(QFile::exists(path));
+
+  const ZImgRegion secondFrameRegion(0, kAnimatedGifWidth, 0, kAnimatedGifHeight, 0, 1, 0, 4, 1, 2);
+  const ZImg img(path, secondFrameRegion, 0, 1, 1, 1, FileFormat::OpenImageIO);
+  ASSERT_EQ(img.width(), static_cast<size_t>(kAnimatedGifWidth));
+  ASSERT_EQ(img.height(), static_cast<size_t>(kAnimatedGifHeight));
+  ASSERT_EQ(img.numChannels(), 4u);
+  ASSERT_EQ(img.numTimes(), 1u);
+
+  EXPECT_EQ(*img.data<uint8_t>(0, 0, 0, 0), 255u);
+  EXPECT_EQ(*img.data<uint8_t>(0, 0, 0, 1), 0u);
+  EXPECT_EQ(*img.data<uint8_t>(0, 0, 0, 2), 0u);
+  EXPECT_EQ(*img.data<uint8_t>(0, 0, 0, 3), 255u);
+  EXPECT_EQ(*img.data<uint8_t>(1, 0, 0, 0), 0u);
+  EXPECT_EQ(*img.data<uint8_t>(1, 0, 0, 1), 255u);
+  EXPECT_EQ(*img.data<uint8_t>(1, 0, 0, 2), 0u);
+  EXPECT_EQ(*img.data<uint8_t>(1, 0, 0, 3), 255u);
+  EXPECT_EQ(*img.data<uint8_t>(2, 1, 0, 0), 255u);
+  EXPECT_EQ(*img.data<uint8_t>(2, 1, 0, 1), 0u);
+  EXPECT_EQ(*img.data<uint8_t>(2, 1, 0, 2), 0u);
+  EXPECT_EQ(*img.data<uint8_t>(2, 1, 0, 3), 255u);
+}
+
+TEST(ZImgOpenImageIO, ReadsBackgroundDisposedGifAsCompositedFrames)
+{
+  QTemporaryDir tmp;
+  ASSERT_TRUE(tmp.isValid());
+
+  const QString path = QDir(tmp.path()).filePath(QStringLiteral("oiio_background_disposed.gif"));
+  writeBackgroundDisposedGifFixture(path);
+  ASSERT_TRUE(QFile::exists(path));
+
+  const ZImgRegion secondFrameRegion(0, kAnimatedGifWidth, 0, kAnimatedGifHeight, 0, 1, 0, 4, 1, 2);
+  const ZImg img(path, secondFrameRegion, 0, 1, 1, 1, FileFormat::OpenImageIO);
+  ASSERT_EQ(img.width(), static_cast<size_t>(kAnimatedGifWidth));
+  ASSERT_EQ(img.height(), static_cast<size_t>(kAnimatedGifHeight));
+  ASSERT_EQ(img.numChannels(), 4u);
+  ASSERT_EQ(img.numTimes(), 1u);
+
+  EXPECT_EQ(*img.data<uint8_t>(0, 0, 0, 0), 0u);
+  EXPECT_EQ(*img.data<uint8_t>(0, 0, 0, 1), 0u);
+  EXPECT_EQ(*img.data<uint8_t>(0, 0, 0, 2), 255u);
+  EXPECT_EQ(*img.data<uint8_t>(0, 0, 0, 3), 255u);
+  EXPECT_EQ(*img.data<uint8_t>(1, 0, 0, 0), 0u);
+  EXPECT_EQ(*img.data<uint8_t>(1, 0, 0, 1), 255u);
+  EXPECT_EQ(*img.data<uint8_t>(1, 0, 0, 2), 0u);
+  EXPECT_EQ(*img.data<uint8_t>(1, 0, 0, 3), 255u);
+  EXPECT_EQ(*img.data<uint8_t>(2, 1, 0, 0), 0u);
+  EXPECT_EQ(*img.data<uint8_t>(2, 1, 0, 1), 0u);
+  EXPECT_EQ(*img.data<uint8_t>(2, 1, 0, 2), 255u);
+  EXPECT_EQ(*img.data<uint8_t>(2, 1, 0, 3), 255u);
 }
 
 TEST(ZImgOpenImageIO, RejectsInvalidScene)
