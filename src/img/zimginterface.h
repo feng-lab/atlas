@@ -211,14 +211,12 @@ enum class FileFormat
   Jpeg = 6,
   JpegXR = 7,
   Png = 8,
-#if defined(ZIMG_HAVE_FREEIMAGE)
-  FreeImage = 9,
-#endif
   MetaImage = 10,
   ZeissCZI = 11,
   ITKImage = 12,
   Leica = 13,
-  BioFormats = 14,
+  OpenImageIO = 14,
+  BioFormats = 15,
 };
 
 enum class Compression : std::uint16_t

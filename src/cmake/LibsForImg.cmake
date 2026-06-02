@@ -83,6 +83,16 @@ print_target_properties(cpuinfo::cpuinfo)
 
 set(JPEGTURBO_INCLUDE_DIRS ${JPEGTURBO_INCLUDE_DIRS}
     ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/include)
+find_package(libjpeg-turbo CONFIG REQUIRED
+             PATHS ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build NO_DEFAULT_PATH)
+if (TARGET libjpeg-turbo::jpeg-static AND NOT TARGET libjpeg-turbo::jpeg)
+  add_library(libjpeg-turbo::jpeg INTERFACE IMPORTED)
+  set_property(TARGET libjpeg-turbo::jpeg PROPERTY INTERFACE_LINK_LIBRARIES libjpeg-turbo::jpeg-static)
+endif ()
+if (TARGET libjpeg-turbo::jpeg AND NOT TARGET JPEG::JPEG)
+  add_library(JPEG::JPEG INTERFACE IMPORTED)
+  set_property(TARGET JPEG::JPEG PROPERTY INTERFACE_LINK_LIBRARIES libjpeg-turbo::jpeg)
+endif ()
 if (WIN32)
   set(JPEGTURBO_LIBRARIES ${JPEGTURBO_LIBRARIES}
       ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/lib/jpeg-static.lib
@@ -94,6 +104,7 @@ else (WIN32)
 endif (WIN32)
 message(STATUS "JPEGTURBO_INCLUDE_DIRS: ${JPEGTURBO_INCLUDE_DIRS}")
 message(STATUS "JPEGTURBO_LIBRARIES: ${JPEGTURBO_LIBRARIES}")
+print_target_properties(libjpeg-turbo::jpeg)
 
 # Our vendored zlib build is static-only. On Windows upstream zlib names that
 # archive `zs.lib`, which CMake's FindZLIB searches only in static mode.
@@ -105,6 +116,12 @@ print_target_properties(ZLIB::ZLIB)
 include(${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/lib/libpng/libpng16.cmake)
 set(PNG_INCLUDE_DIRS ${PNG_INCLUDE_DIRS}
     ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/include/libpng16)
+set(PNG_LIBRARY ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/lib/libpng.a)
+set(PNG_PNG_INCLUDE_DIR ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/include)
+if (TARGET png_static AND NOT TARGET PNG::PNG)
+  add_library(PNG::PNG INTERFACE IMPORTED)
+  set_property(TARGET PNG::PNG PROPERTY INTERFACE_LINK_LIBRARIES png_static)
+endif ()
 message(STATUS "PNG_INCLUDE_DIRS: ${PNG_INCLUDE_DIRS}")
 print_target_properties(png_static)
 
@@ -127,36 +144,6 @@ endif (WIN32)
 message(STATUS "JPEGXR_INCLUDE_DIRS: ${JPEGXR_INCLUDE_DIRS}")
 message(STATUS "JPEGXR_LIBRARIES: ${JPEGXR_LIBRARIES}")
 
-if (ZIMG_DISABLE_FREEIMAGE)
-  set(FREEIMAGE_INCLUDE_DIRS)
-  set(FREEIMAGE_LIBRARIES)
-  set(FREEIMAGE_DLLS)
-  message(STATUS "FreeImage: disabled (ZIMG_DISABLE_FREEIMAGE=ON)")
-else ()
-  if (WIN32)
-    set(FREEIMAGE_INCLUDE_DIRS ${FREEIMAGE_INCLUDE_DIRS}
-        ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/freeimage)
-    set(FREEIMAGE_LIBRARIES ${FREEIMAGE_LIBRARIES}
-        ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/freeimage/FreeImagePlus.lib
-        ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/freeimage/FreeImage.lib)
-    set(FREEIMAGE_DLLS ${FREEIMAGE_DLLS}
-        ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/freeimage/FreeImagePlus.dll
-        ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/freeimage/FreeImage.dll)
-  elseif (APPLE)
-    set(FREEIMAGE_INCLUDE_DIRS ${FREEIMAGE_INCLUDE_DIRS}
-        ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/include)
-    set(FREEIMAGE_LIBRARIES ${FREEIMAGE_LIBRARIES}
-        ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/lib/libfreeimageplus.dylib)
-  else ()
-    set(FREEIMAGE_INCLUDE_DIRS ${FREEIMAGE_INCLUDE_DIRS}
-        ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/include)
-    set(FREEIMAGE_LIBRARIES ${FREEIMAGE_LIBRARIES}
-        ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/lib/libfreeimageplus.so)
-  endif ()
-  message(STATUS "FREEIMAGE_INCLUDE_DIRS: ${FREEIMAGE_INCLUDE_DIRS}")
-  message(STATUS "FREEIMAGE_LIBRARIES: ${FREEIMAGE_LIBRARIES}")
-endif ()
-
 find_package(WebP REQUIRED
              COMPONENTS webp
              PATHS ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build NO_DEFAULT_PATH)
@@ -170,6 +157,61 @@ print_target_properties(liblzma::liblzma)
 find_package(zstd REQUIRED
              PATHS ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build NO_DEFAULT_PATH)
 print_target_properties(zstd::libzstd_static)
+if (TARGET zstd::libzstd_static AND NOT TARGET ZSTD::ZSTD)
+  add_library(ZSTD::ZSTD ALIAS zstd::libzstd_static)
+endif ()
+
+if (NOT TARGET CMath::CMath)
+  add_library(CMath::CMath INTERFACE IMPORTED)
+  find_library(CMATH_LIBRARY m)
+  if (CMATH_LIBRARY)
+    set_property(TARGET CMath::CMath PROPERTY INTERFACE_LINK_LIBRARIES "${CMATH_LIBRARY}")
+  endif ()
+endif ()
+
+find_package(Tiff CONFIG REQUIRED
+             PATHS ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build NO_DEFAULT_PATH)
+if (TARGET TIFF::tiff AND NOT TARGET TIFF::TIFF)
+  add_library(TIFF::TIFF ALIAS TIFF::tiff)
+endif ()
+if (TARGET TIFF::tiffxx AND NOT TARGET TIFF::CXX)
+  add_library(TIFF::CXX ALIAS TIFF::tiffxx)
+endif ()
+print_target_properties(TIFF::tiff)
+print_target_properties(TIFF::CXX)
+
+set(_ATLAS_OPENIMAGEIO_PREFIX ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build)
+set(_ATLAS_PREVIOUS_CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH})
+list(PREPEND CMAKE_PREFIX_PATH ${_ATLAS_OPENIMAGEIO_PREFIX})
+if (APPLE)
+  set(_ATLAS_PREVIOUS_CMAKE_FIND_FRAMEWORK ${CMAKE_FIND_FRAMEWORK})
+  set(CMAKE_FIND_FRAMEWORK LAST)
+endif ()
+
+find_package(Imath CONFIG REQUIRED
+             PATHS ${_ATLAS_OPENIMAGEIO_PREFIX} NO_DEFAULT_PATH)
+find_package(OpenEXR CONFIG REQUIRED
+             PATHS ${_ATLAS_OPENIMAGEIO_PREFIX} NO_DEFAULT_PATH)
+find_package(OpenColorIO CONFIG REQUIRED
+             PATHS ${_ATLAS_OPENIMAGEIO_PREFIX} NO_DEFAULT_PATH)
+find_package(OpenJPEG CONFIG REQUIRED
+             PATHS ${_ATLAS_OPENIMAGEIO_PREFIX} NO_DEFAULT_PATH)
+find_package(fmt CONFIG REQUIRED
+             PATHS ${_ATLAS_OPENIMAGEIO_PREFIX} NO_DEFAULT_PATH)
+find_package(OpenImageIO CONFIG REQUIRED
+             PATHS ${_ATLAS_OPENIMAGEIO_PREFIX} NO_DEFAULT_PATH)
+print_target_properties(OpenColorIO::OpenColorIO)
+print_target_properties(fmt::fmt)
+print_target_properties(fmt::fmt-header-only)
+print_target_properties(OpenImageIO::OpenImageIO)
+
+set(CMAKE_PREFIX_PATH ${_ATLAS_PREVIOUS_CMAKE_PREFIX_PATH})
+if (APPLE)
+  set(CMAKE_FIND_FRAMEWORK ${_ATLAS_PREVIOUS_CMAKE_FIND_FRAMEWORK})
+endif ()
+unset(_ATLAS_PREVIOUS_CMAKE_FIND_FRAMEWORK)
+unset(_ATLAS_PREVIOUS_CMAKE_PREFIX_PATH)
+unset(_ATLAS_OPENIMAGEIO_PREFIX)
 
 find_package(ITK REQUIRED
              COMPONENTS ITKIOMeta ITKIONIFTI ITKIONRRD ITKIOGDCM ITKBinaryMathematicalMorphology ITKSmoothing

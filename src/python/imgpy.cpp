@@ -494,13 +494,11 @@ NB_MODULE(_imgpy, m)
     .value("Jpeg", FileFormat::Jpeg)
     .value("JpegXR", FileFormat::JpegXR)
     .value("Png", FileFormat::Png)
-#if defined(ZIMG_HAVE_FREEIMAGE)
-    .value("FreeImage", FileFormat::FreeImage)
-#endif
     .value("MetaImage", FileFormat::MetaImage)
     .value("ZeissCZI", FileFormat::ZeissCZI)
     .value("ITKImage", FileFormat::ITKImage)
     .value("Leica", FileFormat::Leica)
+    .value("OpenImageIO", FileFormat::OpenImageIO)
     .value("BioFormats", FileFormat::BioFormats);
 
   nb::enum_<Compression>(m, "Compression", nb::is_arithmetic())

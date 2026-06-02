@@ -60,8 +60,7 @@ Available classes:
 
 ### `ZImgSource` input model
 
-These tracing workers accept `ZImgSource`, not just a plain filename. This
-matches Atlas' native image-source model and supports:
+These tracing workers accept `ZImgSource`:
 
 - single files
 - file lists
@@ -241,9 +240,8 @@ Supported file formats depend on how the wheel/source was built. The
 `zimg.FileFormat` enum includes:
 
 - `Tiff`, `OmeTiff`, `Png`, `Jpeg`, `JpegXR`
-- `ZeissCZI`, `ZeissLsm`, `Leica`, `BioFormats`
+- `ZeissCZI`, `ZeissLsm`, `Leica`, `OpenImageIO`, `BioFormats`
 - `Vaa3DRaw`, `HDF5Img`, `MetaImage`, `ITKImage`
-- `FreeImage` (optional; omitted when built with `-DZIMG_DISABLE_FREEIMAGE=ON`)
 
 `BioFormats` requires OME's `bioformats_package.jar`, which is not installed by
 default. Configure an existing jar with

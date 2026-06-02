@@ -213,11 +213,7 @@ def _apply_scikit_build_core_toolchain_env(env: dict[str, str]) -> None:
         )
 
 
-def _assert_linux_wheel_contains_expected_libs(
-    wheel_path: Path,
-    *,
-    expect_freeimage: bool,
-) -> None:
+def _assert_linux_wheel_contains_expected_libs(wheel_path: Path) -> None:
     expected_exact_libs = {
         "libtbb.so.12",
         "libQt6Core.so.6",
@@ -255,27 +251,6 @@ def _assert_linux_wheel_contains_expected_libs(
         name for name in expected_exact_libs if not _has_expected_lib(name)
     )
 
-    freeimage_present = any(
-        name.startswith("libfreeimageplus.so") or name.startswith("libfreeimageplus-")
-        for name in lib_names
-    )
-    if expect_freeimage:
-        if not freeimage_present:
-            missing.append("libfreeimageplus.so*")
-    else:
-        if freeimage_present:
-            unexpected = sorted(
-                name
-                for name in lib_names
-                if name.startswith("libfreeimageplus.so")
-                or name.startswith("libfreeimageplus-")
-            )
-            raise RuntimeError(
-                "Linux wheel contains FreeImage shared libraries, but FreeImage was disabled.\n"
-                f"wheel: {wheel_path}\n"
-                f"unexpected: {unexpected}"
-            )
-
     if missing:
         raise RuntimeError(
             "Linux wheel is missing expected shared libraries. "
@@ -286,9 +261,8 @@ def _assert_linux_wheel_contains_expected_libs(
             f"missing: {missing}"
         )
     logger.info(
-        "Linux wheel contains expected shared libraries (%d + FreeImage=%s)",
+        "Linux wheel contains expected shared libraries (%d)",
         len(expected_exact_libs),
-        "on" if expect_freeimage else "off",
     )
 
 
@@ -470,12 +444,6 @@ def main() -> int:
         ),
     )
     parser.add_argument(
-        "--disable-freeimage",
-        dest="disable_freeimage",
-        action="store_true",
-        help="Build zimg without FreeImage support (passes -DZIMG_DISABLE_FREEIMAGE=ON).",
-    )
-    parser.add_argument(
         "--conda-upload",
         dest="conda_upload",
         choices=("auto", "always", "never"),
@@ -534,9 +502,6 @@ def main() -> int:
 
     if args.dry_run:
         logger.info("Build command: %s", " ".join(cmd))
-        logger.info(
-            "FreeImage: %s", "disabled" if args.disable_freeimage else "enabled"
-        )
         logger.info("Conda upload policy: %s", args.conda_upload)
         atlas_pypi.maybe_upload_to_pypi(
             out_dir,
@@ -604,8 +569,6 @@ def main() -> int:
         else:
             env_base = os.environ.copy()
         env_base["ZIMG_SRC_DIR"] = str(zimg_src_dir)
-        if args.disable_freeimage:
-            _append_cmake_args(env_base, ["-DZIMG_DISABLE_FREEIMAGE=ON"])
 
         env = env_base.copy()
         if common_dirs.is_mac():
@@ -648,9 +611,7 @@ def main() -> int:
                     )
         if common_dirs.is_linux():
             for wheel_path in wheels:
-                _assert_linux_wheel_contains_expected_libs(
-                    wheel_path, expect_freeimage=not args.disable_freeimage
-                )
+                _assert_linux_wheel_contains_expected_libs(wheel_path)
         for wheel in wheels:
             logger.info("Built: %s", wheel)
     else:

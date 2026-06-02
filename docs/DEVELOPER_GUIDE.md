@@ -23,7 +23,7 @@ ROI Mask Import
   adaptive refinement: fit the existing natural cubic spline, measure bidirectional boundary error against the dense contour,
   insert the worst offending contour point, and repeat until the requested tolerance is met or the selected fallback policy
   applies. The default fallback keeps the best spline because mask import is primarily an editable starting point for noisy
-  segmentation, not an exact mask-vectorization endpoint.
+  segmentation.
 - Sampled spline output preserves the historical quick fixed-stride behavior. It uses the configurable sampled target point
   count and maximum contour-point spacing; defaults match the previous constants (`20` and `30`).
 - Do not add hidden fixed point-count sampling or hidden caps outside the explicit sampled-spline mode. If a smoothing
@@ -86,7 +86,7 @@ Entry Points
   - `zToXYRatio = voxelSizeZ / voxelSizeXY` is explicit at the tracing API boundary. Entry points decide it once; the
     tracing stack then passes that value through consistently instead of recomputing anisotropy from signal metadata in
     inner loops.
-  - neuTube tracing keeps locseg positions in isotropized trace space, not raw image space: callers multiply
+  - neuTube tracing keeps locseg positions in isotropized trace space: callers multiply
     input seed/click `z` by `zToXYRatio` when creating locseg geometry, while sampling and mask queries divide by
     `zToXYRatio` to get back to image voxels.
   - Legacy workspace fields named `resolution` remain in a few tracing ports (`TraceWorkspace`, connection-test
@@ -172,10 +172,9 @@ Native TIFF And OME-TIFF
 
 - Plain TIFF and OME-TIFF share the native `ZTiff` parser/decoder. `ZImgTiff::readInfo` detects tiled normal TIFF IFDs and creates `ZImgTileSubBlock`s that match the file's tile size; stripped TIFFs use 512x512 logical subblocks. `ZImgTiff::readImg` uses `ZTiff::readRegionFromIFD` so region requests decode only intersecting tiles or, when the file's `RowsPerStrip` permits it, only intersecting strips. One-strip-per-plane TIFFs still require libtiff to decode that strip, but Atlas no longer allocates and copies a full output plane for small region reads.
 - Native plain TIFF export writes 512x512 tiled pages by default. This keeps large Atlas-generated TIFFs pageable for interactive rendering while preserving classic TIFF/BigTIFF selection based on projected payload size.
-- OME-TIFF is a native C++ reader/writer path (`ZImgOmeTiff`), not a Java bridge feature. Keep native readers ahead of `ZImgBioFormats` in reader selection so `.ome.tif/.ome.tiff/.ome.tf2/.ome.tf8/.ome.btf` files use Atlas' TIFF stack first.
 - The native reader treats OME XML `TiffData` as authoritative for scene, Z, C, and T mapping. Do not assume physical IFD order is `ZCT`; multi-series and non-linear IFD layouts must map through the parsed plane table.
 - Some legacy writers emit explicit `TiffData IFD` values as 1-based indexes. Atlas only applies that compatibility normalization when the zero-based interpretation reaches past the last IFD; valid zero-based mappings that intentionally start at IFD 1 are left unchanged.
-- OME SubIFDs are pyramid sub-resolutions, not ordinary image planes. Reduced-resolution SubIFDs are exposed as `ZImgSubBlock`s when their dimensions form integer XY downsample ratios relative to resolution 0. Resolution 0 remains the canonical scene geometry used by `ZImgInfo`.
+- OME SubIFDs are pyramid sub-resolutions. Reduced-resolution SubIFDs are exposed as `ZImgSubBlock`s when their dimensions form integer XY downsample ratios relative to resolution 0. Resolution 0 remains the canonical scene geometry used by `ZImgInfo`.
 - Native region reads use `ZTiff::readRegionFromIFD` so tiled and stripped TIFF pages can serve just the requested XY/C window. Keep this path free of Java/Bio-Formats dependencies.
 - Binary-only OME-TIFFs may point at a companion OME metadata file via `BinaryOnly MetadataFile`; Atlas resolves the companion metadata relative to the binary TIFF and still reads pixels natively from the referenced TIFF files.
 - Writer output uses OME 2016-06 XML with explicit one-plane `TiffData` entries matching the full-resolution IFD order written by Atlas. `ZImgOmeTiff::writeImg` writes 512x512 tiled TIFF pages and automatically attaches XY-only SubIFD pyramid levels while keeping reduced images out of OME `TiffData`, as required by the OME SubIFD pyramid contract.
@@ -1256,7 +1255,7 @@ Additional Architecture Notes
 - Debugging GL state
   - Enable `--atlas_debug_opengl` for per-call error checks (costly); `--atlas_log_glbinding_context_switch` to audit context switches.
   - When diagnosing rendering differences across devices, log `Z3DGpuInfo::instance().logGpuInfo()` output for driver/features.
-  - GPU caps source: `Z3DGpuInfo` reports GPU memory as a planning capacity, not a live free/budget value. OpenGL first
+  - GPU caps source: `Z3DGpuInfo` reports GPU memory as a planning capacity. OpenGL first
     accepts true static-capacity extensions such as NVIDIA dedicated vidmem, then falls back to `ZGpuMemoryCapacityInfo`
     platform probes (DXGI dedicated memory on Windows, Metal `recommendedMaxWorkingSetSize` on macOS, DRM
     `mem_info_vram_total` on Linux; Linux ranks real render-capable PCI DRM cards ahead of obvious virtual/simple

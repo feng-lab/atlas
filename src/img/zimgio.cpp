@@ -11,9 +11,7 @@
 #include "zimgjpeg.h"
 #include "zimgjpegxr.h"
 #include "zimgpng.h"
-#if defined(ZIMG_HAVE_FREEIMAGE)
-#include "zimgfreeimage.h"
-#endif
+#include "zimgopenimageio.h"
 #include "zimgmetaimage.h"
 #include "zimgitkimage.h"
 #include "zimgbioformats.h"
@@ -49,13 +47,11 @@ ZImgIO::ZImgIO()
   m_ioFormats[FileFormat::Jpeg] = std::make_unique<ZImgJpeg>();
   m_ioFormats[FileFormat::JpegXR] = std::make_unique<ZImgJpegXR>();
   m_ioFormats[FileFormat::Png] = std::make_unique<ZImgPng>();
-#if defined(ZIMG_HAVE_FREEIMAGE)
-  m_ioFormats[FileFormat::FreeImage] = std::make_unique<ZImgFreeImage>();
-#endif
   m_ioFormats[FileFormat::MetaImage] = std::make_unique<ZImgMetaImage>();
   m_ioFormats[FileFormat::ITKImage] = std::make_unique<ZImgITKImage>();
   m_ioFormats[FileFormat::HDF5Img] = std::make_unique<ZImgHDF5>();
   m_ioFormats[FileFormat::Leica] = std::make_unique<ZImgLeica>();
+  m_ioFormats[FileFormat::OpenImageIO] = std::make_unique<ZImgOpenImageIO>();
   m_ioFormats[FileFormat::BioFormats] = std::make_unique<ZImgBioFormats>();
 }
 

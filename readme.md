@@ -133,15 +133,11 @@ CPython is supported as long as the wheel continues to target that configured
 ## C++ Version Defines
 * $Repository_DIR/CMakeLists.txt: set(CMAKE_CXX_STANDARD 20)
 * $Repository_DIR/util/build_ext_libs.py: def cpp_standard() ... // fix to 20 now
-* $Repository_DIR/src/3rdparty/freeimage-makefiles/Makefile_fip: -stdlib=libc++ -std=c++14 // todo: change to 20
-* $Repository_DIR/src/3rdparty/freeimage-makefiles/Makefile_gun: -stdlib=libc++ -std=c++14 // todo: change to 20
 * $Repository_DIR/src/python/CMakeLists.txt: set(CMAKE_CXX_STANDARD 20)
 
 ## Minimum macOS Defines
 * $Repository_DIR/CMakeLists.txt: set(CMAKE_OSX_DEPLOYMENT_TARGET 12.0)
 * $Repository_DIR/util/build_ext_libs.py: def macos_min_version() ...
-* $Repository_DIR/src/3rdparty/freeimage-makefiles/Makefile_fip: change all -mmacosx-version-min=12.0
-* $Repository_DIR/src/3rdparty/freeimage-makefiles/Makefile_gun: change all -mmacosx-version-min=12.0
 * $Repository_DIR/src/python/CMakeLists.txt: set(CMAKE_OSX_DEPLOYMENT_TARGET 12.0)
 
 ## Visual Studio Update

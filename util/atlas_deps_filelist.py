@@ -15,6 +15,16 @@ files_to_download = [
         "filename": "brotli-1.2.0.zip",
     },
     {
+        "expected_size": 447175,
+        "expected_sha256": "be7ffbd057cadebe2aa144542fd90c6838c6a083b5e8a9048b8ee3b66b29d5fb",
+        "filename": "giflib-5.2.2.tar.gz",
+    },
+    {
+        "expected_size": 2234665,
+        "expected_sha256": "7e0be78b8318e8bdbf6fa545d2ecb4c90f947df03f7aadc42c1967f019e63343",
+        "filename": "highway-1.2.0.tar.gz",
+    },
+    {
         "expected_size": 53121812,
         "expected_sha256": "deae7c80cba99c4b4f940ecadb3c3338b13cb77418409238e57d7f31f2a3b736",
         "filename": "openssl-3.5.6.tar.gz",
@@ -43,6 +53,11 @@ files_to_download = [
         "expected_size": 2492624,
         "expected_sha256": "1048d084b89ac1587e3b0dca00b863a757fed2bc1804c6355eb4bce9090356b7",
         "filename": "openjpeg-2.5.4.zip",
+    },
+    {
+        "expected_size": 55380851,
+        "expected_sha256": "e6140dc6ffca92becbb1cc0ade2addb34a4b66df78f71cb9bc93380c0120e7de",
+        "filename": "OpenImageIO-3.1.14.0.tar.gz",
     },
     {
         "expected_size": 64009719,
@@ -78,11 +93,6 @@ files_to_download = [
         "expected_size": 289808,
         "expected_sha256": "26a40fa8595694dec2fad4911e62d29e10525d2133c9a4230b66397774ae25bf",
         "filename": "ninja-win.zip",
-    },
-    {
-        "expected_size": 8314627,
-        "expected_sha256": "dd9256cc7ad3a140b1fa9035c56102455441c26d924d7d8443fe06ba54261607",
-        "filename": "freeimage-svn-r1911-FreeImage-trunk.zip",
     },
     {
         "expected_size": 1448542,
@@ -153,6 +163,26 @@ files_to_download = [
         "expected_size": 3833512,
         "expected_sha256": "93a852c2b3efafee3723efd4636de855b46f9fe1efddd607e1f42f60fc8f2136",
         "filename": "libwebp-1.6.0.tar.gz",
+    },
+    {
+        "expected_size": 1882762,
+        "expected_sha256": "ab38928f7f6248e2a98cc184956021acb927b16a0dee71b4d260dc040a4320ea",
+        "filename": "libjxl-0.11.2.tar.gz",
+    },
+    {
+        "expected_size": 10054247,
+        "expected_sha256": "25672da9917e84f22712b55850997296fe0a1a8a519859c7ad3c624a310edc48",
+        "filename": "skcms-b2e692629c1fb19342517d7fb61f1cf83d075492.tar.gz",
+    },
+    {
+        "expected_size": 1682411,
+        "expected_sha256": "a789dc4e2409e2901d93793a4e0b80c7b49d0d97cf6ad71c850eb7616acfd786",
+        "filename": "LibRaw-0.22.1.tar.gz",
+    },
+    {
+        "expected_size": 14063,
+        "expected_sha256": "3cd218bf6d1254de86e27269541277fbfc5bae57a9002ce0b46fbe2a97088b43",
+        "filename": "LibRaw-cmake-eb98e4325aef2ce85d2eb031c2ff18640ca616d3.tar.gz",
     },
     {
         "expected_size": 51947513,

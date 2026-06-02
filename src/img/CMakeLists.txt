@@ -3,54 +3,6 @@ project(img)
 
 # main stuff
 
-# tiff srcs
-set(TIFFDIR ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/libtiff/libtiff)
-set(TIFF_ATLAS_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/libtiff_atlas/include)
-set(TIFF_SOURCES
-        ${TIFFDIR}/tif_aux.c
-        ${TIFFDIR}/tif_close.c
-        ${TIFFDIR}/tif_codec.c
-        ${TIFFDIR}/tif_color.c
-        ${TIFFDIR}/tif_compress.c
-        ${TIFFDIR}/tif_dir.c
-        ${TIFFDIR}/tif_dirinfo.c
-        ${TIFFDIR}/tif_dirread.c
-        ${TIFFDIR}/tif_dirwrite.c
-        ${TIFFDIR}/tif_dumpmode.c
-        ${TIFFDIR}/tif_error.c
-        ${TIFFDIR}/tif_extension.c
-        ${TIFFDIR}/tif_fax3.c
-        ${TIFFDIR}/tif_fax3sm.c
-        ${TIFFDIR}/tif_flush.c
-        ${TIFFDIR}/tif_getimage.c
-        ${TIFFDIR}/tif_luv.c
-        ${TIFFDIR}/tif_lzw.c
-        ${TIFFDIR}/tif_next.c
-        ${TIFFDIR}/tif_open.c
-        ${TIFFDIR}/tif_packbits.c
-        ${TIFFDIR}/tif_pixarlog.c
-        ${TIFFDIR}/tif_predict.c
-        ${TIFFDIR}/tif_print.c
-        ${TIFFDIR}/tif_read.c
-        ${TIFFDIR}/tif_strip.c
-        ${TIFFDIR}/tif_swab.c
-        ${TIFFDIR}/tif_thunder.c
-        ${TIFFDIR}/tif_tile.c
-        ${TIFFDIR}/tif_version.c
-        ${TIFFDIR}/tif_warning.c
-        ${TIFFDIR}/tif_write.c
-        ${TIFFDIR}/tif_zip.c
-        ${TIFFDIR}/tif_jpeg.c
-        ${TIFFDIR}/tif_jpeg_12.c
-        ${TIFFDIR}/tif_lzma.c
-        ${TIFFDIR}/tif_zstd.c
-        ${TIFFDIR}/tif_webp.c
-        ${TIFFDIR}/tif_stream.cxx
-        ${TIFFDIR}/tif_hash_set.c
-)
-list(APPEND TIFF_SOURCES ${TIFFDIR}/tif_unix.c)
-source_group(libtiff FILES ${TIFF_SOURCES})
-
 set(protobuf_PROTOC_EXE protobuf::protoc)
 set(BIOFORMATS_PROTO ${CMAKE_CURRENT_SOURCE_DIR}/../protos/bioformats_bridge.proto)
 protobuf_generate(LANGUAGE cpp APPEND_PATH PROTOC_OUT_DIR ${CMAKE_CURRENT_BINARY_DIR} OUT_VAR BIOFORMATS_PROTO_SRCS
@@ -88,6 +40,7 @@ set(IMG_SOURCES
         zimgmetaimage.h zimgmetaimage.cpp
         zimgmetatag.h zimgmetatag.cpp
         zimgometiff.h zimgometiff.cpp
+        zimgopenimageio.h zimgopenimageio.cpp
         zimgpng.h zimgpng.cpp
         zimgregion.h zimgregion.cpp
         zimgsliceprovider.h zimgsliceprovider.cpp
@@ -288,21 +241,13 @@ set(IMG_SOURCES
     zrunneutucommand2.cpp zrunneutucommand2.h
 )
 
-if (NOT ZIMG_DISABLE_FREEIMAGE)
-    list(APPEND IMG_SOURCES zimgfreeimage.h zimgfreeimage.cpp)
-endif ()
-
 message(STATUS "CMAKE_CXX_COMPILER_ID: ${CMAKE_CXX_COMPILER_ID}")
 message(STATUS "CMAKE_LINKER: ${CMAKE_LINKER}")
 
 # our target
 set(LIBRARY_NAME img)
-add_library(${LIBRARY_NAME} STATIC ${TIFF_SOURCES} ${IMG_SOURCES} ${BIOFORMATS_PROTO_SRCS} ${BIOFORMATS_GRPC_SRCS})
+add_library(${LIBRARY_NAME} STATIC ${IMG_SOURCES} ${BIOFORMATS_PROTO_SRCS} ${BIOFORMATS_GRPC_SRCS})
 set_property(TARGET ${LIBRARY_NAME} PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELEASE ${ATLAS_ENABLE_RELEASE_IPO})
-
-if (NOT ZIMG_DISABLE_FREEIMAGE)
-    target_compile_definitions(${LIBRARY_NAME} PUBLIC ZIMG_HAVE_FREEIMAGE)
-endif ()
 
 # mkl
 target_compile_definitions(${LIBRARY_NAME} PUBLIC ZIMG_USE_MKL)
@@ -328,15 +273,7 @@ target_compile_definitions(${LIBRARY_NAME} PUBLIC QT_NO_KEYWORDS QT_USE_QSTRINGB
         QT_NO_CAST_TO_ASCII QT_NO_VERSION_TAGGING)
 target_compile_definitions(${LIBRARY_NAME} PUBLIC BOOST_CONTAINER_NO_LIB BOOST_JSON_NO_LIB)
 
-target_compile_definitions(${LIBRARY_NAME} PRIVATE TIFF_DO_NOT_USE_NON_EXT_ALLOC_FUNCTIONS)
-set_source_files_properties(${TIFF_SOURCES} ztiff.cpp PROPERTIES INCLUDE_DIRECTORIES "${TIFF_ATLAS_INCLUDE_DIR};${TIFFDIR}")
-set_source_files_properties(${TIFFDIR}/tif_open.c PROPERTIES COMPILE_DEFINITIONS ALLOW_TIFF_NON_EXT_ALLOC_FUNCTIONS)
-# set_source_files_properties(${TIFFDIR}/tif_win32.c PROPERTIES COMPILE_DEFINITIONS ALLOW_TIFF_NON_EXT_ALLOC_FUNCTIONS)
-set_source_files_properties(${TIFFDIR}/tif_unix.c PROPERTIES COMPILE_DEFINITIONS ALLOW_TIFF_NON_EXT_ALLOC_FUNCTIONS)
 set_source_files_properties(zimgpng.cpp PROPERTIES INCLUDE_DIRECTORIES "${PNG_INCLUDE_DIRS}")
-if (NOT ZIMG_DISABLE_FREEIMAGE)
-    set_source_files_properties(zimgfreeimage.cpp PROPERTIES INCLUDE_DIRECTORIES "${FREEIMAGE_INCLUDE_DIRS}")
-endif ()
 set_source_files_properties(zimgjpegxr.cpp PROPERTIES INCLUDE_DIRECTORIES "${JPEGXR_INCLUDE_DIRS}")
 set_source_files_properties(zimginterpolate.cpp PROPERTIES
         INCLUDE_DIRECTORIES "${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/ITKMorphologicalContourInterpolation")
@@ -412,7 +349,6 @@ if (WIN32)
         target_compile_options(${LIBRARY_NAME} PUBLIC /clang:-Wno-missing-field-initializers)
         # Keep clang-cl aligned with non-Windows Clang for Eigen-heavy img code.
         target_compile_options(${LIBRARY_NAME} PUBLIC /clang:-mllvm /clang:-inline-threshold=600)
-        set_source_files_properties(${TIFF_SOURCES} PROPERTIES COMPILE_FLAGS "/clang:-Wno-reserved-identifier /clang:-Wno-unused-parameter /clang:-Wno-unused-command-line-argument /clang:-Wno-sign-conversion /clang:-Wno-format")
     endif ()
     # standard conformance
     target_compile_options(${LIBRARY_NAME} PUBLIC /volatile:iso /Zc:inline)
@@ -448,16 +384,12 @@ else (WIN32)
         target_compile_options(${LIBRARY_NAME} PUBLIC -Wno-missing-field-initializers)
         target_compile_options(${LIBRARY_NAME} PRIVATE -Wundefined-reinterpret-cast)
 
-        set_source_files_properties(${TIFF_SOURCES} PROPERTIES COMPILE_FLAGS "-Wno-unused-parameter -Wno-unused-command-line-argument")
-
         if (APPLE)
             target_compile_options(${LIBRARY_NAME} PUBLIC -stdlib=libc++)
             target_link_options(${LIBRARY_NAME} PUBLIC -stdlib=libc++)
         else ()
             target_compile_options(${LIBRARY_NAME} PUBLIC -fsized-deallocation)
         endif ()
-    elseif (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-        set_source_files_properties(${TIFF_SOURCES} PROPERTIES COMPILE_FLAGS "-Wno-unused-parameter -Wno-unused-but-set-variable")
     endif ()
 
     if (ATLAS_SANITIZE_ADDRESS)
@@ -480,10 +412,6 @@ else (WIN32)
     set_source_files_properties(zregistrationoptimizer.cpp PROPERTIES COMPILE_FLAGS -Wno-shadow)
 endif (WIN32)
 
-if (NOT ZIMG_DISABLE_FREEIMAGE)
-    target_link_libraries(${LIBRARY_NAME} PUBLIC ${FREEIMAGE_LIBRARIES})
-endif ()
-
 target_link_libraries(${LIBRARY_NAME} PUBLIC ${ITK_LIBRARIES} ${JPEGTURBO_LIBRARIES}
         png_static ${JPEGXR_LIBRARIES} cpuinfo::cpuinfo
         hdf5_cpp-static hdf5-static Ceres::ceres Folly::folly Eigen3::Eigen
@@ -493,7 +421,7 @@ target_link_libraries(${LIBRARY_NAME} PUBLIC ${ITK_LIBRARIES} ${JPEGTURBO_LIBRAR
         absl::check absl::failure_signal_handler absl::log absl::log_globals
         absl::log_initialize absl::log_sink absl::log_sink_registry absl::symbolize
         glm::glm-header-only
-        WebP::webp zstd::libzstd_static liblzma::liblzma ZLIB::ZLIB
+        TIFF::CXX OpenImageIO::OpenImageIO WebP::webp zstd::libzstd_static liblzma::liblzma ZLIB::ZLIB
         ${VTK_LIBRARIES} assimp::assimp TBB::tbb
         glog::glog gRPC::grpc++ protobuf::libprotobuf ${_QT_LIBS_})
 

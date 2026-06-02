@@ -2117,10 +2117,6 @@ def build_atlas_package(is_debug_version: bool = False, release_pdb: bool = Fals
             )
             # build_ext_libs.glob_copy(os.path.join(common_dirs.assimp_redist_dir(), 'assimp*.dll'),
             #                          os.path.join(common_dirs.deploy_target_dir(), 'Atlas'))
-            build_ext_libs.glob_copy(
-                os.path.join(common_dirs.freeimage_redist_dir(), "*.dll"),
-                os.path.join(common_dirs.deploy_target_dir(), "Atlas"),
-            )
             # build_ext_libs.glob_copy(os.path.join(common_dirs.ext_build_dir(), 'bin', 'vtktoken-*.dll'),
             #                          os.path.join(common_dirs.deploy_target_dir(), 'Atlas'))
             shutil.copy2(

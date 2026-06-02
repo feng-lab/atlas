@@ -4,29 +4,22 @@
 
 namespace nim {
 
-class ZImgFreeImage : public ZImgFormat
+class ZImgOpenImageIO : public ZImgFormat
 {
 public:
-  static ZImgFreeImage& instance();
+  [[nodiscard]] bool supportRead() const override;
 
-  ZImgFreeImage();
+  [[nodiscard]] bool supportWrite() const override;
 
-  // ZImgFormat interface
+  [[nodiscard]] QString shortName() const override;
 
-public:
-  bool supportRead() const override;
+  [[nodiscard]] QString fullName() const override;
 
-  bool supportWrite() const override;
+  [[nodiscard]] QStringList extensions() const override;
 
-  QString shortName() const override;
-
-  QString fullName() const override;
-
-  QStringList extensions() const override;
-
-  FileFormat format() const override
+  [[nodiscard]] FileFormat format() const override
   {
-    return FileFormat::FreeImage;
+    return FileFormat::OpenImageIO;
   }
 
   void readInfo(const QString& filename,
@@ -44,9 +37,9 @@ public:
                size_t scene,
                const ZImgReadOptions& readOptions = ZImgReadOptions::complete()) override;
 
-  static void readMemInfo(uint8_t* mem, size_t size, ZImgInfo& info);
+  static void readMemInfo(const uint8_t* mem, size_t size, ZImgInfo& info);
 
-  static void readMemImg(uint8_t* mem, size_t size, uint8_t* des, size_t desSize);
+  static void readMemImg(const uint8_t* mem, size_t size, uint8_t* des, size_t desSize);
 };
 
 } // namespace nim

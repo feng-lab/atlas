@@ -93,11 +93,11 @@ TEST_ENUM_CONVERSIONS(FileFormat,
                       {FileFormat::Jpeg, "Jpeg"},
                       {FileFormat::JpegXR, "JpegXR"},
                       {FileFormat::Png, "Png"},
-                      {FileFormat::FreeImage, "FreeImage"},
                       {FileFormat::MetaImage, "MetaImage"},
                       {FileFormat::ZeissCZI, "ZeissCZI"},
                       {FileFormat::ITKImage, "ITKImage"},
                       {FileFormat::Leica, "Leica"},
+                      {FileFormat::OpenImageIO, "OpenImageIO"},
                       {FileFormat::BioFormats, "BioFormats"});
 
 TEST(EnumConversionTests, FileFormatInvalidEnum2)

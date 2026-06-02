@@ -1583,7 +1583,7 @@ The complete extension inventory below is generated from the Release build with:
 Atlas --run_dump_animation3d_schema --dump_output_dir <dir>
 ```
 
-The command writes `supported_file_formats.json` beside the animation schema. Regenerate the file after dependency or packaging changes because Bio-Formats, ITK ImageIO, FreeImage, Assimp, and optional build flags can change the available suffix list. Atlas tries native C++ readers first, then falls back to Bio-Formats for image files that are not handled natively.
+The command writes `supported_file_formats.json` beside the animation schema.
 
 #### Lookup Workflow
 
@@ -1607,7 +1607,7 @@ The tables below include the common names, vendor names, and aliases users usual
 | Zeiss CZI, Carl Zeiss Image | `.czi` | Zeiss microscopy container with scenes, channels, pyramids, and metadata. | Native reader first; Bio-Formats fallback can cover additional variants. |
 | Zeiss AxioVision ZVI | `.zvi` | Zeiss AxioVision microscopy images. | Bio-Formats-backed. |
 | Leica LIF, LOF, XLEF | `.lif`, `.lof`, `.xlef`, `.lei` | Leica microscope project/image containers and sidecar metadata. | Native reader for `.lif`/`.lof`/`.xlef`; Bio-Formats fallback. Keep related sidecar files together. |
-| Vaa3D raw, V3DRAW | `.v3draw`, `.raw` | Minimal XYZCT raw stacks used by Vaa3D and neuron-imaging workflows. | Native Atlas reader/writer. `.raw` is ambiguous; use image loading, not mesh loading, for Vaa3D raw stacks. |
+| Vaa3D raw, V3DRAW | `.v3draw`, `.raw` | Minimal XYZCT raw stacks used by Vaa3D and neuron-imaging workflows. | Native Atlas reader/writer. |
 | HDF5, HDF, Atlas NIM | `.h5`, `.hdf`, `.nim` | Hierarchical/chunked array storage. `.nim` is Atlas image-pack storage. | Native Atlas HDF5 for `.h5`/`.nim`; dependency readers may also expose HDF-based scientific formats. |
 | MetaImage, Kitware MetaImage | `.mha`, `.mhd` | Medical/scientific volume format. `.mha` is usually single-file; `.mhd` usually references a raw sidecar. | Native Atlas MetaImage and ITK ImageIO support. Keep `.mhd` sidecar payloads with the header. |
 | NIfTI, Neuroimaging Informatics Technology Initiative | `.nii`, `.nii.gz` | Neuroimaging volumes with orientation and voxel metadata. | ITK-backed. |
@@ -1622,18 +1622,18 @@ The tables below include the common names, vendor names, and aliases users usual
 | JPEG, JPG, JFIF | `.jpg`, `.jpeg`, `.jpe`, `.jif` | Lossy 2D raster images and previews. | Native Atlas JPEG reader/writer. Avoid JPEG for quantitative source volumes because compression is lossy. |
 | JPEG 2000 | `.jp2`, `.j2k`, `.j2c`, `.jpf`, `.jpx`, `.j2ki`, `.j2kr` | Wavelet-compressed 2D images and microscopy tiles. | Dependency-backed. Codec support can vary by build. |
 | JPEG XR, Windows Media Photo, HD Photo | `.jxr`, `.wdp`, `.hdp` | Microsoft JPEG XR/HD Photo images. | Native Atlas JPEG XR reader/writer and dependency fallback. |
-| OpenEXR | `.exr` | High-dynamic-range raster images. | FreeImage-backed in this build. |
-| Radiance HDR, RGBE | `.hdr` | High-dynamic-range raster images. | FreeImage-backed; `.hdr` is also used by Analyze medical images. |
-| WebP | `.webp` | Web raster image format with lossy or lossless compression. | FreeImage-backed. |
-| GIF | `.gif` | Palette-based 2D images or simple animations. | FreeImage-backed; Atlas treats it as an image input, not a timeline. |
-| BMP, DIB | `.bmp`, `.dib` | Windows bitmap images. | FreeImage-backed and sometimes ITK-backed. |
-| TGA, TARGA | `.tga`, `.targa` | Truevision Targa raster images. | FreeImage-backed. |
-| Photoshop PSD | `.psd` | Adobe Photoshop layered image container. | FreeImage-backed; layer semantics are flattened or limited by the dependency reader. |
-| Portable anymap, PBM, PGM, PPM | `.pbm`, `.pgm`, `.ppm` | Simple grayscale or RGB raster images. | FreeImage-backed. |
-| Icon, ICO | `.ico` | Windows icon images. | FreeImage-backed. |
-| DirectDraw Surface, DDS | `.dds` | GPU-oriented texture container. | FreeImage-backed read support. |
+| OpenEXR | `.exr` | High-dynamic-range raster images. | OpenImageIO-backed. |
+| Radiance HDR, RGBE | `.hdr` | High-dynamic-range raster images. | OpenImageIO-backed; `.hdr` is also used by Analyze medical images. |
+| WebP | `.webp` | Web raster image format with lossy or lossless compression. | OpenImageIO-backed. |
+| GIF | `.gif` | Palette-based 2D images or simple animations. | OpenImageIO-backed; animated frames load as the image time dimension. |
+| BMP, DIB | `.bmp`, `.dib` | Windows bitmap images. | OpenImageIO-backed and sometimes ITK-backed. |
+| TGA, TARGA | `.tga`, `.targa` | Truevision Targa raster images. | OpenImageIO-backed. |
+| Photoshop PSD | `.psd` | Adobe Photoshop layered image container. | OpenImageIO-backed; layer semantics are flattened or limited by the dependency reader. |
+| Portable anymap, PBM, PGM, PPM | `.pbm`, `.pgm`, `.ppm` | Simple grayscale or RGB raster images. | OpenImageIO-backed. |
+| Icon, ICO | `.ico` | Windows icon images. | OpenImageIO-backed when supported by the installed OpenImageIO plugins. |
+| DirectDraw Surface, DDS | `.dds` | GPU-oriented texture container. | OpenImageIO-backed when supported by the installed OpenImageIO plugins. |
 | Macintosh PICT | `.pct`, `.pict`, `.pic` | Legacy Macintosh raster/vector image container. | Dependency-backed; `.pic` is ambiguous and also appears in microscopy contexts. |
-| Camera RAW | `.arw`, `.bay`, `.cr2`, `.crw`, `.dcr`, `.dng`, `.erf`, `.fff`, `.k25`, `.kdc`, `.mos`, `.mrw`, `.nef`, `.nrw`, `.orf`, `.pef`, `.raf`, `.raw`, `.rw2`, `.rwz`, `.sr2`, `.srf`, `.x3f` | Digital camera sensor files from Sony, Canon, Kodak, Adobe DNG, Epson, Hasselblad, Leaf/Mamiya, Minolta, Nikon, Olympus, Pentax, Fujifilm, Panasonic, Sigma, and related cameras. | FreeImage-backed read support; these are usually 2D photographs rather than microscopy volumes. |
+| Camera RAW | `.arw`, `.bay`, `.cr2`, `.crw`, `.dcr`, `.dng`, `.erf`, `.fff`, `.k25`, `.kdc`, `.mos`, `.mrw`, `.nef`, `.nrw`, `.orf`, `.pef`, `.raf`, `.raw`, `.rw2`, `.rwz`, `.sr2`, `.srf`, `.x3f` | Digital camera sensor files from Sony, Canon, Kodak, Adobe DNG, Epson, Hasselblad, Leaf/Mamiya, Minolta, Nikon, Olympus, Pentax, Fujifilm, Panasonic, Sigma, and related cameras. | OpenImageIO/LibRaw-backed read support; these are usually 2D photographs rather than microscopy volumes. |
 | Nikon NIS-Elements ND2 | `.nd2` | Nikon microscopy acquisition container with channels, timepoints, Z stacks, and metadata. | Bio-Formats-backed. |
 | Olympus OIB, OIF, OIR, VSI | `.oib`, `.oif`, `.oir`, `.vsi` | Olympus microscopy and slide-scanner formats. | Bio-Formats-backed. Keep OIF/VSI companion folders/files together. |
 | Imaris IMS | `.ims` | Bitplane Imaris multi-resolution microscopy container. | Bio-Formats-backed. |
@@ -1653,19 +1653,19 @@ The tables below include the common names, vendor names, and aliases users usual
 
 | Search name | Extensions | What it usually contains | Atlas support notes |
 | --- | --- | --- | --- |
-| Wavefront OBJ | `.obj` | Polygon meshes; materials are commonly stored in sidecar `.mtl` files. | Assimp-backed import. `.mtl` is a sidecar, not a standalone Atlas mesh extension. |
+| Wavefront OBJ | `.obj` | Polygon meshes; materials are commonly stored in sidecar `.mtl` files. | Assimp-backed import. |
 | Stanford PLY, Polygon File Format | `.ply` | Triangle/point meshes with optional vertex colors and normals. | Assimp-backed import. |
 | STL, Stereolithography | `.stl` | Triangle meshes for CAD/3D printing; usually no color or material metadata. | Assimp-backed import. |
 | OFF, Object File Format | `.off` | Simple polygon mesh format. | Assimp-backed import. |
 | COLLADA | `.dae` | Scene/asset exchange format with geometry and materials. | Assimp-backed import; Atlas keeps the renderable mesh data it needs. |
 | glTF, GL Transmission Format, binary GLB | `.gltf`, `.glb` | Modern 3D asset format with geometry, materials, and textures. | Assimp-backed import; complex material features may be simplified for Atlas rendering. |
-| Autodesk FBX | `.fbx` | 3D asset interchange format with geometry, materials, and animation data. | Assimp-backed import; Atlas imports mesh geometry, not a full DCC scene. |
+| Autodesk FBX | `.fbx` | 3D asset interchange format with geometry, materials, and animation data. | Assimp-backed import; Atlas imports mesh geometry. |
 | 3D Studio | `.3ds` | Legacy Autodesk 3D Studio mesh format. | Assimp-backed import. |
 | 3D Manufacturing Format | `.3mf` | 3D printing/manufacturing geometry package. | Assimp-backed import. |
 | Additive Manufacturing File | `.amf` | XML-based 3D printing/manufacturing geometry. | Assimp-backed import. |
 | AutoCAD DXF | `.dxf` | CAD drawing/exchange format. | Assimp-backed import for supported mesh-like content. |
 | STEP, STP | `.step`, `.stp` | CAD exchange format. | Assimp-backed import when the Assimp build includes STEP support; conversion to renderable mesh may be limited by source content. |
-| IFC, Industry Foundation Classes | `.ifc`, `.ifczip` | Building information modeling geometry and metadata. | Assimp-backed import; Atlas uses renderable geometry, not full BIM semantics. |
+| IFC, Industry Foundation Classes | `.ifc`, `.ifczip` | Building information modeling geometry and metadata. | Assimp-backed import; Atlas uses renderable geometry. |
 | DirectX X | `.x` | Legacy DirectX mesh format. | Assimp-backed import. |
 | X3D, Extensible 3D | `.x3d`, `.x3db` | XML/binary successor to VRML. | Assimp-backed import. |
 | AC3D | `.ac`, `.ac3d`, `.acc` | AC3D model files. | Assimp-backed import. |
@@ -1695,7 +1695,7 @@ The tables below include the common names, vendor names, and aliases users usual
 | Region annotation | `.reganno` | Atlas region annotation packs. Label images can be imported into region annotations through **Import Label Image...**. |
 | SWC skeleton | `.swc` | Text neuron morphology trees. Standard SWC is a row-based format with optional comment headers and node rows. Atlas avoids duplicate loads for the same resolved source path. |
 | Puncta and markers | `.nimp`, `.apo`, `.marker`, `.txt`, `.xyz` | Point catalogs. `.nimp` is Atlas-native; `.apo` and `.marker` are Vaa3D marker formats; `.txt` and `.xyz` are simple point-list imports. |
-| SVG overlay | `.svg` | 2D vector overlay loaded through Qt SVG support. Atlas treats SVG as an overlay object, not as a raster image volume. |
+| SVG overlay | `.svg` | 2D vector overlay loaded through Qt SVG support. |
 
 #### Image and Volume Readers
 
@@ -1710,12 +1710,12 @@ The tables below include the common names, vendor names, and aliases users usual
 | HDF5-backed Atlas image | `.nim`, `.h5` | Atlas native HDF5 reader/writer | Atlas image-pack storage backed by HDF5. Useful for chunked internal image data. |
 | MetaImage | `.mha`, `.mhd` | Atlas native MetaImage reader and ITK ImageIO | Kitware MetaImage headers/data. `.mha` is single-file; `.mhd` typically references a sidecar raw payload. |
 | PNG | `.png` | Atlas native PNG reader/writer and dependency fallbacks | Common 2D image format. For volumetric work, use stacks or a volume-capable container. |
-| JPEG | `.jpg`, `.jpeg`, `.jpe`, `.jif` | Atlas JPEG reader and dependency fallbacks | Lossy 2D image format. Good for screenshots and previews, not quantitative source volumes. |
-| JPEG XR | `.jxr`, `.wdp`, `.hdp` | Atlas native JPEG XR reader and dependency fallbacks | 2D image format also exposed by FreeImage/Bio-Formats depending on build. |
+| JPEG | `.jpg`, `.jpeg`, `.jpe`, `.jif` | Atlas JPEG reader and dependency fallbacks | Lossy 2D image formats. |
+| JPEG XR | `.jxr`, `.wdp`, `.hdp` | Atlas native JPEG XR reader and dependency fallbacks | 2D image format also exposed by dependency readers depending on build. |
 | ITK scientific/medical formats | Common examples: `.nii`, `.nii.gz`, `.nrrd`, `.nhdr`, `.mha`, `.mhd`, `.mrc`, `.mrcs`, `.mnc`, `.fdf` | ITK ImageIO factories | ITK discovers registered ImageIO factories at runtime. Build configuration controls which factories are present; DICOM-style suffixes appear only when the corresponding ImageIO support is enabled. |
-| FreeImage general images and camera RAW | Common examples: `.bmp`, `.gif`, `.exr`, `.hdr`, `.webp`, `.psd`, `.tga`, `.dds`, `.jp2`, `.j2k`, `.pbm`, `.pgm`, `.ppm`, `.arw`, `.cr2`, `.dng`, `.nef`, `.orf`, `.raf`, `.rw2` | FreeImage, when built in | Broad read support for general 2D images and camera RAW-style files. Atlas registers FreeImage as read-only support. |
+| OpenImageIO general images and camera RAW | Common examples: `.bmp`, `.gif`, `.exr`, `.hdr`, `.webp`, `.psd`, `.tga`, `.jp2`, `.j2k`, `.jxl`, `.pbm`, `.pgm`, `.ppm`, `.arw`, `.cr2`, `.dng`, `.nef`, `.orf`, `.raf`, `.rw2` | OpenImageIO with Atlas-managed codec dependencies | Broad read support for general 2D images and camera RAW-style files. |
 | Bio-Formats microscopy and proprietary formats | Common examples: `.czi`, `.lif`, `.nd2`, `.oib`, `.oif`, `.oir`, `.ims`, `.vsi`, `.zvi`, `.svs`, `.qptiff`, `.ndpi`, `.dv`, `.ics`, `.ids` | Bundled Java Bio-Formats bridge | Atlas starts the Java bridge on demand and queries Bio-Formats for its supported reader list. Bio-Formats covers many microscopy/vendor formats and may also probe uncommon or extensionless files by content. Native Atlas readers still run first. |
-| Neuroglancer precomputed datasets | URL/directory based, not extension based | Atlas Neuroglancer precomputed loader | Opens precomputed image and segmentation layers from local paths, HTTP(S), `gs://`, and `s3://` sources. The dataset directory must contain an `info` metadata file. |
+| Neuroglancer precomputed datasets | URL/directory based | Atlas Neuroglancer precomputed loader | Opens precomputed image and segmentation layers from local paths, HTTP(S), `gs://`, and `s3://` sources. The dataset directory must contain an `info` metadata file. |
 | Neuroglancer state | Raw JSON, share links, or JSON URLs | Atlas Neuroglancer state loader | Imports supported image/segmentation precomputed layers from Neuroglancer state JSON. Unsupported layer types are skipped with diagnostics. |
 
 #### Mesh and Geometry Readers
@@ -1733,7 +1733,7 @@ The tables below include the common names, vendor names, and aliases users usual
 - [Neuroglancer precomputed format](https://neuroglancer-docs.web.app/datasource/precomputed/index.html) — precomputed volume, mesh, skeleton, annotation, and segment-property dataset layout.
 - [Assimp supported file formats](https://github.com/assimp/assimp/blob/master/doc/Fileformats.md) — upstream mesh importer/exporter list.
 - [ITK ImageIO file formats](https://docs.itk.org/en/release/learn/faq.html#what-3d-data-file-formats-can-itk-import-and-export) — ImageIO factory model and scientific/medical image formats.
-- [FreeImage supported formats](https://freeimage.sourceforge.io/features.html) — general 2D image and camera RAW support.
+- [OpenImageIO supported formats](https://openimageio.readthedocs.io/en/latest/builtinplugins.html) — general 2D image, HDR, codec, and camera RAW support.
 - [SWC specification](https://swc-specification.readthedocs.io/en/latest/swc.html) — neuron morphology text format.
 - [Vaa3D `.v3draw` description](https://imagej.net/formats/vaa3d-writer) — minimal XYZCT raw stack format used by Vaa3D.
 

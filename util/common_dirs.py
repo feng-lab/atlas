@@ -652,14 +652,6 @@ def tbb_redist_dir() -> str:
 #     return res
 
 
-def freeimage_redist_dir() -> str:
-    assert sys.platform.startswith("win32")
-
-    res = os.path.join(ext_build_dir(), "freeimage")
-    assert os.path.exists(res)
-    return res
-
-
 def _curl_version_sort_key(path: str):
     basename = os.path.basename(path)
     match = re.search(

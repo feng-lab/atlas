@@ -37,7 +37,6 @@ test_build.sh
 /src/3rdparty/libjpeg*
 /src/3rdparty/libpng*
 /src/3rdparty/hdf5*
-/src/3rdparty/freeimage-svn*
 /src/3rdparty/__*
 /src/3rdparty/boost*
 /src/3rdparty/openssl*
@@ -46,6 +45,11 @@ test_build.sh
 /src/3rdparty/libsodium*
 /src/3rdparty/openjpeg*
 /src/3rdparty/libwebp*
+/src/3rdparty/giflib*
+/src/3rdparty/highway*
+/src/3rdparty/libjxl*
+/src/3rdparty/LibRaw*
+/src/3rdparty/OpenImageIO*/
 /src/3rdparty/ospray*
 /src/3rdparty/jansson*
 /src/3rdparty/pcre*

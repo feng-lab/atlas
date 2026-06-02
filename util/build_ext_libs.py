@@ -83,8 +83,12 @@ def use_windows_clang_cl() -> bool:
     return is_windows() and use_clang_cl()
 
 
+def parallel_jobs_count() -> int:
+    return os.cpu_count() or 1
+
+
 def make_parallel_jobs_arg() -> str:
-    return "-j" + str(os.cpu_count() or 1)
+    return "-j" + str(parallel_jobs_count())
 
 
 def _clang_major_env() -> str:
@@ -430,6 +434,27 @@ def create_universal_binaries(
                         check=True,
                     )
     _merge_universal_headers(arm64_install_dir, final_install_dir)
+
+
+def build_macos_split_or_single(src_dir: str, install_dir: str, build_arch):
+    build_arch(install_dir, arm64_only=False)
+    if is_mac():
+        arm64_install_dir = create_arm64_install_dir(src_dir)
+        try:
+            build_arch(arm64_install_dir, arm64_only=True)
+            create_universal_binaries(arm64_install_dir, install_dir)
+        finally:
+            rm_tree(arm64_install_dir)
+
+
+def cmake_prefix_path_for_arch(active_install_dir: str, install_dir: str) -> str:
+    paths = [active_install_dir, install_dir]
+    normalized_paths = []
+    for path in paths:
+        normalized_path = os.path.normpath(path)
+        if normalized_path not in normalized_paths:
+            normalized_paths.append(normalized_path)
+    return ";".join(normalized_paths)
 
 
 def get_bak_file_name(orig_file: str):
@@ -943,10 +968,19 @@ def build_and_install_cmakecmd(
     ninja_para: str = "install",
 ):
     cmakecmd[:] = [x for x in cmakecmd if x]
+
+    def apply_additional_env(env: dict[str, str]):
+        if additional_env is None:
+            return
+        for key, value in additional_env.items():
+            if key == "PATH" and value:
+                env[key] = value + os.pathsep + env.get(key, "")
+            else:
+                env[key] = value
+
     if is_windows():
         env = get_vcvars_environment()
-        if additional_env is not None:
-            env.update(additional_env)
+        apply_additional_env(env)
         subprocess.run(cmakecmd, cwd=build_dir, shell=False, check=True, env=env)
         if use_cmake:
             subprocess.run(
@@ -987,8 +1021,7 @@ def build_and_install_cmakecmd(
             )
     else:
         env = get_env_for_config_make(with_optimization=False)
-        if additional_env is not None:
-            env.update(additional_env)
+        apply_additional_env(env)
         if use_cmake:
             subprocess.run(cmakecmd, cwd=build_dir, shell=False, check=True, env=env)
             subprocess.run(
@@ -1943,6 +1976,163 @@ def build_brotli(src_dir: str, install_dir: str):
         build_and_install_cmakecmd(cmakecmd, build_dir)
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
+
+
+def build_giflib(src_dir: str, install_dir: str):
+    version = Path(src_dir).name.removeprefix("giflib-")
+    if version == Path(src_dir).name:
+        version = "5.2.2"
+    cmake_lists = os.path.join(src_dir, "CMakeLists.txt")
+    cmake_text = """
+cmake_minimum_required(VERSION 3.16)
+project(GIF VERSION @ATLAS_GIF_VERSION@ LANGUAGES C)
+
+include(GNUInstallDirs)
+include(CMakePackageConfigHelpers)
+
+option(BUILD_SHARED_LIBS "Build shared libraries" OFF)
+
+if(MSVC)
+    add_compile_definitions(_CRT_SECURE_NO_WARNINGS)
+endif()
+
+set(GIF_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
+if(WIN32)
+    file(GLOB GIF_ORIGINALS
+         "${CMAKE_CURRENT_SOURCE_DIR}/*.h"
+         "${CMAKE_CURRENT_SOURCE_DIR}/*.c")
+    foreach(GIF_ORIGINAL ${GIF_ORIGINALS})
+        file(RELATIVE_PATH GIF_RELATIVE_PATH
+             "${CMAKE_CURRENT_SOURCE_DIR}" "${GIF_ORIGINAL}")
+        set(GIF_PATCHED "${CMAKE_CURRENT_BINARY_DIR}/${GIF_RELATIVE_PATH}")
+        get_filename_component(GIF_PATCHED_DIR "${GIF_PATCHED}" DIRECTORY)
+        file(MAKE_DIRECTORY "${GIF_PATCHED_DIR}")
+        file(READ "${GIF_ORIGINAL}" GIF_CONTENTS)
+        string(REPLACE "#include <unistd.h>"
+               "#ifdef _WIN32\\n#include <io.h>\\n#else\\n#include <unistd.h>\\n#endif"
+               GIF_CONTENTS "${GIF_CONTENTS}")
+        file(WRITE "${GIF_PATCHED}" "${GIF_CONTENTS}")
+    endforeach()
+    set(GIF_SOURCE_DIR "${CMAKE_CURRENT_BINARY_DIR}")
+endif()
+
+add_library(GIF
+    "${GIF_SOURCE_DIR}/dgif_lib.c"
+    "${GIF_SOURCE_DIR}/egif_lib.c"
+    "${GIF_SOURCE_DIR}/gif_err.c"
+    "${GIF_SOURCE_DIR}/gif_hash.c"
+    "${GIF_SOURCE_DIR}/gifalloc.c"
+    "${GIF_SOURCE_DIR}/openbsd-reallocarray.c"
+    "${GIF_SOURCE_DIR}/quantize.c")
+add_library(GIF::GIF ALIAS GIF)
+
+set_target_properties(GIF PROPERTIES
+    OUTPUT_NAME GIF
+    POSITION_INDEPENDENT_CODE ON)
+
+target_include_directories(GIF PUBLIC
+    $<BUILD_INTERFACE:${GIF_SOURCE_DIR}>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
+
+install(TARGETS GIF
+    EXPORT GIFTargets
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+
+install(FILES
+    "${GIF_SOURCE_DIR}/gif_lib.h"
+    "${GIF_SOURCE_DIR}/gif_hash.h"
+    "${GIF_SOURCE_DIR}/gif_lib_private.h"
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+
+install(EXPORT GIFTargets
+    FILE GIFTargets.cmake
+    NAMESPACE GIF::
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/GIF)
+
+write_basic_package_version_file(
+    "${CMAKE_CURRENT_BINARY_DIR}/GIFConfigVersion.cmake"
+    VERSION ${PROJECT_VERSION}
+    COMPATIBILITY SameMajorVersion)
+
+set(GIF_CONFIG_IN "
+@PACKAGE_INIT@
+include(\\${CMAKE_CURRENT_LIST_DIR}/GIFTargets.cmake)
+check_required_components(GIF)
+")
+file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/GIFConfig.cmake.in" "${GIF_CONFIG_IN}")
+configure_package_config_file(
+    "${CMAKE_CURRENT_BINARY_DIR}/GIFConfig.cmake.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/GIFConfig.cmake"
+    INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/GIF)
+
+install(FILES
+    "${CMAKE_CURRENT_BINARY_DIR}/GIFConfig.cmake"
+    "${CMAKE_CURRENT_BINARY_DIR}/GIFConfigVersion.cmake"
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/GIF)
+""".replace("@ATLAS_GIF_VERSION@", version)
+    Path(cmake_lists).write_text(cmake_text, encoding="utf-8")
+
+    def remove_giflib_outputs(active_install_dir: str):
+        for output_path in [
+            os.path.join(active_install_dir, "include", "gif_hash.h"),
+            os.path.join(active_install_dir, "include", "gif_lib.h"),
+            os.path.join(active_install_dir, "include", "gif_lib_private.h"),
+            os.path.join(active_install_dir, "lib", "cmake", "GIF"),
+        ]:
+            if os.path.exists(output_path):
+                if os.path.isdir(output_path):
+                    rm_tree(output_path)
+                else:
+                    os.remove(output_path)
+                    logger.info(f"{output_path} removed")
+        glob_remove(os.path.join(active_install_dir, "lib", "libGIF*"))
+
+    def build_arch(active_install_dir: str, *, arm64_only: bool):
+        build_dir = create_build_dir(src_dir)
+        try:
+            remove_giflib_outputs(active_install_dir)
+            cmakecmd = get_cmake_cmd_common_part(
+                active_install_dir, arm64_only=arm64_only, enable_cxx=False
+            )
+            cmakecmd.extend(
+                [
+                    "-DBUILD_SHARED_LIBS:BOOL=OFF",
+                    src_dir,
+                ]
+            )
+            build_and_install_cmakecmd(cmakecmd, build_dir)
+        finally:
+            shutil.rmtree(build_dir, ignore_errors=False)
+
+    build_macos_split_or_single(src_dir, install_dir, build_arch)
+
+
+def build_highway(src_dir: str, install_dir: str):
+    def build_arch(active_install_dir: str, *, arm64_only: bool):
+        build_dir = create_build_dir(src_dir)
+        try:
+            cmakecmd = get_cmake_cmd_common_part(
+                active_install_dir, arm64_only=arm64_only
+            )
+            cmakecmd.extend(
+                [
+                    "-DBUILD_SHARED_LIBS:BOOL=OFF",
+                    "-DHWY_FORCE_STATIC_LIBS:BOOL=ON",
+                    "-DHWY_ENABLE_CONTRIB:BOOL=OFF",
+                    "-DHWY_ENABLE_EXAMPLES:BOOL=OFF",
+                    "-DHWY_ENABLE_TESTS:BOOL=OFF",
+                    "-DHWY_ENABLE_INSTALL:BOOL=ON",
+                    src_dir,
+                ]
+            )
+            build_and_install_cmakecmd(cmakecmd, build_dir)
+        finally:
+            shutil.rmtree(build_dir, ignore_errors=False)
+
+    build_macos_split_or_single(src_dir, install_dir, build_arch)
 
 
 def build_fmt(src_dir: str, install_dir: str):
@@ -3297,6 +3487,860 @@ def build_libwebp(src_dir: str, install_dir: str):
     )
 
 
+def populate_libjxl_skcms(src_dir: str, skcms_package: str):
+    skcms_dir = os.path.join(src_dir, "third_party", "skcms")
+    rm_tree(skcms_dir)
+    os.makedirs(skcms_dir)
+    unpack_file_to_folder(skcms_package, skcms_dir)
+
+
+def build_libjxl(src_dir: str, install_dir: str, skcms_package: str):
+    populate_libjxl_skcms(src_dir, skcms_package)
+
+    def build_arch(active_install_dir: str, *, arm64_only: bool):
+        build_dir = create_build_dir(src_dir)
+        try:
+            cmakecmd = get_cmake_cmd_common_part(
+                active_install_dir, arm64_only=arm64_only
+            )
+            cmakecmd.append(
+                "-DCMAKE_PREFIX_PATH="
+                + cmake_prefix_path_for_arch(active_install_dir, install_dir)
+            )
+            cmakecmd.extend(
+                [
+                    "-DBUILD_SHARED_LIBS:BOOL=OFF",
+                    "-DBUILD_TESTING:BOOL=OFF",
+                    "-DHWY_DIR:PATH="
+                    + os.path.join(install_dir, "lib", "cmake", "hwy"),
+                    "-DJPEGXL_ENABLE_FUZZERS:BOOL=OFF",
+                    "-DJPEGXL_ENABLE_DEVTOOLS:BOOL=OFF",
+                    "-DJPEGXL_ENABLE_TOOLS:BOOL=OFF",
+                    "-DJPEGXL_ENABLE_JPEGLI:BOOL=OFF",
+                    "-DJPEGXL_ENABLE_JPEGLI_LIBJPEG:BOOL=OFF",
+                    "-DJPEGXL_INSTALL_JPEGLI_LIBJPEG:BOOL=OFF",
+                    "-DJPEGXL_ENABLE_DOXYGEN:BOOL=OFF",
+                    "-DJPEGXL_ENABLE_MANPAGES:BOOL=OFF",
+                    "-DJPEGXL_ENABLE_BENCHMARK:BOOL=OFF",
+                    "-DJPEGXL_ENABLE_EXAMPLES:BOOL=OFF",
+                    "-DJPEGXL_BUNDLE_LIBPNG:BOOL=OFF",
+                    "-DJPEGXL_ENABLE_JNI:BOOL=OFF",
+                    "-DJPEGXL_ENABLE_SJPEG:BOOL=OFF",
+                    "-DJPEGXL_ENABLE_OPENEXR:BOOL=OFF",
+                    "-DJPEGXL_ENABLE_SKCMS:BOOL=ON",
+                    "-DJPEGXL_ENABLE_VIEWERS:BOOL=OFF",
+                    "-DJPEGXL_ENABLE_PLUGINS:BOOL=OFF",
+                    "-DJPEGXL_ENABLE_TCMALLOC:BOOL=OFF",
+                    "-DJPEGXL_ENABLE_TRANSCODE_JPEG:BOOL=OFF",
+                    "-DJPEGXL_ENABLE_BOXES:BOOL=ON",
+                    "-DJPEGXL_FORCE_SYSTEM_BROTLI:BOOL=ON",
+                    "-DJPEGXL_FORCE_SYSTEM_GTEST:BOOL=ON",
+                    "-DJPEGXL_FORCE_SYSTEM_HWY:BOOL=ON",
+                    src_dir,
+                ]
+            )
+            build_and_install_cmakecmd(cmakecmd, build_dir)
+        finally:
+            shutil.rmtree(build_dir, ignore_errors=False)
+
+    build_macos_split_or_single(src_dir, install_dir, build_arch)
+
+
+def build_libraw(libraw_src_dir: str, libraw_cmake_src_dir: str, install_dir: str):
+    def build_arch(active_install_dir: str, *, arm64_only: bool):
+        build_dir = create_build_dir(libraw_cmake_src_dir)
+        try:
+            cmakecmd = get_cmake_cmd_common_part(
+                active_install_dir, arm64_only=arm64_only
+            )
+            cmakecmd.append(
+                "-DCMAKE_PREFIX_PATH="
+                + cmake_prefix_path_for_arch(active_install_dir, install_dir)
+            )
+            cmakecmd.extend(
+                [
+                    "-DBUILD_SHARED_LIBS:BOOL=OFF",
+                    "-DLIBRAW_PATH:PATH=" + libraw_src_dir,
+                    "-DLIBRAW_INSTALL:BOOL=ON",
+                    "-DLIBRAW_UNINSTALL_TARGET:BOOL=OFF",
+                    "-DENABLE_OPENMP:BOOL=OFF",
+                    "-DENABLE_LCMS:BOOL=OFF",
+                    "-DENABLE_JASPER:BOOL=OFF",
+                    "-DENABLE_EXAMPLES:BOOL=OFF",
+                    "-DENABLE_RAWSPEED:BOOL=OFF",
+                    "-DENABLE_DCRAW_DEBUG:BOOL=OFF",
+                    "-DENABLE_X3FTOOLS:BOOL=OFF",
+                    "-DENABLE_6BY9RPI:BOOL=OFF",
+                    libraw_cmake_src_dir,
+                ]
+            )
+            build_and_install_cmakecmd(cmakecmd, build_dir)
+        finally:
+            shutil.rmtree(build_dir, ignore_errors=False)
+
+    build_macos_split_or_single(libraw_cmake_src_dir, install_dir, build_arch)
+
+
+def build_libtiff(src_dir: str, install_dir: str):
+    build_dir = create_build_dir(src_dir)
+
+    try:
+        cmakecmd = get_cmake_cmd_common_part(install_dir, universal=True)
+        cmakecmd.extend(
+            [
+                "-DBUILD_SHARED_LIBS:BOOL=OFF",
+                "-Dtiff-static:BOOL=ON",
+                "-Dtiff-tools:BOOL=OFF",
+                "-Dtiff-tests:BOOL=OFF",
+                "-Dtiff-contrib:BOOL=OFF",
+                "-Dtiff-docs:BOOL=OFF",
+                "-Dtiff-deprecated:BOOL=OFF",
+                "-Dtiff-install:BOOL=ON",
+                "-Dtiff-opengl:BOOL=OFF",
+                "-Dstrip-chopping:BOOL=OFF",
+                # Atlas does not currently build these optional codec
+                # dependencies. Keep the exported TIFF target constrained to
+                # dependencies already managed by util/build_ext_libs.py.
+                "-Dlibdeflate:BOOL=OFF",
+                "-Djbig:BOOL=OFF",
+                "-Dlerc:BOOL=OFF",
+                src_dir,
+            ]
+        )
+        build_and_install_cmakecmd(cmakecmd, build_dir)
+    finally:
+        shutil.rmtree(build_dir, ignore_errors=False)
+
+    # Upstream installs TiffConfig.cmake. Some consumers, including OIIO's
+    # checked_find_package(TIFF), look for the all-caps package spelling first.
+    cmake_dir = os.path.join(install_dir, "lib", "cmake", "tiff")
+    patch_file(
+        os.path.join(cmake_dir, "TiffConfig.cmake"),
+        from_texts=[
+            """if(NOT "OFF")
+    # TODO: import dependencies
+endif()
+"""
+        ],
+        to_texts=[
+            """include(CMakeFindDependencyMacro)
+
+if(NOT TARGET ZLIB::ZLIB)
+    find_dependency(ZLIB)
+    if(TARGET ZLIB::ZLIBSTATIC AND NOT TARGET ZLIB::ZLIB)
+        add_library(ZLIB::ZLIB INTERFACE IMPORTED)
+        set_target_properties(ZLIB::ZLIB PROPERTIES
+                              INTERFACE_LINK_LIBRARIES ZLIB::ZLIBSTATIC)
+    endif()
+endif()
+
+if(NOT TARGET JPEG::JPEG)
+    find_dependency(libjpeg-turbo CONFIG)
+    if(TARGET libjpeg-turbo::jpeg)
+        add_library(JPEG::JPEG INTERFACE IMPORTED)
+        set_target_properties(JPEG::JPEG PROPERTIES
+                              INTERFACE_LINK_LIBRARIES libjpeg-turbo::jpeg)
+    elseif(TARGET libjpeg-turbo::jpeg-static)
+        add_library(JPEG::JPEG INTERFACE IMPORTED)
+        set_target_properties(JPEG::JPEG PROPERTIES
+                              INTERFACE_LINK_LIBRARIES libjpeg-turbo::jpeg-static)
+    else()
+        find_dependency(JPEG)
+    endif()
+endif()
+
+if(NOT TARGET liblzma::liblzma)
+    find_dependency(liblzma CONFIG)
+endif()
+
+if(NOT TARGET ZSTD::ZSTD)
+    find_dependency(zstd CONFIG)
+    if(TARGET zstd::libzstd_static)
+        add_library(ZSTD::ZSTD INTERFACE IMPORTED)
+        set_target_properties(ZSTD::ZSTD PROPERTIES
+                              INTERFACE_LINK_LIBRARIES zstd::libzstd_static)
+    elseif(TARGET zstd::libzstd)
+        add_library(ZSTD::ZSTD INTERFACE IMPORTED)
+        set_target_properties(ZSTD::ZSTD PROPERTIES
+                              INTERFACE_LINK_LIBRARIES zstd::libzstd)
+    endif()
+endif()
+
+if(NOT TARGET WebP::webp)
+    find_dependency(WebP CONFIG)
+endif()
+
+if(NOT TARGET CMath::CMath)
+    add_library(CMath::CMath INTERFACE IMPORTED)
+    find_library(CMATH_LIBRARY m)
+    if(CMATH_LIBRARY)
+        set_property(TARGET CMath::CMath PROPERTY
+                     INTERFACE_LINK_LIBRARIES "${CMATH_LIBRARY}")
+    endif()
+endif()
+"""
+        ],
+        keep_bak_file=False,
+    )
+    for stem in ("Config", "ConfigVersion"):
+        mixed_case = os.path.join(cmake_dir, f"Tiff{stem}.cmake")
+        upper_case = os.path.join(cmake_dir, f"TIFF{stem}.cmake")
+        if os.path.exists(mixed_case):
+            if os.path.exists(upper_case) and os.path.samefile(mixed_case, upper_case):
+                continue
+            shutil.copy2(mixed_case, upper_case)
+
+
+def build_openimageio(src_dir: str, install_dir: str):
+    fmt_config_dir = os.path.join(install_dir, "lib", "cmake", "fmt")
+
+    def remove_openimageio_outputs(active_install_dir: str):
+        for output_path in [
+            os.path.join(active_install_dir, "openimageio-local"),
+            os.path.join(active_install_dir, "include", "OpenImageIO"),
+            os.path.join(active_install_dir, "include", "Imath"),
+            os.path.join(active_install_dir, "include", "OpenEXR"),
+            os.path.join(active_install_dir, "include", "OpenColorIO"),
+            os.path.join(active_install_dir, "include", "minizip-ng"),
+            os.path.join(active_install_dir, "include", "pystring"),
+            os.path.join(active_install_dir, "include", "tsl"),
+            os.path.join(active_install_dir, "include", "yaml-cpp"),
+            os.path.join(active_install_dir, "lib", "cmake", "Imath"),
+            os.path.join(active_install_dir, "lib", "cmake", "minizip-ng"),
+            os.path.join(active_install_dir, "lib", "cmake", "OpenColorIO"),
+            os.path.join(active_install_dir, "lib", "cmake", "OpenEXR"),
+            os.path.join(active_install_dir, "lib", "cmake", "OpenImageIO"),
+            os.path.join(active_install_dir, "lib", "cmake", "yaml-cpp"),
+            os.path.join(active_install_dir, "lib", "pkgconfig", "Imath.pc"),
+            os.path.join(active_install_dir, "lib", "pkgconfig", "minizip-ng.pc"),
+            os.path.join(active_install_dir, "lib", "pkgconfig", "OpenColorIO.pc"),
+            os.path.join(active_install_dir, "lib", "pkgconfig", "OpenImageIO.pc"),
+            os.path.join(active_install_dir, "lib", "pkgconfig", "OpenEXR.pc"),
+            os.path.join(active_install_dir, "lib", "pkgconfig", "OpenEXRCore.pc"),
+            os.path.join(active_install_dir, "lib", "pkgconfig", "yaml-cpp.pc"),
+            os.path.join(active_install_dir, "share", "cmake", "tsl-robin-map"),
+            os.path.join(active_install_dir, "share", "ocio"),
+            os.path.join(active_install_dir, "share", "OpenColorIO"),
+        ]:
+            if os.path.exists(output_path):
+                if os.path.isdir(output_path):
+                    rm_tree(output_path)
+                else:
+                    os.remove(output_path)
+                    logger.info(f"{output_path} removed")
+        for library_pattern in [
+            "libIex*OpenImageIO*.a",
+            "libIlmThread*OpenImageIO*.a",
+            "libImath*OpenImageIO*.a",
+            "libminizip-ng.a",
+            "libOpenColorIO*.a",
+            "libOpenEXR*OpenImageIO*.a",
+            "libpystring.a",
+            "libyaml-cpp.a",
+        ]:
+            glob_remove(os.path.join(active_install_dir, "lib", library_pattern))
+        glob_remove(os.path.join(active_install_dir, "lib", "libOpenImageIO*"))
+        glob_remove(os.path.join(active_install_dir, "lib", "OpenImageIO*"))
+
+    def patch_opencolorio_minizip_link(local_deps_install_dir: str):
+        if not is_mac():
+            return
+
+        opencolorio_targets = os.path.join(
+            local_deps_install_dir,
+            "lib",
+            "cmake",
+            "OpenColorIO",
+            "OpenColorIOTargets.cmake",
+        )
+        minizip_target_link = r"\$<LINK_ONLY:MINIZIP::minizip-ng>"
+        hidden_minizip_link = (
+            r"-Wl,-L${_IMPORT_PREFIX}/lib;"
+            r"-Wl,-hidden-lminizip-ng"
+        )
+        legacy_hidden_minizip_link = (
+            r"\$<LINK_ONLY:-Wl,-L${_IMPORT_PREFIX}/lib>;"
+            r"$<LINK_ONLY:-Wl,-hidden-lminizip-ng>"
+        )
+        escaped_hidden_minizip_link = (
+            r"\$<LINK_ONLY:-Wl,-L${_IMPORT_PREFIX}/lib>;"
+            r"\$<LINK_ONLY:-Wl,-hidden-lminizip-ng>"
+        )
+        if os.path.exists(opencolorio_targets):
+            opencolorio_targets_text = Path(opencolorio_targets).read_text(
+                encoding="utf-8", errors="ignore"
+            )
+            if minizip_target_link in opencolorio_targets_text:
+                patch_file(
+                    opencolorio_targets,
+                    from_texts=[minizip_target_link],
+                    to_texts=[hidden_minizip_link],
+                    keep_bak_file=False,
+                )
+            elif legacy_hidden_minizip_link in opencolorio_targets_text:
+                patch_file(
+                    opencolorio_targets,
+                    from_texts=[legacy_hidden_minizip_link],
+                    to_texts=[hidden_minizip_link],
+                    keep_bak_file=False,
+                )
+            elif escaped_hidden_minizip_link in opencolorio_targets_text:
+                patch_file(
+                    opencolorio_targets,
+                    from_texts=[escaped_hidden_minizip_link],
+                    to_texts=[hidden_minizip_link],
+                    keep_bak_file=False,
+                )
+            else:
+                assert hidden_minizip_link in opencolorio_targets_text, (
+                    f"{opencolorio_targets}: missing minizip-ng link entry"
+                )
+
+    def patch_openimageio_config(active_install_dir: str):
+        patch_file(
+            os.path.join(
+                active_install_dir,
+                "lib",
+                "cmake",
+                "OpenImageIO",
+                "OpenImageIOConfig.cmake",
+            ),
+            from_texts=["find_dependency(fmt)", "find_dependency(TIFF)"],
+            to_texts=[
+                "find_dependency(fmt CONFIG)",
+                "find_dependency(TIFF CONFIG)",
+            ],
+            keep_bak_file=False,
+        )
+
+    def openimageio_build_env(*, arm64_only: bool) -> dict[str, str]:
+        env = {"CMAKE_BUILD_PARALLEL_LEVEL": str(parallel_jobs_count())}
+        if use_ninja():
+            path_entries = [os.path.dirname(get_ninja_binary())]
+            if is_windows() and use_clang_cl():
+                path_entries.append(llvm_bin_dir())
+            env["PATH"] = os.pathsep.join(path_entries)
+        if is_windows() and use_clang_cl():
+            env["CC"] = clang_cl_binary()
+            env["CXX"] = clang_cl_binary()
+        if is_mac():
+            cbf = get_common_build_flags(with_optimization=False, arm64_only=arm64_only)
+            env.update(
+                {
+                    "CC": cbf["CC"],
+                    "CFLAGS": cbf["CFLAGS"],
+                    "LDFLAGS": cbf["LDFLAGS"],
+                    "CXX": cbf["CXX"],
+                    "CXXFLAGS": cbf["CXXFLAGS"],
+                }
+            )
+        return env
+
+    def build_openimageio_arch(active_install_dir: str, *, arm64_only: bool):
+        active_build_dir = create_build_dir(src_dir)
+        active_local_deps_root = os.path.join(active_install_dir, "openimageio-local")
+        try:
+            remove_openimageio_outputs(active_install_dir)
+            cmakecmd = get_cmake_cmd_common_part(
+                active_install_dir, arm64_only=arm64_only
+            )
+            cmakecmd.append(
+                "-DCMAKE_PREFIX_PATH="
+                + cmake_prefix_path_for_arch(active_install_dir, install_dir)
+            )
+            if is_mac():
+                cmakecmd.append("-DCMAKE_FIND_FRAMEWORK=LAST")
+            local_deps = ["pystring"]
+            if arm64_only:
+                local_deps.extend(
+                    [
+                        "Imath",
+                        "OpenEXR",
+                        "OpenColorIO",
+                        "yaml-cpp",
+                        "minizip-ng",
+                        "Robinmap",
+                    ]
+                )
+            cmakecmd.append("-DOpenImageIO_BUILD_LOCAL_DEPS=" + ";".join(local_deps))
+            cmakecmd.extend(
+                [
+                    "-DBUILD_SHARED_LIBS:BOOL=OFF",
+                    "-DLINKSTATIC:BOOL=ON",
+                    "-DEMBEDPLUGINS:BOOL=ON",
+                    "-DOIIO_INTERNALIZE_FMT:BOOL=OFF",
+                    "-Dfmt_DIR=" + fmt_config_dir,
+                    "-DTBB_DIR:PATH=" + tbb_dir(),
+                    "-DOIIO_BUILD_TOOLS:BOOL=OFF",
+                    "-DOIIO_BUILD_TESTS:BOOL=OFF",
+                    "-DBUILD_DOCS:BOOL=OFF",
+                    "-DINSTALL_DOCS:BOOL=OFF",
+                    "-DINSTALL_FONTS:BOOL=OFF",
+                    "-DUSE_PYTHON:BOOL=OFF",
+                    "-DUSE_QT:BOOL=OFF",
+                    # OIIO 3.1 still compiles color_ocio.cpp into libOpenImageIO,
+                    # so disabling OCIO leaves unresolved OpenColorIO symbols at
+                    # downstream static-link time.
+                    "-DUSE_OpenColorIO:BOOL=ON",
+                    "-DUSE_OpenCV:BOOL=OFF",
+                    "-DUSE_TBB:BOOL=ON",
+                    "-DUSE_FFmpeg:BOOL=OFF",
+                    "-DUSE_Freetype:BOOL=OFF",
+                    "-DUSE_DCMTK:BOOL=OFF",
+                    "-DUSE_GIF:BOOL=ON",
+                    "-DUSE_JXL:BOOL=ON",
+                    "-DUSE_libuhdr:BOOL=OFF",
+                    "-DUSE_Libheif:BOOL=OFF",
+                    "-DUSE_LibRaw:BOOL=ON",
+                    "-DUSE_OpenVDB:BOOL=OFF",
+                    "-DUSE_Ptex:BOOL=OFF",
+                    "-DUSE_R3DSDK:BOOL=OFF",
+                    "-DOIIO_USE_CUDA:BOOL=OFF",
+                    "-DSTOP_ON_WARNING:BOOL=OFF",
+                    "-DOpenImageIO_BUILD_MISSING_DEPS=required",
+                    "-DOpenImageIO_LOCAL_DEPS_ROOT=" + active_local_deps_root,
+                    "-DOpenImageIO_LOCAL_DEPS_INSTALL_DIR=" + active_install_dir,
+                    # Make CMake 4.x tolerate older minimum-version declarations
+                    # in OIIO's local dependency bootstrap projects.
+                    "-DCMAKE_POLICY_VERSION_MINIMUM=3.5",
+                    src_dir,
+                ]
+            )
+            build_and_install_cmakecmd(
+                cmakecmd,
+                active_build_dir,
+                additional_env=openimageio_build_env(arm64_only=arm64_only),
+            )
+            patch_opencolorio_minizip_link(active_install_dir)
+            patch_openimageio_config(active_install_dir)
+            rm_tree(active_local_deps_root)
+        finally:
+            shutil.rmtree(active_build_dir, ignore_errors=False)
+
+    patches = [
+        FilePatcher(
+            orig_file=os.path.join(src_dir, "src", "cmake", "externalpackages.cmake"),
+            from_texts=[
+                """checked_find_package (TIFF REQUIRED
+                      VERSION_MIN 4.0
+""",
+                """checked_find_package (OpenColorIO REQUIRED
+                      VERSION_MIN 2.3
+                      VERSION_MAX 2.9
+                     )
+if (NOT OPENCOLORIO_INCLUDES)
+    get_target_property(OPENCOLORIO_INCLUDES OpenColorIO::OpenColorIO INTERFACE_INCLUDE_DIRECTORIES)
+endif ()
+include_directories(BEFORE ${OPENCOLORIO_INCLUDES})
+""",
+            ],
+            to_texts=[
+                """checked_find_package (TIFF REQUIRED CONFIG
+                      VERSION_MIN 4.0
+""",
+                """checked_find_package (OpenColorIO REQUIRED
+                      VERSION_MIN 2.3
+                      VERSION_MAX 2.9
+                     )
+if (OpenColorIO_FOUND)
+    if (NOT OPENCOLORIO_INCLUDES AND TARGET OpenColorIO::OpenColorIO)
+        get_target_property(OPENCOLORIO_INCLUDES OpenColorIO::OpenColorIO INTERFACE_INCLUDE_DIRECTORIES)
+    endif ()
+    include_directories(BEFORE ${OPENCOLORIO_INCLUDES})
+endif ()
+""",
+            ],
+        ),
+        FilePatcher(
+            orig_file=os.path.join(src_dir, "src", "cmake", "modules", "FindJXL.cmake"),
+            from_texts=[
+                """find_library(JXL_THREADS_LIBRARY
+  NAMES jxl_threads)
+mark_as_advanced(JXL_THREADS_LIBRARY)
+
+find_package_handle_standard_args(JXL
+  REQUIRED_VARS JXL_LIBRARY JXL_THREADS_LIBRARY JXL_INCLUDE_DIR)
+
+if(JXL_FOUND)
+  set(JXL_LIBRARIES ${JXL_LIBRARY} ${JXL_THREADS_LIBRARY})
+  set(JXL_INCLUDES ${JXL_INCLUDE_DIR})
+endif(JXL_FOUND)
+"""
+            ],
+            to_texts=[
+                """find_library(JXL_THREADS_LIBRARY
+  NAMES jxl_threads)
+mark_as_advanced(JXL_THREADS_LIBRARY)
+
+find_library(JXL_CMS_LIBRARY
+  NAMES jxl_cms)
+mark_as_advanced(JXL_CMS_LIBRARY)
+
+find_library(HWY_LIBRARY
+  NAMES hwy)
+mark_as_advanced(HWY_LIBRARY)
+
+find_library(BROTLIENC_LIBRARY
+  NAMES brotlienc)
+find_library(BROTLIDEC_LIBRARY
+  NAMES brotlidec)
+find_library(BROTLICOMMON_LIBRARY
+  NAMES brotlicommon)
+mark_as_advanced(BROTLIENC_LIBRARY BROTLIDEC_LIBRARY BROTLICOMMON_LIBRARY)
+
+find_library(CMATH_LIBRARY m)
+mark_as_advanced(CMATH_LIBRARY)
+
+find_package_handle_standard_args(JXL
+  REQUIRED_VARS JXL_LIBRARY JXL_THREADS_LIBRARY JXL_CMS_LIBRARY HWY_LIBRARY
+                BROTLIENC_LIBRARY BROTLIDEC_LIBRARY BROTLICOMMON_LIBRARY
+                JXL_INCLUDE_DIR)
+
+if(JXL_FOUND)
+  set(JXL_LIBRARIES
+      ${JXL_LIBRARY}
+      ${JXL_THREADS_LIBRARY}
+      ${JXL_CMS_LIBRARY}
+      ${HWY_LIBRARY}
+      ${BROTLIENC_LIBRARY}
+      ${BROTLIDEC_LIBRARY}
+      ${BROTLICOMMON_LIBRARY})
+  if(CMATH_LIBRARY)
+    list(APPEND JXL_LIBRARIES ${CMATH_LIBRARY})
+  endif()
+  set(JXL_INCLUDES ${JXL_INCLUDE_DIR})
+endif(JXL_FOUND)
+"""
+            ],
+        ),
+        FilePatcher(
+            orig_file=os.path.join(
+                src_dir, "src", "cmake", "modules", "FindLibRaw.cmake"
+            ),
+            from_texts=[
+                """if (LINKSTATIC)
+    # Necessary?
+    find_package (Jasper)
+    if (JASPER_FOUND)
+        set (LibRaw_r_LIBRARIES ${LibRaw_r_LIBRARIES} ${JASPER_LIBRARIES})
+    endif()
+    find_library (LCMS2_LIBRARIES NAMES lcms2)
+    if (LCMS2_LIBRARIES)
+        set (LibRaw_r_LIBRARIES ${LibRaw_r_LIBRARIES} ${LCMS2_LIBRARIES})
+    endif()
+    if (MSVC)
+        set (LibRaw_r_DEFINITIONS ${LibRaw_r_DEFINITIONS} -D LIBRAW_NODLL)
+        set (LibRaw_DEFINITIONS ${LibRaw_DEFINITIONS} -D LIBRAW_NODLL)
+    endif()
+endif ()
+"""
+            ],
+            to_texts=[
+                """if (LINKSTATIC)
+    find_package (Jasper)
+    if (JASPER_FOUND)
+        list (APPEND LibRaw_r_LIBRARIES ${JASPER_LIBRARIES})
+        list (APPEND LibRaw_LIBRARIES ${JASPER_LIBRARIES})
+    endif()
+
+    find_library (LCMS2_LIBRARIES NAMES lcms2)
+    if (LCMS2_LIBRARIES)
+        list (APPEND LibRaw_r_LIBRARIES ${LCMS2_LIBRARIES})
+        list (APPEND LibRaw_LIBRARIES ${LCMS2_LIBRARIES})
+    endif()
+
+    find_package (ZLIB)
+    if (TARGET ZLIB::ZLIB)
+        list (APPEND LibRaw_r_LIBRARIES ZLIB::ZLIB)
+        list (APPEND LibRaw_LIBRARIES ZLIB::ZLIB)
+    elseif (ZLIB_LIBRARIES)
+        list (APPEND LibRaw_r_LIBRARIES ${ZLIB_LIBRARIES})
+        list (APPEND LibRaw_LIBRARIES ${ZLIB_LIBRARIES})
+    endif()
+
+    find_package (JPEG)
+    if (TARGET JPEG::JPEG)
+        list (APPEND LibRaw_r_LIBRARIES JPEG::JPEG)
+        list (APPEND LibRaw_LIBRARIES JPEG::JPEG)
+    elseif (JPEG_LIBRARIES)
+        list (APPEND LibRaw_r_LIBRARIES ${JPEG_LIBRARIES})
+        list (APPEND LibRaw_LIBRARIES ${JPEG_LIBRARIES})
+    endif()
+
+    find_package (Threads)
+    if (CMAKE_THREAD_LIBS_INIT)
+        list (APPEND LibRaw_r_LIBRARIES ${CMAKE_THREAD_LIBS_INIT})
+        list (APPEND LibRaw_LIBRARIES ${CMAKE_THREAD_LIBS_INIT})
+    endif()
+
+    find_library (CMATH_LIBRARY m)
+    if (CMATH_LIBRARY)
+        list (APPEND LibRaw_r_LIBRARIES ${CMATH_LIBRARY})
+        list (APPEND LibRaw_LIBRARIES ${CMATH_LIBRARY})
+    endif()
+
+    if (MSVC)
+        list (APPEND LibRaw_r_DEFINITIONS -D LIBRAW_NODLL)
+        list (APPEND LibRaw_DEFINITIONS -D LIBRAW_NODLL)
+    endif()
+endif ()
+"""
+            ],
+        ),
+        FilePatcher(
+            orig_file=os.path.join(src_dir, "src", "cmake", "dependency_utils.cmake"),
+            from_texts=[
+                """    if (CMAKE_IGNORE_PATH)
+        string(REPLACE ";" "\\\\;" CMAKE_IGNORE_PATH_ESCAPED "${CMAKE_IGNORE_PATH}")
+        list(APPEND _pkg_CMAKE_ARGS "-DCMAKE_IGNORE_PATH=${CMAKE_IGNORE_PATH_ESCAPED}")
+    endif()
+
+    # Pass along any CMAKE_MSVC_RUNTIME_LIBRARY
+""",
+                """set_cache (${PROJECT_NAME}_LOCAL_DEPS_ROOT "${PROJECT_BINARY_DIR}/deps"
+           "Directory were we do local builds of dependencies")
+list (APPEND CMAKE_PREFIX_PATH ${${PROJECT_NAME}_LOCAL_DEPS_ROOT}/dist)
+include_directories(BEFORE ${${PROJECT_NAME}_LOCAL_DEPS_ROOT}/include)
+""",
+                """    set (${pkgname}_LOCAL_INSTALL_DIR "${${PROJECT_NAME}_LOCAL_DEPS_ROOT}/dist")
+""",
+            ],
+            to_texts=[
+                """    set(_pkg_INHERITED_CMAKE_ARGS)
+    if (CMAKE_GENERATOR)
+        list(APPEND _pkg_INHERITED_CMAKE_ARGS "-G" "${CMAKE_GENERATOR}")
+    endif()
+    if (CMAKE_GENERATOR_PLATFORM)
+        list(APPEND _pkg_INHERITED_CMAKE_ARGS "-A" "${CMAKE_GENERATOR_PLATFORM}")
+    endif()
+    if (CMAKE_GENERATOR_TOOLSET)
+        list(APPEND _pkg_INHERITED_CMAKE_ARGS "-T" "${CMAKE_GENERATOR_TOOLSET}")
+    endif()
+
+    foreach (_pkg_INHERITED_CMAKE_VAR
+             CMAKE_MAKE_PROGRAM
+             CMAKE_C_COMPILER
+             CMAKE_CXX_COMPILER
+             CMAKE_LINKER
+             CMAKE_AR
+             CMAKE_RANLIB
+             CMAKE_RC_COMPILER
+             CMAKE_MT
+             CMAKE_PREFIX_PATH
+             CMAKE_IGNORE_PREFIX_PATH
+             CMAKE_C_FLAGS
+             CMAKE_CXX_FLAGS
+             CMAKE_EXE_LINKER_FLAGS
+             CMAKE_SHARED_LINKER_FLAGS
+             CMAKE_MODULE_LINKER_FLAGS
+             CMAKE_STATIC_LINKER_FLAGS
+             CMAKE_FIND_FRAMEWORK
+             CMAKE_FIND_ROOT_PATH
+             CMAKE_FIND_ROOT_PATH_MODE_PROGRAM
+             CMAKE_FIND_ROOT_PATH_MODE_LIBRARY
+             CMAKE_FIND_ROOT_PATH_MODE_INCLUDE
+             CMAKE_FIND_ROOT_PATH_MODE_PACKAGE
+             CMAKE_POLICY_VERSION_MINIMUM)
+        if (DEFINED ${_pkg_INHERITED_CMAKE_VAR} AND NOT "${${_pkg_INHERITED_CMAKE_VAR}}" STREQUAL "")
+            string(REPLACE ";" "\\\\;" _pkg_INHERITED_CMAKE_VALUE "${${_pkg_INHERITED_CMAKE_VAR}}")
+            list(APPEND _pkg_INHERITED_CMAKE_ARGS "-D${_pkg_INHERITED_CMAKE_VAR}=${_pkg_INHERITED_CMAKE_VALUE}")
+        endif()
+    endforeach()
+    set(_pkg_CMAKE_ARGS ${_pkg_INHERITED_CMAKE_ARGS} ${_pkg_CMAKE_ARGS})
+
+    if (CMAKE_IGNORE_PATH)
+        string(REPLACE ";" "\\\\;" CMAKE_IGNORE_PATH_ESCAPED "${CMAKE_IGNORE_PATH}")
+        list(APPEND _pkg_CMAKE_ARGS "-DCMAKE_IGNORE_PATH=${CMAKE_IGNORE_PATH_ESCAPED}")
+    endif()
+
+    if (APPLE AND CMAKE_OSX_ARCHITECTURES)
+        string(REPLACE ";" "\\\\;" CMAKE_OSX_ARCHITECTURES_ESCAPED "${CMAKE_OSX_ARCHITECTURES}")
+        list(APPEND _pkg_CMAKE_ARGS "-DCMAKE_OSX_ARCHITECTURES=${CMAKE_OSX_ARCHITECTURES_ESCAPED}")
+        if (CMAKE_OSX_DEPLOYMENT_TARGET)
+            list(APPEND _pkg_CMAKE_ARGS "-DCMAKE_OSX_DEPLOYMENT_TARGET=${CMAKE_OSX_DEPLOYMENT_TARGET}")
+        endif()
+        if (CMAKE_OSX_SYSROOT)
+            list(APPEND _pkg_CMAKE_ARGS "-DCMAKE_OSX_SYSROOT=${CMAKE_OSX_SYSROOT}")
+        endif()
+    endif()
+
+    # Pass along any CMAKE_MSVC_RUNTIME_LIBRARY
+""",
+                """set_cache (${PROJECT_NAME}_LOCAL_DEPS_ROOT "${PROJECT_BINARY_DIR}/deps"
+           "Directory were we do local builds of dependencies")
+set_cache (${PROJECT_NAME}_LOCAL_DEPS_INSTALL_DIR "${${PROJECT_NAME}_LOCAL_DEPS_ROOT}/dist"
+           "Directory where locally built dependencies are installed")
+list (PREPEND CMAKE_PREFIX_PATH ${${PROJECT_NAME}_LOCAL_DEPS_INSTALL_DIR})
+include_directories(BEFORE ${${PROJECT_NAME}_LOCAL_DEPS_INSTALL_DIR}/include)
+""",
+                """    set (${pkgname}_LOCAL_INSTALL_DIR "${${PROJECT_NAME}_LOCAL_DEPS_INSTALL_DIR}")
+""",
+            ],
+        ),
+        FilePatcher(
+            orig_file=os.path.join(src_dir, "src", "cmake", "dependency_utils.cmake"),
+            from_texts=[
+                """                ${_pkg_CMAKE_ARGS}
+        ${_pkg_exec_quiet}
+        )
+""",
+                """    execute_process (COMMAND ${CMAKE_COMMAND}
+                        --build ${${pkgname}_LOCAL_BUILD_DIR}
+                        --config ${${PROJECT_NAME}_DEPENDENCY_BUILD_TYPE}
+                     ${_pkg_exec_quiet}
+                    )
+""",
+                """        execute_process (COMMAND ${CMAKE_COMMAND}
+                            --build ${${pkgname}_LOCAL_BUILD_DIR}
+                            --config ${${PROJECT_NAME}_DEPENDENCY_BUILD_TYPE}
+                            --target install
+                         ${_pkg_exec_quiet}
+                        )
+""",
+            ],
+            to_texts=[
+                """                ${_pkg_CMAKE_ARGS}
+        ${_pkg_exec_quiet}
+        RESULT_VARIABLE _pkg_configure_result
+        )
+    if (_pkg_configure_result)
+        message(FATAL_ERROR "Configuring local ${pkgname} failed with exit code ${_pkg_configure_result}")
+    endif()
+""",
+                """    execute_process (COMMAND ${CMAKE_COMMAND}
+                        --build ${${pkgname}_LOCAL_BUILD_DIR}
+                        --config ${${PROJECT_NAME}_DEPENDENCY_BUILD_TYPE}
+                     ${_pkg_exec_quiet}
+                     RESULT_VARIABLE _pkg_build_result
+                    )
+    if (_pkg_build_result)
+        message(FATAL_ERROR "Building local ${pkgname} failed with exit code ${_pkg_build_result}")
+    endif()
+""",
+                """        execute_process (COMMAND ${CMAKE_COMMAND}
+                            --build ${${pkgname}_LOCAL_BUILD_DIR}
+                            --config ${${PROJECT_NAME}_DEPENDENCY_BUILD_TYPE}
+                            --target install
+                         ${_pkg_exec_quiet}
+                         RESULT_VARIABLE _pkg_install_result
+                        )
+        if (_pkg_install_result)
+            message(FATAL_ERROR "Installing local ${pkgname} failed with exit code ${_pkg_install_result}")
+        endif()
+""",
+            ],
+        ),
+        FilePatcher(
+            orig_file=os.path.join(src_dir, "src", "cmake", "build_minizip-ng.cmake"),
+            from_texts=[
+                """        -D ZLIB_LIBRARY=${ZLIB_LIBRARIES}
+        -D ZLIB_INCLUDE_DIR=${ZLIB_INCLUDE_DIRS}
+"""
+            ],
+            to_texts=[
+                """        -D ZLIB_LIBRARY=${ZLIB_LIBRARIES}
+        -D ZLIB_INCLUDE_DIR=${ZLIB_INCLUDE_DIRS}
+        -D "CMAKE_C_FLAGS=${CMAKE_C_FLAGS} -Dmz_zip_writer_add_file=oiio_mz_zip_writer_add_file"
+"""
+            ],
+        ),
+        FilePatcher(
+            orig_file=os.path.join(src_dir, "src", "cmake", "build_OpenColorIO.cmake"),
+            from_texts=[
+                """        -D CMAKE_INSTALL_LIBDIR=lib
+        # Don't built unnecessary parts of OCIO
+"""
+            ],
+            to_texts=[
+                """        -D CMAKE_INSTALL_LIBDIR=lib
+        -D ZLIB_LIBRARY=${ZLIB_LIBRARIES}
+        -D ZLIB_INCLUDE_DIR=${ZLIB_INCLUDE_DIRS}
+        -D ZLIB_CMAKE_ARGS=-DZLIB_BUILD_EXAMPLES=OFF
+        # Don't built unnecessary parts of OCIO
+"""
+            ],
+        ),
+        FilePatcher(
+            orig_file=os.path.join(src_dir, "src", "tiff.imageio", "CMakeLists.txt"),
+            from_texts=[
+                """add_oiio_plugin (tiffinput.cpp tiffoutput.cpp
+                 LINK_LIBRARIES TIFF::TIFF
+"""
+            ],
+            to_texts=[
+                """add_oiio_plugin (tiffinput.cpp tiffoutput.cpp
+                 INCLUDE_DIRS ${TIFF_INCLUDE_DIRS}
+                 LINK_LIBRARIES TIFF::TIFF
+"""
+            ],
+        ),
+        FilePatcher(
+            orig_file=os.path.join(src_dir, "src", "libOpenImageIO", "CMakeLists.txt"),
+            from_texts=[
+                """            OpenColorIO::OpenColorIO
+"""
+            ],
+            to_texts=[
+                """            $<TARGET_NAME_IF_EXISTS:OpenColorIO::OpenColorIO>
+"""
+            ],
+        ),
+        FilePatcher(
+            orig_file=os.path.join(src_dir, "src", "cmake", "Config.cmake.in"),
+            from_texts=[
+                """if (NOT @OPENIMAGEIO_CONFIG_DO_NOT_FIND_IMATH@ AND NOT OPENIMAGEIO_CONFIG_DO_NOT_FIND_IMATH)
+    find_dependency(Imath @Imath_VERSION@
+                    HINTS @Imath_DIR@)
+endif ()
+""",
+                """    find_dependency(TIFF)
+    find_dependency(OpenColorIO)
+""",
+                """        find_dependency(TBB)
+""",
+            ],
+            to_texts=[
+                """if (NOT @OPENIMAGEIO_CONFIG_DO_NOT_FIND_IMATH@ AND NOT OPENIMAGEIO_CONFIG_DO_NOT_FIND_IMATH)
+    find_dependency(Imath @Imath_VERSION@
+                    HINTS @Imath_DIR@)
+endif ()
+if (@FOUND_OPENEXR_WITH_CONFIG@ AND NOT OPENIMAGEIO_CONFIG_DO_NOT_FIND_OPENEXR)
+    find_dependency(OpenEXR CONFIG)
+endif ()
+""",
+                """    find_dependency(TIFF)
+    if (@GIF_FOUND@)
+        find_dependency(GIF CONFIG)
+    endif()
+    if (@OpenColorIO_FOUND@)
+        find_dependency(OpenColorIO)
+    endif()
+""",
+                """        find_dependency(TBB CONFIG)
+""",
+            ],
+        ),
+    ]
+    patch_manager = PatchManager(patches)
+
+    try:
+        assert os.path.isdir(fmt_config_dir), (
+            f"Atlas fmt package is required before OpenImageIO: {fmt_config_dir}"
+        )
+        patch_manager.apply_patches()
+
+        build_openimageio_arch(install_dir, arm64_only=False)
+        if is_mac():
+            arm64_install_dir = create_arm64_install_dir(src_dir)
+            try:
+                build_openimageio_arch(arm64_install_dir, arm64_only=True)
+                create_universal_binaries(arm64_install_dir, install_dir)
+            finally:
+                rm_tree(arm64_install_dir)
+    finally:
+        patch_manager.restore_files()
+
+
 def build_jxrlib(src_dir: str, install_dir: str):
     try:
         orig_file = os.path.join(src_dir, "Makefile")
@@ -3720,254 +4764,6 @@ def build_hdf5(src_dir: str, install_dir: str):
     finally:
         print()
         shutil.rmtree(build_dir, ignore_errors=False)
-
-
-def build_freeimage(src_dir: str, install_dir: str):
-    patches = [
-        # Behavior policy: FreeImage's bundled PNG plugin would bypass Atlas'
-        # separately built and patched libpng. Remove the plugin and LibPNG
-        # sources so PNG behavior stays controlled by the external libpng path;
-        # keep tif_hash_set.c with the bundled TIFF sources.
-        FilePatcher(
-            orig_file=os.path.join(src_dir, "fipMakefile.srcs"),
-            from_texts=[
-                r"Source/LibTIFF4/tif_dir.c ",
-                r"Source/LibPNG/png.c Source/LibPNG/pngerror.c Source/LibPNG/pngget.c Source/LibPNG/pngmem.c Source/LibPNG/pngpread.c Source/LibPNG/pngread.c Source/LibPNG/pngrio.c Source/LibPNG/pngrtran.c Source/LibPNG/pngrutil.c Source/LibPNG/pngset.c Source/LibPNG/pngtrans.c Source/LibPNG/pngwio.c Source/LibPNG/pngwrite.c Source/LibPNG/pngwtran.c Source/LibPNG/pngwutil.c ",
-                r"./Source/FreeImage/PluginPNG.cpp ",
-            ],
-            to_texts=[
-                r"Source/LibTIFF4/tif_dir.c Source/LibTIFF4/tif_hash_set.c ",
-                r"",
-                r"",
-            ],
-        ),
-        FilePatcher(
-            orig_file=os.path.join(src_dir, "Source", "FreeImage", "Plugin.cpp"),
-            from_texts=[r"s_plugins->AddNode(InitPNG);"],
-            to_texts=[r""],
-        ),
-        FilePatcher(
-            orig_file=os.path.join(
-                src_dir, "Wrapper", "FreeImagePlus", "FreeImagePlus.h"
-            ),
-            from_texts=[r"#define WIN32_LEAN_AND_MEAN"],
-            to_texts=[
-                "#ifndef WIN32_LEAN_AND_MEAN\n#define WIN32_LEAN_AND_MEAN\n#endif"
-            ],
-        ),
-        FilePatcher(
-            orig_file=os.path.join(
-                src_dir, "Source", "OpenEXR", "IlmImf", "ImfAttribute.cpp"
-            ),
-            from_texts=[r": std::binary_function <const char *, const char *, bool>"],
-            to_texts=[""],
-        ),
-        FilePatcher(
-            orig_file=os.path.join(src_dir, "Makefile.gnu"),
-            from_texts=[
-                r"INCDIR ?= $(DESTDIR)/usr/include",
-                r"INSTALLDIR ?= $(DESTDIR)/usr/lib",
-                r" -o root -g root ",
-            ],
-            to_texts=[
-                r"INCDIR ?= $(DESTDIR)$(PREFIX)/include",
-                r"INSTALLDIR ?= $(DESTDIR)$(PREFIX)/lib",
-                r" ",
-            ],
-            patch_condition=lambda: is_linux() and not use_clang_in_linux(),
-        ),
-        FilePatcher(
-            orig_file=os.path.join(src_dir, "Makefile.fip"),
-            from_texts=[
-                r"INCDIR ?= $(DESTDIR)/usr/include",
-                r"INSTALLDIR ?= $(DESTDIR)/usr/lib",
-                r" -o root -g root ",
-            ],
-            to_texts=[
-                r"INCDIR ?= $(DESTDIR)$(PREFIX)/include",
-                r"INSTALLDIR ?= $(DESTDIR)$(PREFIX)/lib",
-                r" ",
-            ],
-            patch_condition=lambda: is_linux() and not use_clang_in_linux(),
-        ),
-    ]
-    patch_manager = PatchManager(patches)
-
-    try:
-        patch_manager.apply_patches()
-
-        if os.path.exists(os.path.join(src_dir, "Source", "LibTIFF4", "VERSION")):
-            os.rename(
-                os.path.join(src_dir, "Source", "LibTIFF4", "VERSION"),
-                os.path.join(src_dir, "Source", "LibTIFF4", "__VERSION"),
-            )
-
-        if is_windows():
-            env = get_vcvars_environment()
-            msbuild_toolset = windows_native_platform_toolset()
-            # FreeImage still builds from vendored MSBuild projects, so force the
-            # DLL CRT explicitly instead of inheriting their /MT defaults.
-            runtime_md_props = ext_dir() + "\\runtime_md.props"
-            msbuild_cmd = [
-                "MSBuild",
-                "FreeImage.2017.sln",
-                "/target:FreeImagePlus",
-                "/property:Platform=x64",
-                "/property:Configuration=Release",
-                "/maxcpucount",
-                "/property:PlatformToolset=" + msbuild_toolset,
-                "/property:ForceImportBeforeCppTargets=" + runtime_md_props,
-                "/property:WindowsTargetPlatformVersion="
-                + env["UCRTVERSION"],  # like 10.0.16299.0
-            ]
-            if msbuild_toolset == windows_msbuild_platform_toolset():
-                msbuild_cmd.extend(
-                    [
-                        "/property:LLVMInstallDir=" + llvm_install_dir(),
-                        "/property:LLVMToolsVersion=" + llvm_tools_version(),
-                    ]
-                )
-            subprocess.run(
-                msbuild_cmd,
-                cwd=src_dir,
-                shell=True,
-                check=True,
-                env=env,
-            )
-            shutil.copytree(
-                os.path.join(src_dir, "Dist", "x64"),
-                os.path.join(install_dir, "freeimage"),
-                dirs_exist_ok=True,
-            )
-            shutil.copytree(
-                os.path.join(src_dir, "Wrapper", "FreeImagePlus", "dist", "x64"),
-                os.path.join(install_dir, "freeimage"),
-                dirs_exist_ok=True,
-            )
-        elif is_linux():
-            if use_clang_in_linux():
-                env = get_env_for_config_make()
-                env.pop("CFLAGS")
-                env.pop("CXXFLAGS")
-                shutil.copy2(
-                    os.path.join(
-                        ext_dir(), "freeimage-makefiles", "Makefile_fip_clang_linux"
-                    ),
-                    src_dir,
-                )
-                subprocess.run(
-                    [
-                        "make",
-                        "-f",
-                        "Makefile_fip_clang_linux",
-                        "-j" + str(os.cpu_count()),
-                    ],
-                    cwd=src_dir,
-                    shell=False,
-                    check=True,
-                    env=env,
-                )
-                subprocess.run(
-                    [
-                        "make",
-                        "-f",
-                        "Makefile_fip_clang_linux",
-                        "-j" + str(os.cpu_count()),
-                        "install",
-                        "PREFIX=" + install_dir,
-                    ],
-                    cwd=src_dir,
-                    shell=False,
-                    check=True,
-                    env=env,
-                )
-                subprocess.run(
-                    ["make", "-f", "Makefile_fip_clang_linux", "clean"],
-                    cwd=src_dir,
-                    shell=False,
-                    check=True,
-                    env=env,
-                )
-            else:
-                # subprocess.run(['make', '-f', 'Makefile.gnu', '-j' + str(os.cpu_count())],
-                #                cwd=src_dir, shell=False, check=True)
-                # subprocess.run(['make', '-f', 'Makefile.gnu', '-j' + str(os.cpu_count()), 'install',
-                #                 'PREFIX=' + install_dir],
-                #                cwd=src_dir, shell=False, check=True)
-                # subprocess.run(['make', '-f', 'Makefile.gnu', 'clean'],
-                #                cwd=src_dir, shell=False, check=True)
-                subprocess.run(
-                    ["make", "-f", "Makefile.fip", "-j" + str(os.cpu_count())],
-                    cwd=src_dir,
-                    shell=False,
-                    check=True,
-                )
-                subprocess.run(
-                    [
-                        "make",
-                        "-f",
-                        "Makefile.fip",
-                        "-j" + str(os.cpu_count()),
-                        "install",
-                        "PREFIX=" + install_dir,
-                    ],
-                    cwd=src_dir,
-                    shell=False,
-                    check=True,
-                )
-                subprocess.run(
-                    ["make", "-f", "Makefile.fip", "clean"],
-                    cwd=src_dir,
-                    shell=False,
-                    check=True,
-                )
-        else:
-            shutil.copy2(
-                os.path.join(ext_dir(), "freeimage-makefiles", "Makefile_gnu"), src_dir
-            )
-            shutil.copy2(
-                os.path.join(ext_dir(), "freeimage-makefiles", "Makefile_fip"), src_dir
-            )
-            # subprocess.run(['make', '-f', 'Makefile_gnu', '-j' + str(os.cpu_count())],
-            #                cwd=src_dir, shell=False, check=True)
-            # subprocess.run(['make', '-f', 'Makefile_gnu', '-j' + str(os.cpu_count()), 'install',
-            #                 'PREFIX=' + install_dir],
-            #                cwd=src_dir, shell=False, check=True)
-            # subprocess.run(['make', '-f', 'Makefile_gnu', 'clean'],
-            #                cwd=src_dir, shell=False, check=True)
-            subprocess.run(
-                ["make", "-f", "Makefile_fip", "-j" + str(os.cpu_count())],
-                cwd=src_dir,
-                shell=False,
-                check=True,
-            )
-            subprocess.run(
-                [
-                    "make",
-                    "-f",
-                    "Makefile_fip",
-                    "-j" + str(os.cpu_count()),
-                    "install",
-                    "PREFIX=" + install_dir,
-                ],
-                cwd=src_dir,
-                shell=False,
-                check=True,
-            )
-            subprocess.run(
-                ["make", "-f", "Makefile_fip", "clean"],
-                cwd=src_dir,
-                shell=False,
-                check=True,
-            )
-    finally:
-        patch_manager.restore_files()
-        if is_mac():
-            os.remove(os.path.join(src_dir, "Makefile_gnu"))
-            os.remove(os.path.join(src_dir, "Makefile_fip"))
-        elif is_linux():
-            if use_clang_in_linux():
-                os.remove(os.path.join(src_dir, "Makefile_fip_clang_linux"))
 
 
 def build_itk(src_dir: str, install_dir: str):
@@ -5779,6 +6575,87 @@ def build_libs(libs: OrderedDict, use_asan: bool):
                 assert os.path.exists(src_dir)
             build_libwebp(src_dir, ext_build_dir())
 
+        if lib_name == "giflib":
+            package_name = find_src_package_with_glob(
+                os.path.join(src_package_dir(), "giflib*")
+            )
+            src_dir = os.path.join(
+                ext_dir(), get_package_top_level_folder(package_name)
+            )
+            if not os.path.exists(src_dir):
+                remove_old_src_folder_with_glob(os.path.join(ext_dir(), "giflib*"))
+                unpack_file_to_folder(package_name, ext_dir())
+                assert os.path.exists(src_dir)
+            build_giflib(src_dir, ext_build_dir())
+
+        if lib_name == "highway":
+            package_name = find_src_package_with_glob(
+                os.path.join(src_package_dir(), "highway*")
+            )
+            src_dir = os.path.join(
+                ext_dir(), get_package_top_level_folder(package_name)
+            )
+            if not os.path.exists(src_dir):
+                remove_old_src_folder_with_glob(os.path.join(ext_dir(), "highway*"))
+                unpack_file_to_folder(package_name, ext_dir())
+                assert os.path.exists(src_dir)
+            build_highway(src_dir, ext_build_dir())
+
+        if lib_name == "libjxl":
+            package_name = find_src_package_with_glob(
+                os.path.join(src_package_dir(), "libjxl*")
+            )
+            skcms_package_name = find_src_package_with_glob(
+                os.path.join(src_package_dir(), "skcms*")
+            )
+            src_dir = os.path.join(
+                ext_dir(), get_package_top_level_folder(package_name)
+            )
+            if not os.path.exists(src_dir):
+                remove_old_src_folder_with_glob(os.path.join(ext_dir(), "libjxl*"))
+                unpack_file_to_folder(package_name, ext_dir())
+                assert os.path.exists(src_dir)
+            build_libjxl(src_dir, ext_build_dir(), skcms_package_name)
+
+        if lib_name == "libtiff":
+            src_dir = os.path.join(ext_dir(), "libtiff")
+            build_libtiff(src_dir, ext_build_dir())
+
+        if lib_name == "libraw":
+            libraw_package_name = find_src_package_with_glob(
+                os.path.join(src_package_dir(), "LibRaw-[0-9]*")
+            )
+            libraw_cmake_package_name = find_src_package_with_glob(
+                os.path.join(src_package_dir(), "LibRaw-cmake*")
+            )
+            libraw_src_dir = os.path.join(
+                ext_dir(), get_package_top_level_folder(libraw_package_name)
+            )
+            libraw_cmake_src_dir = os.path.join(
+                ext_dir(), get_package_top_level_folder(libraw_cmake_package_name)
+            )
+            if not os.path.exists(libraw_src_dir) or not os.path.exists(
+                libraw_cmake_src_dir
+            ):
+                remove_old_src_folders_with_glob(os.path.join(ext_dir(), "LibRaw*"))
+                unpack_file_to_folder(libraw_package_name, ext_dir())
+                unpack_file_to_folder(libraw_cmake_package_name, ext_dir())
+                assert os.path.exists(libraw_src_dir)
+                assert os.path.exists(libraw_cmake_src_dir)
+            build_libraw(libraw_src_dir, libraw_cmake_src_dir, ext_build_dir())
+
+        if lib_name == "openimageio":
+            package_name = find_src_package_with_glob(
+                os.path.join(src_package_dir(), "OpenImageIO*")
+            )
+            src_dir = os.path.join(
+                ext_dir(), get_package_top_level_folder(package_name)
+            )
+            remove_old_src_folder_with_glob(os.path.join(ext_dir(), "OpenImageIO*"))
+            unpack_file_to_folder(package_name, ext_dir())
+            assert os.path.exists(src_dir)
+            build_openimageio(src_dir, ext_build_dir())
+
         if lib_name == "jxrlib":
             src_dir = os.path.join(ext_dir(), "jxrlib")
             build_jxrlib(src_dir, ext_build_dir())
@@ -5802,21 +6679,6 @@ def build_libs(libs: OrderedDict, use_asan: bool):
                 unpack_file_to_folder(package_name, ext_dir())
                 assert os.path.exists(src_dir)
             build_hdf5(src_dir, ext_build_dir())
-
-        if lib_name == "freeimage":
-            package_name = find_src_package_with_glob(
-                os.path.join(src_package_dir(), "freeimage-svn*")
-            )
-            src_dir = os.path.join(
-                ext_dir(), get_package_top_level_folder(package_name)
-            )
-            if not os.path.exists(src_dir):
-                remove_old_src_folder_with_glob(
-                    os.path.join(ext_dir(), "freeimage-svn*")
-                )
-                unpack_file_to_folder(package_name, ext_dir())
-            assert os.path.exists(src_dir)
-            build_freeimage(src_dir, ext_build_dir())
 
         if lib_name == "itk":
             src_dir = os.path.join(ext_dir(), "ITK")
@@ -5971,6 +6833,8 @@ def parse_inputs(argv: list):
         "xz",
         "zstd",
         "brotli",
+        "giflib",
+        "highway",
         "fmt",
         "libevent",
         "snappy",
@@ -5985,11 +6849,14 @@ def parse_inputs(argv: list):
         "libpng",
         "openjpeg",
         "libwebp",
+        "libjxl",
+        "libtiff",
+        "libraw",
+        "openimageio",
         "jxrlib",
         "geometrictools",
         "assimp",
         "hdf5",
-        "freeimage",
         "itk",
         "vtk",
         "opencv",
@@ -6023,10 +6890,13 @@ def parse_inputs(argv: list):
 
     libs_reverse_depends = {
         "eigen": ["opencv", "ceres-solver", "itk", "vtk"],
-        "libpng": ["opencv", "itk", "vtk"],
-        "libjpeg": ["opencv", "itk", "vtk"],
+        "libpng": ["openimageio", "opencv", "itk", "vtk"],
+        "libjpeg": ["libtiff", "libraw", "openimageio", "opencv", "itk", "vtk"],
         "zlib": [
             "libpng",
+            "libtiff",
+            "libraw",
+            "openimageio",
             "assimp",
             "hdf5",
             "itk",
@@ -6049,11 +6919,17 @@ def parse_inputs(argv: list):
         "libevent": ["folly"],
         "double-conversion": ["folly", "itk", "vtk"],
         "lz4": ["vtk", "folly", "rocksdb"],
-        "xz": ["vtk", "folly"],
-        "zstd": ["folly", "rocksdb"],
-        "fmt": ["folly"],
-        "openjpeg": ["opencv"],
-        "libwebp": ["opencv"],
+        "xz": ["libtiff", "vtk", "folly"],
+        "zstd": ["libtiff", "folly", "rocksdb"],
+        "brotli": ["libjxl", "folly"],
+        "giflib": ["openimageio"],
+        "highway": ["libjxl"],
+        "fmt": ["openimageio", "folly"],
+        "openjpeg": ["openimageio", "opencv"],
+        "libjxl": ["openimageio"],
+        "libwebp": ["libtiff", "openimageio", "opencv"],
+        "libtiff": ["openimageio"],
+        "libraw": ["openimageio"],
         "snappy": ["folly", "rocksdb"],
         "bzip2": ["folly"],
         "libsodium": ["folly"],

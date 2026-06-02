@@ -99,9 +99,6 @@ message(STATUS "ATLAS_ENABLE_RELEASE_IPO: ${ATLAS_ENABLE_RELEASE_IPO}")
 
 include(PrintCMakeTargetInfo)
 
-option(ZIMG_DISABLE_FREEIMAGE
-       "Disable FreeImage support in img (removes FreeImage formats and avoids linking libfreeimageplus)."
-       OFF)
 include(LibsForImg)
 
 # subprojects
@@ -242,14 +239,6 @@ set_property(TARGET ${module_name} PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELEASE
 
 if (APPLE)
   target_compile_options(${module_name} PRIVATE -faligned-allocation)
-  set(freeimagelibname libfreeimageplus.dylib)
-  if (NOT ZIMG_DISABLE_FREEIMAGE)
-    add_custom_command(TARGET ${module_name}
-                       POST_BUILD
-                       COMMAND ${CMAKE_COMMAND} -E copy ${FREEIMAGE_LIBRARIES}
-                       $<TARGET_FILE_DIR:${module_name}>/${freeimagelibname}
-    )
-  endif ()
   set(tbblibname libtbb.12.dylib)
   add_custom_command(TARGET ${module_name}
                      POST_BUILD
@@ -264,14 +253,6 @@ if (UNIX AND NOT APPLE)
   # keeps working after relocation.
   #
   # Use the SONAME-level filenames (e.g. `.so.6`) to avoid relying on symlinks inside wheels.
-  set(freeimagelibname libfreeimageplus.so.3)
-  if (NOT ZIMG_DISABLE_FREEIMAGE)
-    add_custom_command(TARGET ${module_name}
-                       POST_BUILD
-                       COMMAND ${CMAKE_COMMAND} -E copy ${FREEIMAGE_LIBRARIES}
-                       $<TARGET_FILE_DIR:${module_name}>/${freeimagelibname}
-    )
-  endif ()
   set(tbblibname libtbb.so.12)
   add_custom_command(TARGET ${module_name}
                      POST_BUILD
@@ -296,17 +277,11 @@ install(DIRECTORY "${_ZIMG_PY_PACKAGE_DIR}/" # canonical pure-Python package sou
 install(TARGETS ${module_name} DESTINATION zimg)
 
 if (WIN32)
-  if (NOT ZIMG_DISABLE_FREEIMAGE)
-    install(FILES ${FREEIMAGE_DLLS} DESTINATION zimg)
-  endif ()
   install(FILES $<TARGET_FILE:TBB::tbb> DESTINATION zimg)
   install(FILES $<TARGET_FILE:Qt6::Core> DESTINATION zimg)
 endif (WIN32)
 
 if (APPLE)
-  if (NOT ZIMG_DISABLE_FREEIMAGE)
-    install(FILES $<TARGET_FILE_DIR:${module_name}>/${freeimagelibname} DESTINATION zimg/lib)
-  endif ()
   install(FILES $<TARGET_FILE_DIR:${module_name}>/${tbblibname} DESTINATION zimg/lib)
   install(FILES $<TARGET_FILE:Qt6::Core> DESTINATION zimg/lib/QtCore.framework/Versions/A)
 
@@ -368,7 +343,6 @@ if (APPLE)
 
       set(_sign_targets
         "${_install_root}/zimg/_imgpy.abi3.so"
-        "${_install_root}/zimg/lib/libfreeimageplus.dylib"
         "${_install_root}/zimg/lib/libtbb.12.dylib"
         "${_install_root}/zimg/lib/QtCore.framework/Versions/A/QtCore"
       )
@@ -406,9 +380,6 @@ if (APPLE)
 endif ()
 
 if (UNIX AND NOT APPLE)
-  if (NOT ZIMG_DISABLE_FREEIMAGE)
-    install(FILES $<TARGET_FILE_DIR:${module_name}>/${freeimagelibname} DESTINATION zimg/lib)
-  endif ()
   install(FILES $<TARGET_FILE_DIR:${module_name}>/${tbblibname} DESTINATION zimg/lib)
   install(FILES $<TARGET_FILE_DIR:${module_name}>/${qtcorelibname} DESTINATION zimg/lib)
 

@@ -45,6 +45,10 @@ namespace {
 #define TIFFPRINT_GEOKEYDIRECTORY 0x80000000
 #define TIFFPRINT_GEOKEYPARAMS 0x40000000
 
+// Atlas reads TIFF tags itself and uses the original strip layout for region
+// reads, so file-backed libtiff handles must not expose chopped virtual strips.
+constexpr const char* kTiffReadMode = "rc";
+
 const struct tiftagname
 {
   uint32_t tag;
@@ -790,9 +794,9 @@ void ZTiff::load(const QString& filename, bool tagOnly)
 
     try {
 #if defined(_WIN32) || defined(_WIN64)
-      m_tif.reset(TIFFOpenW(filename.toStdWString().c_str(), "r"));
+      m_tif.reset(TIFFOpenW(filename.toStdWString().c_str(), kTiffReadMode));
 #else
-      m_tif.reset(TIFFOpen(QFile::encodeName(filename).constData(), "r"));
+      m_tif.reset(TIFFOpen(QFile::encodeName(filename).constData(), kTiffReadMode));
 #endif
     }
     catch (const ZException& e) {
@@ -803,9 +807,9 @@ void ZTiff::load(const QString& filename, bool tagOnly)
         m_useColormap = false;
         TIFFSetErrorHandler(LibtiffErrorHandlerIgnoreColormapError);
 #if defined(_WIN32) || defined(_WIN64)
-        m_tif.reset(TIFFOpenW(filename.toStdWString().c_str(), "r"));
+        m_tif.reset(TIFFOpenW(filename.toStdWString().c_str(), kTiffReadMode));
 #else
-        m_tif.reset(TIFFOpen(QFile::encodeName(filename).constData(), "r"));
+        m_tif.reset(TIFFOpen(QFile::encodeName(filename).constData(), kTiffReadMode));
 #endif
       } else {
         m_tif.reset();
