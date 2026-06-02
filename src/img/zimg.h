@@ -79,6 +79,8 @@ struct ZImgWriteParameters
   uint32_t jpegChrominanceSubsampling = 444;
   // jpeg xr quality, [0.0 - 1.0] 1.0 is lossless
   double jpegXRQuality = 0.8;
+  // Zstd compression level, [ZSTD_minCLevel() - ZSTD_maxCLevel()]. Negative levels favor speed over density.
+  int32_t zstdCompressionLevel = 1;
 };
 
 struct ZImgReadOptions

@@ -10,10 +10,13 @@
 #include "zbenchtimer.h"
 #include "zhdf5globallock.h"
 #include "zh5zjpegxr.h"
+#include "zh5zzstd.h"
 #include "zimgjpegxr.h"
 #include <QFile>
 #include <folly/compression/Compression.h>
+#include <zstd.h>
 #include <array>
+#include <bit>
 #include <limits>
 #include <string>
 #include <utility>
@@ -175,9 +178,11 @@ DatasetFilterInfo datasetFilterInfo(hid_t dcplId, std::string_view datasetName)
 
   res.usesFilter = true;
   if (filterId == H5Z_FILTER_DEFLATE) {
-    res.compression = nim::Compression::AUTO;
+    res.compression = nim::Compression::DEFLATE;
   } else if (filterId == H5Z_FILTER_JPEGXR) {
     res.compression = nim::Compression::JPEGXR;
+  } else if (filterId == H5Z_FILTER_ZSTD) {
+    res.compression = nim::Compression::ZSTD;
   } else {
     res.supported = false;
     res.unsupportedReason = fmt::format("dataset {} uses unsupported HDF5 filter id {} ({})",
@@ -434,6 +439,37 @@ void readH5DataToImg(nim::ZImg& img, const H5::DataSet& data, size_t x_, size_t 
   }
 }
 
+void setHDF5CompressionFilter(H5::DSetCreatPropList& pList,
+                              const nim::ZImg& img,
+                              const nim::ZImgWriteParameters& paras,
+                              const hsize_t* chunkDim)
+{
+  CHECK(chunkDim != nullptr);
+  if (paras.compression == nim::Compression::JPEGXR) {
+    if (img.voxelFormat() != nim::VoxelFormat::Unsigned || img.bytesPerVoxel() > 2) {
+      throw nim::ZException("image can not be compressed with jpegxr");
+    }
+    size_t nelements = 4;
+    unsigned int values[] = {std::bit_cast<unsigned int>(float(paras.jpegXRQuality)),
+                             static_cast<unsigned int>(img.bytesPerVoxel()),
+                             static_cast<unsigned int>(chunkDim[0]),
+                             static_cast<unsigned int>(chunkDim[1])};
+    H5Pset_filter(pList.getId(), H5Z_FILTER_JPEGXR, H5Z_FLAG_OPTIONAL, nelements, values);
+  } else if (paras.compression == nim::Compression::AUTO || paras.compression == nim::Compression::ZSTD) {
+    if (paras.zstdCompressionLevel < ZSTD_minCLevel() || paras.zstdCompressionLevel > ZSTD_maxCLevel()) {
+      throw nim::ZException(fmt::format("invalid Zstd compression level: {}. Expected {}-{}",
+                                        paras.zstdCompressionLevel,
+                                        ZSTD_minCLevel(),
+                                        ZSTD_maxCLevel()));
+    }
+    size_t nelements = 1;
+    unsigned int values[] = {std::bit_cast<unsigned int>(paras.zstdCompressionLevel)};
+    H5Pset_filter(pList.getId(), H5Z_FILTER_ZSTD, H5Z_FLAG_OPTIONAL, nelements, values);
+  } else {
+    pList.setDeflate(paras.zlibCompressionLevel);
+  }
+}
+
 void writeFixedValueImgSliceToH5Grp(H5::Group& zGrp,
                                     const H5std_string& name,
                                     const nim::ZImg& img,
@@ -460,19 +496,7 @@ void writeFixedValueImgSliceToH5Grp(H5::Group& zGrp,
   H5::DataSpace imgDataspace(2, imgDim);
   H5::DSetCreatPropList pList;
   pList.setChunk(2, chunkDim);
-  if (paras.compression == nim::Compression::JPEGXR) {
-    if (img.voxelFormat() != nim::VoxelFormat::Unsigned || img.bytesPerVoxel() > 2) {
-      throw nim::ZException("image can not be compressed with jpegxr");
-    }
-    size_t nelements = 4;
-    unsigned int values[] = {std::bit_cast<unsigned int>(float(paras.jpegXRQuality)),
-                             (unsigned int)img.bytesPerVoxel(),
-                             (unsigned int)chunkDim[0],
-                             (unsigned int)chunkDim[1]};
-    H5Pset_filter(pList.getId(), H5Z_FILTER_JPEGXR, H5Z_FLAG_OPTIONAL, nelements, values);
-  } else {
-    pList.setDeflate(paras.zlibCompressionLevel);
-  }
+  setHDF5CompressionFilter(pList, img, paras, chunkDim);
 
   H5::DataSet imgData;
 
@@ -555,19 +579,7 @@ void writeImgSliceToH5Grp(H5::Group& zGrp,
   H5::DataSpace imgDataspace(2, imgDim);
   H5::DSetCreatPropList pList;
   pList.setChunk(2, chunkDim);
-  if (paras.compression == nim::Compression::JPEGXR) {
-    if (img.voxelFormat() != nim::VoxelFormat::Unsigned || img.bytesPerVoxel() > 2) {
-      throw nim::ZException("image can not be compressed with jpegxr");
-    }
-    size_t nelements = 4;
-    unsigned int values[] = {std::bit_cast<unsigned int>(float(paras.jpegXRQuality)),
-                             (unsigned int)img.bytesPerVoxel(),
-                             (unsigned int)chunkDim[0],
-                             (unsigned int)chunkDim[1]};
-    H5Pset_filter(pList.getId(), H5Z_FILTER_JPEGXR, H5Z_FLAG_OPTIONAL, nelements, values);
-  } else {
-    pList.setDeflate(paras.zlibCompressionLevel);
-  }
+  setHDF5CompressionFilter(pList, img, paras, chunkDim);
 
   H5::DataSet imgData;
 
@@ -1005,6 +1017,15 @@ void readRawHDF5ChunkToImg(const QString& filename,
 
   if (hdf5Tile.compression == Compression::JPEGXR) {
     ZImgJpegXR::readMemImg(scratch.compressedBuffer.data(), hdf5Tile.length, img.timeData(0), img.timeByteNumber());
+    return;
+  }
+  if (hdf5Tile.compression == Compression::ZSTD) {
+    const size_t decompressedSize =
+      ZSTD_decompress(img.timeData(0), img.timeByteNumber(), scratch.compressedBuffer.data(), hdf5Tile.length);
+    if (ZSTD_isError(decompressedSize) != 0) {
+      throw ZException(fmt::format("zstd decompress failed: {}", ZSTD_getErrorName(decompressedSize)));
+    }
+    CHECK(decompressedSize == img.timeByteNumber()) << decompressedSize << " " << img.timeByteNumber();
     return;
   }
 

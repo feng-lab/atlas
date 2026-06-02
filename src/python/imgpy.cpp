@@ -560,9 +560,10 @@ NB_MODULE(_imgpy, m)
                                   "ZImgWriteParameters",
                                   "This class holds different parameters for configuring image compression.")
     .def(nb::init<>(), "Default constructor. Initializes the parameters with their respective default values.")
-    .def_rw("compression",
-            &ZImgWriteParameters::compression,
-            "Specifies the compression algorithm to use, default to Compression.Auto.")
+    .def_rw(
+      "compression",
+      &ZImgWriteParameters::compression,
+      "Specifies the compression algorithm to use, default to Compression.Auto. For NIM/HDF5 writes, Auto uses Zstd.")
     .def_rw(
       "zlibCompressionLevel",
       &ZImgWriteParameters::zlibCompressionLevel,
@@ -585,7 +586,10 @@ NB_MODULE(_imgpy, m)
     .def_rw(
       "jpegXRQuality",
       &ZImgWriteParameters::jpegXRQuality,
-      "Specifies the quality factor for the JPEG XR compression. Ranges [0.0 - 1.0], 1.0 is lossless, default to 0.8.");
+      "Specifies the quality factor for the JPEG XR compression. Ranges [0.0 - 1.0], 1.0 is lossless, default to 0.8.")
+    .def_rw("zstdCompressionLevel",
+            &ZImgWriteParameters::zstdCompressionLevel,
+            "Specifies the compression level for Zstd. Negative values favor speed over density, default to 1.");
 
   nb::class_<ZImgInfo>(m, "ZImgInfo", "This class holds the metadata for a multidimensional image.")
     .def(nb::init<>(), "Default constructor that initializes the image information with default values.")

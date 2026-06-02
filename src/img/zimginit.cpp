@@ -4,6 +4,7 @@
 #include "zcpuinfo.h"
 #include "zimginterface.h"
 #include "zh5zjpegxr.h"
+#include "zh5zzstd.h"
 #include "zmkl.h"
 #ifdef ZIMG_USE_FFTW
 #include <fftw3.h>
@@ -128,6 +129,7 @@ ZImgInit::ZImgInit(const QString& resourcesDIR, const QString& jreDIR, const QSt
   }
 
   jpegxr_register_h5filter();
+  zstd_register_h5filter();
 
   // Keep this as the small Folly runtime subset Atlas needs. Full folly::Init
   // also initializes glog and installs Folly's fatal signal handler, while

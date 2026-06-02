@@ -159,6 +159,7 @@ set(IMG_SOURCES
         zmemorymappedfile.cpp zmemorymappedfile.h
         zmemorymappedfilecache.cpp zmemorymappedfilecache.h
         zh5zjpegxr.cpp zh5zjpegxr.h
+        zh5zzstd.cpp zh5zzstd.h
         zhashutils.h
         zfolly.cpp zfolly.h
         zcachedimg.cpp zcachedimg.h
