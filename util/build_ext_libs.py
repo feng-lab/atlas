@@ -3952,6 +3952,21 @@ endif ()
             ],
         ),
         FilePatcher(
+            orig_file=os.path.join(src_dir, "src", "cmake", "externalpackages.cmake"),
+            from_texts=[
+                """set (OPENIMAGEIO_CONFIG_DO_NOT_FIND_IMATH OFF CACHE BOOL
+     "Exclude find_dependency(Imath) from the exported OpenImageIOConfig.cmake")
+"""
+            ],
+            to_texts=[
+                """set (OPENIMAGEIO_CONFIG_DO_NOT_FIND_IMATH OFF CACHE BOOL
+     "Exclude find_dependency(Imath) from the exported OpenImageIOConfig.cmake")
+set (OPENIMAGEIO_CONFIG_DO_NOT_FIND_OPENEXR OFF CACHE BOOL
+     "Exclude find_dependency(OpenEXR) from the exported OpenImageIOConfig.cmake")
+"""
+            ],
+        ),
+        FilePatcher(
             orig_file=os.path.join(src_dir, "src", "cmake", "modules", "FindJXL.cmake"),
             from_texts=[
                 """find_library(JXL_THREADS_LIBRARY
@@ -4304,8 +4319,9 @@ endif ()
     find_dependency(Imath @Imath_VERSION@
                     HINTS @Imath_DIR@)
 endif ()
-if (@FOUND_OPENEXR_WITH_CONFIG@ AND NOT OPENIMAGEIO_CONFIG_DO_NOT_FIND_OPENEXR)
-    find_dependency(OpenEXR CONFIG)
+if (NOT @OPENIMAGEIO_CONFIG_DO_NOT_FIND_OPENEXR@ AND NOT OPENIMAGEIO_CONFIG_DO_NOT_FIND_OPENEXR)
+    find_dependency(OpenEXR CONFIG
+                    HINTS @OpenEXR_DIR@)
 endif ()
 """,
                 """    find_dependency(TIFF)
