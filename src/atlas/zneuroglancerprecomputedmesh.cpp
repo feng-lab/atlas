@@ -1002,6 +1002,13 @@ ZNeuroglancerPrecomputedMeshSource::multiLodClipBoundsLocalVoxel(const MultiLodM
   return out;
 }
 
+glm::mat4 ZNeuroglancerPrecomputedMeshSource::multiLodStoredToLocalVoxelTransform() const
+{
+  CHECK(supportsRuntimeLod());
+  CHECK(sharedMeshInfo().multiLodInfo) << "Runtime multi-LOD stored coordinate transform requires multiLodInfo";
+  return sharedMeshInfo().multiLodInfo->voxelFromStored;
+}
+
 folly::coro::Task<std::shared_ptr<const ZNeuroglancerPrecomputedMeshSource::MultiLodChunkMesh>>
 ZNeuroglancerPrecomputedMeshSource::loadChunkMeshAsync(uint64_t segmentId, uint32_t row) const
 {

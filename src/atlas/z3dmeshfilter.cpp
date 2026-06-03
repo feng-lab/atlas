@@ -20,6 +20,7 @@
 #include <folly/coro/WithCancellation.h>
 
 #include <algorithm>
+#include <cmath>
 #include <limits>
 #include <ranges>
 #include <string>
@@ -509,8 +510,8 @@ void Z3DMeshFilter::beginExportMeshLod(const glm::uvec2& fullViewport, folly::Ca
 
   m_runtimeNgFailedRows.clear();
 
-  const glm::mat4 modelViewProjection =
-    m_globalParameters.camera.get().projectionViewMatrix(MonoEye) * coordTransform();
+  const glm::mat4 modelViewProjection = m_globalParameters.camera.get().projectionViewMatrix(MonoEye) *
+                                        coordTransform() * m_runtimeNgSource->multiLodStoredToLocalVoxelTransform();
   const auto clippingPlanes = ZNeuroglancerPrecomputedMeshSource::getFrustumPlanes(modelViewProjection);
   const auto desiredRows = ZNeuroglancerPrecomputedMeshSource::desiredChunksForView(*m_runtimeNgManifest,
                                                                                     modelViewProjection,
@@ -697,6 +698,7 @@ void Z3DMeshFilter::setExternalSourceState(json::value sourceJson,
   resetRuntimeNeuroglancerLodState();
   m_runtimeNgRemoteContext = std::move(remoteContext);
   m_runtimeNgSourceKey = *keyOpt;
+  applyRuntimeNeuroglancerVoxelAspectScale(*keyOpt);
   startRuntimeNeuroglancerOpen();
 }
 
@@ -1093,6 +1095,48 @@ void Z3DMeshFilter::resetRuntimeNeuroglancerLodState()
   initializeRotationCenterIfDefault();
   m_dataIsInvalid = true;
   invalidateResult();
+}
+
+void Z3DMeshFilter::applyRuntimeNeuroglancerVoxelAspectScale(const ZNeuroglancerMeshExternalSourceKey& key)
+{
+  if (!key.baseResolutionNm) {
+    return;
+  }
+
+  const auto& resolution = *key.baseResolutionNm;
+  if (!std::isfinite(resolution[0]) || !std::isfinite(resolution[1]) || !std::isfinite(resolution[2]) ||
+      resolution[0] <= 0.0 || resolution[1] <= 0.0 || resolution[2] <= 0.0) {
+    return;
+  }
+
+  const double xy = std::max(resolution[0], resolution[1]);
+  const double zOverXY = resolution[2] / xy;
+  if (!std::isfinite(zOverXY) || zOverXY <= 0.0) {
+    return;
+  }
+
+  const glm::vec3 currentScale = m_rendererParameters.coordTransform.scale();
+  const bool isDefaultScale = glm::all(glm::epsilonEqual(currentScale, glm::vec3(1.f), 1e-6f));
+  const bool isPreviousAutoScale = m_hasRuntimeNgAutoVoxelAspectScale &&
+                                   glm::all(glm::epsilonEqual(currentScale, m_runtimeNgAutoVoxelAspectScale, 1e-6f));
+  if (!isDefaultScale && !isPreviousAutoScale) {
+    return;
+  }
+
+  const glm::vec3 suggestedScale(1.f, 1.f, static_cast<float>(zOverXY));
+  m_hasRuntimeNgAutoVoxelAspectScale = true;
+  m_runtimeNgAutoVoxelAspectScale = suggestedScale;
+  if (glm::all(glm::epsilonEqual(currentScale, suggestedScale, 1e-6f))) {
+    return;
+  }
+
+  m_rendererParameters.coordTransform.setScale(suggestedScale);
+  LOG(INFO) << fmt::format("3D mesh: using Neuroglancer voxel-size aspect ratio for coordTransform scale: "
+                           "baseResolutionNm=({:.6g},{:.6g},{:.6g}) -> scale=(1,1,{:.6g})",
+                           resolution[0],
+                           resolution[1],
+                           resolution[2],
+                           zOverXY);
 }
 
 void Z3DMeshFilter::clearRuntimeNeuroglancerRequestFrontier()
@@ -1559,8 +1603,8 @@ void Z3DMeshFilter::applyRuntimeNeuroglancerSelection()
     // chunks we have so far while we continue streaming the full base working
     // set in the background.
     const float detailCutoff = kRuntimeNgInteractionDetailCutoff;
-    const glm::mat4 modelViewProjection =
-      m_globalParameters.camera.get().projectionViewMatrix(MonoEye) * coordTransform();
+    const glm::mat4 modelViewProjection = m_globalParameters.camera.get().projectionViewMatrix(MonoEye) *
+                                          coordTransform() * m_runtimeNgSource->multiLodStoredToLocalVoxelTransform();
     const auto clippingPlanes = ZNeuroglancerPrecomputedMeshSource::getFrustumPlanes(modelViewProjection);
 
     const auto drawChunks = ZNeuroglancerPrecomputedMeshSource::chunksToDrawForView(
@@ -1624,8 +1668,8 @@ void Z3DMeshFilter::applyRuntimeNeuroglancerSelection()
 
   const float detailCutoff =
     m_runtimeNgInteractionActive ? kRuntimeNgInteractionDetailCutoff : kRuntimeNgIdleDetailCutoff;
-  const glm::mat4 modelViewProjection =
-    m_globalParameters.camera.get().projectionViewMatrix(MonoEye) * coordTransform();
+  const glm::mat4 modelViewProjection = m_globalParameters.camera.get().projectionViewMatrix(MonoEye) *
+                                        coordTransform() * m_runtimeNgSource->multiLodStoredToLocalVoxelTransform();
   const auto clippingPlanes = ZNeuroglancerPrecomputedMeshSource::getFrustumPlanes(modelViewProjection);
   const bool deferViewDrivenRefinementUntilIdle = m_runtimeNgBaseReady && m_runtimeNgInteractionActive;
 

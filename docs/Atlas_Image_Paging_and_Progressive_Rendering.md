@@ -16,7 +16,7 @@ Scope
 - This document details the Atlas image paging and progressive volume rendering pipeline across OpenGL and Vulkan backends, from ingesting images to progressive full‑resolution rendering. It focuses on the filter/renderers, image cache layout and updates, the block‑ID discovery pass, and how progressive rounds converge to a full‑resolution result.
 - Relevant code: `src/atlas/` (filter, renderers, cache), `src/img/` and `src/atlas/zimgpack.*` (I/O and tile management), scratch resource pool, and shaders listed in `src/atlas/CMakeLists.txt`.
 
-Quick Reference — Addressable Max Size (per axis)
+Quick Reference — Addressable Max Size (cubic/isotropic estimate)
 
 | Block size flag | Interior B (= flag − 4) | D_ID_max (32-bit ID bound) | D_PD_max (page-dir bound) | Dominant |
 | --- | ---:| ---:| ---:| --- |
@@ -25,7 +25,7 @@ Quick Reference — Addressable Max Size (per axis)
 | 256 | 252 | ≈ 391,793 | 11,007,360 | 32-bit ID |
 | 512 | 508 | ≈ 789,805 | 22,189,440 | 32-bit ID |
 
-Notes: D_ID_max ≈ B · c, where c = cbrt(((2^32 − 1) · 7)/8) ≈ 1,554.733553; D_PD_max = B · 32 · floor(2048/1.5) = B · 43,680.
+Notes: D_ID_max ≈ B · c, where c = cbrt(((2^32 − 1) · 7)/8) ≈ 1,554.733553; D_PD_max = B · 32 · floor(2048/1.5) = B · 43,680. These values assume a cubic image and isotropic 2× LODs; rectangular or anisotropic datasets are checked by summing the actual per-level brick counts.
 
 Key Components
 
@@ -387,7 +387,9 @@ Invariants and Error Handling
 
 Tuning and Flags
 
-- `--atlas_image_block_size`: brick dimension (64 default; supports 128/256/512); pad added internally to avoid seams
+- `--atlas_image_block_size`: starting brick dimension (64 default; supports 128/256/512); pad added internally to avoid
+  seams. If the requested size would exceed the 32-bit block-ID address space, Atlas promotes to the next supported size
+  that fits and logs the promotion; if none fit, loading fails with a clear 3D paging error.
 - `--atlas_volume_rendering_maximum_round`: limit progressive raycaster rounds
 - `--atlas_number_of_blocks_to_use_PBO_threashold`: threshold to switch to PBO upload path
 - Device VRAM determines image/page cache memory budgets (see constructor in `Z3DImg`).
@@ -533,6 +535,8 @@ This section derives the theoretical upper bound on volume dimensions that the p
   - Brick padding: `m_imageBlockSizePad = (4,4,4)` → 2‑voxel border each side (src/atlas/z3dimg.h:320)
   - Configurable brick nominal edge: `--atlas_image_block_size ∈ {64,128,256,512}`; effective interior brick size is
     `B = (--atlas_image_block_size) − 4` (src/atlas/z3dimg.cpp:47, 68)
+    - The flag is a starting size. Atlas preserves the requested size when it fits; if the exact paging layout exceeds
+      the 32-bit block-ID domain, it retries larger supported sizes in order (`128`, `256`, `512`) before failing.
   - Max 3D texture side used for page‑directory: `Z3DGpuInfo::max3DTextureSize() = min(2048, GL_MAX_3D_TEXTURE_SIZE)`
     (src/atlas/z3dgpuinfo.h:82, src/atlas/z3dgpuinfo.cpp:274)
   - Page‑table cache side limit used in sizing: 512 (src/atlas/z3dimg.cpp:371)
@@ -555,6 +559,10 @@ Two independent constraints bound the maximum image size D (voxels per axis, ass
 - Solving for D: `D_ID_max ≈ B · cbrt(((2^32 − 1) · 7)/8)`.
   - The constant `c = cbrt(((2^32 − 1) · 7)/8) ≈ 1,554.733553`.
   - With `B=60` → `D_ID_max ≈ 60 · 1,554.733553 ≈ 93,284` voxels per axis.
+- The exact runtime check uses the actual rectangular dimensions and anisotropic LOD scales:
+  `sum_l ceil(ceil(W/sx_l)/B) · ceil(ceil(H/sy_l)/B) · ceil(ceil(D/sz_l)/B) < 2^32 − 1`.
+  For datasets with physical voxel sizes, `(sx_l,sy_l,sz_l)` may intentionally keep a coarse axis from downsampling for
+  early levels, so the exact count can be much larger than the cubic estimate.
 
 Which constraint dominates?
 - For practical datasets, the 32‑bit Block‑ID limit is far tighter than the page‑directory texture limit. With default settings, the maximum addressable cubic volume is on the order of 93k³ voxels.
@@ -566,8 +574,9 @@ Results by block size (padding is always 4, so `B = block − 4`)
 - `block=512 → B=508`: `D_ID_max ≈ 789,805`,  `D_PD_max = 22,189,440` → effective max ≈ 790k per axis.
 
 Notes
-- These are theoretical addressability limits. Actual memory residency is governed by the cache budgets that adapt to GPU VRAM (src/atlas/z3dimg.cpp:77–119), but paging allows rendering sub‑regions progressively regardless of dataset size up to these bounds.
+- These are theoretical addressability limits for the selected brick size. Actual memory residency is governed by the cache budgets that adapt to GPU VRAM (src/atlas/z3dimg.cpp:77–119), but paging allows rendering sub‑regions progressively regardless of dataset size up to these bounds.
 - The page‑directory packing across axes ensures `~1.5×` overhead on the longest dimension for isotropic data; highly anisotropic data may shift which axis saturates first, but the 32‑bit Block‑ID bound remains the dominant constraint.
+- Larger bricks reduce address pressure without dropping data. The trade-off is coarser paging granularity and larger per-brick uploads.
 
 Derivation Sidebar — 1.5× Page‑Directory Packing
 

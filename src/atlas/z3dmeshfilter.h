@@ -139,6 +139,8 @@ private:
 
   void resetRuntimeNeuroglancerLodState();
 
+  void applyRuntimeNeuroglancerVoxelAspectScale(const ZNeuroglancerMeshExternalSourceKey& key);
+
   void markRuntimeNeuroglancerLodDirty();
 
   void onRuntimeNeuroglancerCameraChanged();
@@ -248,6 +250,8 @@ private:
   json::value m_externalSourceJson;
   std::shared_ptr<const ZNeuroglancerRemoteContext> m_runtimeNgRemoteContext;
   std::optional<ZNeuroglancerMeshExternalSourceKey> m_runtimeNgSourceKey;
+  bool m_hasRuntimeNgAutoVoxelAspectScale = false;
+  glm::vec3 m_runtimeNgAutoVoxelAspectScale{1.f, 1.f, 1.f};
   std::shared_ptr<const ZNeuroglancerPrecomputedMeshSource> m_runtimeNgSource;
   std::shared_ptr<const ZNeuroglancerPrecomputedMeshSource::MultiLodManifest> m_runtimeNgManifest;
   std::vector<uint32_t> m_runtimeNgBaseRows;

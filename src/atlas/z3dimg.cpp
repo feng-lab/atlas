@@ -25,8 +25,11 @@
 #include <chrono>
 #include <cstddef>
 #include <exception>
+#include <limits>
 #include <memory>
+#include <string>
 #include <utility>
+#include <vector>
 
 ABSL_FLAG(uint32_t,
           atlas_log_folly_global_executor_status_interval_in_seconds,
@@ -75,6 +78,50 @@ ABSL_DECLARE_FLAG(uint64_t, atlas_vk_residency_budget_bytes);
 namespace nim {
 
 namespace {
+
+constexpr std::array<uint32_t, 4> kSupportedImageBlockNominalSizes{64u, 128u, 256u, 512u};
+constexpr uint32_t kDefaultImageBlockNominalSize = kSupportedImageBlockNominalSizes.front();
+
+bool isSupportedImageBlockNominalSize(uint32_t imageBlockSize)
+{
+  return std::ranges::find(kSupportedImageBlockNominalSizes, imageBlockSize) != kSupportedImageBlockNominalSizes.end();
+}
+
+uint32_t normalizeImageBlockNominalSize(uint32_t imageBlockSize)
+{
+  if (isSupportedImageBlockNominalSize(imageBlockSize)) {
+    return imageBlockSize;
+  }
+
+  LOG(INFO) << fmt::format("atlas_image_block_size {} is not supported, use {}",
+                           imageBlockSize,
+                           kDefaultImageBlockNominalSize);
+  return kDefaultImageBlockNominalSize;
+}
+
+std::vector<uint32_t> imageBlockNominalSizeCandidates(uint32_t imageBlockSize)
+{
+  const auto first = std::ranges::find(kSupportedImageBlockNominalSizes, imageBlockSize);
+  CHECK(first != kSupportedImageBlockNominalSizes.end()) << "unsupported normalized image block size";
+  return std::vector<uint32_t>(first, kSupportedImageBlockNominalSizes.end());
+}
+
+std::string formatImageBlockNominalSizes(const std::vector<uint32_t>& imageBlockSizes)
+{
+  fmt::memory_buffer buffer;
+  for (uint32_t imageBlockSize : imageBlockSizes) {
+    if (buffer.size() != 0u) {
+      fmt::format_to(std::back_inserter(buffer), ", ");
+    }
+    fmt::format_to(std::back_inserter(buffer), "{}", imageBlockSize);
+  }
+  return fmt::to_string(buffer);
+}
+
+bool equalUvec3(const glm::uvec3& lhs, const glm::uvec3& rhs)
+{
+  return lhs.x == rhs.x && lhs.y == rhs.y && lhs.z == rhs.z;
+}
 
 std::unique_ptr<Z3DTexture> createChannelTexture(const ZImg& image)
 {
@@ -211,16 +258,8 @@ Z3DImg::Z3DImg(const ZImgPack& imgPack, const glm::vec3& scale, const std::vecto
   }
 
   if (m_isVolumeDownsampled) {
-    const uint32_t imageBlockSize = absl::GetFlag(FLAGS_atlas_image_block_size);
-    if (imageBlockSize == 64 || imageBlockSize == 128 || imageBlockSize == 256 || imageBlockSize == 512) {
-      m_imageBlockSize = glm::uvec3(imageBlockSize) - m_imageBlockSizePad;
-    } else {
-      constexpr uint32_t defaultImageBlockSize = 64;
-      LOG(INFO) << fmt::format("atlas_image_block_size {} is not supported, use {}",
-                               imageBlockSize,
-                               defaultImageBlockSize);
-      m_imageBlockSize = glm::uvec3(defaultImageBlockSize) - m_imageBlockSizePad;
-    }
+    const uint32_t imageBlockSize = normalizeImageBlockNominalSize(absl::GetFlag(FLAGS_atlas_image_block_size));
+    m_imageBlockSize = glm::uvec3(imageBlockSize) - m_imageBlockSizePad;
 
     const size_t cacheSizingMemoryMB = pagedImageCacheSizingMemoryMB();
     if (cacheSizingMemoryMB >= 32000) {
@@ -379,9 +418,6 @@ void Z3DImg::setScale(const glm::vec3& scale)
 
   double minRes = std::min(std::min(relativeResolution.x, relativeResolution.y), relativeResolution.z);
   relativeResolution /= minRes;
-  imgDim *= relativeResolution;
-  glm::dvec3 levels = glm::ceil(glm::log2(imgDim / glm::dvec3(m_imageBlockSize))) + 1.0;
-  const size_t requestedNumLevels = std::max(std::max(levels.x, levels.y), levels.z);
 
   std::vector<size_t> sortedIndex = argSort(&relativeResolution[0], &relativeResolution[0] + 3);
   const std::vector<size_t> baseStayRounds = [&]() {
@@ -404,7 +440,7 @@ void Z3DImg::setScale(const glm::vec3& scale)
     return stayRounds;
   }();
 
-  const auto candidateLevelScales = [&]() {
+  const auto buildLevelScales = [&](size_t requestedNumLevels) {
     std::vector<glm::uvec3> out;
     out.resize(requestedNumLevels);
     std::vector<size_t> stayRounds = baseStayRounds;
@@ -431,20 +467,6 @@ void Z3DImg::setScale(const glm::vec3& scale)
       CHECK(out[l].x == out[l].y);
     }
     return out;
-  }();
-
-  auto isStructureIdentical = [&](size_t effectiveNumLevels) -> bool {
-    if (m_levelScales.empty() || effectiveNumLevels != m_numLevels) {
-      return false;
-    }
-    for (size_t l = 0; l < effectiveNumLevels; ++l) {
-      const auto& a = m_levelScales[l];
-      const auto& b = candidateLevelScales[l];
-      if (a.x != b.x || a.y != b.y || a.z != b.z) {
-        return false;
-      }
-    }
-    return true;
   };
 
   // Determine the effective number of LOD levels after clamping the coarsest
@@ -454,153 +476,325 @@ void Z3DImg::setScale(const glm::vec3& scale)
   const float candidateVolumeVoxelWorldSize = std::max(std::max(candidateVolumeVoxelWorldDimension.x,
                                                                 candidateVolumeVoxelWorldDimension.y),
                                                        candidateVolumeVoxelWorldDimension.z);
-  size_t candidateEffectiveNumLevels = requestedNumLevels;
-  for (size_t l = 0; l < requestedNumLevels; ++l) {
+
+  const auto clampToPreview = [&](const glm::uvec3& levelScale) {
     if (hasPhysicalVoxelSize) {
       // Physical-resolution mode: clamp based purely on voxel-downsample factors, independent of
       // user transform scale. This keeps the paging hierarchy stable.
-      const glm::vec3 levelScaleF(candidateLevelScales[l]);
-      if (levelScaleF.x >= m_volumeSpacing.x && levelScaleF.y >= m_volumeSpacing.y && levelScaleF.z >= m_volumeSpacing.z) {
-        candidateEffectiveNumLevels = l + 1;
+      const glm::vec3 levelScaleF(levelScale);
+      return levelScaleF.x >= m_volumeSpacing.x && levelScaleF.y >= m_volumeSpacing.y &&
+             levelScaleF.z >= m_volumeSpacing.z;
+    }
+    const glm::vec3 voxelWorldDim = absScale * glm::vec3(levelScale);
+    const float voxelWorldSize = std::min(std::min(voxelWorldDim.x, voxelWorldDim.y), voxelWorldDim.z);
+    return voxelWorldSize > candidateVolumeVoxelWorldSize;
+  };
+
+  enum class LayoutFailure
+  {
+    None,
+    BlockIdDomain,
+    PageDirectoryTexture
+  };
+
+  struct PagingLayout
+  {
+    uint32_t nominalImageBlockSize = 0;
+    glm::uvec3 imageBlockSize = glm::uvec3(0);
+    size_t numLevels = 1;
+    size_t numImageBlocks = 0;
+    size_t numPageTableBlocks = 0;
+    glm::uvec3 pageDirectorySize = glm::uvec3(0);
+    std::vector<glm::uvec3> levelScales;
+    std::vector<glm::uvec3> imageDimensions;
+    std::vector<glm::uvec3> pageTableDimensions;
+    std::vector<glm::uvec3> pageDirectoryDimensions;
+    std::vector<glm::uvec3> posToBlockIDs;
+    std::vector<glm::uvec3> pageDirectoryBases;
+    std::vector<glm::vec3> voxelWorldDimensions;
+    std::vector<float> voxelWorldSizes;
+    LayoutFailure failure = LayoutFailure::None;
+    std::string failureMessage;
+  };
+
+  const auto failLayout = [](PagingLayout& layout, LayoutFailure failure, std::string message) {
+    layout.failure = failure;
+    layout.failureMessage = std::move(message);
+    return layout;
+  };
+
+  const auto buildLayout = [&](uint32_t nominalImageBlockSize) {
+    PagingLayout layout;
+    layout.nominalImageBlockSize = nominalImageBlockSize;
+    layout.imageBlockSize = glm::uvec3(nominalImageBlockSize) - m_imageBlockSizePad;
+
+    glm::dvec3 scaledImgDim = imgDim * relativeResolution;
+    const glm::dvec3 levels = glm::ceil(glm::log2(scaledImgDim / glm::dvec3(layout.imageBlockSize))) + 1.0;
+    const double maxLevels = std::max(std::max(levels.x, levels.y), levels.z);
+    CHECK(std::isfinite(maxLevels) && maxLevels > 0.0) << "invalid 3D paging LOD count";
+    const size_t requestedNumLevels = static_cast<size_t>(maxLevels);
+
+    layout.numLevels = requestedNumLevels;
+    layout.levelScales = buildLevelScales(requestedNumLevels);
+    layout.imageDimensions.resize(requestedNumLevels);
+    layout.pageTableDimensions.resize(requestedNumLevels);
+    layout.pageDirectoryDimensions.resize(requestedNumLevels);
+    layout.posToBlockIDs.resize(requestedNumLevels);
+    layout.pageDirectoryBases.resize(requestedNumLevels);
+    layout.voxelWorldDimensions.resize(requestedNumLevels);
+    layout.voxelWorldSizes.resize(requestedNumLevels);
+
+    constexpr uint64_t maxBlockId = std::numeric_limits<uint32_t>::max();
+    const uint32_t max3DTextureSize = Z3DGpuInfo::instance().max3DTextureSize();
+
+    for (size_t l = 0; l < requestedNumLevels; ++l) {
+      const glm::uvec3& levelScale = layout.levelScales[l];
+      layout.voxelWorldDimensions[l] = absScale * glm::vec3(levelScale);
+      layout.voxelWorldSizes[l] = std::min(std::min(layout.voxelWorldDimensions[l].x, layout.voxelWorldDimensions[l].y),
+                                           layout.voxelWorldDimensions[l].z);
+
+      if (clampToPreview(levelScale)) {
+        layout.numLevels = l + 1;
+        layout.imageDimensions[l] = m_volumeDimension;
+        layout.voxelWorldDimensions[l] = candidateVolumeVoxelWorldDimension;
+        layout.voxelWorldSizes[l] = candidateVolumeVoxelWorldSize;
+        layout.pageTableDimensions[l] = glm::uvec3(0);
+        layout.pageDirectoryDimensions[l] = glm::uvec3(0);
+        if (layout.numImageBlocks >= maxBlockId) {
+          return failLayout(
+            layout,
+            LayoutFailure::BlockIdDomain,
+            fmt::format("3D paging needs {} logical image blocks before preview level {}", layout.numImageBlocks, l));
+        }
+        layout.posToBlockIDs[l] = glm::uvec3(static_cast<uint32_t>(1 + layout.numImageBlocks), 0, 0);
+        layout.pageDirectoryBases[l] = glm::uvec3(std::numeric_limits<uint32_t>::max());
         break;
       }
-    } else {
-      const glm::vec3 voxelWorldDim = absScale * glm::vec3(candidateLevelScales[l]);
-      const float voxelWorldSize = std::min(std::min(voxelWorldDim.x, voxelWorldDim.y), voxelWorldDim.z);
-      if (voxelWorldSize > candidateVolumeVoxelWorldSize) {
-        candidateEffectiveNumLevels = l + 1;
-        break;
+
+      const std::array<uint64_t, 3> imageDimensions = {
+        (static_cast<uint64_t>(info.width) + levelScale.x - 1u) / levelScale.x,
+        (static_cast<uint64_t>(info.height) + levelScale.y - 1u) / levelScale.y,
+        (static_cast<uint64_t>(info.depth) + levelScale.z - 1u) / levelScale.z};
+      if (imageDimensions[0] > std::numeric_limits<uint32_t>::max() ||
+          imageDimensions[1] > std::numeric_limits<uint32_t>::max() ||
+          imageDimensions[2] > std::numeric_limits<uint32_t>::max()) {
+        return failLayout(layout,
+                          LayoutFailure::BlockIdDomain,
+                          fmt::format("3D paging level {} image dimensions ({}, {}, {}) exceed 32-bit metadata fields",
+                                      l,
+                                      imageDimensions[0],
+                                      imageDimensions[1],
+                                      imageDimensions[2]));
+      }
+      layout.imageDimensions[l] = glm::uvec3(static_cast<uint32_t>(imageDimensions[0]),
+                                             static_cast<uint32_t>(imageDimensions[1]),
+                                             static_cast<uint32_t>(imageDimensions[2]));
+
+      const std::array<uint64_t, 3> pageTableDimensions = {
+        (imageDimensions[0] + layout.imageBlockSize.x - 1u) / layout.imageBlockSize.x,
+        (imageDimensions[1] + layout.imageBlockSize.y - 1u) / layout.imageBlockSize.y,
+        (imageDimensions[2] + layout.imageBlockSize.z - 1u) / layout.imageBlockSize.z};
+      if (pageTableDimensions[0] > std::numeric_limits<uint32_t>::max() ||
+          pageTableDimensions[1] > std::numeric_limits<uint32_t>::max() ||
+          pageTableDimensions[2] > std::numeric_limits<uint32_t>::max()) {
+        return failLayout(
+          layout,
+          LayoutFailure::BlockIdDomain,
+          fmt::format("3D paging level {} page-table dimensions ({}, {}, {}) exceed 32-bit metadata fields",
+                      l,
+                      pageTableDimensions[0],
+                      pageTableDimensions[1],
+                      pageTableDimensions[2]));
+      }
+      layout.pageTableDimensions[l] = glm::uvec3(static_cast<uint32_t>(pageTableDimensions[0]),
+                                                 static_cast<uint32_t>(pageTableDimensions[1]),
+                                                 static_cast<uint32_t>(pageTableDimensions[2]));
+
+      const std::array<uint64_t, 3> pageDirectoryDimensions = {
+        (pageTableDimensions[0] + m_pageTableBlockSize.x - 1u) / m_pageTableBlockSize.x,
+        (pageTableDimensions[1] + m_pageTableBlockSize.y - 1u) / m_pageTableBlockSize.y,
+        (pageTableDimensions[2] + m_pageTableBlockSize.z - 1u) / m_pageTableBlockSize.z};
+      if (pageDirectoryDimensions[0] > std::numeric_limits<uint32_t>::max() ||
+          pageDirectoryDimensions[1] > std::numeric_limits<uint32_t>::max() ||
+          pageDirectoryDimensions[2] > std::numeric_limits<uint32_t>::max()) {
+        return failLayout(
+          layout,
+          LayoutFailure::PageDirectoryTexture,
+          fmt::format("3D paging level {} page-directory dimensions ({}, {}, {}) exceed 32-bit metadata fields",
+                      l,
+                      pageDirectoryDimensions[0],
+                      pageDirectoryDimensions[1],
+                      pageDirectoryDimensions[2]));
+      }
+      if (pageDirectoryDimensions[0] > max3DTextureSize || pageDirectoryDimensions[1] > max3DTextureSize ||
+          pageDirectoryDimensions[2] > max3DTextureSize) {
+        return failLayout(
+          layout,
+          LayoutFailure::PageDirectoryTexture,
+          fmt::format("3D paging level {} page-directory dimensions ({}, {}, {}) exceed max 3D texture size {}",
+                      l,
+                      pageDirectoryDimensions[0],
+                      pageDirectoryDimensions[1],
+                      pageDirectoryDimensions[2],
+                      max3DTextureSize));
+      }
+      layout.pageDirectoryDimensions[l] = glm::uvec3(static_cast<uint32_t>(pageDirectoryDimensions[0]),
+                                                     static_cast<uint32_t>(pageDirectoryDimensions[1]),
+                                                     static_cast<uint32_t>(pageDirectoryDimensions[2]));
+
+      if (pageTableDimensions[0] != 0u && pageTableDimensions[1] > maxBlockId / pageTableDimensions[0]) {
+        return failLayout(layout,
+                          LayoutFailure::BlockIdDomain,
+                          fmt::format("3D paging level {} block-ID Z stride exceeds the 32-bit block-ID domain", l));
+      }
+      const uint64_t blockIDStrideZ = pageTableDimensions[0] * pageTableDimensions[1];
+      if (blockIDStrideZ > maxBlockId) {
+        return failLayout(
+          layout,
+          LayoutFailure::BlockIdDomain,
+          fmt::format("3D paging level {} block-ID Z stride {} exceeds the 32-bit block-ID domain", l, blockIDStrideZ));
+      }
+      if (blockIDStrideZ != 0u && pageTableDimensions[2] > std::numeric_limits<uint64_t>::max() / blockIDStrideZ) {
+        return failLayout(layout,
+                          LayoutFailure::BlockIdDomain,
+                          fmt::format("3D paging level {} logical image block count overflows 64-bit accounting", l));
+      }
+      const uint64_t levelImageBlocks = blockIDStrideZ * pageTableDimensions[2];
+      if (levelImageBlocks >= maxBlockId - layout.numImageBlocks) {
+        return failLayout(layout,
+                          LayoutFailure::BlockIdDomain,
+                          fmt::format("3D paging needs {} logical image blocks by level {}",
+                                      layout.numImageBlocks + levelImageBlocks,
+                                      l));
+      }
+
+      const uint64_t firstBlockID = uint64_t{layout.numImageBlocks} + 1u;
+      layout.numImageBlocks += static_cast<size_t>(levelImageBlocks);
+      layout.numPageTableBlocks += size_t(layout.pageDirectoryDimensions[l].x) * layout.pageDirectoryDimensions[l].y *
+                                   layout.pageDirectoryDimensions[l].z;
+
+      layout.posToBlockIDs[l] = glm::uvec3(static_cast<uint32_t>(firstBlockID),
+                                           layout.pageTableDimensions[l].x,
+                                           static_cast<uint32_t>(blockIDStrideZ));
+      if (l == 0) {
+        layout.pageDirectoryBases[l] = glm::uvec3(0, 0, 0);
+      } else if (l == 1) {
+        layout.pageDirectoryBases[l] = layout.pageDirectoryBases[l - 1];
+        layout.pageDirectoryBases[l][sortedIndex[1]] += layout.pageDirectoryDimensions[l - 1][sortedIndex[1]];
+      } else {
+        layout.pageDirectoryBases[l] = layout.pageDirectoryBases[l - 1];
+        layout.pageDirectoryBases[l][sortedIndex[0]] += layout.pageDirectoryDimensions[l - 1][sortedIndex[0]];
+      }
+      layout.pageDirectorySize =
+        glm::max(layout.pageDirectorySize, layout.pageDirectoryBases[l] + layout.pageDirectoryDimensions[l]);
+      if (layout.pageDirectorySize.x > max3DTextureSize || layout.pageDirectorySize.y > max3DTextureSize ||
+          layout.pageDirectorySize.z > max3DTextureSize) {
+        return failLayout(layout,
+                          LayoutFailure::PageDirectoryTexture,
+                          fmt::format("3D paging page-directory size ({}, {}, {}) exceeds max 3D texture size {}",
+                                      layout.pageDirectorySize.x,
+                                      layout.pageDirectorySize.y,
+                                      layout.pageDirectorySize.z,
+                                      max3DTextureSize));
       }
     }
+
+    layout.levelScales.resize(layout.numLevels);
+    layout.imageDimensions.resize(layout.numLevels);
+    layout.pageTableDimensions.resize(layout.numLevels);
+    layout.pageDirectoryDimensions.resize(layout.numLevels);
+    layout.posToBlockIDs.resize(layout.numLevels);
+    layout.pageDirectoryBases.resize(layout.numLevels);
+    layout.voxelWorldDimensions.resize(layout.numLevels);
+    layout.voxelWorldSizes.resize(layout.numLevels);
+    return layout;
+  };
+
+  const uint32_t startingNominalImageBlockSize = m_imageBlockSize.x + m_imageBlockSizePad.x;
+  const std::vector<uint32_t> nominalImageBlockSizeCandidates =
+    imageBlockNominalSizeCandidates(startingNominalImageBlockSize);
+
+  PagingLayout selectedLayout;
+  PagingLayout lastFailedLayout;
+  bool hasSelectedLayout = false;
+  bool hasFailedLayout = false;
+  for (const uint32_t nominalImageBlockSize : nominalImageBlockSizeCandidates) {
+    PagingLayout candidateLayout = buildLayout(nominalImageBlockSize);
+    if (candidateLayout.failure == LayoutFailure::None) {
+      selectedLayout = std::move(candidateLayout);
+      hasSelectedLayout = true;
+      break;
+    }
+    lastFailedLayout = std::move(candidateLayout);
+    hasFailedLayout = true;
   }
+
+  if (!hasSelectedLayout) {
+    const std::string triedBlockSizes = formatImageBlockNominalSizes(nominalImageBlockSizeCandidates);
+    const std::string reason =
+      hasFailedLayout ? lastFailedLayout.failureMessage : "no block-size candidates were tried";
+    throw ZException(
+      fmt::format("Image ({}) is not supported by 3D paging with atlas_image_block_size candidate(s) [{}]: {}",
+                  info,
+                  triedBlockSizes,
+                  reason));
+  }
+
+  if (selectedLayout.nominalImageBlockSize != startingNominalImageBlockSize) {
+    const std::string failedReason =
+      hasFailedLayout ? lastFailedLayout.failureMessage : "the previous block size failed";
+    LOG(WARNING) << fmt::format(
+      "Promoting 3D image paging block size from {} to {} because {}. This preserves full-resolution paging "
+      "correctness but uses larger bricks.",
+      startingNominalImageBlockSize,
+      selectedLayout.nominalImageBlockSize,
+      failedReason);
+  }
+
+  auto isStructureIdentical = [&](const PagingLayout& layout) -> bool {
+    if (!equalUvec3(m_imageBlockSize, layout.imageBlockSize) || m_levelScales.empty() ||
+        layout.numLevels != m_numLevels) {
+      return false;
+    }
+    for (size_t l = 0; l < layout.numLevels; ++l) {
+      if (!equalUvec3(m_levelScales[l], layout.levelScales[l])) {
+        return false;
+      }
+    }
+    return true;
+  };
 
   // Fast path: if the LOD hierarchy itself doesn't change, keep page tables / caches intact
   // and only update the world-size metadata used by shaders.
-  if (isStructureIdentical(candidateEffectiveNumLevels)) {
+  if (isStructureIdentical(selectedLayout)) {
     if (glm::all(glm::epsilonEqual(candidateVolumeVoxelWorldDimension, m_volumeVoxelWorldDimension, 1e-6f))) {
       return;
     }
     m_volumeVoxelWorldDimension = candidateVolumeVoxelWorldDimension;
     m_volumeVoxelWorldSize = candidateVolumeVoxelWorldSize;
-    if (m_voxelWorldDimensions.size() != m_numLevels) {
-      m_voxelWorldDimensions.resize(m_numLevels);
-    }
-    if (m_voxelWorldSizes.size() != m_numLevels) {
-      m_voxelWorldSizes.resize(m_numLevels);
-    }
-    for (size_t l = 0; l < m_numLevels; ++l) {
-      m_voxelWorldDimensions[l] = absScale * glm::vec3(m_levelScales[l]);
-      m_voxelWorldSizes[l] =
-        std::min(std::min(m_voxelWorldDimensions[l].x, m_voxelWorldDimensions[l].y), m_voxelWorldDimensions[l].z);
-    }
+    m_voxelWorldDimensions = selectedLayout.voxelWorldDimensions;
+    m_voxelWorldSizes = selectedLayout.voxelWorldSizes;
     return;
   }
 
-  m_numLevels = requestedNumLevels;
+  const size_t numImageBlocks = selectedLayout.numImageBlocks;
+  const size_t numPageTableBlocks = selectedLayout.numPageTableBlocks;
+  m_imageBlockSize = selectedLayout.imageBlockSize;
+  m_numLevels = selectedLayout.numLevels;
   m_volumeVoxelWorldDimension = candidateVolumeVoxelWorldDimension;
   m_volumeVoxelWorldSize = candidateVolumeVoxelWorldSize;
   LOG(INFO) << "volumeDimension: " << m_volumeDimension << " volumeVoxelWorldDimension: " << m_volumeVoxelWorldDimension
             << " volumeVoxelWorldSize: " << m_volumeVoxelWorldSize;
 
-  m_pageDirectorySize = glm::uvec3(0, 0, 0);
-  m_maxPagedBlockID = 0;
-  m_levelScales.resize(m_numLevels);
-  m_imageDimensions.resize(m_numLevels);
-  m_pageTableDimensions.resize(m_numLevels);
-  m_pageDirectoryDimensions.resize(m_numLevels);
-  m_posToBlockIDs.resize(m_numLevels);
-  m_pageDirectoryBases.resize(m_numLevels);
-  m_voxelWorldDimensions.resize(m_numLevels);
-  m_voxelWorldSizes.resize(m_numLevels);
-  size_t numImageBlocks = 0;
-  size_t numPageTableBlocks = 0;
-  std::vector<size_t> stayRounds = baseStayRounds;
-  for (size_t l = 0; l < m_numLevels; ++l) {
-    if (l == 0) {
-      m_levelScales[l] = glm::uvec3(1, 1, 1);
-    } else {
-      if (stayRounds[sortedIndex[2]] > stayRounds[sortedIndex[1]]) {
-        --stayRounds[sortedIndex[2]];
-        m_levelScales[l][sortedIndex[2]] = m_levelScales[l - 1][sortedIndex[2]];
-        m_levelScales[l][sortedIndex[1]] = m_levelScales[l - 1][sortedIndex[1]] * 2;
-        m_levelScales[l][sortedIndex[0]] = m_levelScales[l - 1][sortedIndex[0]] * 2;
-      } else if (stayRounds[sortedIndex[2]] > 0) {
-        CHECK(stayRounds[sortedIndex[2]] == stayRounds[sortedIndex[1]]);
-        --stayRounds[sortedIndex[2]];
-        --stayRounds[sortedIndex[1]];
-        m_levelScales[l][sortedIndex[2]] = m_levelScales[l - 1][sortedIndex[2]];
-        m_levelScales[l][sortedIndex[1]] = m_levelScales[l - 1][sortedIndex[1]];
-        m_levelScales[l][sortedIndex[0]] = m_levelScales[l - 1][sortedIndex[0]] * 2;
-      } else {
-        m_levelScales[l] = m_levelScales[l - 1] * 2_u32;
-      }
-    }
-    CHECK(m_levelScales[l].x == m_levelScales[l].y);
-
-    m_voxelWorldDimensions[l] = absScale * glm::vec3(m_levelScales[l]);
-    m_voxelWorldSizes[l] =
-      std::min(std::min(m_voxelWorldDimensions[l].x, m_voxelWorldDimensions[l].y), m_voxelWorldDimensions[l].z);
-    bool clampToPreview = false;
-    if (hasPhysicalVoxelSize) {
-      // In physical-resolution mode, keep the hierarchy stable by clamping once
-      // this level is coarser than the preloaded downsampled volume in all axes.
-      const glm::vec3 levelScaleF(m_levelScales[l]);
-      clampToPreview =
-        levelScaleF.x >= m_volumeSpacing.x && levelScaleF.y >= m_volumeSpacing.y && levelScaleF.z >= m_volumeSpacing.z;
-    } else {
-      clampToPreview = m_voxelWorldSizes[l] > m_volumeVoxelWorldSize;
-    }
-    if (clampToPreview) {
-      m_numLevels = l + 1;
-      m_imageDimensions[l] = m_volumeDimension;
-      m_voxelWorldDimensions[l] = m_volumeVoxelWorldDimension;
-      m_voxelWorldSizes[l] = m_volumeVoxelWorldSize;
-      m_pageTableDimensions[l] = glm::uvec3(0);
-      m_pageDirectoryDimensions[l] = glm::uvec3(0);
-      CHECK_LT(numImageBlocks, size_t{std::numeric_limits<uint32_t>::max()});
-      m_posToBlockIDs[l] = glm::uvec3(static_cast<uint32_t>(1 + numImageBlocks), 0, 0);
-      m_pageDirectoryBases[l] = glm::uvec3(std::numeric_limits<uint32_t>::max());
-      break;
-    }
-
-    m_imageDimensions[l] = glm::uvec3((info.width + m_levelScales[l].x - 1) / m_levelScales[l].x,
-                                      (info.height + m_levelScales[l].y - 1) / m_levelScales[l].y,
-                                      (info.depth + m_levelScales[l].z - 1) / m_levelScales[l].z);
-    m_pageTableDimensions[l] = (m_imageDimensions[l] + m_imageBlockSize - 1_u32) / m_imageBlockSize;
-    m_pageDirectoryDimensions[l] = (m_pageTableDimensions[l] + m_pageTableBlockSize - 1_u32) / m_pageTableBlockSize;
-
-    const uint64_t firstBlockID = uint64_t{numImageBlocks} + 1u;
-    const uint64_t blockIDStrideZ = uint64_t{m_pageTableDimensions[l].x} * m_pageTableDimensions[l].y;
-    const uint64_t levelImageBlocks = blockIDStrideZ * m_pageTableDimensions[l].z;
-    CHECK_LE(firstBlockID, uint64_t{std::numeric_limits<uint32_t>::max()});
-    CHECK_LE(blockIDStrideZ, uint64_t{std::numeric_limits<uint32_t>::max()});
-    CHECK_LE(levelImageBlocks, uint64_t{std::numeric_limits<size_t>::max()});
-
-    numImageBlocks += static_cast<size_t>(levelImageBlocks);
-    CHECK_LT(numImageBlocks, size_t{std::numeric_limits<uint32_t>::max()});
-    numPageTableBlocks +=
-      size_t(m_pageDirectoryDimensions[l].x) * m_pageDirectoryDimensions[l].y * m_pageDirectoryDimensions[l].z;
-
-    // id starts from 1
-    m_posToBlockIDs[l] = glm::uvec3(static_cast<uint32_t>(firstBlockID),
-                                    m_pageTableDimensions[l].x,
-                                    static_cast<uint32_t>(blockIDStrideZ));
-    if (l == 0) {
-      m_pageDirectoryBases[l] = glm::uvec3(0, 0, 0);
-    } else if (l == 1) {
-      m_pageDirectoryBases[l] = m_pageDirectoryBases[l - 1];
-      m_pageDirectoryBases[l][sortedIndex[1]] += m_pageDirectoryDimensions[l - 1][sortedIndex[1]];
-    } else {
-      m_pageDirectoryBases[l] = m_pageDirectoryBases[l - 1];
-      m_pageDirectoryBases[l][sortedIndex[0]] += m_pageDirectoryDimensions[l - 1][sortedIndex[0]];
-    }
-    m_pageDirectorySize = glm::max(m_pageDirectorySize, m_pageDirectoryBases[l] + m_pageDirectoryDimensions[l]);
-    if (m_pageDirectorySize.x > Z3DGpuInfo::instance().max3DTextureSize() ||
-        m_pageDirectorySize.y > Z3DGpuInfo::instance().max3DTextureSize() ||
-        m_pageDirectorySize.z > Z3DGpuInfo::instance().max3DTextureSize()) {
-      throw ZException(fmt::format("Image ({}) is not supported", info));
-    }
-  }
+  m_pageDirectorySize = selectedLayout.pageDirectorySize;
+  m_levelScales = std::move(selectedLayout.levelScales);
+  m_imageDimensions = std::move(selectedLayout.imageDimensions);
+  m_pageTableDimensions = std::move(selectedLayout.pageTableDimensions);
+  m_pageDirectoryDimensions = std::move(selectedLayout.pageDirectoryDimensions);
+  m_posToBlockIDs = std::move(selectedLayout.posToBlockIDs);
+  m_pageDirectoryBases = std::move(selectedLayout.pageDirectoryBases);
+  m_voxelWorldDimensions = std::move(selectedLayout.voxelWorldDimensions);
+  m_voxelWorldSizes = std::move(selectedLayout.voxelWorldSizes);
 
   m_maxPagedBlockID = static_cast<uint32_t>(numImageBlocks);
   LOG(INFO) << "pageDirectorySize: " << m_pageDirectorySize << " numPageTableBlocks: " << numPageTableBlocks

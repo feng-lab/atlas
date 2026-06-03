@@ -190,6 +190,12 @@ public:
   // - selection/bound-box rendering for runtime-NG meshes whose vertices remain quantized
   [[nodiscard]] ZBBox<glm::dvec3> multiLodClipBoundsLocalVoxel(const MultiLodManifest& manifest) const;
 
+  // Transform Neuroglancer multi-LOD stored manifest coordinates into Atlas local-voxel coordinates.
+  //
+  // Runtime LOD selection traverses manifest chunk bounds, which are expressed in the mesh's stored coordinate
+  // system. Callers that project/cull those bounds must include this transform before the filter's coordTransform.
+  [[nodiscard]] glm::mat4 multiLodStoredToLocalVoxelTransform() const;
+
   // Loads a multi-LOD chunk mesh. This may perform network I/O and suspend.
   folly::coro::Task<std::shared_ptr<const MultiLodChunkMesh>> loadChunkMeshAsync(uint64_t segmentId,
                                                                                  uint32_t row) const;
