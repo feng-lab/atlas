@@ -205,9 +205,9 @@ files_to_download = [
         "filename": "jars/bioformats_package.jar",
     },
     {
-        "expected_size": 13307,
-        "expected_sha256": "726286d3408c2f29521bc9b7270e7add335e7b6d9b3f3962282809974576a1d1",
-        "filename": "jars/scifio-itk-bridge.jar",
+        "expected_size": 20399772,
+        "expected_sha256": "1c91b2a2fce8417effb34f0d7ae805756e85751589407d5f6339fb0ccf988f1a",
+        "filename": "jars/atlas-bioformats-bridge.jar",
     },
     {
         "expected_size": 485,
