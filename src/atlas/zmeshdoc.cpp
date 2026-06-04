@@ -10,6 +10,7 @@
 #include "ztheme.h"
 #include "zmessageboxhelpers.h"
 #include <QFileDialog>
+#include <QFileInfo>
 #include <QSettings>
 #include <QApplication>
 #include <set>
@@ -28,6 +29,22 @@ struct ResolvedNeuroglancerMeshSource
   std::shared_ptr<const ZNeuroglancerRemoteContext> remoteContext;
   std::shared_ptr<const ZNeuroglancerPrecomputedMeshSource> source;
 };
+
+[[nodiscard]] QString meshFilePathForPersistence(const QString& fileName)
+{
+  const QFileInfo info(fileName);
+  const QString canonicalPath = info.canonicalFilePath();
+  if (!canonicalPath.isEmpty()) {
+    return canonicalPath;
+  }
+
+  const QString absolutePath = info.absoluteFilePath();
+  if (!absolutePath.isEmpty()) {
+    return absolutePath;
+  }
+
+  return fileName;
+}
 
 [[nodiscard]] ResolvedNeuroglancerMeshSource
 resolveNeuroglancerMeshSource(ZDoc& doc,
@@ -541,7 +558,7 @@ size_t ZMeshDoc::addMesh(ZMesh mesh, const QString& path)
 }
 
 ZMeshDoc::MeshPack::MeshPack(ZMesh& imesh, const QString& path_)
-  : path(QFileInfo(path_).canonicalFilePath())
+  : path(meshFilePathForPersistence(path_))
 {
   mesh.swap(imesh);
   meshList.push_back(&mesh);
@@ -667,8 +684,13 @@ bool ZMeshDoc::saveMesh(MeshPack* pack, const QString& fileName, QString& errorM
       pack->mesh.save(fileName, format);
     }
 
-    pack->path = QFileInfo(fileName).canonicalFilePath();
-    pack->sourceJson = {};
+    const QString storedPath = meshFilePathForPersistence(fileName);
+    if (storedPath.trimmed().isEmpty()) {
+      throw ZException("Saved mesh path is empty");
+    }
+
+    pack->path = storedPath;
+    pack->sourceJson = nullptr;
     pack->runtimeRemoteContext.reset();
     pack->displayNameOverride.clear();
     pack->tooltipOverride.clear();

@@ -1,5 +1,6 @@
 #include "zpunctapack.h"
 
+#include "zexception.h"
 #include "zpunctadoc.h"
 #include <QFileInfo>
 #include <QInputDialog>
@@ -7,10 +8,30 @@
 
 namespace nim {
 
+namespace {
+
+[[nodiscard]] QString punctaFilePathForPersistence(const QString& fileName)
+{
+  const QFileInfo info(fileName);
+  const QString canonicalPath = info.canonicalFilePath();
+  if (!canonicalPath.isEmpty()) {
+    return canonicalPath;
+  }
+
+  const QString absolutePath = info.absoluteFilePath();
+  if (!absolutePath.isEmpty()) {
+    return absolutePath;
+  }
+
+  return fileName;
+}
+
+} // namespace
+
 ZPunctaPack::ZPunctaPack(ZPuncta puncta, const QString& path, size_t id, ZPunctaDoc& doc, QObject* parent)
   : ZObjPack(id, &doc, parent)
   , m_puncta(std::move(puncta))
-  , m_path(QFileInfo(path).canonicalFilePath())
+  , m_path(punctaFilePathForPersistence(path))
   , m_doc(doc)
 {
   updateDerivedData();
@@ -47,8 +68,13 @@ QMenu& ZPunctaPack::contextMenu()
 void ZPunctaPack::save(const QString& fileName, const QString& format)
 {
   m_puncta.save(fileName, format);
-  m_path = QFileInfo(fileName).canonicalFilePath();
-  sourceJson = {};
+  const QString storedPath = punctaFilePathForPersistence(fileName);
+  if (storedPath.trimmed().isEmpty()) {
+    throw ZException("Saved puncta path is empty");
+  }
+
+  m_path = storedPath;
+  sourceJson = nullptr;
   displayNameOverride.clear();
   tooltipOverride.clear();
   m_undoStack.setClean();
