@@ -3735,6 +3735,9 @@ def build_openimageio(src_dir: str, install_dir: str):
                     os.remove(output_path)
                     logger.info(f"{output_path} removed")
         for library_pattern in [
+            "Iex*OpenImageIO*.lib",
+            "IlmThread*OpenImageIO*.lib",
+            "Imath*OpenImageIO*.lib",
             "libIex*OpenImageIO*.a",
             "libIlmThread*OpenImageIO*.a",
             "libImath*OpenImageIO*.a",
@@ -3743,8 +3746,16 @@ def build_openimageio(src_dir: str, install_dir: str):
             "libOpenEXR*OpenImageIO*.a",
             "libpystring.a",
             "libyaml-cpp.a",
+            "OpenEXR*OpenImageIO*.lib",
         ]:
             glob_remove(os.path.join(active_install_dir, "lib", library_pattern))
+        for library_pattern in [
+            "Iex*OpenImageIO*.dll",
+            "IlmThread*OpenImageIO*.dll",
+            "Imath*OpenImageIO*.dll",
+            "OpenEXR*OpenImageIO*.dll",
+        ]:
+            glob_remove(os.path.join(active_install_dir, "bin", library_pattern))
         glob_remove(os.path.join(active_install_dir, "lib", "libOpenImageIO*"))
         glob_remove(os.path.join(active_install_dir, "lib", "OpenImageIO*"))
 
@@ -3872,6 +3883,10 @@ def build_openimageio(src_dir: str, install_dir: str):
             cmakecmd.extend(
                 [
                     "-DBUILD_SHARED_LIBS:BOOL=OFF",
+                    "-DLOCAL_BUILD_SHARED_LIBS_DEFAULT:BOOL=OFF",
+                    "-DImath_BUILD_SHARED_LIBS:BOOL=OFF",
+                    "-DOpenEXR_BUILD_SHARED_LIBS:BOOL=OFF",
+                    "-DOpenColorIO_BUILD_SHARED_LIBS:BOOL=OFF",
                     "-DLINKSTATIC:BOOL=ON",
                     "-DEMBEDPLUGINS:BOOL=ON",
                     "-DOIIO_INTERNALIZE_FMT:BOOL=OFF",
@@ -5205,6 +5220,7 @@ void vtkBoundingBox::ComputeBounds(
                 "-DVTK_BUILD_TESTING:STRING=OFF",
                 "-DBUILD_SHARED_LIBS:BOOL=OFF",
                 "-DVTK_MODULE_USE_EXTERNAL_VTK_eigen:BOOL=ON",
+                "-DVTK_MODULE_USE_EXTERNAL_VTK_expat:BOOL=ON",
                 "-DVTK_MODULE_USE_EXTERNAL_VTK_hdf5:BOOL="
                 + ("ON" if vtk_use_external_hdf5 else "OFF"),
                 "-DVTK_MODULE_USE_EXTERNAL_VTK_jpeg:BOOL=ON",
