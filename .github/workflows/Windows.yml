@@ -34,7 +34,7 @@ env:
   VULKAN_SDK_VERSION: 1.4.341.1
   # Split point for 3rdparty build; job1 stops before this lib, job2 starts from this lib.
   # Keep HDF5 in part 1 because its build expects Perl and part 1 installs Perl.
-  EXT_SPLIT_LIB: freeimage
+  EXT_SPLIT_LIB: itk
 
 jobs:
   ext-cache-probe:

@@ -26,10 +26,6 @@ if (Matlab_FOUND AND ${CMAKE_VERSION} VERSION_GREATER_EQUAL "3.14.0")
                          @loader_path/QtCore
                          $<TARGET_FILE:${mexname}>
                          COMMAND install_name_tool -change
-                         @rpath/libfreeimageplus.dylib
-                         @loader_path/libfreeimageplus.dylib
-                         $<TARGET_FILE:${mexname}>
-                         COMMAND install_name_tool -change
                          @rpath/libtbb.dylib
                          @loader_path/libtbb.dylib
                          $<TARGET_FILE:${mexname}>
@@ -48,14 +44,10 @@ if (Matlab_FOUND AND ${CMAKE_VERSION} VERSION_GREATER_EQUAL "3.14.0")
                        POST_BUILD
                        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:TBB::tbb>
                        $<TARGET_FILE_DIR:correct_czi_shading_mex>
-                       COMMAND ${CMAKE_COMMAND} -E copy ${FREEIMAGE_LIBRARIES}
-                       $<TARGET_FILE_DIR:correct_czi_shading_mex>
                        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:Qt5::Core>
                        $<TARGET_FILE_DIR:correct_czi_shading_mex>
                        COMMAND install_name_tool -id QtCore
                        $<TARGET_FILE_DIR:correct_czi_shading_mex>/QtCore
-                       COMMAND install_name_tool -id libfreeimageplus.dylib
-                       $<TARGET_FILE_DIR:correct_czi_shading_mex>/libfreeimageplus.dylib
                        COMMAND install_name_tool -id libtbb.dylib
                        $<TARGET_FILE_DIR:correct_czi_shading_mex>/libtbb.dylib
                        )
@@ -87,8 +79,6 @@ if (Matlab_FOUND AND ${CMAKE_VERSION} VERSION_GREATER_EQUAL "3.14.0")
                        POST_BUILD
                        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:TBB::tbb>
                        $<TARGET_FILE_DIR:correct_czi_shading_mex>
-                       COMMAND ${CMAKE_COMMAND} -E copy ${FREEIMAGE_LIBRARIES}
-                       $<TARGET_FILE_DIR:correct_czi_shading_mex>/libfreeimageplus.so.3
                        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:Qt5::Core>
                        $<TARGET_FILE_DIR:correct_czi_shading_mex>/libQt5Core.so.5
                        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE_DIR:Qt5::Core>/libicui18n.so.56
