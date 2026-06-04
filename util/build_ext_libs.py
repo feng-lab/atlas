@@ -906,6 +906,7 @@ def get_cmake_cmd_common_part(
             "-DCMAKE_PREFIX_PATH=" + ext_build_dir(),
             "-DCMAKE_IGNORE_PREFIX_PATH=/usr/local",
             "-DCMAKE_IGNORE_PATH=/usr/local/bin",
+            "-DCMAKE_FIND_FRAMEWORK=LAST",
             "-DCMAKE_MODULE_PATH=" + ext_build_dir(),
             "-DCMAKE_INSTALL_PREFIX=" + install_dir,
             "" if no_hidden_visibility else "-DCMAKE_VISIBILITY_INLINES_HIDDEN=ON",
@@ -3865,9 +3866,12 @@ def build_openimageio(src_dir: str, install_dir: str):
                 "-DCMAKE_PREFIX_PATH="
                 + cmake_prefix_path_for_arch(active_install_dir, install_dir)
             )
-            if is_mac():
-                cmakecmd.append("-DCMAKE_FIND_FRAMEWORK=LAST")
-            local_deps = ["pystring"]
+            local_deps = [
+                "pystring",
+                # Keep Expat private to Atlas/OIIO instead of accepting
+                # platform SDK or framework headers paired with system stubs.
+                "expat",
+            ]
             if arm64_only:
                 local_deps.extend(
                     [
@@ -5020,6 +5024,7 @@ def build_itk(src_dir: str, install_dir: str):
                 "-DITK_USE_SYSTEM_HDF5:BOOL=ON",
                 "-DITK_USE_SYSTEM_JPEG:BOOL=ON",
                 "-DITK_USE_SYSTEM_PNG:BOOL=ON",
+                "-DITK_USE_SYSTEM_TIFF:BOOL=ON",
                 "-DITK_USE_SYSTEM_ZLIB:BOOL=ON",
                 # '-DGDCM_USE_SYSTEM_OPENJPEG:BOOL=ON',
                 "-DModule_MorphologicalContourInterpolation=OFF",  # example how to turn on a remote module
@@ -5221,12 +5226,14 @@ void vtkBoundingBox::ComputeBounds(
                 "-DBUILD_SHARED_LIBS:BOOL=OFF",
                 "-DVTK_MODULE_USE_EXTERNAL_VTK_eigen:BOOL=ON",
                 "-DVTK_MODULE_USE_EXTERNAL_VTK_expat:BOOL=ON",
+                "-DEXPAT_USE_STATIC_LIBS:BOOL=ON",
                 "-DVTK_MODULE_USE_EXTERNAL_VTK_hdf5:BOOL="
                 + ("ON" if vtk_use_external_hdf5 else "OFF"),
                 "-DVTK_MODULE_USE_EXTERNAL_VTK_jpeg:BOOL=ON",
                 "-DVTK_MODULE_USE_EXTERNAL_VTK_lz4:BOOL=ON",
                 "-DVTK_MODULE_USE_EXTERNAL_VTK_lzma:BOOL=ON",
                 "-DVTK_MODULE_USE_EXTERNAL_VTK_png:BOOL=ON",
+                "-DVTK_MODULE_USE_EXTERNAL_VTK_tiff:BOOL=ON",
                 "-DVTK_MODULE_USE_EXTERNAL_VTK_zlib:BOOL=ON",
                 "-DVTK_MODULE_ENABLE_VTK_IOADIOS2:STRING=NO",
                 "-DVTK_MODULE_ENABLE_VTK_diy2:STRING=NO",
@@ -7090,7 +7097,7 @@ def parse_inputs(argv: list):
         "openjpeg": ["openimageio", "opencv"],
         "libjxl": ["openimageio"],
         "libwebp": ["libtiff", "openimageio", "opencv"],
-        "libtiff": ["openimageio"],
+        "libtiff": ["openimageio", "itk", "vtk"],
         "libraw": ["openimageio"],
         "snappy": ["folly", "rocksdb"],
         "bzip2": ["folly"],
