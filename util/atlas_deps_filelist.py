@@ -15,19 +15,19 @@ files_to_download = [
         "filename": "brotli-1.2.0.zip",
     },
     {
-        "expected_size": 447175,
-        "expected_sha256": "be7ffbd057cadebe2aa144542fd90c6838c6a083b5e8a9048b8ee3b66b29d5fb",
-        "filename": "giflib-5.2.2.tar.gz",
-    },
-    {
-        "expected_size": 2234665,
-        "expected_sha256": "7e0be78b8318e8bdbf6fa545d2ecb4c90f947df03f7aadc42c1967f019e63343",
-        "filename": "highway-1.2.0.tar.gz",
+        "expected_size": 1882762,
+        "expected_sha256": "ab38928f7f6248e2a98cc184956021acb927b16a0dee71b4d260dc040a4320ea",
+        "filename": "libjxl-0.11.2.tar.gz",
     },
     {
         "expected_size": 53121812,
         "expected_sha256": "deae7c80cba99c4b4f940ecadb3c3338b13cb77418409238e57d7f31f2a3b736",
         "filename": "openssl-3.5.6.tar.gz",
+    },
+    {
+        "expected_size": 61687836,
+        "expected_sha256": "487ad434d8b121ae3902d5ad9cb830cd8e1f75fefad6e2ba80f89d60e3db95d7",
+        "filename": "OpenJDK25U-jre_x64_linux_hotspot_25.0.3_9.tar.gz",
     },
     {
         "expected_size": 2528617,
@@ -38,6 +38,11 @@ files_to_download = [
         "expected_size": 1616754,
         "expected_sha256": "e8bf55f3017aa181690990cb58a994e77885da140609fc8f94abe9b65d2cae28",
         "filename": "zlib132.zip",
+    },
+    {
+        "expected_size": 14063,
+        "expected_sha256": "3cd218bf6d1254de86e27269541277fbfc5bae57a9002ce0b46fbe2a97088b43",
+        "filename": "LibRaw-cmake-eb98e4325aef2ce85d2eb031c2ff18640ca616d3.tar.gz",
     },
     {
         "expected_size": 1582074,
@@ -53,6 +58,11 @@ files_to_download = [
         "expected_size": 2492624,
         "expected_sha256": "1048d084b89ac1587e3b0dca00b863a757fed2bc1804c6355eb4bce9090356b7",
         "filename": "openjpeg-2.5.4.zip",
+    },
+    {
+        "expected_size": 447175,
+        "expected_sha256": "be7ffbd057cadebe2aa144542fd90c6838c6a083b5e8a9048b8ee3b66b29d5fb",
+        "filename": "giflib-5.2.2.tar.gz",
     },
     {
         "expected_size": 55380851,
@@ -85,9 +95,14 @@ files_to_download = [
         "filename": "boost_1_91_0.7z",
     },
     {
-        "expected_size": 8595619,
-        "expected_sha256": "0456397a5edbe3533ed0c6abb3950e9228331a2577f9fa1c69e9dfb7b7ffe667",
+        "expected_size": 8595539,
+        "expected_sha256": "760f56789ce7b90c0dc18f3bac16b4ba636a984b91fd8d1056008590fcf32afe",
         "filename": "neurolabi-internal-src.zip",
+    },
+    {
+        "expected_size": 56464762,
+        "expected_sha256": "287cc80077dc2ffd0e5733ba238f92206a84c26bef33e6881a23c213e4c35af4",
+        "filename": "OpenJDK25U-jre_aarch64_mac_hotspot_25.0.3_9.tar.gz",
     },
     {
         "expected_size": 289808,
@@ -105,6 +120,11 @@ files_to_download = [
         "filename": "cmake-4.3.2-macos-universal.tar.gz",
     },
     {
+        "expected_size": 2234665,
+        "expected_sha256": "7e0be78b8318e8bdbf6fa545d2ecb4c90f947df03f7aadc42c1967f019e63343",
+        "filename": "highway-1.2.0.tar.gz",
+    },
+    {
         "expected_size": 1746114,
         "expected_sha256": "400b797db8fc7cb7046db0dda996fbae779f388869db39896f82cfac0534e94c",
         "filename": "nasm-3.01-macosx.zip",
@@ -113,11 +133,6 @@ files_to_download = [
         "expected_size": 140303220,
         "expected_sha256": "c403b53a4950ccd0d5d6d8738b06fa4b9a7aaaa529bdc80cda6ca73d1fddb5cd",
         "filename": "ffmpeg-n8.1-latest-linux64-gpl-8.1.tar.xz",
-    },
-    {
-        "expected_size": 48082795,
-        "expected_sha256": "c3be8c87f1a5cdc727903546eb810e112f94cd7222dac6a9d3f3146ee932008d",
-        "filename": "OpenJDK21U-jre_aarch64_mac_hotspot_21.0.10_7.tar.gz",
     },
     {
         "expected_size": 52961068,
@@ -140,6 +155,11 @@ files_to_download = [
         "filename": "hdf5-2.1.1.zip",
     },
     {
+        "expected_size": 42429998,
+        "expected_sha256": "594bf4e7d15b622157a54915de7e458c208e3363d61a5e488d8abfbda9aff3e5",
+        "filename": "OpenJDK25U-jre_x64_mac_hotspot_25.0.3_9.tar.gz",
+    },
+    {
         "expected_size": 17845221,
         "expected_sha256": "07fa0fb57f28427f9d38ed43c37448df0da1f205c939bab36b50980378ad86a5",
         "filename": "ffmpeg-8.1intel.7z",
@@ -155,9 +175,9 @@ files_to_download = [
         "filename": "libsodium-1.0.22.tar.bz2",
     },
     {
-        "expected_size": 48963112,
-        "expected_sha256": "a6ac6789e51a2c245f41430c42e72b39ec706a449812fc5e4cbfc55ceed1e5ae",
-        "filename": "OpenJDK21U-jre_x64_windows_hotspot_21.0.10_7.zip",
+        "expected_size": 58466005,
+        "expected_sha256": "a183e7280220ad5f6fe94ecbf025a5f10fc5797a0b18c600ed8f813c8158c530",
+        "filename": "OpenJDK25U-jre_x64_windows_hotspot_25.0.3_9.zip",
     },
     {
         "expected_size": 3833512,
@@ -165,9 +185,9 @@ files_to_download = [
         "filename": "libwebp-1.6.0.tar.gz",
     },
     {
-        "expected_size": 1882762,
-        "expected_sha256": "ab38928f7f6248e2a98cc184956021acb927b16a0dee71b4d260dc040a4320ea",
-        "filename": "libjxl-0.11.2.tar.gz",
+        "expected_size": 105431,
+        "expected_sha256": "413d9f5562c39c2fcac1e48b3e2155838680a0aec1ddcb95b23cb2f092962dcc",
+        "filename": "gperf-3.0.1-bin.zip",
     },
     {
         "expected_size": 10054247,
@@ -178,26 +198,6 @@ files_to_download = [
         "expected_size": 1682411,
         "expected_sha256": "a789dc4e2409e2901d93793a4e0b80c7b49d0d97cf6ad71c850eb7616acfd786",
         "filename": "LibRaw-0.22.1.tar.gz",
-    },
-    {
-        "expected_size": 14063,
-        "expected_sha256": "3cd218bf6d1254de86e27269541277fbfc5bae57a9002ce0b46fbe2a97088b43",
-        "filename": "LibRaw-cmake-eb98e4325aef2ce85d2eb031c2ff18640ca616d3.tar.gz",
-    },
-    {
-        "expected_size": 51947513,
-        "expected_sha256": "991be6ac6725e76109ecbd131d658f992dcbeacba3a8b4b6650302c8012b52fb",
-        "filename": "OpenJDK21U-jre_x64_linux_hotspot_21.0.10_7.tar.gz",
-    },
-    {
-        "expected_size": 42082349,
-        "expected_sha256": "008d2bb904c0e07500b92bf4b0f8d434d694b13d5189f06358a52d46b1351f37",
-        "filename": "OpenJDK21U-jre_x64_mac_hotspot_21.0.10_7.tar.gz",
-    },
-    {
-        "expected_size": 105431,
-        "expected_sha256": "413d9f5562c39c2fcac1e48b3e2155838680a0aec1ddcb95b23cb2f092962dcc",
-        "filename": "gperf-3.0.1-bin.zip",
     },
     {
         "expected_size": 53843906,
