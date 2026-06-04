@@ -1173,11 +1173,11 @@ if (WIN32)
     # Release debug info is configured centrally in the top-level CMakeLists.
     # Keep Atlas-specific Windows linker knobs here without overriding the
     # chosen /DEBUG mode for ATLAS_DEBUG_VERSION or --release-pdb builds.
-    target_link_options(${APP_NAME} PUBLIC /FORCE:MULTIPLE /VERBOSE:LIB /NODEFAULTLIB:msvcrtd.lib)
+    target_link_options(${APP_NAME} PUBLIC /VERBOSE:LIB /NODEFAULTLIB:msvcrtd.lib)
   elseif (NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     # Keep the default Release build free of linker debug info unless the
     # dedicated optimized Release+PDB option is requested.
-    target_link_options(${APP_NAME} PUBLIC /DEBUG:NONE /FORCE:MULTIPLE /VERBOSE:LIB /NODEFAULTLIB:msvcrtd.lib)
+    target_link_options(${APP_NAME} PUBLIC /DEBUG:NONE /VERBOSE:LIB /NODEFAULTLIB:msvcrtd.lib)
   endif ()
 
   # add manifest

@@ -202,7 +202,6 @@ find_package(OpenImageIO CONFIG REQUIRED
              PATHS ${_ATLAS_OPENIMAGEIO_PREFIX} NO_DEFAULT_PATH)
 print_target_properties(OpenColorIO::OpenColorIO)
 print_target_properties(fmt::fmt)
-print_target_properties(fmt::fmt-header-only)
 print_target_properties(OpenImageIO::OpenImageIO)
 
 set(CMAKE_PREFIX_PATH ${_ATLAS_PREVIOUS_CMAKE_PREFIX_PATH})

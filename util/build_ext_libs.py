@@ -457,6 +457,10 @@ def cmake_prefix_path_for_arch(active_install_dir: str, install_dir: str) -> str
     return ";".join(normalized_paths)
 
 
+def cmake_path(path: str) -> str:
+    return os.path.normpath(path).replace("\\", "/")
+
+
 def get_bak_file_name(orig_file: str):
     return orig_file + ".bak"
 
@@ -715,7 +719,9 @@ def get_common_build_flags(
                 " /clang:-Wno-pre-c++17-compat"
                 " /clang:-Wno-pre-c++20-compat"
             )
-        res["CFLAGS"] = "/utf-8" + clang_cl_warning_suppressions + optimization
+        res["CFLAGS"] = (
+            "/utf-8 /arch:AVX" + clang_cl_warning_suppressions + optimization
+        )
         res["CXXFLAGS"] = (
             f"/utf-8 /std:c++{cpp_standard} /EHsc /D_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS "
             f"/DNOMINMAX /arch:AVX"
@@ -3898,8 +3904,10 @@ def build_openimageio(src_dir: str, install_dir: str):
                     "-DOIIO_USE_CUDA:BOOL=OFF",
                     "-DSTOP_ON_WARNING:BOOL=OFF",
                     "-DOpenImageIO_BUILD_MISSING_DEPS=required",
-                    "-DOpenImageIO_LOCAL_DEPS_ROOT=" + active_local_deps_root,
-                    "-DOpenImageIO_LOCAL_DEPS_INSTALL_DIR=" + active_install_dir,
+                    "-DOpenImageIO_LOCAL_DEPS_ROOT="
+                    + cmake_path(active_local_deps_root),
+                    "-DOpenImageIO_LOCAL_DEPS_INSTALL_DIR="
+                    + cmake_path(active_install_dir),
                     # Make CMake 4.x tolerate older minimum-version declarations
                     # in OIIO's local dependency bootstrap projects.
                     "-DCMAKE_POLICY_VERSION_MINIMUM=3.5",
@@ -4260,6 +4268,21 @@ include_directories(BEFORE ${${PROJECT_NAME}_LOCAL_DEPS_INSTALL_DIR}/include)
             ],
         ),
         FilePatcher(
+            orig_file=os.path.join(src_dir, "src", "cmake", "build_libdeflate.cmake"),
+            from_texts=[
+                """        -D CMAKE_INSTALL_LIBDIR=lib
+        -D LIBDEFLATE_BUILD_GZIP=OFF
+"""
+            ],
+            to_texts=[
+                """        -D CMAKE_INSTALL_LIBDIR=lib
+        -D LIBDEFLATE_BUILD_GZIP=OFF
+        -D "CMAKE_C_FLAGS=${CMAKE_C_FLAGS} -D__EVEX512__"
+"""
+            ],
+            patch_condition=use_windows_clang_cl,
+        ),
+        FilePatcher(
             orig_file=os.path.join(src_dir, "src", "cmake", "build_OpenColorIO.cmake"),
             from_texts=[
                 """        -D CMAKE_INSTALL_LIBDIR=lib
@@ -4276,6 +4299,24 @@ include_directories(BEFORE ${${PROJECT_NAME}_LOCAL_DEPS_INSTALL_DIR}/include)
             ],
         ),
         FilePatcher(
+            orig_file=os.path.join(src_dir, "src", "cmake", "build_OpenColorIO.cmake"),
+            from_texts=[
+                """        -D ZLIB_CMAKE_ARGS=-DZLIB_BUILD_EXAMPLES=OFF
+        # Don't built unnecessary parts of OCIO
+"""
+            ],
+            to_texts=[
+                """        -D ZLIB_CMAKE_ARGS=-DZLIB_BUILD_EXAMPLES=OFF
+        -D OCIO_USE_AVX=OFF
+        -D OCIO_USE_AVX2=OFF
+        -D OCIO_USE_AVX512=OFF
+        -D OCIO_USE_F16C=OFF
+        # Don't built unnecessary parts of OCIO
+"""
+            ],
+            patch_condition=use_windows_clang_cl,
+        ),
+        FilePatcher(
             orig_file=os.path.join(src_dir, "src", "tiff.imageio", "CMakeLists.txt"),
             from_texts=[
                 """add_oiio_plugin (tiffinput.cpp tiffoutput.cpp
@@ -4290,6 +4331,38 @@ include_directories(BEFORE ${${PROJECT_NAME}_LOCAL_DEPS_INSTALL_DIR}/include)
             ],
         ),
         FilePatcher(
+            orig_file=os.path.join(src_dir, "src", "jpegxl.imageio", "CMakeLists.txt"),
+            from_texts=[
+                """                     LINK_LIBRARIES ${JXL_LIBRARIES}
+                     DEFINITIONS "USE_JXL")
+"""
+            ],
+            to_texts=[
+                """                     LINK_LIBRARIES ${JXL_LIBRARIES}
+                     DEFINITIONS "USE_JXL;JXL_STATIC_DEFINE;JXL_THREADS_STATIC_DEFINE;JXL_CMS_STATIC_DEFINE")
+"""
+            ],
+            patch_condition=is_windows,
+        ),
+        FilePatcher(
+            orig_file=os.path.join(
+                src_dir, "src", "include", "OpenImageIO", "detail", "fmt.h"
+            ),
+            from_texts=[
+                """// We want the header-only implementation of fmt
+#ifndef FMT_HEADER_ONLY
+#    define FMT_HEADER_ONLY
+#endif
+"""
+            ],
+            to_texts=[
+                """// Atlas links OpenImageIO against the same compiled fmt target as the
+// rest of the dependency graph. Do not force header-only fmt here: doing so
+// emits fmt definitions into OpenImageIO.lib and conflicts with fmt.lib.
+"""
+            ],
+        ),
+        FilePatcher(
             orig_file=os.path.join(src_dir, "src", "libOpenImageIO", "CMakeLists.txt"),
             from_texts=[
                 """            OpenColorIO::OpenColorIO
@@ -4299,6 +4372,63 @@ include_directories(BEFORE ${${PROJECT_NAME}_LOCAL_DEPS_INSTALL_DIR}/include)
                 """            $<TARGET_NAME_IF_EXISTS:OpenColorIO::OpenColorIO>
 """
             ],
+        ),
+        FilePatcher(
+            orig_file=os.path.join(src_dir, "src", "libOpenImageIO", "CMakeLists.txt"),
+            from_texts=[
+                """if (WIN32)
+    configure_file(../build-scripts/version_win32.rc.in "${CMAKE_CURRENT_BINARY_DIR}/version_win32.rc" @ONLY)
+    add_library (OpenImageIO ${libOpenImageIO_srcs} ${CMAKE_CURRENT_BINARY_DIR}/version_win32.rc)
+else ()
+    add_library (OpenImageIO ${libOpenImageIO_srcs})
+endif ()
+"""
+            ],
+            to_texts=[
+                """if (WIN32 AND BUILD_SHARED_LIBS)
+    configure_file(../build-scripts/version_win32.rc.in "${CMAKE_CURRENT_BINARY_DIR}/version_win32.rc" @ONLY)
+    add_library (OpenImageIO ${libOpenImageIO_srcs} ${CMAKE_CURRENT_BINARY_DIR}/version_win32.rc)
+else ()
+    add_library (OpenImageIO ${libOpenImageIO_srcs})
+endif ()
+"""
+            ],
+            patch_condition=use_windows_clang_cl,
+        ),
+        FilePatcher(
+            orig_file=os.path.join(src_dir, "src", "libutil", "CMakeLists.txt"),
+            from_texts=[
+                """        target_link_libraries (${targetname}
+                               PUBLIC fmt::fmt-header-only)
+"""
+            ],
+            to_texts=[
+                """        target_link_libraries (${targetname}
+                               PUBLIC fmt::fmt)
+"""
+            ],
+        ),
+        FilePatcher(
+            orig_file=os.path.join(src_dir, "src", "libutil", "CMakeLists.txt"),
+            from_texts=[
+                """    if (WIN32)
+        configure_file(../build-scripts/version_win32.rc.in "${CMAKE_CURRENT_BINARY_DIR}/version_win32.rc" @ONLY)
+        add_library (${targetname} ${libtype} ${libOpenImageIO_Util_srcs} ${CMAKE_CURRENT_BINARY_DIR}/version_win32.rc)
+    else ()
+        add_library (${targetname} ${libtype} ${libOpenImageIO_Util_srcs})
+    endif ()
+"""
+            ],
+            to_texts=[
+                """    if (WIN32 AND BUILD_SHARED_LIBS)
+        configure_file(../build-scripts/version_win32.rc.in "${CMAKE_CURRENT_BINARY_DIR}/version_win32.rc" @ONLY)
+        add_library (${targetname} ${libtype} ${libOpenImageIO_Util_srcs} ${CMAKE_CURRENT_BINARY_DIR}/version_win32.rc)
+    else ()
+        add_library (${targetname} ${libtype} ${libOpenImageIO_Util_srcs})
+    endif ()
+"""
+            ],
+            patch_condition=use_windows_clang_cl,
         ),
         FilePatcher(
             orig_file=os.path.join(src_dir, "src", "cmake", "Config.cmake.in"),

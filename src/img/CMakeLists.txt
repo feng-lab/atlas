@@ -356,7 +356,6 @@ if (WIN32)
     target_compile_options(${LIBRARY_NAME} PUBLIC /Zc:__cplusplus) # The /Zc:__cplusplus compiler option enables the __cplusplus preprocessor macro to report an updated value for recent C++ language standards support
 
     target_compile_options(${LIBRARY_NAME} PUBLIC /arch:AVX)
-    target_link_options(${LIBRARY_NAME} PUBLIC /FORCE:MULTIPLE)
 
     # for some files
     set_source_files_properties(zimageavx512.cpp PROPERTIES COMPILE_FLAGS /arch:AVX512)
