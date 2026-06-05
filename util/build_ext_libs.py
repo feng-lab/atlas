@@ -2034,7 +2034,7 @@ add_library(GIF
 add_library(GIF::GIF ALIAS GIF)
 
 set_target_properties(GIF PROPERTIES
-    OUTPUT_NAME GIF
+    OUTPUT_NAME gif
     POSITION_INDEPENDENT_CODE ON)
 
 target_include_directories(GIF PUBLIC
@@ -2095,7 +2095,8 @@ install(FILES
                 else:
                     os.remove(output_path)
                     logger.info(f"{output_path} removed")
-        glob_remove(os.path.join(active_install_dir, "lib", "libGIF*"))
+        for pattern in ["libGIF*", "libgif*", "GIF.lib", "gif.lib"]:
+            glob_remove(os.path.join(active_install_dir, "lib", pattern))
 
     def build_arch(active_install_dir: str, *, arm64_only: bool):
         build_dir = create_build_dir(src_dir)

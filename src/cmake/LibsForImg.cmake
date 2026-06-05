@@ -180,10 +180,6 @@ endif ()
 print_target_properties(TIFF::tiff)
 print_target_properties(TIFF::CXX)
 
-find_package(GIF CONFIG REQUIRED
-             PATHS ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build NO_DEFAULT_PATH)
-print_target_properties(GIF::GIF)
-
 set(_ATLAS_OPENIMAGEIO_PREFIX ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build)
 set(_ATLAS_PREVIOUS_CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH})
 list(PREPEND CMAKE_PREFIX_PATH ${_ATLAS_OPENIMAGEIO_PREFIX})
