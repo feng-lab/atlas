@@ -4994,6 +4994,108 @@ def build_itk(src_dir: str, install_dir: str):
             ],
             patch_condition=is_windows,
         ),
+        FilePatcher(
+            orig_file=os.path.join(
+                src_dir, "Modules", "ThirdParty", "TIFF", "itk-module.cmake"
+            ),
+            from_texts=[
+                """itk_module(ITKTIFF
+  DEPENDS
+"""
+            ],
+            to_texts=[
+                """itk_module(ITKTIFF
+  EXCLUDE_FROM_DEFAULT
+  DEPENDS
+"""
+            ],
+        ),
+        FilePatcher(
+            orig_file=os.path.join(
+                src_dir, "Modules", "IO", "TIFF", "itk-module.cmake"
+            ),
+            from_texts=[
+                """itk_module(
+  ITKIOTIFF
+  ENABLE_SHARED
+"""
+            ],
+            to_texts=[
+                """itk_module(
+  ITKIOTIFF
+  EXCLUDE_FROM_DEFAULT
+  ENABLE_SHARED
+"""
+            ],
+        ),
+        FilePatcher(
+            orig_file=os.path.join(src_dir, "Modules", "IO", "LSM", "itk-module.cmake"),
+            from_texts=[
+                """itk_module(
+  ITKIOLSM
+  DEPENDS
+"""
+            ],
+            to_texts=[
+                """itk_module(
+  ITKIOLSM
+  EXCLUDE_FROM_DEFAULT
+  DEPENDS
+"""
+            ],
+        ),
+        FilePatcher(
+            orig_file=os.path.join(
+                src_dir, "Modules", "Core", "TestKernel", "itk-module.cmake"
+            ),
+            from_texts=[
+                """itk_module(
+  ITKTestKernel
+  DEPENDS
+"""
+            ],
+            to_texts=[
+                """itk_module(
+  ITKTestKernel
+  EXCLUDE_FROM_DEFAULT
+  DEPENDS
+"""
+            ],
+        ),
+        FilePatcher(
+            orig_file=os.path.join(
+                src_dir, "Modules", "Nonunit", "Review", "itk-module.cmake"
+            ),
+            from_texts=[
+                """  ITKIOTIFF
+  ITKIOVTK
+""",
+                """  ITKIOLSM
+  DESCRIPTION
+""",
+            ],
+            to_texts=[
+                """  ITKIOVTK
+""",
+                """  DESCRIPTION
+""",
+            ],
+        ),
+        FilePatcher(
+            orig_file=os.path.join(
+                src_dir, "Modules", "Nonunit", "Review", "src", "CMakeLists.txt"
+            ),
+            from_texts=[
+                """    ${ITKTestKernel_LIBRARIES}
+    ${ITKIOLSM_LIBRARIES}
+    itkopenjpeg
+"""
+            ],
+            to_texts=[
+                """    itkopenjpeg
+"""
+            ],
+        ),
     ]
     patch_manager = PatchManager(patches)
 
@@ -5018,7 +5120,6 @@ def build_itk(src_dir: str, install_dir: str):
                 "-DITK_USE_SYSTEM_HDF5:BOOL=ON",
                 "-DITK_USE_SYSTEM_JPEG:BOOL=ON",
                 "-DITK_USE_SYSTEM_PNG:BOOL=ON",
-                "-DITK_USE_SYSTEM_TIFF:BOOL=ON",
                 "-DITK_USE_SYSTEM_ZLIB:BOOL=ON",
                 # '-DGDCM_USE_SYSTEM_OPENJPEG:BOOL=ON',
                 "-DModule_MorphologicalContourInterpolation=OFF",  # example how to turn on a remote module
@@ -5221,6 +5322,10 @@ void vtkBoundingBox::ComputeBounds(
                 "-DBUILD_SHARED_LIBS:BOOL=OFF",
                 "-DVTK_BUILD_TESTING:STRING=OFF",
                 "-DBUILD_SHARED_LIBS:BOOL=OFF",
+                # Keep VTK's broad default groups, but reject VTK::tiff. Modules
+                # that merely WANT TIFF-backed image IO will be skipped by VTK's
+                # dependency resolver instead of falling back to vendored libtiff.
+                "-DVTK_MODULE_ENABLE_VTK_tiff:STRING=NO",
                 "-DVTK_MODULE_USE_EXTERNAL_VTK_eigen:BOOL=ON",
                 "-DVTK_MODULE_USE_EXTERNAL_VTK_expat:BOOL=ON",
                 "-DEXPAT_USE_STATIC_LIBS:BOOL="
@@ -5231,7 +5336,6 @@ void vtkBoundingBox::ComputeBounds(
                 "-DVTK_MODULE_USE_EXTERNAL_VTK_lz4:BOOL=ON",
                 "-DVTK_MODULE_USE_EXTERNAL_VTK_lzma:BOOL=ON",
                 "-DVTK_MODULE_USE_EXTERNAL_VTK_png:BOOL=ON",
-                "-DVTK_MODULE_USE_EXTERNAL_VTK_tiff:BOOL=ON",
                 "-DVTK_MODULE_USE_EXTERNAL_VTK_zlib:BOOL=ON",
                 "-DVTK_MODULE_ENABLE_VTK_IOADIOS2:STRING=NO",
                 "-DVTK_MODULE_ENABLE_VTK_diy2:STRING=NO",
@@ -7095,7 +7199,7 @@ def parse_inputs(argv: list):
         "openjpeg": ["openimageio", "opencv"],
         "libjxl": ["openimageio"],
         "libwebp": ["libtiff", "openimageio", "opencv"],
-        "libtiff": ["openimageio", "itk", "vtk"],
+        "libtiff": ["openimageio"],
         "libraw": ["openimageio"],
         "snappy": ["folly", "rocksdb"],
         "bzip2": ["folly"],
