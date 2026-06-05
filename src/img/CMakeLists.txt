@@ -421,7 +421,7 @@ target_link_libraries(${LIBRARY_NAME} PUBLIC ${ITK_LIBRARIES} ${JPEGTURBO_LIBRAR
         absl::check absl::failure_signal_handler absl::log absl::log_globals
         absl::log_initialize absl::log_sink absl::log_sink_registry absl::symbolize
         glm::glm-header-only
-        TIFF::CXX OpenImageIO::OpenImageIO WebP::webp zstd::libzstd_static liblzma::liblzma ZLIB::ZLIB
+        TIFF::CXX OpenImageIO::OpenImageIO GIF::GIF WebP::webp zstd::libzstd_static liblzma::liblzma ZLIB::ZLIB
         ${VTK_LIBRARIES} assimp::assimp TBB::tbb
         glog::glog gRPC::grpc++ protobuf::libprotobuf ${_QT_LIBS_})
 

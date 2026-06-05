@@ -4085,12 +4085,6 @@ endif ()
         list (APPEND LibRaw_LIBRARIES ${JASPER_LIBRARIES})
     endif()
 
-    find_library (LCMS2_LIBRARIES NAMES lcms2)
-    if (LCMS2_LIBRARIES)
-        list (APPEND LibRaw_r_LIBRARIES ${LCMS2_LIBRARIES})
-        list (APPEND LibRaw_LIBRARIES ${LCMS2_LIBRARIES})
-    endif()
-
     find_package (ZLIB)
     if (TARGET ZLIB::ZLIB)
         list (APPEND LibRaw_r_LIBRARIES ZLIB::ZLIB)
@@ -5212,6 +5206,9 @@ void vtkBoundingBox::ComputeBounds(
 
         vtk_smp_backend = "STDThread"
         vtk_use_external_hdf5 = not (is_windows() and not use_clang_cl())
+        # OIIO's local static Expat on Windows uses the dynamic CRT archive name
+        # libexpatMD.lib; VTK's static-name search only includes MT variants.
+        vtk_expat_use_static_names = not is_windows()
 
         # Keep these cache args aligned with the current vendored VTK tree.
         # VTK_DATA_EXCLUDE_FROM_ALL only matters when VTK_BUILD_TESTING is ON,
@@ -5226,7 +5223,8 @@ void vtkBoundingBox::ComputeBounds(
                 "-DBUILD_SHARED_LIBS:BOOL=OFF",
                 "-DVTK_MODULE_USE_EXTERNAL_VTK_eigen:BOOL=ON",
                 "-DVTK_MODULE_USE_EXTERNAL_VTK_expat:BOOL=ON",
-                "-DEXPAT_USE_STATIC_LIBS:BOOL=ON",
+                "-DEXPAT_USE_STATIC_LIBS:BOOL="
+                + ("ON" if vtk_expat_use_static_names else "OFF"),
                 "-DVTK_MODULE_USE_EXTERNAL_VTK_hdf5:BOOL="
                 + ("ON" if vtk_use_external_hdf5 else "OFF"),
                 "-DVTK_MODULE_USE_EXTERNAL_VTK_jpeg:BOOL=ON",
