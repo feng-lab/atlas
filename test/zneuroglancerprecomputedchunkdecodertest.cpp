@@ -1,91 +1,54 @@
 #include "zneuroglancerprecomputedchunkdecoder.h"
 #include "zneuroglancerprecomputed.h"
 #include "zexception.h"
+#include "zimg.h"
 
 #include <gtest/gtest.h>
 
-#include <png.h>
+#include <QDir>
+#include <QFile>
+#include <QTemporaryDir>
 
-#include <array>
 #include <cstdint>
-#include <cstring>
+#include <span>
 #include <vector>
 
 namespace nim {
 namespace {
 
-struct PngWriteState
-{
-  std::vector<uint8_t> bytes;
-};
-
-void pngWriteErrorFunction(png_structp, const char* message)
-{
-  throw ZException(message ? message : "libpng write error");
-}
-
-void pngWriteWarningFunction(png_structp, const char* /*message*/) {}
-
-void pngWriteCallback(png_structp pngPtr, png_bytep data, png_size_t length)
-{
-  auto* st = static_cast<PngWriteState*>(png_get_io_ptr(pngPtr));
-  if (!st) {
-    png_error(pngPtr, "missing write state");
-    return;
-  }
-  const size_t n = static_cast<size_t>(length);
-  st->bytes.insert(st->bytes.end(), data, data + n);
-}
-
-void pngFlushCallback(png_structp) {}
-
 std::vector<uint8_t> encodeRgb8PngToMemory(size_t width, size_t height, const std::vector<uint8_t>& interleavedRgb)
 {
   if (width == 0 || height == 0) {
-    throw ZException("invalid png dims");
+    throw ZException("invalid PNG dims");
   }
   if (interleavedRgb.size() != width * height * 3) {
     throw ZException("invalid rgb size");
   }
 
-  PngWriteState state{};
-
-  png_structp pngPtr = png_create_write_struct(PNG_LIBPNG_VER_STRING, nullptr, pngWriteErrorFunction, pngWriteWarningFunction);
-  if (!pngPtr) {
-    throw ZException("libpng: png_create_write_struct failed");
-  }
-  png_infop infoPtr = png_create_info_struct(pngPtr);
-  if (!infoPtr) {
-    png_destroy_write_struct(&pngPtr, nullptr);
-    throw ZException("libpng: png_create_info_struct failed");
+  ZImgInfo info(width, height, 1, 3, 1, 1, VoxelFormat::Unsigned);
+  ZImg img(info);
+  const size_t pixelCount = width * height;
+  for (size_t i = 0; i < pixelCount; ++i) {
+    img.channelData<uint8_t>(0)[i] = interleavedRgb[i * 3 + 0];
+    img.channelData<uint8_t>(1)[i] = interleavedRgb[i * 3 + 1];
+    img.channelData<uint8_t>(2)[i] = interleavedRgb[i * 3 + 2];
   }
 
-  try {
-    png_set_write_fn(pngPtr, &state, pngWriteCallback, pngFlushCallback);
-    png_set_IHDR(pngPtr,
-                 infoPtr,
-                 static_cast<png_uint_32>(width),
-                 static_cast<png_uint_32>(height),
-                 /*bit_depth=*/8,
-                 PNG_COLOR_TYPE_RGB,
-                 PNG_INTERLACE_NONE,
-                 PNG_COMPRESSION_TYPE_BASE,
-                 PNG_FILTER_TYPE_BASE);
-    png_write_info(pngPtr, infoPtr);
-
-    std::vector<png_bytep> rows(height);
-    for (size_t y = 0; y < height; ++y) {
-      rows[y] = const_cast<png_bytep>(interleavedRgb.data() + y * width * 3);
-    }
-
-    png_write_image(pngPtr, rows.data());
-    png_write_end(pngPtr, nullptr);
-    png_destroy_write_struct(&pngPtr, &infoPtr);
-    return state.bytes;
-  } catch (...) {
-    png_destroy_write_struct(&pngPtr, &infoPtr);
-    throw;
+  QTemporaryDir tmp;
+  if (!tmp.isValid()) {
+    throw ZException("failed to create temporary PNG directory");
   }
+
+  const QString path = QDir(tmp.path()).filePath(QStringLiteral("fixture.png"));
+  img.save(path, FileFormat::Png);
+
+  QFile file(path);
+  if (!file.open(QIODevice::ReadOnly)) {
+    throw ZException("failed to open temporary PNG fixture");
+  }
+
+  const QByteArray bytes = file.readAll();
+  return std::vector<uint8_t>(bytes.begin(), bytes.end());
 }
 
 std::vector<uint8_t> makeConstantCompressoChunkBytes(size_t sx, size_t sy, size_t sz, uint8_t value)

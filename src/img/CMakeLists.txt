@@ -258,14 +258,9 @@ if (llfio_FOUND)
     target_compile_definitions(${LIBRARY_NAME} PUBLIC ZIMG_USE_LLFIO)
 endif ()
 
-if (WIN32)
-    target_include_directories(${LIBRARY_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/include)
-endif ()
+target_include_directories(${LIBRARY_NAME} SYSTEM BEFORE PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/include)
 target_include_directories(${LIBRARY_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_include_directories(${LIBRARY_NAME} PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
-if (NOT WIN32)
-    target_include_directories(${LIBRARY_NAME} SYSTEM BEFORE PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/include)
-endif ()
 target_compile_definitions(${LIBRARY_NAME} PUBLIC EIGEN_NO_DEBUG EIGEN_DONT_PARALLELIZE EIGEN_USE_BLAS)
 
 target_compile_definitions(${LIBRARY_NAME} PUBLIC lapack_complex_float=std::complex<float>
@@ -275,6 +270,22 @@ target_compile_definitions(${LIBRARY_NAME} PUBLIC QT_NO_KEYWORDS QT_USE_QSTRINGB
 target_compile_definitions(${LIBRARY_NAME} PUBLIC BOOST_CONTAINER_NO_LIB BOOST_JSON_NO_LIB)
 
 set_source_files_properties(zimgpng.cpp PROPERTIES INCLUDE_DIRECTORIES "${PNG_INCLUDE_DIRS}")
+get_target_property(ATLAS_TIFF_INCLUDE_DIRS TIFF::tiff INTERFACE_INCLUDE_DIRECTORIES)
+if (NOT ATLAS_TIFF_INCLUDE_DIRS)
+    set(ATLAS_TIFF_INCLUDE_DIRS "")
+endif ()
+set_source_files_properties(ztiff.cpp PROPERTIES INCLUDE_DIRECTORIES "${ATLAS_TIFF_INCLUDE_DIRS}")
+get_target_property(ATLAS_OIIO_INCLUDE_DIRS OpenImageIO::OpenImageIO INTERFACE_INCLUDE_DIRECTORIES)
+if (NOT ATLAS_OIIO_INCLUDE_DIRS)
+    set(ATLAS_OIIO_INCLUDE_DIRS "")
+endif ()
+get_target_property(ATLAS_OIIO_COMPILE_DEFINITIONS OpenImageIO::OpenImageIO INTERFACE_COMPILE_DEFINITIONS)
+if (NOT ATLAS_OIIO_COMPILE_DEFINITIONS)
+    set(ATLAS_OIIO_COMPILE_DEFINITIONS "")
+endif ()
+set_source_files_properties(zimgopenimageio.cpp PROPERTIES
+        INCLUDE_DIRECTORIES "${ATLAS_OIIO_INCLUDE_DIRS}"
+        COMPILE_DEFINITIONS "${ATLAS_OIIO_COMPILE_DEFINITIONS}")
 set_source_files_properties(zimgjpegxr.cpp PROPERTIES INCLUDE_DIRECTORIES "${JPEGXR_INCLUDE_DIRS}")
 set_source_files_properties(zimginterpolate.cpp PROPERTIES
         INCLUDE_DIRECTORIES "${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/ITKMorphologicalContourInterpolation")
@@ -412,8 +423,15 @@ else (WIN32)
     set_source_files_properties(zregistrationoptimizer.cpp PROPERTIES COMPILE_FLAGS -Wno-shadow)
 endif (WIN32)
 
-target_link_libraries(${LIBRARY_NAME} PUBLIC ${ITK_LIBRARIES} ${JPEGTURBO_LIBRARIES}
-        png_static ${JPEGXR_LIBRARIES} cpuinfo::cpuinfo
+set(ATLAS_IMG_FORMAT_LINK_LIBRARIES
+        ${JPEGTURBO_LIBRARIES}
+        png_static
+        ${JPEGXR_LIBRARIES}
+        TIFF::CXX
+        WebP::webp
+        OpenImageIO::OpenImageIO)
+
+target_link_libraries(${LIBRARY_NAME} PUBLIC ${ITK_LIBRARIES} cpuinfo::cpuinfo
         hdf5_cpp-static hdf5-static Ceres::ceres Folly::folly Eigen3::Eigen
         Boost::headers Boost::charconv
         absl::bits absl::int128
@@ -421,9 +439,13 @@ target_link_libraries(${LIBRARY_NAME} PUBLIC ${ITK_LIBRARIES} ${JPEGTURBO_LIBRAR
         absl::check absl::failure_signal_handler absl::log absl::log_globals
         absl::log_initialize absl::log_sink absl::log_sink_registry absl::symbolize
         glm::glm-header-only
-        TIFF::CXX OpenImageIO::OpenImageIO WebP::webp zstd::libzstd_static liblzma::liblzma ZLIB::ZLIB
+        zstd::libzstd_static liblzma::liblzma ZLIB::ZLIB
         ${VTK_LIBRARIES} assimp::assimp TBB::tbb
         glog::glog gRPC::grpc++ protobuf::libprotobuf ${_QT_LIBS_})
+
+foreach (ATLAS_IMG_FORMAT_LINK_LIBRARY IN LISTS ATLAS_IMG_FORMAT_LINK_LIBRARIES)
+    target_link_libraries(${LIBRARY_NAME} INTERFACE "$<LINK_ONLY:${ATLAS_IMG_FORMAT_LINK_LIBRARY}>")
+endforeach ()
 
 if (llfio_FOUND)
     target_link_libraries(${LIBRARY_NAME} PUBLIC llfio::sl)
