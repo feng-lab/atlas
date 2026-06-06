@@ -197,7 +197,8 @@ def build_atlas(
             ]
         )
         env["PATH"] = (
-            f"{env['PATH']};{common_dirs.tbb_redist_dir()};{common_dirs.qt_bin_dir()};"
+            f"{env['PATH']};{common_dirs.vc_CRT_redist_dir()};"
+            f"{common_dirs.tbb_redist_dir()};{common_dirs.qt_bin_dir()};"
             f"{common_dirs.curl_bin_dir()}"
         )
         logger.info(env["PATH"])

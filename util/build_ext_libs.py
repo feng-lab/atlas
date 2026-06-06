@@ -3947,6 +3947,16 @@ def build_openimageio(src_dir: str, install_dir: str):
 
     patches = [
         FilePatcher(
+            orig_file=os.path.join(src_dir, "src", "cmake", "compiler.cmake"),
+            from_texts=[
+                """    # https://github.com/AcademySoftwareFoundation/OpenImageIO/issues/4641#issuecomment-2725013661
+    add_compile_definitions (_DISABLE_CONSTEXPR_MUTEX_CONSTRUCTOR)
+"""
+            ],
+            to_texts=[""],
+            patch_condition=is_windows,
+        ),
+        FilePatcher(
             orig_file=os.path.join(src_dir, "src", "cmake", "externalpackages.cmake"),
             from_texts=[
                 """checked_find_package (TIFF REQUIRED
@@ -7124,13 +7134,13 @@ def parse_inputs(argv: list):
         "libjxl",
         "libtiff",
         "libraw",
-        "openimageio",
         "jxrlib",
         "geometrictools",
         "assimp",
         "hdf5",
         "itk",
         "vtk",
+        "openimageio",
         "opencv",
         "neuTube",
         "rocksdb",
