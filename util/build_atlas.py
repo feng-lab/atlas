@@ -191,73 +191,6 @@ def _run_diagnostic_command(
     return result
 
 
-def _run_windows_best_effort_diagnostic(title: str, fn, *args, **kwargs):
-    try:
-        return fn(*args, **kwargs)
-    except Exception:
-        logger.exception("Windows diagnostic step failed (%s); continuing.", title)
-        return None
-
-
-def _windows_exit_code_text(returncode: int) -> str:
-    return f"{returncode} (0x{returncode & 0xFFFFFFFF:08X})"
-
-
-def _debug_windows_failed_test_command(
-    env: dict[str, str], title: str, cmd: list[str], returncode: int
-):
-    logger.warning(
-        "Rerunning failed Windows test diagnostic under debugger (%s), exit code %s.",
-        title,
-        _windows_exit_code_text(returncode),
-    )
-    cdb = _find_windows_cdb(env)
-    if cdb:
-        _run_diagnostic_command(
-            [
-                cdb,
-                "-o",
-                "-G",
-                "-c",
-                "g;!analyze -v;kv;q",
-                *cmd,
-            ],
-            cwd=common_dirs.atlas_build_dir(),
-            env=env,
-            title=f"cdb rerun {title}",
-            timeout=600,
-        )
-        return
-
-    lldb = _find_windows_lldb(env)
-    if lldb:
-        _run_diagnostic_command(
-            [
-                lldb,
-                "--batch",
-                "-o",
-                "run",
-                "-o",
-                "thread backtrace all",
-                "-o",
-                "image list",
-                "--",
-                *cmd,
-            ],
-            cwd=common_dirs.atlas_build_dir(),
-            env=env,
-            title=f"lldb rerun {title}",
-            timeout=600,
-        )
-        return
-
-    logger.warning(
-        "No debugger found for failed Windows diagnostic command (%s): %s",
-        title,
-        " ".join(cmd),
-    )
-
-
 def _find_windows_debugger_tool(tool_name: str, env: dict[str, str]) -> str | None:
     tool = shutil.which(tool_name, path=env.get("PATH"))
     if tool:
@@ -296,10 +229,6 @@ def _find_windows_lldb(env: dict[str, str]) -> str | None:
     return _find_windows_llvm_tool("lldb.exe", env)
 
 
-def _find_windows_dumpbin(env: dict[str, str]) -> str | None:
-    return shutil.which("dumpbin.exe", path=env.get("PATH"))
-
-
 def _windows_focused_test_executable_names() -> list[str]:
     return [
         "zimglinksmoketest.exe",
@@ -335,13 +264,6 @@ def _windows_discovered_test_executables() -> list[Path]:
             len(executables),
         )
     return executables
-
-
-def _windows_discovered_test_executable_by_name() -> dict[str, Path]:
-    return {
-        executable.name.lower(): executable
-        for executable in _windows_discovered_test_executables()
-    }
 
 
 def _windows_diagnostic_test_executable_names() -> list[str]:
@@ -522,7 +444,7 @@ def _log_windows_runtime_resolution(env: dict[str, str]):
         elif tool_name in {"cdb.exe", "gflags.exe"}:
             tool_path = _find_windows_debugger_tool(tool_name, env)
         else:
-            tool_path = _find_windows_dumpbin(env)
+            tool_path = shutil.which(tool_name, path=env.get("PATH"))
         if tool_path:
             logger.info("Windows diagnostic tool %s: %s", tool_name, tool_path)
         else:
@@ -548,14 +470,9 @@ def _log_windows_runtime_resolution(env: dict[str, str]):
             title=f"where {dll_name}",
         )
 
-    dumpbin = _find_windows_dumpbin(env)
-    if not dumpbin:
-        logger.warning("dumpbin.exe not found; skipping test executable dependents.")
-        return
-
     for exe_path in _windows_discovered_test_executables():
         _run_diagnostic_command(
-            [dumpbin, "/dependents", str(exe_path)],
+            ["dumpbin", "/dependents", str(exe_path)],
             cwd=common_dirs.atlas_build_dir(),
             env=env,
             title=f"dumpbin dependents {exe_path.name}",
@@ -563,11 +480,11 @@ def _log_windows_runtime_resolution(env: dict[str, str]):
 
 
 def _focused_windows_test_commands() -> list[tuple[str, list[str]]]:
-    focused_specs = [
+    return [
         (
             "zimglink smoke",
-            "zimglinksmoketest.exe",
             [
+                "zimglinksmoketest.exe",
                 "--gtest_filter=ZImgLinkSmoke.StartsAndStops",
                 "--gtest_also_run_disabled_tests",
                 "--gtest_catch_exceptions=0",
@@ -575,8 +492,8 @@ def _focused_windows_test_commands() -> list[tuple[str, list[str]]]:
         ),
         (
             "zatlaslink smoke",
-            "zatlaslinksmoketest.exe",
             [
+                "zatlaslinksmoketest.exe",
                 "--gtest_filter=ZAtlasLinkSmoke.StartsAndStops",
                 "--gtest_also_run_disabled_tests",
                 "--gtest_catch_exceptions=0",
@@ -584,8 +501,8 @@ def _focused_windows_test_commands() -> list[tuple[str, list[str]]]:
         ),
         (
             "zneutubeswcsignalfitter focused",
-            "zneutubeswcsignalfittertest.exe",
             [
+                "zneutubeswcsignalfittertest.exe",
                 "--gtest_filter=ZNeutubeSwcSignalFitter.FitsRadiusOnSimpleDisk",
                 "--gtest_also_run_disabled_tests",
                 "--gtest_catch_exceptions=0",
@@ -593,8 +510,8 @@ def _focused_windows_test_commands() -> list[tuple[str, list[str]]]:
         ),
         (
             "zimgometiffpack focused",
-            "zimgometiffpacktest.exe",
             [
+                "zimgometiffpacktest.exe",
                 "--gtest_filter=ZImgOmeTiffPack.DetailedInfoLoadsMetadataOnDemand",
                 "--gtest_also_run_disabled_tests",
                 "--gtest_catch_exceptions=0",
@@ -602,25 +519,14 @@ def _focused_windows_test_commands() -> list[tuple[str, list[str]]]:
         ),
         (
             "zatlasheavy focused",
-            "zatlasheavytest.exe",
             [
+                "zatlasheavytest.exe",
                 "--gtest_filter=Z3DBlockIdCollectorTest.IgnoresSentinelsAndSortsBothDirections",
                 "--gtest_also_run_disabled_tests",
                 "--gtest_catch_exceptions=0",
             ],
         ),
     ]
-    executables_by_name = _windows_discovered_test_executable_by_name()
-    commands = []
-    for title, exe_name, args in focused_specs:
-        executable = executables_by_name.get(exe_name.lower())
-        if not executable:
-            logger.warning(
-                "Focused Windows diagnostic executable is missing: %s", exe_name
-            )
-            continue
-        commands.append((title, [str(executable), *args]))
-    return commands
 
 
 def _windows_gtest_list_commands() -> list[tuple[str, list[str]]]:
@@ -641,37 +547,33 @@ def _windows_gtest_list_commands() -> list[tuple[str, list[str]]]:
 def _run_windows_gtest_list_preflight(env: dict[str, str]):
     logger.info("Running Windows GoogleTest listing preflight diagnostics.")
     for title, cmd in _windows_gtest_list_commands():
-        result = _run_diagnostic_command(
+        _run_diagnostic_command(
             cmd,
             cwd=common_dirs.atlas_build_dir(),
             env=env,
             title=title,
             timeout=300,
         )
-        if result.returncode != 0:
-            _debug_windows_failed_test_command(env, title, cmd, result.returncode)
 
 
 def _run_windows_focused_test_preflight(env: dict[str, str]):
     logger.info("Running focused Windows test preflight diagnostics.")
     for title, cmd in _focused_windows_test_commands():
-        result = _run_diagnostic_command(
+        _run_diagnostic_command(
             cmd,
             cwd=common_dirs.atlas_build_dir(),
             env=env,
             title=title,
             timeout=300,
         )
-        if result.returncode != 0:
-            _debug_windows_failed_test_command(env, title, cmd, result.returncode)
 
 
 def _run_windows_parallel_startup_probe(env: dict[str, str]):
-    probe_specs = [
+    probe_commands = [
         (
             "parallel zimglink smoke",
-            "zimglinksmoketest.exe",
             [
+                "zimglinksmoketest.exe",
                 "--gtest_filter=ZImgLinkSmoke.StartsAndStops",
                 "--gtest_also_run_disabled_tests",
                 "--gtest_catch_exceptions=0",
@@ -679,8 +581,8 @@ def _run_windows_parallel_startup_probe(env: dict[str, str]):
         ),
         (
             "parallel zatlaslink smoke",
-            "zatlaslinksmoketest.exe",
             [
+                "zatlaslinksmoketest.exe",
                 "--gtest_filter=ZAtlasLinkSmoke.StartsAndStops",
                 "--gtest_also_run_disabled_tests",
                 "--gtest_catch_exceptions=0",
@@ -688,25 +590,14 @@ def _run_windows_parallel_startup_probe(env: dict[str, str]):
         ),
         (
             "parallel zneutubeswcsignalfitter",
-            "zneutubeswcsignalfittertest.exe",
             [
+                "zneutubeswcsignalfittertest.exe",
                 "--gtest_filter=ZNeutubeSwcSignalFitter.FitsRadiusOnSimpleDisk",
                 "--gtest_also_run_disabled_tests",
                 "--gtest_catch_exceptions=0",
             ],
         ),
     ]
-    executables_by_name = _windows_discovered_test_executable_by_name()
-    probe_commands = []
-    for title, exe_name, args in probe_specs:
-        executable = executables_by_name.get(exe_name.lower())
-        if not executable:
-            logger.warning(
-                "Parallel Windows diagnostic executable is missing: %s", exe_name
-            )
-            continue
-        probe_commands.append((title, [str(executable), *args]))
-
     process_count = min(os.cpu_count() or 1, 16)
     logger.info(
         "Running Windows parallel startup probe with %d processes.", process_count
@@ -716,31 +607,17 @@ def _run_windows_parallel_startup_probe(env: dict[str, str]):
         logger.info("Starting %s: %s", title, " ".join(cmd))
         processes = []
         for _ in range(process_count):
-            try:
-                processes.append(
-                    subprocess.Popen(
-                        cmd,
-                        cwd=common_dirs.atlas_build_dir(),
-                        env=env,
-                        shell=False,
-                        text=True,
-                        stdout=subprocess.PIPE,
-                        stderr=subprocess.PIPE,
-                    )
+            processes.append(
+                subprocess.Popen(
+                    cmd,
+                    cwd=common_dirs.atlas_build_dir(),
+                    env=env,
+                    shell=False,
+                    text=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
                 )
-            except FileNotFoundError:
-                logger.warning(
-                    "Parallel diagnostic command not found (%s): %s", title, cmd[0]
-                )
-                break
-            except OSError as e:
-                logger.warning(
-                    "Parallel diagnostic command failed to start (%s): %s", title, e
-                )
-                break
-
-        if not processes:
-            continue
+            )
 
         failures = []
         for idx, proc in enumerate(processes):
@@ -863,45 +740,19 @@ def build_atlas(
             # runners don't fail when outbound access is restricted.
             env["ATLAS_ENABLE_NETWORK_TESTS"] = "1" if enable_network_tests else "0"
             dump_dir = os.path.join(common_dirs.atlas_build_dir(), "windows-test-dumps")
+            _configure_windows_local_dumps(env, dump_dir)
+            page_heap_gflags = _configure_windows_page_heap(env)
+            _log_windows_runtime_resolution(env)
+            _run_windows_gtest_list_preflight(env)
+            _run_windows_focused_test_preflight(env)
+            _run_windows_parallel_startup_probe(env)
             ctest_cmd = [
                 common_dirs.get_ctest_binary(),
                 "--extra-verbose",
                 "--output-on-failure",
             ]
             ctest_result = subprocess.CompletedProcess(ctest_cmd, 127)
-            page_heap_gflags = None
             try:
-                _run_windows_best_effort_diagnostic(
-                    "configure local crash dumps",
-                    _configure_windows_local_dumps,
-                    env,
-                    dump_dir,
-                )
-                page_heap_gflags = _run_windows_best_effort_diagnostic(
-                    "configure page heap",
-                    _configure_windows_page_heap,
-                    env,
-                )
-                _run_windows_best_effort_diagnostic(
-                    "log runtime resolution",
-                    _log_windows_runtime_resolution,
-                    env,
-                )
-                _run_windows_best_effort_diagnostic(
-                    "gtest list preflight",
-                    _run_windows_gtest_list_preflight,
-                    env,
-                )
-                _run_windows_best_effort_diagnostic(
-                    "focused test preflight",
-                    _run_windows_focused_test_preflight,
-                    env,
-                )
-                _run_windows_best_effort_diagnostic(
-                    "parallel startup probe",
-                    _run_windows_parallel_startup_probe,
-                    env,
-                )
                 ctest_result = subprocess.run(
                     ctest_cmd,
                     cwd=common_dirs.atlas_build_dir(),
@@ -910,28 +761,10 @@ def build_atlas(
                     env=env,
                 )
             finally:
-                _run_windows_best_effort_diagnostic(
-                    "summarize crash dumps",
-                    _summarize_windows_crash_dumps,
-                    dump_dir,
-                )
-                _run_windows_best_effort_diagnostic(
-                    "analyze crash dumps",
-                    _analyze_windows_crash_dumps,
-                    env,
-                    dump_dir,
-                )
-                _run_windows_best_effort_diagnostic(
-                    "disable page heap",
-                    _disable_windows_page_heap,
-                    page_heap_gflags,
-                    env,
-                )
-                _run_windows_best_effort_diagnostic(
-                    "cleanup local crash dumps",
-                    _cleanup_windows_local_dumps,
-                    env,
-                )
+                _summarize_windows_crash_dumps(dump_dir)
+                _analyze_windows_crash_dumps(env, dump_dir)
+                _disable_windows_page_heap(page_heap_gflags, env)
+                _cleanup_windows_local_dumps(env)
 
             if ctest_result.returncode != 0:
                 raise subprocess.CalledProcessError(
