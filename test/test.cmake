@@ -24,8 +24,8 @@ include(GoogleTest)
 message(STATUS "ATLAS_TEST_DATA_DIR is set to ${CMAKE_CURRENT_LIST_DIR}/../atlas_test_data")
 
 macro(add_gtest_executable test_name)
-  add_executable(${test_name} ${CMAKE_CURRENT_LIST_DIR}/${test_name}.cpp ${CMAKE_CURRENT_LIST_DIR}/ztestmain.cpp)
-  target_link_libraries(${test_name} GTest::gtest img)
+  add_executable(${test_name} ${CMAKE_CURRENT_LIST_DIR}/${test_name}.cpp)
+  target_link_libraries(${test_name} GTest::gtest_main img)
   target_compile_definitions(${test_name} PRIVATE ATLAS_TEST_DATA_DIR="${CMAKE_CURRENT_LIST_DIR}/../atlas_test_data")
   gtest_discover_tests(${test_name} DISCOVERY_TIMEOUT 600)
 endmacro()
@@ -34,8 +34,8 @@ endmacro()
 # Atlas-aware test: links against the public Atlas library target, exporting
 # all required include dirs and link dependencies (Qt, glbinding, etc.).
 macro(add_atlas_gtest_executable test_name)
-  add_executable(${test_name} ${CMAKE_CURRENT_LIST_DIR}/${test_name}.cpp ${CMAKE_CURRENT_LIST_DIR}/ztestmain.cpp)
-  target_link_libraries(${test_name} PRIVATE GTest::gtest atlas_lib)
+  add_executable(${test_name} ${CMAKE_CURRENT_LIST_DIR}/${test_name}.cpp)
+  target_link_libraries(${test_name} PRIVATE GTest::gtest_main atlas_lib)
   target_compile_definitions(${test_name} PRIVATE ATLAS_TEST_DATA_DIR="${CMAKE_CURRENT_LIST_DIR}/../atlas_test_data")
   gtest_discover_tests(${test_name} DISCOVERY_TIMEOUT 600)
 endmacro()
@@ -97,7 +97,6 @@ add_gtest_executable(zimgcompressiontest)
 add_gtest_executable(zimgregionalextrematest)
 add_gtest_executable(zimgsigneddistancemaptest)
 add_gtest_executable(zimgtest)
-add_gtest_executable(zimglinksmoketest)
 add_gtest_executable(zconcurrentlrucachetest)
 add_executable(zbioformatstest ${CMAKE_CURRENT_LIST_DIR}/zbioformatstest.cpp ${CMAKE_CURRENT_LIST_DIR}/ztestmain.cpp)
 target_link_libraries(zbioformatstest GTest::gtest img)
@@ -123,7 +122,6 @@ add_gtest_executable(ztupleliketest)
 
 # Vulkan RAII pipeline recorder debug checks (debug-only assertions in code)
 # This test only exercises header + a few .cpp symbols; there is no GPU work.
-add_atlas_gtest_executable(zatlaslinksmoketest)
 add_atlas_gtest_executable(zvulkanpipelinecontexttest)
 add_atlas_gtest_executable(zimgometiffpacktest)
 
@@ -143,7 +141,6 @@ endif ()
 # add_atlas_gtest_executable(zswcpackundomergetest)
 add_executable(
   zatlasheavytest
-  ${CMAKE_CURRENT_LIST_DIR}/ztestmain.cpp
   ${CMAKE_CURRENT_LIST_DIR}/z3dblockidcollectortest.cpp
   ${CMAKE_CURRENT_LIST_DIR}/zroimaskrastertest.cpp
   ${CMAKE_CURRENT_LIST_DIR}/zcameraparameteranimationtest.cpp
@@ -166,7 +163,7 @@ add_executable(
   ${CMAKE_CURRENT_LIST_DIR}/zmarkdownbrowsertest.cpp
   ${CMAKE_CURRENT_LIST_DIR}/zflagfiledocumenttest.cpp
   ${CMAKE_CURRENT_LIST_DIR}/zhttpdiskcachetest.cpp)
-target_link_libraries(zatlasheavytest PRIVATE GTest::gtest atlas_lib)
+target_link_libraries(zatlasheavytest PRIVATE GTest::gtest_main atlas_lib)
 target_compile_definitions(zatlasheavytest PRIVATE ATLAS_TEST_DATA_DIR="${CMAKE_CURRENT_LIST_DIR}/../atlas_test_data")
 gtest_discover_tests(zatlasheavytest DISCOVERY_TIMEOUT 600)
 

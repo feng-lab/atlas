@@ -355,15 +355,6 @@ jobs:
           python util/build_and_deploy_atlas.py
           if ($LASTEXITCODE -ne 0) { Write-Error "build_and_deploy_atlas failed with exit code $LASTEXITCODE"; exit $LASTEXITCODE }
 
-      - name: Upload Windows test crash dumps
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: windows-test-dumps-${{ github.run_id }}-${{ github.run_attempt }}
-          path: cmake-build-release-ninja/windows-test-dumps
-          if-no-files-found: ignore
-          retention-days: 7
-
       - name: Publish artifacts to R2
         shell: bash -l {0}
         run: |
