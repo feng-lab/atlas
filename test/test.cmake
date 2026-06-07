@@ -21,12 +21,23 @@ FetchContent_MakeAvailable(googletest)
 enable_testing()
 include(GoogleTest)
 
-message(STATUS "ATLAS_TEST_DATA_DIR is set to ${CMAKE_CURRENT_LIST_DIR}/../atlas_test_data")
+set(ATLAS_TEST_DATA_DIR "${CMAKE_CURRENT_LIST_DIR}/../atlas_test_data")
+set(ATLAS_THIRDPARTY_BUILD_DIR "${CMAKE_CURRENT_LIST_DIR}/../src/3rdparty/build")
+
+message(STATUS "ATLAS_TEST_DATA_DIR is set to ${ATLAS_TEST_DATA_DIR}")
+
+function(configure_atlas_test_paths target_name)
+  target_compile_definitions(
+    ${target_name}
+    PRIVATE
+      ATLAS_TEST_DATA_DIR="${ATLAS_TEST_DATA_DIR}"
+      ATLAS_THIRDPARTY_BUILD_DIR="${ATLAS_THIRDPARTY_BUILD_DIR}")
+endfunction()
 
 macro(add_gtest_executable test_name)
-  add_executable(${test_name} ${CMAKE_CURRENT_LIST_DIR}/${test_name}.cpp)
-  target_link_libraries(${test_name} GTest::gtest_main img)
-  target_compile_definitions(${test_name} PRIVATE ATLAS_TEST_DATA_DIR="${CMAKE_CURRENT_LIST_DIR}/../atlas_test_data")
+  add_executable(${test_name} ${CMAKE_CURRENT_LIST_DIR}/${test_name}.cpp ${CMAKE_CURRENT_LIST_DIR}/ztestmain.cpp)
+  target_link_libraries(${test_name} GTest::gtest img)
+  configure_atlas_test_paths(${test_name})
   gtest_discover_tests(${test_name} DISCOVERY_TIMEOUT 600)
 endmacro()
 
@@ -34,9 +45,9 @@ endmacro()
 # Atlas-aware test: links against the public Atlas library target, exporting
 # all required include dirs and link dependencies (Qt, glbinding, etc.).
 macro(add_atlas_gtest_executable test_name)
-  add_executable(${test_name} ${CMAKE_CURRENT_LIST_DIR}/${test_name}.cpp)
-  target_link_libraries(${test_name} PRIVATE GTest::gtest_main atlas_lib)
-  target_compile_definitions(${test_name} PRIVATE ATLAS_TEST_DATA_DIR="${CMAKE_CURRENT_LIST_DIR}/../atlas_test_data")
+  add_executable(${test_name} ${CMAKE_CURRENT_LIST_DIR}/${test_name}.cpp ${CMAKE_CURRENT_LIST_DIR}/ztestmain.cpp)
+  target_link_libraries(${test_name} PRIVATE GTest::gtest atlas_lib)
+  configure_atlas_test_paths(${test_name})
   gtest_discover_tests(${test_name} DISCOVERY_TIMEOUT 600)
 endmacro()
 
@@ -101,8 +112,7 @@ add_gtest_executable(zimgtest)
 add_gtest_executable(zconcurrentlrucachetest)
 add_executable(zbioformatstest ${CMAKE_CURRENT_LIST_DIR}/zbioformatstest.cpp ${CMAKE_CURRENT_LIST_DIR}/ztestmain.cpp)
 target_link_libraries(zbioformatstest GTest::gtest img)
-target_compile_definitions(zbioformatstest PRIVATE ATLAS_TEST_DATA_DIR="${CMAKE_CURRENT_LIST_DIR}/../atlas_test_data")
-target_compile_definitions(zbioformatstest PRIVATE ATLAS_THIRDPARTY_BUILD_DIR="${CMAKE_CURRENT_LIST_DIR}/../src/3rdparty/build")
+configure_atlas_test_paths(zbioformatstest)
 gtest_discover_tests(zbioformatstest DISCOVERY_TIMEOUT 600)
 add_gtest_executable(zimgpngtest)
 add_gtest_executable(zswceditlegacytest)
@@ -142,6 +152,7 @@ endif ()
 # add_atlas_gtest_executable(zswcpackundomergetest)
 add_executable(
   zatlasheavytest
+  ${CMAKE_CURRENT_LIST_DIR}/ztestmain.cpp
   ${CMAKE_CURRENT_LIST_DIR}/z3dblockidcollectortest.cpp
   ${CMAKE_CURRENT_LIST_DIR}/zroimaskrastertest.cpp
   ${CMAKE_CURRENT_LIST_DIR}/zcameraparameteranimationtest.cpp
@@ -164,8 +175,8 @@ add_executable(
   ${CMAKE_CURRENT_LIST_DIR}/zmarkdownbrowsertest.cpp
   ${CMAKE_CURRENT_LIST_DIR}/zflagfiledocumenttest.cpp
   ${CMAKE_CURRENT_LIST_DIR}/zhttpdiskcachetest.cpp)
-target_link_libraries(zatlasheavytest PRIVATE GTest::gtest_main atlas_lib)
-target_compile_definitions(zatlasheavytest PRIVATE ATLAS_TEST_DATA_DIR="${CMAKE_CURRENT_LIST_DIR}/../atlas_test_data")
+target_link_libraries(zatlasheavytest PRIVATE GTest::gtest atlas_lib)
+configure_atlas_test_paths(zatlasheavytest)
 gtest_discover_tests(zatlasheavytest DISCOVERY_TIMEOUT 600)
 
 
@@ -175,7 +186,7 @@ print_target_properties(benchmark::benchmark)
 
 add_executable(zbenchmark ${CMAKE_CURRENT_LIST_DIR}/zbenchmark.cpp)
 target_link_libraries(zbenchmark atlas_lib benchmark::benchmark)
-target_compile_definitions(zbenchmark PRIVATE ATLAS_THIRDPARTY_BUILD_DIR="${CMAKE_CURRENT_LIST_DIR}/../src/3rdparty/build")
+configure_atlas_test_paths(zbenchmark)
 
 add_executable(zimgcompressionbenchmark EXCLUDE_FROM_ALL ${CMAKE_CURRENT_LIST_DIR}/zimgcompressionbenchmark.cpp)
 target_link_libraries(zimgcompressionbenchmark PRIVATE img)

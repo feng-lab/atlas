@@ -102,7 +102,6 @@ extern "C" {
 #include "zimg.h"
 #include "zimgneighborhooditerator.h"
 #include "zimginfo.h"
-#include "zimginit.h"
 #include "zimgregionalextrema.h"
 #include "zjson.h"
 #include "zlog.h"
@@ -206,23 +205,20 @@ private:
   std::unique_ptr<QCoreApplication> _app;
 };
 
-class ZImgInitEnvironment : public ::testing::Environment
+class QtCoreApplicationEnvironment : public ::testing::Environment
 {
 public:
   void SetUp() override
   {
     _qtApp = std::make_unique<ScopedQtCoreApplication>();
-    // Some img ports use folly::getGlobalCPUExecutor(), which aborts until
-    // ZImgInit completes Folly singleton registration for the process.
-    std::ignore = nim::ZImgInit::instance("", "", "", false);
   }
 
 private:
   std::unique_ptr<ScopedQtCoreApplication> _qtApp;
 };
 
-[[maybe_unused]] ::testing::Environment* const kZImgInitEnvironment =
-  ::testing::AddGlobalTestEnvironment(new ZImgInitEnvironment());
+[[maybe_unused]] ::testing::Environment* const kQtCoreApplicationEnvironment =
+  ::testing::AddGlobalTestEnvironment(new QtCoreApplicationEnvironment());
 
 class ScopedStdoutSilencer
 {

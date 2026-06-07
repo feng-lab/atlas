@@ -11,6 +11,7 @@ public:
                                   const QString& jreDIR = "",
                                   const QString& jarsDIR = "",
                                   bool verbose = true);
+  static void shutdown() noexcept;
 
 private:
   ZImgInit(const QString& resourcesDIR, const QString& jreDIR, const QString& jarsDIR, bool verbose);

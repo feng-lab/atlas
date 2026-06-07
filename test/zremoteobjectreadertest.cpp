@@ -7,7 +7,6 @@
 #include "zneuroglancerremotecontext.h"
 #include "zneuroglancerstate.h"
 #include "zexception.h"
-#include "zimginit.h"
 
 #include <folly/coro/BlockingWait.h>
 #include <folly/coro/Collect.h>
@@ -71,20 +70,6 @@ public:
 };
 
 } // namespace
-
-class ZRemoteObjectReaderImgInitEnvironment : public ::testing::Environment
-{
-public:
-  void SetUp() override
-  {
-    // Retry tests in this binary hit Folly coroutine sleep/timekeeper paths. Keep
-    // the init local to this suite by reusing the standard img runtime init.
-    (void)ZImgInit::instance("", "", "", false);
-  }
-};
-
-[[maybe_unused]] ::testing::Environment* const kZRemoteObjectReaderImgInitEnvironment =
-  ::testing::AddGlobalTestEnvironment(new ZRemoteObjectReaderImgInitEnvironment());
 
 void expectIdenticalRequestSuffix(const FakeRemoteObjectStore& store, size_t firstSuffixIndex)
 {

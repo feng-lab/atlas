@@ -3,6 +3,7 @@
 #include "zbioformatsbridgeclient.h"
 #include "zcpuinfo.h"
 #include "zimginterface.h"
+#include "zimgopenimageio.h"
 #include "zh5zjpegxr.h"
 #include "zh5zzstd.h"
 #include "zmkl.h"
@@ -19,6 +20,8 @@
 #include <folly/synchronization/HazptrThreadPoolExecutor.h>
 
 #include <sstream>
+#include <atomic>
+#include <mutex>
 
 namespace nim {
 
@@ -31,6 +34,18 @@ constexpr const char* kJavaExecutable = "bin/java.exe";
 #else
 constexpr const char* kJavaExecutable = "bin/java";
 #endif
+
+std::atomic_bool& imgRuntimeShutdownComplete()
+{
+  static auto* complete = new std::atomic_bool(false);
+  return *complete;
+}
+
+std::mutex& imgRuntimeShutdownMutex()
+{
+  static auto* mutex = new std::mutex;
+  return *mutex;
+}
 
 } // namespace
 
@@ -130,6 +145,7 @@ ZImgInit::ZImgInit(const QString& resourcesDIR, const QString& jreDIR, const QSt
 
   jpegxr_register_h5filter();
   zstd_register_h5filter();
+  ZImgOpenImageIO::initializeRuntime();
 
   // Keep this as the small Folly runtime subset Atlas needs. Full folly::Init
   // also initializes glog and installs Folly's fatal signal handler, while
@@ -145,11 +161,23 @@ ZImgInit::ZImgInit(const QString& resourcesDIR, const QString& jreDIR, const QSt
   folly::enable_hazptr_thread_pool_executor();
 }
 
+void ZImgInit::shutdown() noexcept
+{
+  std::scoped_lock lock(imgRuntimeShutdownMutex());
+  if (imgRuntimeShutdownComplete().exchange(true, std::memory_order_acq_rel)) {
+    return;
+  }
+
+  ZImgOpenImageIO::shutdownRuntime();
+}
+
 ZImgInit::~ZImgInit()
 {
 #ifdef ZIMG_USE_FFTW
   fftw_cleanup_threads();
 #endif
+
+  shutdown();
 
   // Do not manually tear down Folly singletons here.
   //

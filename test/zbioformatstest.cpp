@@ -2,9 +2,7 @@
 
 #include "zbioformatsbridgeclient.h"
 #include "zimgbioformats.h"
-#include "zimginit.h"
 #include "zimgio.h"
-#include "zcpuinfo.h"
 #include "zexception.h"
 
 #include <QDir>
@@ -71,70 +69,27 @@ void configureBioFormatsTestBridge()
   }
 }
 
-QString platformJavaExecutableName()
-{
-#ifdef _WIN32
-  return QStringLiteral("java.exe");
-#else
-  return QStringLiteral("java");
-#endif
-}
-
-QString javaExecutableInJreDir(const QString& jreDir)
-{
-  return QDir(jreDir).filePath(QStringLiteral("bin/") + platformJavaExecutableName());
-}
-
-std::optional<QString> normalizeBundledJreDir(const QString& path)
-{
-  QDir dir(path);
-  if (!dir.exists()) {
-    return std::nullopt;
-  }
-
-  if (dir.exists(QStringLiteral("bin/") + platformJavaExecutableName())) {
-    return dir.absolutePath();
-  }
-
-  const QString macHome = dir.filePath(QStringLiteral("Contents/Home"));
-  QDir macHomeDir(macHome);
-  if (macHomeDir.exists(QStringLiteral("bin/") + platformJavaExecutableName())) {
-    return macHomeDir.absolutePath();
-  }
-
-  return std::nullopt;
-}
-
-std::optional<QString> bundledJreDir()
-{
-  const QDir thirdPartyBuild(QStringLiteral(ATLAS_THIRDPARTY_BUILD_DIR));
-  const QString jreName = ZCpuInfo::instance().isX86_64 ? QStringLiteral("jre") : QStringLiteral("jre-arm");
-  return normalizeBundledJreDir(thirdPartyBuild.filePath(jreName));
-}
-
 std::optional<std::string> bioFormatsRuntimeSkipReason()
 {
   configureBioFormatsTestBridge();
 
-  const QDir thirdPartyBuild(QStringLiteral(ATLAS_THIRDPARTY_BUILD_DIR));
-  const QDir jarsDir(thirdPartyBuild.filePath(QStringLiteral("jars")));
-  if (!jarsDir.exists("bioformats_package.jar")) {
-    return fmt::format("missing {}", jarsDir.filePath("bioformats_package.jar"));
+  const QDir jarsDir = atlasTestJarsDir();
+  if (!QFileInfo(atlasTestBioFormatsJarPath()).isFile()) {
+    return fmt::format("missing {}", atlasTestBioFormatsJarPath());
   }
-  if (!jarsDir.exists("atlas-bioformats-bridge.jar")) {
-    return fmt::format("missing {}", jarsDir.filePath("atlas-bioformats-bridge.jar"));
+  if (!QFileInfo(atlasTestBioFormatsBridgeJarPath()).isFile()) {
+    return fmt::format("missing {}", atlasTestBioFormatsBridgeJarPath());
   }
-  const std::optional<QString> jreDir = bundledJreDir();
-  if (!jreDir) {
-    return fmt::format("missing bundled JRE under {}", QStringLiteral(ATLAS_THIRDPARTY_BUILD_DIR));
+  const QDir jreDir = atlasTestJreDir();
+  if (!QFileInfo(atlasTestJavaExecutablePath()).isExecutable()) {
+    return fmt::format("missing {}", atlasTestJavaExecutablePath());
   }
 
   ZLogInit::instance("zbioformatstest");
-  LOG(INFO) << "Bio-Formats test runtime: jreDIR=" << *jreDir << ", java=" << javaExecutableInJreDir(*jreDir)
-            << ", jarsDIR=" << jarsDir.absolutePath();
+  LOG(INFO) << "Bio-Formats test runtime: jreDIR=" << jreDir.absolutePath()
+            << ", java=" << atlasTestJavaExecutablePath() << ", jarsDIR=" << jarsDir.absolutePath();
 
   try {
-    ZImgInit::instance("", *jreDir, jarsDir.absolutePath(), false);
     if (!ZImgBioFormats().supportRead()) {
       return "Bio-Formats runtime support is not available";
     }

@@ -43,6 +43,10 @@ public:
   static ZImgInfo readMemInfo(std::span<const uint8_t> bytes);
 
   static void readMemImg(std::span<const uint8_t> bytes, std::span<uint8_t> des);
+
+  static void initializeRuntime();
+
+  static void shutdownRuntime() noexcept;
 };
 
 } // namespace nim

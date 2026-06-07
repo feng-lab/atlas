@@ -7,6 +7,7 @@ repository’s C++ sources in ``src/python/imgpy.cpp``.
 import os
 import shutil
 import sys
+import atexit
 from pathlib import Path
 
 # Enforce supported Python versions early and fail with an import error.
@@ -44,6 +45,7 @@ _native._initialize_runtime(
     str(current_dir / "jars"),
     _java_executable_path(),
 )
+atexit.register(_native._shutdown_runtime)
 
 from ._imgpy import *  # type: ignore[import-not-found]  # noqa: F401,F403,E402
 from . import bioformats  # noqa: F401,E402

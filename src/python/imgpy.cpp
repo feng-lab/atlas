@@ -438,6 +438,7 @@ NB_MODULE(_imgpy, m)
     )pbdoc";
 
   m.def("_initialize_runtime", &initializeRuntime, "resources_dir"_a, "jars_dir"_a, "java_executable_path"_a);
+  m.def("_shutdown_runtime", &ZImgInit::shutdown);
   m.def("_set_bioformats_jar_path", &ZBioFormatsBridgeClient::configureBioFormatsJarPath, "bioformats_jar_path"_a);
   m.def("_set_bioformats_java_executable_path",
         &ZBioFormatsBridgeClient::configureJavaExecutablePath,

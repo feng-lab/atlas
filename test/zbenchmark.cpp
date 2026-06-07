@@ -1,7 +1,6 @@
 #include <benchmark/benchmark.h>
 
 #include "zbioformatsbridgeclient.h"
-#include "zcpuinfo.h"
 #include "zconcurrentlrucache.h"
 #include "z3dblockidcollector.h"
 #include "zimgbioformats.h"
@@ -11,12 +10,12 @@
 #include "zexception.h"
 #include "zrandom.h"
 #include "zsaturateoperation.h"
+#include "ztest.h"
 #include <boost/multiprecision/cpp_int.hpp>
 #if __has_include(<absl/numeric/int128.h> )
 #define ATLAS_HAS_ABSL
 #include <absl/numeric/int128.h>
 #endif
-#include <QDir>
 #include <QElapsedTimer>
 #include <QFileInfo>
 #include <QMutexLocker>
@@ -667,47 +666,6 @@ constexpr uint64_t kBioFormatsBenchmarkTileSize = 1024;
 constexpr uint32_t kBioFormatsBenchmarkAxisSamples = 4;
 constexpr int kBioFormatsBenchmarkMaxConcurrency = 16;
 
-QString platformJavaExecutableName()
-{
-#ifdef _WIN32
-  return QStringLiteral("java.exe");
-#else
-  return QStringLiteral("java");
-#endif
-}
-
-QString javaExecutableInJreDir(const QString& jreDir)
-{
-  return QDir(jreDir).filePath(QStringLiteral("bin/") + platformJavaExecutableName());
-}
-
-std::optional<QString> normalizeBundledJreDir(const QString& path)
-{
-  QDir dir(path);
-  if (!dir.exists()) {
-    return std::nullopt;
-  }
-
-  if (dir.exists(QStringLiteral("bin/") + platformJavaExecutableName())) {
-    return dir.absolutePath();
-  }
-
-  const QString macHome = dir.filePath(QStringLiteral("Contents/Home"));
-  QDir macHomeDir(macHome);
-  if (macHomeDir.exists(QStringLiteral("bin/") + platformJavaExecutableName())) {
-    return macHomeDir.absolutePath();
-  }
-
-  return std::nullopt;
-}
-
-std::optional<QString> bundledJreDir()
-{
-  const QDir thirdPartyBuild(QStringLiteral(ATLAS_THIRDPARTY_BUILD_DIR));
-  const QString jreName = ZCpuInfo::instance().isX86_64 ? QStringLiteral("jre") : QStringLiteral("jre-arm");
-  return normalizeBundledJreDir(thirdPartyBuild.filePath(jreName));
-}
-
 QString bioFormatsBenchmarkFile()
 {
   const char* env = std::getenv("ATLAS_BIOFORMATS_BENCHMARK_FILE");
@@ -726,29 +684,28 @@ const std::optional<std::string>& bioFormatsBenchmarkRuntimeError()
       absl::SetFlag(&FLAGS_atlas_bioformats_bridge_io_timeout_ms, kBioFormatsBenchmarkIoTimeoutMs);
     }
 
-    const QDir thirdPartyBuild(QStringLiteral(ATLAS_THIRDPARTY_BUILD_DIR));
-    const QDir jarsDir(thirdPartyBuild.filePath(QStringLiteral("jars")));
-    if (!jarsDir.exists("bioformats_package.jar")) {
-      error = fmt::format("missing {}", jarsDir.filePath("bioformats_package.jar"));
+    const QDir jarsDir = atlasTestJarsDir();
+    if (!QFileInfo(atlasTestBioFormatsJarPath()).isFile()) {
+      error = fmt::format("missing {}", atlasTestBioFormatsJarPath());
       return;
     }
-    if (!jarsDir.exists("atlas-bioformats-bridge.jar")) {
-      error = fmt::format("missing {}", jarsDir.filePath("atlas-bioformats-bridge.jar"));
+    if (!QFileInfo(atlasTestBioFormatsBridgeJarPath()).isFile()) {
+      error = fmt::format("missing {}", atlasTestBioFormatsBridgeJarPath());
       return;
     }
-    const std::optional<QString> jreDir = bundledJreDir();
-    if (!jreDir) {
-      error = fmt::format("missing bundled JRE under {}", QStringLiteral(ATLAS_THIRDPARTY_BUILD_DIR));
+    const QDir jreDir = atlasTestJreDir();
+    if (!QFileInfo(atlasTestJavaExecutablePath()).isExecutable()) {
+      error = fmt::format("missing {}", atlasTestJavaExecutablePath());
       return;
     }
 
     ZLogInit::instance("zbenchmark");
     LOG(INFO) << "Bio-Formats benchmark runtime: file=" << bioFormatsBenchmarkFile()
-              << ", java=" << javaExecutableInJreDir(*jreDir) << ", jarsDIR=" << jarsDir.absolutePath()
+              << ", java=" << atlasTestJavaExecutablePath() << ", jarsDIR=" << jarsDir.absolutePath()
               << ", bridgeDiagnostics=" << absl::GetFlag(FLAGS_atlas_bioformats_bridge_diagnostics);
 
     try {
-      ZImgInit::instance("", *jreDir, jarsDir.absolutePath(), false);
+      ZImgInit::instance("", jreDir.absolutePath(), jarsDir.absolutePath(), false);
       if (!ZImgBioFormats().supportRead()) {
         error = "Bio-Formats runtime support is not available";
       }

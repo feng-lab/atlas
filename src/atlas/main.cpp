@@ -134,6 +134,9 @@ int main(int argc, char* argv[])
                        ZCpuInfo::instance().isX86_64 ? ZSystemInfo::jreDirPath() : ZSystemInfo::jreArmDirPath(),
                        ZSystemInfo::jarsDirPath(),
                        true);
+    auto shutdownImgRuntime = folly::makeGuard([]() {
+      ZImgInit::shutdown();
+    });
 
     // neuTube CLI runner (modernized, src/img).
     return ZRunNeuTuCommand2().run(argc, argv, ZSystemInfo::jsonDirPath());
@@ -214,6 +217,9 @@ int main(int argc, char* argv[])
                        ZCpuInfo::instance().isX86_64 ? ZSystemInfo::jreDirPath() : ZSystemInfo::jreArmDirPath(),
                        ZSystemInfo::jarsDirPath(),
                        true);
+    auto shutdownImgRuntime = folly::makeGuard([]() {
+      ZImgInit::shutdown();
+    });
 
     if (!isGUIMode) {
       // start non-GUI version...

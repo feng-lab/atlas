@@ -1,4 +1,5 @@
 #include "zimgopenimageio.h"
+#include "zlog.h"
 
 #include <OpenImageIO/filesystem.h>
 #include <OpenImageIO/imageio.h>
@@ -8,6 +9,7 @@
 #include <algorithm>
 #include <array>
 #include <cstring>
+#include <exception>
 #include <memory>
 #include <optional>
 #include <string_view>
@@ -1002,6 +1004,26 @@ namespace nim {
 bool ZImgOpenImageIO::supportRead() const
 {
   return true;
+}
+
+void ZImgOpenImageIO::initializeRuntime()
+{
+  if (!OIIO::attribute("use_tbb", 1)) {
+    LOG(WARNING) << "Failed to configure OpenImageIO to use TBB";
+  }
+}
+
+void ZImgOpenImageIO::shutdownRuntime() noexcept
+{
+  try {
+    OIIO::shutdown();
+  }
+  catch (const std::exception& e) {
+    LOG(WARNING) << "OpenImageIO shutdown failed: " << e.what();
+  }
+  catch (...) {
+    LOG(WARNING) << "OpenImageIO shutdown failed with unknown exception";
+  }
 }
 
 bool ZImgOpenImageIO::supportWrite() const
