@@ -2,6 +2,11 @@
 
 #include "zimgformat.h"
 
+#include <cstddef>
+#include <cstdint>
+#include <span>
+#include <vector>
+
 namespace nim {
 
 class ZImgPng : public ZImgFormat
@@ -43,6 +48,11 @@ public:
   [[nodiscard]] bool supportRead() const override;
 
   [[nodiscard]] bool supportWrite() const override;
+
+  [[nodiscard]] static std::vector<uint8_t> readMemRaw(std::span<const uint8_t> pngBytes,
+                                                       size_t expectedVoxelCount,
+                                                       size_t expectedChannels,
+                                                       size_t bytesPerVoxel);
 };
 
 } // namespace nim

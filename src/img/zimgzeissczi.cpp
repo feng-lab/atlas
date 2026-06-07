@@ -15,6 +15,7 @@
 #include <boost/iostreams/device/array.hpp>
 #include <boost/iostreams/stream.hpp>
 #include <array>
+#include <span>
 #include <tuple>
 #include <utility>
 
@@ -269,16 +270,20 @@ ZImg readCZITile(std::ifstream& inputFileStream, const CZITile& tile)
                                       res,
                                       pixelTypeIsBGR(sb.directoryEntry.pixelType));
       } break;
-      case 1: // Jpeg
-        ZImgJpeg::readMemInfo(fileBuf.data(), sb.dataSize, info);
+      case 1: { // Jpeg
+        const std::span<const uint8_t> jpegBytes(fileBuf.data(), sb.dataSize);
+        info = ZImgJpeg::readMemInfo(jpegBytes);
         res = ZImg(info);
-        ZImgJpeg::readMemImg(fileBuf.data(), sb.dataSize, res.timeData<uint8_t>(0), res.byteNumber());
+        ZImgJpeg::readMemImg(jpegBytes, std::span<uint8_t>(res.timeData<uint8_t>(0), res.byteNumber()));
         break;
-      case 4: // JpegXR
-        ZImgJpegXR::readMemInfo(fileBuf.data(), sb.dataSize, info);
+      }
+      case 4: { // JpegXR
+        const std::span<const uint8_t> jpegXRBytes(fileBuf.data(), sb.dataSize);
+        info = ZImgJpegXR::readMemInfo(jpegXRBytes);
         res = ZImg(info);
-        ZImgJpegXR::readMemImg(fileBuf.data(), sb.dataSize, res.timeData<uint8_t>(0), res.byteNumber());
+        ZImgJpegXR::readMemImg(jpegXRBytes, std::span<uint8_t>(res.timeData<uint8_t>(0), res.byteNumber()));
         break;
+      }
       default:
         try {
           if (info.sByteNumber() == sb.dataSize) {
@@ -288,9 +293,10 @@ ZImg readCZITile(std::ifstream& inputFileStream, const CZITile& tile)
                                           res,
                                           pixelTypeIsBGR(sb.directoryEntry.pixelType));
           } else {
-            ZImgOpenImageIO::readMemInfo(fileBuf.data(), sb.dataSize, info);
+            const std::span<const uint8_t> oiioBytes(fileBuf.data(), sb.dataSize);
+            info = ZImgOpenImageIO::readMemInfo(oiioBytes);
             res = ZImg(info);
-            ZImgOpenImageIO::readMemImg(fileBuf.data(), sb.dataSize, res.timeData<uint8_t>(0), res.byteNumber());
+            ZImgOpenImageIO::readMemImg(oiioBytes, std::span<uint8_t>(res.timeData<uint8_t>(0), res.byteNumber()));
           }
         }
         catch (const ZException& e) {

@@ -2,6 +2,9 @@
 
 #include "zimgformat.h"
 
+#include <cstdint>
+#include <span>
+
 namespace nim {
 
 class ZImgOpenImageIO : public ZImgFormat
@@ -37,9 +40,9 @@ public:
                size_t scene,
                const ZImgReadOptions& readOptions = ZImgReadOptions::complete()) override;
 
-  static void readMemInfo(const uint8_t* mem, size_t size, ZImgInfo& info);
+  static ZImgInfo readMemInfo(std::span<const uint8_t> bytes);
 
-  static void readMemImg(const uint8_t* mem, size_t size, uint8_t* des, size_t desSize);
+  static void readMemImg(std::span<const uint8_t> bytes, std::span<uint8_t> des);
 };
 
 } // namespace nim

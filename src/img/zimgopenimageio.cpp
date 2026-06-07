@@ -1080,33 +1080,36 @@ void ZImgOpenImageIO::readImg(const QString& filename,
   img = readImageFromInput(*input, filename, region, scene, readOptions.includeMetadata);
 }
 
-void ZImgOpenImageIO::readMemInfo(const uint8_t* mem, size_t size, ZImgInfo& info)
+ZImgInfo ZImgOpenImageIO::readMemInfo(std::span<const uint8_t> bytes)
 {
-  CHECK(mem);
-  auto memoryInput = openOiioMemoryInput(mem, size);
+  if (bytes.empty()) {
+    throw ZException("Invalid OpenImageIO memory buffer: empty payload");
+  }
+  auto memoryInput = openOiioMemoryInput(bytes.data(), bytes.size());
   const OiioInputLayout layout = readInputLayout(*memoryInput.input);
   CHECK(!layout.sceneInfos.empty());
-  info = layout.sceneInfos.front();
+  return layout.sceneInfos.front();
 }
 
-void ZImgOpenImageIO::readMemImg(const uint8_t* mem, size_t size, uint8_t* des, size_t desSize)
+void ZImgOpenImageIO::readMemImg(std::span<const uint8_t> bytes, std::span<uint8_t> des)
 {
-  CHECK(mem);
-  CHECK(des);
-  auto layoutInput = openOiioMemoryInput(mem, size);
+  if (bytes.empty()) {
+    throw ZException("Invalid OpenImageIO memory buffer: empty payload");
+  }
+  auto layoutInput = openOiioMemoryInput(bytes.data(), bytes.size());
   const OiioInputLayout layout = readInputLayout(*layoutInput.input);
   CHECK(!layout.sceneInfos.empty());
-  if (desSize < layout.sceneInfos.front().byteNumber()) {
+  if (des.size() < layout.sceneInfos.front().byteNumber()) {
     throw ZException(fmt::format("Output buffer is too small for OpenImageIO memory image. Need {}, got {}",
                                  layout.sceneInfos.front().byteNumber(),
-                                 desSize));
+                                 des.size()));
   }
-  auto decodeInput = openOiioMemoryInput(mem, size);
+  auto decodeInput = openOiioMemoryInput(bytes.data(), bytes.size());
   ZImg img = readImageFromLayout(*decodeInput.input, QStringLiteral("<memory>"), layout, ZImgRegion(), 0, false);
   CHECK(img.byteNumber() == layout.sceneInfos.front().byteNumber());
   size_t offset = 0;
   for (size_t t = 0; t < img.numTimes(); ++t) {
-    std::copy_n(img.timeData<uint8_t>(t), img.timeByteNumber(), des + offset);
+    std::copy_n(img.timeData<uint8_t>(t), img.timeByteNumber(), des.data() + offset);
     offset += img.timeByteNumber();
   }
   CHECK(offset == img.byteNumber());

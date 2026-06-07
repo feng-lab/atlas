@@ -4,7 +4,11 @@
 #include "zioutils.h"
 #include "zbenchtimer.h"
 #include <png.h>
+#include <algorithm>
 #include <csetjmp>
+#include <cstring>
+#include <limits>
+#include <memory>
 
 namespace {
 
@@ -66,6 +70,55 @@ void pngErrorFunction(png_structp pngPtr, const char* message)
 void pngWarningFunction(png_structp, const char* message)
 {
   LOG(WARNING) << "Libpng warning: " << message;
+}
+
+void pngSilentWarningFunction(png_structp, const char* message)
+{
+  // The memory decode path is used for small remote chunks; surface hard failures only.
+  (void)message;
+}
+
+size_t checkedPngMul(size_t a, size_t b, const char* what)
+{
+  if (a == 0 || b == 0) {
+    return 0;
+  }
+  if (a > std::numeric_limits<size_t>::max() / b) {
+    throw ZException(fmt::format("Overflow computing {}", what));
+  }
+  return a * b;
+}
+
+struct PngMemoryReadState
+{
+  const uint8_t* data = nullptr;
+  size_t size = 0;
+  size_t offset = 0;
+};
+
+struct PngMemoryDecodeState
+{
+  PngReadPack png;
+  PngMemoryReadState readState;
+  std::string errorMessage;
+  std::vector<uint8_t> interleaved;
+  std::vector<png_bytep> rowPointers;
+};
+
+void pngMemoryReadCallback(png_structp pngPtr, png_bytep outBytes, png_size_t byteCountToRead)
+{
+  auto* state = static_cast<PngMemoryReadState*>(png_get_io_ptr(pngPtr));
+  if (!state || !state->data) {
+    png_error(pngPtr, "Invalid PNG read state");
+    return;
+  }
+  const auto bytesToRead = static_cast<size_t>(byteCountToRead);
+  if (bytesToRead > state->size || state->offset > state->size - bytesToRead) {
+    png_error(pngPtr, "PNG read out of range");
+    return;
+  }
+  std::memcpy(outBytes, state->data + state->offset, bytesToRead);
+  state->offset += bytesToRead;
 }
 
 int skipIDATiDOTChunk(png_structp, png_unknown_chunkp chunk)
@@ -263,6 +316,161 @@ QStringList ZImgPng::extensions() const
   QStringList res;
   res << "png";
   return res;
+}
+
+std::vector<uint8_t> ZImgPng::readMemRaw(std::span<const uint8_t> pngBytes,
+                                         size_t expectedVoxelCount,
+                                         size_t expectedChannels,
+                                         size_t bytesPerVoxel)
+{
+  if (expectedVoxelCount == 0) {
+    throw ZException("Invalid PNG decode request: expectedVoxelCount must be > 0");
+  }
+  if (expectedChannels == 0 || expectedChannels > 4) {
+    throw ZException(
+      fmt::format("Invalid PNG decode request: expectedChannels must be 1..4 (got {})", expectedChannels));
+  }
+  if (bytesPerVoxel != 1 && bytesPerVoxel != 2) {
+    throw ZException(fmt::format("Invalid PNG decode request: bytesPerVoxel must be 1 or 2 (got {})", bytesPerVoxel));
+  }
+  if (pngBytes.empty()) {
+    throw ZException("Invalid PNG chunk: empty payload");
+  }
+
+  auto decodeState = std::make_unique<PngMemoryDecodeState>();
+  decodeState->png.pngPtr = png_create_read_struct(PNG_LIBPNG_VER_STRING,
+                                                   &decodeState->errorMessage,
+                                                   pngErrorFunction,
+                                                   pngSilentWarningFunction);
+  if (decodeState->png.pngPtr) {
+    decodeState->png.infoPtr = png_create_info_struct(decodeState->png.pngPtr);
+    decodeState->png.endPtr = png_create_info_struct(decodeState->png.pngPtr);
+  }
+  if (!decodeState->png.pngPtr || !decodeState->png.infoPtr || !decodeState->png.endPtr) {
+    throw ZException("Libpng: failed to create read struct");
+  }
+  if (setjmp(png_jmpbuf(decodeState->png.pngPtr))) {
+    const std::string message = decodeState->errorMessage.empty() ? "Libpng decode failed" : decodeState->errorMessage;
+    throw ZException(message);
+  }
+
+  decodeState->readState.data = pngBytes.data();
+  decodeState->readState.size = pngBytes.size();
+  decodeState->readState.offset = 0;
+
+  png_set_read_fn(decodeState->png.pngPtr, &decodeState->readState, pngMemoryReadCallback);
+  png_read_info(decodeState->png.pngPtr, decodeState->png.infoPtr);
+
+  const png_uint_32 widthU32 = png_get_image_width(decodeState->png.pngPtr, decodeState->png.infoPtr);
+  const png_uint_32 heightU32 = png_get_image_height(decodeState->png.pngPtr, decodeState->png.infoPtr);
+  if (widthU32 == 0 || heightU32 == 0) {
+    throw ZException(fmt::format("Invalid PNG chunk dimensions: width={}, height={}", widthU32, heightU32));
+  }
+  const size_t width = static_cast<size_t>(widthU32);
+  const size_t height = static_cast<size_t>(heightU32);
+  const size_t area = checkedPngMul(width, height, "PNG pixel count");
+  if (area != expectedVoxelCount) {
+    throw ZException(fmt::format("PNG chunk pixel count mismatch: got {} pixels ({}x{}), expected {}",
+                                 area,
+                                 width,
+                                 height,
+                                 expectedVoxelCount));
+  }
+
+  const png_byte bitDepth = png_get_bit_depth(decodeState->png.pngPtr, decodeState->png.infoPtr);
+  const png_byte colorType = png_get_color_type(decodeState->png.pngPtr, decodeState->png.infoPtr);
+
+  if (!(bitDepth == 1 || bitDepth == 2 || bitDepth == 4 || bitDepth == 8 || bitDepth == 16)) {
+    throw ZException(fmt::format("Invalid PNG bit depth: {}", static_cast<int>(bitDepth)));
+  }
+
+  size_t dataWidth = (bitDepth <= 8) ? 1 : 2;
+  size_t numChannels = 1;
+  switch (colorType) {
+    case PNG_COLOR_TYPE_GRAY:
+      numChannels = 1;
+      break;
+    case PNG_COLOR_TYPE_RGB:
+      if (bitDepth != 8 && bitDepth != 16) {
+        throw ZException(fmt::format("Invalid PNG bit depth {} for RGB", static_cast<int>(bitDepth)));
+      }
+      numChannels = 3;
+      break;
+    case PNG_COLOR_TYPE_PALETTE:
+      if (bitDepth > 8) {
+        throw ZException(fmt::format("Invalid PNG bit depth {} for palette", static_cast<int>(bitDepth)));
+      }
+      dataWidth = 1;
+      numChannels = 3;
+      break;
+    case PNG_COLOR_TYPE_GRAY_ALPHA:
+      if (bitDepth != 8 && bitDepth != 16) {
+        throw ZException(fmt::format("Invalid PNG bit depth {} for grayscale+alpha", static_cast<int>(bitDepth)));
+      }
+      numChannels = 2;
+      break;
+    case PNG_COLOR_TYPE_RGB_ALPHA:
+      if (bitDepth != 8 && bitDepth != 16) {
+        throw ZException(fmt::format("Invalid PNG bit depth {} for RGBA", static_cast<int>(bitDepth)));
+      }
+      numChannels = 4;
+      break;
+    default:
+      throw ZException(fmt::format("Unsupported PNG color type {}", static_cast<int>(colorType)));
+  }
+
+  if (bytesPerVoxel != dataWidth) {
+    throw ZException(
+      fmt::format("PNG chunk bytesPerVoxel mismatch: decoded {}, expected {}", dataWidth, bytesPerVoxel));
+  }
+  if (numChannels != expectedChannels) {
+    throw ZException(fmt::format("PNG chunk channel mismatch: decoded {}, expected {}", numChannels, expectedChannels));
+  }
+
+  if (colorType == PNG_COLOR_TYPE_PALETTE) {
+    png_set_palette_to_rgb(decodeState->png.pngPtr);
+  }
+  if (colorType == PNG_COLOR_TYPE_GRAY && bitDepth < 8) {
+    png_set_packing(decodeState->png.pngPtr);
+  }
+  if (bitDepth == 16) {
+    // PNG stores 16-bit samples in big-endian order. Neuroglancer expects little-endian raw data.
+    png_set_swap(decodeState->png.pngPtr);
+  }
+  png_set_interlace_handling(decodeState->png.pngPtr);
+  png_read_update_info(decodeState->png.pngPtr, decodeState->png.infoPtr);
+
+  const size_t rowBytes = static_cast<size_t>(png_get_rowbytes(decodeState->png.pngPtr, decodeState->png.infoPtr));
+  const size_t expectedRowBytes =
+    checkedPngMul(checkedPngMul(width, expectedChannels, "PNG row pixels"), bytesPerVoxel, "PNG row bytes");
+  if (rowBytes != expectedRowBytes) {
+    throw ZException(
+      fmt::format("PNG chunk row byte mismatch: decoded rowBytes={}, expected {}", rowBytes, expectedRowBytes));
+  }
+
+  decodeState->interleaved.resize(checkedPngMul(rowBytes, height, "PNG decoded bytes"));
+  decodeState->rowPointers.resize(height);
+  for (size_t y = 0; y < height; ++y) {
+    decodeState->rowPointers[y] = decodeState->interleaved.data() + y * rowBytes;
+  }
+
+  png_read_image(decodeState->png.pngPtr, decodeState->rowPointers.data());
+  png_read_end(decodeState->png.pngPtr, decodeState->png.endPtr);
+
+  if (expectedChannels == 1) {
+    return std::move(decodeState->interleaved);
+  }
+
+  std::vector<uint8_t> planar(
+    checkedPngMul(checkedPngMul(area, expectedChannels, "PNG planar elements"), bytesPerVoxel, "PNG planar bytes"));
+  for (size_t i = 0; i < area; ++i) {
+    for (size_t c = 0; c < expectedChannels; ++c) {
+      const size_t srcOffset = (i * expectedChannels + c) * bytesPerVoxel;
+      const size_t dstOffset = (c * area + i) * bytesPerVoxel;
+      std::memcpy(planar.data() + dstOffset, decodeState->interleaved.data() + srcOffset, bytesPerVoxel);
+    }
+  }
+  return planar;
 }
 
 void ZImgPng::readInfo(const QString& filename,

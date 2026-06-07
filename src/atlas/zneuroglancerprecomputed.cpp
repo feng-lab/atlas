@@ -12,6 +12,7 @@
 #include "zneuroglancerurl.h"
 #include "zneuroglanceruint64sharding.h"
 #include "zfolly.h"
+#include "zimgpng.h"
 #include "zlog.h"
 #include "zconcurrentlrucache.h"
 
@@ -1409,11 +1410,10 @@ ZNeuroglancerPrecomputedVolume::readChunkAsync(Chunk chunk,
       }
       case Scale::ChunkEncoding::Png: {
         CHECK(bytesPerVoxel == 1 || bytesPerVoxel == 2);
-        body =
-          ZNeuroglancerPrecomputedChunkDecoder::decodePngToRaw(std::span<const uint8_t>(payload.data(), payload.size()),
-                                                               /*expectedVoxelCount=*/sx * sy * sz,
-                                                               /*expectedChannels=*/m_numChannels,
-                                                               bytesPerVoxel);
+        body = ZImgPng::readMemRaw(std::span<const uint8_t>(payload.data(), payload.size()),
+                                   /*expectedVoxelCount=*/sx * sy * sz,
+                                   /*expectedChannels=*/m_numChannels,
+                                   bytesPerVoxel);
         break;
       }
       case Scale::ChunkEncoding::Compresso: {

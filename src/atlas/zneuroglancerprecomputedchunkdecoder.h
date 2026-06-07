@@ -11,11 +11,6 @@ namespace nim {
 class ZNeuroglancerPrecomputedChunkDecoder
 {
 public:
-  static std::vector<uint8_t> decodePngToRaw(std::span<const uint8_t> pngBytes,
-                                             size_t expectedVoxelCount,
-                                             size_t expectedChannels,
-                                             size_t bytesPerVoxel);
-
   static std::vector<uint8_t> decodeJpegToRaw(std::span<const uint8_t> jpegBytes,
                                               size_t expectedVoxelCount,
                                               size_t expectedChannels);

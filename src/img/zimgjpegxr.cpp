@@ -3,6 +3,7 @@
 #include <folly/ScopeGuard.h>
 #include <QFile>
 #include <cmath>
+#include <span>
 #include <JXRGlue.h>
 
 #ifdef Call
@@ -338,8 +339,12 @@ void ZImgJpegXR::readImg(const QString& filename,
   }
 }
 
-void ZImgJpegXR::readMemInfo(void* mem, size_t size, ZImgInfo& info)
+ZImgInfo ZImgJpegXR::readMemInfo(std::span<const uint8_t> jpegXRBytes)
 {
+  if (jpegXRBytes.empty()) {
+    throw ZException("Invalid JPEG XR memory buffer: empty payload");
+  }
+
   PKFactory* pFactory = nullptr;
   auto pFactoryGuard = folly::makeGuard([&pFactory]() {
     if (pFactory) {
@@ -359,7 +364,8 @@ void ZImgJpegXR::readMemInfo(void* mem, size_t size, ZImgInfo& info)
   struct WMPStream* pStream = nullptr;
 
   Call(PKCreateFactory(&pFactory, PK_SDK_VERSION));
-  Call(pFactory->CreateStreamFromMemory(&pStream, mem, size));
+  // The JPEG XR SDK accepts a mutable pointer for read-only memory streams.
+  Call(pFactory->CreateStreamFromMemory(&pStream, const_cast<uint8_t*>(jpegXRBytes.data()), jpegXRBytes.size()));
 
   // Create decoder
   Call(PKCodecFactory_CreateCodec(pIID, (void**)&pDecoder));
@@ -372,11 +378,17 @@ void ZImgJpegXR::readMemInfo(void* mem, size_t size, ZImgInfo& info)
   Call(PixelFormatLookup(&PI, LOOKUP_FORWARD));
   // Call(PixelFormatLookup(&PI, LOOKUP_BACKWARD_TIF));
 
+  ZImgInfo info;
   readInfoFromDecoder(pDecoder, PI, info);
+  return info;
 }
 
-void ZImgJpegXR::readMemImg(void* mem, size_t size, void* des, size_t desSize)
+void ZImgJpegXR::readMemImg(std::span<const uint8_t> jpegXRBytes, std::span<uint8_t> des)
 {
+  if (jpegXRBytes.empty()) {
+    throw ZException("Invalid JPEG XR memory buffer: empty payload");
+  }
+
   PKFactory* pFactory = nullptr;
   auto pFactoryGuard = folly::makeGuard([&pFactory]() {
     if (pFactory) {
@@ -398,7 +410,8 @@ void ZImgJpegXR::readMemImg(void* mem, size_t size, void* des, size_t desSize)
   struct WMPStream* pStream = nullptr;
 
   Call(PKCreateFactory(&pFactory, PK_SDK_VERSION));
-  Call(pFactory->CreateStreamFromMemory(&pStream, mem, size));
+  // The JPEG XR SDK accepts a mutable pointer for read-only memory streams.
+  Call(pFactory->CreateStreamFromMemory(&pStream, const_cast<uint8_t*>(jpegXRBytes.data()), jpegXRBytes.size()));
 
   // Create decoder
   Call(PKCodecFactory_CreateCodec(pIID, (void**)&pDecoder));
@@ -414,7 +427,7 @@ void ZImgJpegXR::readMemImg(void* mem, size_t size, void* des, size_t desSize)
   readInfoFromDecoder(pDecoder, PI, info);
   // VLOG(1) << info;
 
-  if (desSize < info.byteNumber()) {
+  if (des.size() < info.byteNumber()) {
     throw ZException("buffer space is not enough");
   }
 
@@ -434,11 +447,11 @@ void ZImgJpegXR::readMemImg(void* mem, size_t size, void* des, size_t desSize)
   pDecoder->WMP.wmiI.cROIWidth = rect.Width;
   pDecoder->WMP.wmiI.cROIHeight = rect.Height;
 
-  Call(pDecoder->Copy(pDecoder, &rect, (U8*)des, info.rowByteNumber() * info.numChannels));
+  Call(pDecoder->Copy(pDecoder, &rect, reinterpret_cast<U8*>(des.data()), info.rowByteNumber() * info.numChannels));
 
   if (info.numChannels > 1) {
     ZImg img;
-    img.wrapData(des, info);
+    img.wrapData(des.data(), info);
 
     ZImg imgTmp = img;
     CXYZtoXYZC(imgTmp, img, PI.grBit & PK_pixfmtBGR);
@@ -575,10 +588,10 @@ void ZImgJpegXR::writeImg(const QString& filename, const ZImg& img, const ZImgWr
   }
 }
 
-size_t ZImgJpegXR::writeImgToMem(const ZImg& img, const ZImgWriteParameters& paras, void* mem, size_t size)
+size_t ZImgJpegXR::writeImgToMem(const ZImg& img, const ZImgWriteParameters& paras, std::span<uint8_t> dest)
 {
   checkBeforeWriting(img.info(), paras);
-  if (size < img.byteNumber()) {
+  if (dest.size() < img.byteNumber()) {
     throw ZException("target buffer space is not enough");
   }
   size_t byteWritten = 0;
@@ -630,7 +643,7 @@ size_t ZImgJpegXR::writeImgToMem(const ZImg& img, const ZImgWriteParameters& par
   });
 
   Call(PKCreateFactory(&pFactory, PK_SDK_VERSION));
-  Call(pFactory->CreateStreamFromMemory(&pEncodeStream, mem, size));
+  Call(pFactory->CreateStreamFromMemory(&pEncodeStream, dest.data(), dest.size()));
   Call(PKCreateCodecFactory(&pCodecFactory, WMP_SDK_VERSION));
   Call(pCodecFactory->CreateCodec(&IID_PKImageWmpEncode, (void**)&pEncoder));
 

@@ -5,11 +5,12 @@
 #include "zioutils.h"
 #include "zimage2dutils.h"
 #include "../3rdparty/build/include/jpeglib.h"
-#include "../3rdparty/build/include/turbojpeg.h"
-#include <QFile>
 #include <folly/ScopeGuard.h>
 #include <boost/iostreams/device/array.hpp>
 #include <boost/iostreams/stream.hpp>
+#include <algorithm>
+#include <limits>
+#include <vector>
 
 namespace {
 
@@ -25,6 +26,9 @@ namespace {
 #define TIFFTAG_JPEGIFOFFSET 513 /* !pointer to SOI marker */
 
 using namespace nim;
+
+constexpr int JPEG_LOSSLESS_PREDICTOR = 1;
+constexpr int JPEG_LOSSLESS_POINT_TRANSFORM = 0;
 
 struct my_error_mgr
 {
@@ -94,6 +98,49 @@ void createcinfo(jpeg_decompress_struct& cinfo, my_error_mgr& jerr)
   jpeg_create_decompress(&cinfo);
 }
 
+void createcinfo(jpeg_compress_struct& cinfo, my_error_mgr& jerr)
+{
+  cinfo.err = jpeg_std_error(&jerr.pub);
+  jerr.pub.error_exit = my_error_exit;
+  jpeg_create_compress(&cinfo);
+}
+
+void checkSupportedDataPrecision(int dataPrecision)
+{
+  if (dataPrecision < 2 || dataPrecision > 16) {
+    throw ZException(
+      fmt::format("Unsupported JPEG data precision: {} bits; Atlas JPEG reader supports 2-16 bit samples",
+                  dataPrecision));
+  }
+}
+
+size_t bytesPerVoxelForDataPrecision(int dataPrecision)
+{
+  checkSupportedDataPrecision(dataPrecision);
+  return dataPrecision <= 8 ? 1 : 2;
+}
+
+bool canUseJpegColorConversion(const jpeg_decompress_struct& cinfo)
+{
+  // Lossless JPEG does not support color-space conversion. 8-bit and 12-bit
+  // streams are the only precisions that can be lossy DCT streams, so keep the
+  // historical YCbCr/CMYK-to-RGB behavior there.
+  return cinfo.data_precision == 8 || cinfo.data_precision == 12;
+}
+
+void setRgbOutputIfSupported(jpeg_decompress_struct& cinfo)
+{
+  if (!canUseJpegColorConversion(cinfo)) {
+    return;
+  }
+
+  if (cinfo.jpeg_color_space == JCS_YCbCr || cinfo.jpeg_color_space == JCS_CMYK || cinfo.jpeg_color_space == JCS_YCCK ||
+      cinfo.jpeg_color_space == JCS_EXT_RGBX || cinfo.jpeg_color_space == JCS_EXT_BGRX ||
+      cinfo.jpeg_color_space == JCS_EXT_XBGR || cinfo.jpeg_color_space == JCS_EXT_XRGB) {
+    cinfo.out_color_space = JCS_RGB;
+  }
+}
+
 void startReading(FILE* infile, jpeg_decompress_struct& cinfo)
 {
   jpeg_stdio_src(&cinfo, infile);
@@ -103,6 +150,7 @@ void startReading(FILE* infile, jpeg_decompress_struct& cinfo)
   /* Step 3: read file parameters with jpeg_read_header() */
 
   (void)jpeg_read_header(&cinfo, TRUE);
+  checkSupportedDataPrecision(cinfo.data_precision);
   /* We can ignore the return value from jpeg_read_header since
    *   (a) suspension is not possible with the stdio data source, and
    *   (b) we passed TRUE to reject a tables-only JPEG file as an error.
@@ -111,24 +159,26 @@ void startReading(FILE* infile, jpeg_decompress_struct& cinfo)
 
   /* Step 4: set parameters for decompression */
 
-  if (cinfo.jpeg_color_space == JCS_YCbCr || cinfo.jpeg_color_space == JCS_CMYK || cinfo.jpeg_color_space == JCS_YCCK ||
-      cinfo.jpeg_color_space == JCS_EXT_RGBX || cinfo.jpeg_color_space == JCS_EXT_BGRX ||
-      cinfo.jpeg_color_space == JCS_EXT_XBGR || cinfo.jpeg_color_space == JCS_EXT_XRGB) {
-    cinfo.out_color_space = JCS_RGB;
-  }
-
+  setRgbOutputIfSupported(cinfo);
   cinfo.quantize_colors = FALSE;
 }
 
-void startReading(unsigned char* inbuffer, size_t insize, jpeg_decompress_struct& cinfo)
+void startReading(std::span<const uint8_t> jpegBytes, jpeg_decompress_struct& cinfo)
 {
-  jpeg_mem_src(&cinfo, inbuffer, insize);
+  if (jpegBytes.empty()) {
+    throw ZException("Invalid JPEG memory buffer: empty payload");
+  }
+  if (jpegBytes.size() > static_cast<size_t>(std::numeric_limits<unsigned long>::max())) {
+    throw ZException("Invalid JPEG memory buffer: payload too large");
+  }
+  jpeg_mem_src(&cinfo, jpegBytes.data(), static_cast<unsigned long>(jpegBytes.size()));
 
   jpeg_save_markers(&cinfo, JPEG_APP0 + 1, 0xFFFF);
 
   /* Step 3: read file parameters with jpeg_read_header() */
 
   (void)jpeg_read_header(&cinfo, TRUE);
+  checkSupportedDataPrecision(cinfo.data_precision);
   /* We can ignore the return value from jpeg_read_header since
    *   (a) suspension is not possible with the stdio data source, and
    *   (b) we passed TRUE to reject a tables-only JPEG file as an error.
@@ -137,12 +187,7 @@ void startReading(unsigned char* inbuffer, size_t insize, jpeg_decompress_struct
 
   /* Step 4: set parameters for decompression */
 
-  if (cinfo.jpeg_color_space == JCS_YCbCr || cinfo.jpeg_color_space == JCS_CMYK || cinfo.jpeg_color_space == JCS_YCCK ||
-      cinfo.jpeg_color_space == JCS_EXT_RGBX || cinfo.jpeg_color_space == JCS_EXT_BGRX ||
-      cinfo.jpeg_color_space == JCS_EXT_XBGR || cinfo.jpeg_color_space == JCS_EXT_XRGB) {
-    cinfo.out_color_space = JCS_RGB;
-  }
-
+  setRgbOutputIfSupported(cinfo);
   cinfo.quantize_colors = FALSE;
 }
 
@@ -180,7 +225,8 @@ void readInfoFromJpeg(jpeg_decompress_struct& cinfo, ZImgInfo& info)
 
   jpeg_calc_output_dimensions(&cinfo);
 
-  info.bytesPerVoxel = 1;
+  info.bytesPerVoxel = bytesPerVoxelForDataPrecision(cinfo.data_precision);
+  info.validBitCount = cinfo.data_precision;
   info.width = cinfo.output_width;
   info.height = cinfo.output_height;
   info.depth = 1;
@@ -194,13 +240,11 @@ void readInfoFromJpeg(jpeg_decompress_struct& cinfo, ZImgInfo& info)
   }
 }
 
-void readImgFromJpeg(jpeg_decompress_struct& cinfo, ZImg& img, const ZImgRegion& region, uint16_t orientation)
+ZImgInfo readStartedInfoFromJpeg(const jpeg_decompress_struct& cinfo)
 {
-  /* Step 5: Start decompressor */
-  (void)jpeg_start_decompress(&cinfo);
-
   ZImgInfo imgInfo;
-  imgInfo.bytesPerVoxel = 1;
+  imgInfo.bytesPerVoxel = bytesPerVoxelForDataPrecision(cinfo.data_precision);
+  imgInfo.validBitCount = cinfo.data_precision;
   imgInfo.width = cinfo.output_width;
   imgInfo.height = cinfo.output_height;
   imgInfo.depth = 1;
@@ -208,6 +252,90 @@ void readImgFromJpeg(jpeg_decompress_struct& cinfo, ZImg& img, const ZImgRegion&
   imgInfo.numTimes = 1;
   imgInfo.voxelFormat = VoxelFormat::Unsigned;
   imgInfo.createDefaultDescriptions();
+  return imgInfo;
+}
+
+template<typename TJpegSample>
+JDIMENSION readJpegScanlines(jpeg_decompress_struct& cinfo, TJpegSample** scanlines, JDIMENSION maxLines);
+
+template<>
+JDIMENSION readJpegScanlines<JSAMPLE>(jpeg_decompress_struct& cinfo, JSAMPLE** scanlines, JDIMENSION maxLines)
+{
+  return jpeg_read_scanlines(&cinfo, scanlines, maxLines);
+}
+
+template<>
+JDIMENSION readJpegScanlines<J12SAMPLE>(jpeg_decompress_struct& cinfo, J12SAMPLE** scanlines, JDIMENSION maxLines)
+{
+  return jpeg12_read_scanlines(&cinfo, scanlines, maxLines);
+}
+
+template<>
+JDIMENSION readJpegScanlines<J16SAMPLE>(jpeg_decompress_struct& cinfo, J16SAMPLE** scanlines, JDIMENSION maxLines)
+{
+  return jpeg16_read_scanlines(&cinfo, scanlines, maxLines);
+}
+
+template<typename TVoxel>
+void applyOrientation(ZImg& imgTmp, uint16_t orientation)
+{
+  if (orientation > 4) {
+    std::swap(imgTmp.infoRef().width, imgTmp.infoRef().height);
+  }
+
+  switch (orientation) {
+    case ORIENTATION_TOPLEFT:
+      break;
+    case ORIENTATION_TOPRIGHT:
+      for (size_t i = 0; i < imgTmp.numChannels(); ++i) {
+        image2DFlip(imgTmp.channelData<TVoxel>(i), imgTmp.width(), imgTmp.height(), Dimension::X);
+      }
+      break;
+    case ORIENTATION_BOTRIGHT:
+      for (size_t i = 0; i < imgTmp.numChannels(); ++i) {
+        image2DReflect(imgTmp.channelData<TVoxel>(i), imgTmp.width(), imgTmp.height());
+      }
+      break;
+    case ORIENTATION_BOTLEFT:
+      for (size_t i = 0; i < imgTmp.numChannels(); ++i) {
+        image2DFlip(imgTmp.channelData<TVoxel>(i), imgTmp.width(), imgTmp.height(), Dimension::Y);
+      }
+      break;
+    case ORIENTATION_LEFTTOP:
+      for (size_t i = 0; i < imgTmp.numChannels(); ++i) {
+        image2DTranspose(imgTmp.channelData<TVoxel>(i), imgTmp.height(), imgTmp.width());
+      }
+      break;
+    case ORIENTATION_RIGHTTOP:
+      for (size_t i = 0; i < imgTmp.numChannels(); ++i) {
+        image2DTranspose(imgTmp.channelData<TVoxel>(i), imgTmp.height(), imgTmp.width());
+        image2DFlip(imgTmp.channelData<TVoxel>(i), imgTmp.width(), imgTmp.height(), Dimension::X);
+      }
+      break;
+    case ORIENTATION_RIGHTBOT:
+      for (size_t i = 0; i < imgTmp.numChannels(); ++i) {
+        image2DTranspose(imgTmp.channelData<TVoxel>(i), imgTmp.height(), imgTmp.width());
+        image2DReflect(imgTmp.channelData<TVoxel>(i), imgTmp.width(), imgTmp.height());
+      }
+      break;
+    case ORIENTATION_LEFTBOT:
+      for (size_t i = 0; i < imgTmp.numChannels(); ++i) {
+        image2DTranspose(imgTmp.channelData<TVoxel>(i), imgTmp.height(), imgTmp.width());
+        image2DFlip(imgTmp.channelData<TVoxel>(i), imgTmp.width(), imgTmp.height(), Dimension::Y);
+      }
+      break;
+    default:
+      break;
+  }
+}
+
+template<typename TJpegSample, typename TVoxel>
+void readImgFromJpegTyped(jpeg_decompress_struct& cinfo, ZImg& img, const ZImgRegion& region, uint16_t orientation)
+{
+  /* Step 5: Start decompressor */
+  (void)jpeg_start_decompress(&cinfo);
+
+  ZImgInfo imgInfo = readStartedInfoFromJpeg(cinfo);
 
   if (region.isEmpty() || !region.isValid(imgInfo)) {
     throw ZException(fmt::format("Invalid image region. Image info: '{}', region: '{}'", imgInfo, region));
@@ -216,18 +344,12 @@ void readImgFromJpeg(jpeg_decompress_struct& cinfo, ZImg& img, const ZImgRegion&
   ZImgInfo partialImgInfo = region.clip(imgInfo);
   ZImg imgTmp(partialImgInfo);
 
-  /* We may need to do some setup of our own at this point before reading
-   * the data.  After jpeg_start_decompress() we have the correct scaled
-   * output image dimensions available, as well as the output colormap
-   * if we asked for color quantization.
-   * In this example, we need to make an output work buffer of the right size.
-   */
-  /* JSAMPLEs per row in output buffer */
-  /* Make a one-row-high sample array that will go away when done with image */
-  JSAMPARRAY buffer = (*cinfo.mem->alloc_sarray)(reinterpret_cast<j_common_ptr>(&cinfo),
-                                                 JPOOL_IMAGE,
-                                                 imgInfo.rowByteNumber() * imgInfo.numChannels,
-                                                 cinfo.rec_outbuf_height);
+  const size_t scanlineSampleCount = imgInfo.width * imgInfo.numChannels;
+  std::vector<TJpegSample> scanlineBuffer(scanlineSampleCount * cinfo.rec_outbuf_height);
+  std::vector<TJpegSample*> scanlineRows(cinfo.rec_outbuf_height);
+  for (size_t row = 0; row < scanlineRows.size(); ++row) {
+    scanlineRows[row] = scanlineBuffer.data() + row * scanlineSampleCount;
+  }
 
   /* Step 6: while (scan lines remain to be read) */
   /*           jpeg_read_scanlines(...); */
@@ -241,21 +363,20 @@ void readImgFromJpeg(jpeg_decompress_struct& cinfo, ZImg& img, const ZImgRegion&
      * Here the array is only one element long, but you could ask for
      * more than one scanline at a time if that's more convenient.
      */
-    size_t lineRead = jpeg_read_scanlines(&cinfo, buffer, cinfo.rec_outbuf_height);
+    size_t lineRead = readJpegScanlines(cinfo, scanlineRows.data(), cinfo.rec_outbuf_height);
 
     for (size_t y = lineStart; y < lineStart + lineRead; ++y) {
       if (region.yInRegion(y)) {
+        const TJpegSample* row = scanlineRows[y - lineStart];
         if (imgInfo.numChannels == 1) {
-          std::copy_n(&(buffer[y - lineStart][region.start.x]),
-                      imgTmp.rowByteNumber(),
-                      imgTmp.rowData<uint8_t>(y - region.start.y));
+          std::copy_n(row + region.start.x, imgTmp.width(), imgTmp.rowData<TVoxel>(y - region.start.y));
         } else {
           size_t cEnd = region.end.c == -1 ? imgInfo.numChannels : region.end.c;
           size_t xEnd = region.end.x == -1 ? imgInfo.width : region.end.x;
           for (size_t c = region.start.c; c < cEnd; ++c) {
             for (size_t x = region.start.x; x < xEnd; ++x) {
-              *imgTmp.data<uint8_t>(x - region.start.x, y - region.start.y, 0, c - region.start.c) =
-                buffer[y - lineStart][x * imgInfo.numChannels + c];
+              *imgTmp.data<TVoxel>(x - region.start.x, y - region.start.y, 0, c - region.start.c) =
+                static_cast<TVoxel>(row[x * imgInfo.numChannels + c]);
             }
           }
         }
@@ -268,56 +389,185 @@ void readImgFromJpeg(jpeg_decompress_struct& cinfo, ZImg& img, const ZImgRegion&
   /* Step 7: Finish decompression */
   (void)jpeg_finish_decompress(&cinfo);
 
-  if (orientation > 4) {
-    std::swap(imgTmp.infoRef().width, imgTmp.infoRef().height);
-  }
-
-  switch (orientation) {
-    case ORIENTATION_TOPLEFT:
-      break;
-    case ORIENTATION_TOPRIGHT:
-      for (size_t i = 0; i < imgTmp.numChannels(); ++i) {
-        image2DFlip(imgTmp.channelData<uint8_t>(i), imgTmp.width(), imgTmp.height(), Dimension::X);
-      }
-      break;
-    case ORIENTATION_BOTRIGHT:
-      for (size_t i = 0; i < imgTmp.numChannels(); ++i) {
-        image2DReflect(imgTmp.channelData<uint8_t>(i), imgTmp.width(), imgTmp.height());
-      }
-      break;
-    case ORIENTATION_BOTLEFT:
-      for (size_t i = 0; i < imgTmp.numChannels(); ++i) {
-        image2DFlip(imgTmp.channelData<uint8_t>(i), imgTmp.width(), imgTmp.height(), Dimension::Y);
-      }
-      break;
-    case ORIENTATION_LEFTTOP:
-      for (size_t i = 0; i < imgTmp.numChannels(); ++i) {
-        image2DTranspose(imgTmp.channelData<uint8_t>(i), imgTmp.height(), imgTmp.width());
-      }
-      break;
-    case ORIENTATION_RIGHTTOP:
-      for (size_t i = 0; i < imgTmp.numChannels(); ++i) {
-        image2DTranspose(imgTmp.channelData<uint8_t>(i), imgTmp.height(), imgTmp.width());
-        image2DFlip(imgTmp.channelData<uint8_t>(i), imgTmp.width(), imgTmp.height(), Dimension::X);
-      }
-      break;
-    case ORIENTATION_RIGHTBOT:
-      for (size_t i = 0; i < imgTmp.numChannels(); ++i) {
-        image2DTranspose(imgTmp.channelData<uint8_t>(i), imgTmp.height(), imgTmp.width());
-        image2DReflect(imgTmp.channelData<uint8_t>(i), imgTmp.width(), imgTmp.height());
-      }
-      break;
-    case ORIENTATION_LEFTBOT:
-      for (size_t i = 0; i < imgTmp.numChannels(); ++i) {
-        image2DTranspose(imgTmp.channelData<uint8_t>(i), imgTmp.height(), imgTmp.width());
-        image2DFlip(imgTmp.channelData<uint8_t>(i), imgTmp.width(), imgTmp.height(), Dimension::Y);
-      }
-      break;
-    default:
-      break;
-  }
+  applyOrientation<TVoxel>(imgTmp, orientation);
 
   imgTmp.swap(img);
+}
+
+void readImgFromJpeg(jpeg_decompress_struct& cinfo, ZImg& img, const ZImgRegion& region, uint16_t orientation)
+{
+  if (cinfo.data_precision <= 8) {
+    readImgFromJpegTyped<JSAMPLE, uint8_t>(cinfo, img, region, orientation);
+  } else if (cinfo.data_precision <= 12) {
+    readImgFromJpegTyped<J12SAMPLE, uint16_t>(cinfo, img, region, orientation);
+  } else {
+    readImgFromJpegTyped<J16SAMPLE, uint16_t>(cinfo, img, region, orientation);
+  }
+}
+
+size_t jpegInputComponentCount(const ZImgInfo& info)
+{
+  return info.numChannels == 1 ? 1 : 3;
+}
+
+int dataPrecisionForWrite(const ZImgInfo& info)
+{
+  if (info.bytesPerVoxel == 1) {
+    if (info.validBitCount > 8) {
+      throw ZException(fmt::format("uint8 JPEG image has invalid validBitCount: {}", info.validBitCount));
+    }
+    return 8;
+  }
+
+  if (info.bytesPerVoxel == 2) {
+    const size_t precision = info.validBitCount == 0 ? 16 : info.validBitCount;
+    if (precision < 2 || precision > 16) {
+      throw ZException(fmt::format("uint16 JPEG image has unsupported validBitCount: {}", info.validBitCount));
+    }
+    return static_cast<int>(precision);
+  }
+
+  throw ZException(fmt::format("JPEG writer supports uint8 and uint16 images only: {}", info));
+}
+
+bool usesLosslessJpeg(int dataPrecision)
+{
+  return dataPrecision != 8 && dataPrecision != 12;
+}
+
+uint64_t maxSampleValueForPrecision(int dataPrecision)
+{
+  CHECK(dataPrecision >= 2 && dataPrecision <= 16);
+  return (1ULL << dataPrecision) - 1;
+}
+
+void setChrominanceSubsampling(jpeg_compress_struct& cinfo, uint32_t jpegChrominanceSubsampling)
+{
+  if (cinfo.input_components == 1) {
+    return;
+  }
+
+  CHECK(cinfo.num_components >= 3);
+  cinfo.comp_info[0].h_samp_factor = 1;
+  cinfo.comp_info[0].v_samp_factor = 1;
+  cinfo.comp_info[1].h_samp_factor = 1;
+  cinfo.comp_info[1].v_samp_factor = 1;
+  cinfo.comp_info[2].h_samp_factor = 1;
+  cinfo.comp_info[2].v_samp_factor = 1;
+
+  if (jpegChrominanceSubsampling == 422) {
+    cinfo.comp_info[0].h_samp_factor = 2;
+  } else if (jpegChrominanceSubsampling == 420) {
+    cinfo.comp_info[0].h_samp_factor = 2;
+    cinfo.comp_info[0].v_samp_factor = 2;
+  } else {
+    CHECK(jpegChrominanceSubsampling == 444);
+  }
+}
+
+void configureCompression(jpeg_compress_struct& cinfo,
+                          const ZImg& img,
+                          int dataPrecision,
+                          const ZImgWriteParameters& paras)
+{
+  cinfo.image_width = static_cast<JDIMENSION>(img.width());
+  cinfo.image_height = static_cast<JDIMENSION>(img.height());
+  cinfo.input_components = static_cast<int>(jpegInputComponentCount(img.info()));
+  cinfo.in_color_space = cinfo.input_components == 1 ? JCS_GRAYSCALE : JCS_RGB;
+  cinfo.data_precision = dataPrecision;
+
+  jpeg_set_defaults(&cinfo);
+
+  if (usesLosslessJpeg(dataPrecision)) {
+    jpeg_enable_lossless(&cinfo, JPEG_LOSSLESS_PREDICTOR, JPEG_LOSSLESS_POINT_TRANSFORM);
+    return;
+  }
+
+  jpeg_set_quality(&cinfo, static_cast<int>(paras.jpegQuality), TRUE);
+  cinfo.dct_method = paras.jpegAccurateDCT ? JDCT_ISLOW : JDCT_FASTEST;
+  setChrominanceSubsampling(cinfo, paras.jpegChrominanceSubsampling);
+  if (paras.jpegProgressive) {
+    jpeg_simple_progression(&cinfo);
+  }
+}
+
+template<typename TJpegSample>
+JDIMENSION writeJpegScanlines(jpeg_compress_struct& cinfo, TJpegSample** scanlines, JDIMENSION numLines);
+
+template<>
+JDIMENSION writeJpegScanlines<JSAMPLE>(jpeg_compress_struct& cinfo, JSAMPLE** scanlines, JDIMENSION numLines)
+{
+  return jpeg_write_scanlines(&cinfo, scanlines, numLines);
+}
+
+template<>
+JDIMENSION writeJpegScanlines<J12SAMPLE>(jpeg_compress_struct& cinfo, J12SAMPLE** scanlines, JDIMENSION numLines)
+{
+  return jpeg12_write_scanlines(&cinfo, scanlines, numLines);
+}
+
+template<>
+JDIMENSION writeJpegScanlines<J16SAMPLE>(jpeg_compress_struct& cinfo, J16SAMPLE** scanlines, JDIMENSION numLines)
+{
+  return jpeg16_write_scanlines(&cinfo, scanlines, numLines);
+}
+
+template<typename TJpegSample, typename TVoxel>
+TJpegSample checkedJpegSample(TVoxel value, uint64_t maxSampleValue, bool validateSampleRange, int dataPrecision)
+{
+  if (validateSampleRange && static_cast<uint64_t>(value) > maxSampleValue) {
+    throw ZException(fmt::format("Image value {} exceeds the maximum value {} for {}-bit JPEG output",
+                                 static_cast<uint64_t>(value),
+                                 maxSampleValue,
+                                 dataPrecision));
+  }
+  return static_cast<TJpegSample>(value);
+}
+
+template<typename TJpegSample, typename TVoxel>
+void fillWriteScanline(const ZImg& img,
+                       size_t y,
+                       std::vector<TJpegSample>& row,
+                       uint64_t maxSampleValue,
+                       bool validateSampleRange,
+                       int dataPrecision)
+{
+  if (img.numChannels() == 1) {
+    const TVoxel* src = img.rowData<TVoxel>(y);
+    for (size_t x = 0; x < img.width(); ++x) {
+      row[x] = checkedJpegSample<TJpegSample>(src[x], maxSampleValue, validateSampleRange, dataPrecision);
+    }
+    return;
+  }
+
+  const TVoxel* r = img.rowData<TVoxel>(y, 0, 0);
+  const TVoxel* g = img.rowData<TVoxel>(y, 0, 1);
+  const TVoxel* b = img.rowData<TVoxel>(y, 0, 2);
+  for (size_t x = 0; x < img.width(); ++x) {
+    row[x * 3] = checkedJpegSample<TJpegSample>(r[x], maxSampleValue, validateSampleRange, dataPrecision);
+    row[x * 3 + 1] = checkedJpegSample<TJpegSample>(g[x], maxSampleValue, validateSampleRange, dataPrecision);
+    row[x * 3 + 2] = checkedJpegSample<TJpegSample>(b[x], maxSampleValue, validateSampleRange, dataPrecision);
+  }
+}
+
+template<typename TJpegSample, typename TVoxel>
+void writeImgToJpeg(jpeg_compress_struct& cinfo, const ZImg& img, int dataPrecision)
+{
+  const size_t rowSampleCount = img.width() * jpegInputComponentCount(img.info());
+  std::vector<TJpegSample> row(rowSampleCount);
+  TJpegSample* rowPointer[1] = {row.data()};
+  const uint64_t maxSampleValue = maxSampleValueForPrecision(dataPrecision);
+  const bool validateSampleRange = maxSampleValue < std::numeric_limits<TVoxel>::max();
+
+  while (cinfo.next_scanline < cinfo.image_height) {
+    fillWriteScanline<TJpegSample, TVoxel>(img,
+                                           cinfo.next_scanline,
+                                           row,
+                                           maxSampleValue,
+                                           validateSampleRange,
+                                           dataPrecision);
+    (void)writeJpegScanlines(cinfo, rowPointer, 1);
+  }
 }
 
 } // namespace
@@ -477,7 +727,7 @@ void ZImgJpeg::readThumbnail(const QString& filename,
 
               ZImg thumbImg;
 
-              startReading(buf.data(), buf.size(), thumbCinfo);
+              startReading(std::span<const uint8_t>(buf.data(), buf.size()), thumbCinfo);
               readImgFromJpeg(thumbCinfo, thumbImg, thumbRegion, getOrientation(cinfo));
 
               thumbnail.attachToPlane(thumbImg, 0, 0);
@@ -539,8 +789,13 @@ void ZImgJpeg::checkImgBeforeWriting(const QString& filename, const ZImgInfo& in
   }
   if (!(info.numChannels == 1 || (info.numChannels == 4 && info.lastChannelIsAlphaChannel) ||
         (info.numChannels == 3 && !info.lastChannelIsAlphaChannel)) ||
-      info.voxelFormat != VoxelFormat::Unsigned || info.bytesPerVoxel > 1) {
+      info.voxelFormat != VoxelFormat::Unsigned || (info.bytesPerVoxel != 1 && info.bytesPerVoxel != 2)) {
     throw ZException(fmt::format("image can not be represented as jpeg: {}", info));
+  }
+  const int dataPrecision = dataPrecisionForWrite(info);
+  if (usesLosslessJpeg(dataPrecision) && paras.jpegChrominanceSubsampling != 444) {
+    throw ZException(
+      fmt::format("chrominance subsampling is not supported for {}-bit lossless JPEG output", dataPrecision));
   }
   if (paras.jpegChrominanceSubsampling != 444 && paras.jpegChrominanceSubsampling != 422 &&
       paras.jpegChrominanceSubsampling != 420) {
@@ -555,73 +810,34 @@ void ZImgJpeg::writeImg(const QString& filename, const ZImg& img, const ZImgWrit
 {
   checkImgBeforeWriting(filename, img.info(), paras);
 
-  int flags = 0;
-  if (paras.jpegAccurateDCT) {
-    flags |= TJFLAG_ACCURATEDCT;
-  }
-  if (paras.jpegProgressive) {
-    flags |= TJFLAG_PROGRESSIVE;
+  if (img.numChannels() == 4) {
+    LOG(WARNING) << "Alpha Channel will be ignored when encoding as jpeg";
   }
 
-  int pixelFormat = TJPF_RGB;
-  int chrominanceSubsampling = TJSAMP_444;
-  if (img.numChannels() == 1) {
-    pixelFormat = TJPF_GRAY;
-    chrominanceSubsampling = TJSAMP_GRAY;
-  } else {
-    if (img.numChannels() == 4) {
-      LOG(WARNING) << "Alpha Channel will be ignored when encoding as jpeg";
-      pixelFormat = TJPF_RGBA;
-    }
-    if (paras.jpegChrominanceSubsampling == 422) {
-      chrominanceSubsampling = TJSAMP_422;
-    } else if (paras.jpegChrominanceSubsampling == 420) {
-      chrominanceSubsampling = TJSAMP_420;
-    } else {
-      CHECK(chrominanceSubsampling == TJSAMP_444);
-    }
-  }
-
-  tjhandle tjInstance = nullptr;
-  if ((tjInstance = tjInitCompress()) == nullptr) {
-    throw ZException(fmt::format("libjpeg-turbo: initializing compressor: {}", tjGetErrorStr2(tjInstance)),
-                     ZException::Option::CheckErrno);
-  }
-  auto guard1 = folly::makeGuard([&tjInstance]() {
-    if (tjInstance) {
-      tjDestroy(tjInstance);
-    }
-  });
-
-  ZImg tmp(img.info());
-  CHECK(tmp.channelData<uint8_t>(0) != img.channelData<uint8_t>(0)) << img.info();
-  ZImgFormat::XYZCtoCXYZ(img, tmp);
-  unsigned char* jpegBuf = nullptr; /* Dynamically allocate the JPEG buffer */
-  auto guard2 = folly::makeGuard([&jpegBuf]() {
-    if (jpegBuf) {
-      tjFree(jpegBuf);
-    }
-  });
-  unsigned long jpegSize;
-  if (tjCompress2(tjInstance,
-                  tmp.channelData<uint8_t>(0),
-                  img.width(),
-                  0,
-                  img.height(),
-                  pixelFormat,
-                  &jpegBuf,
-                  &jpegSize,
-                  chrominanceSubsampling,
-                  paras.jpegQuality,
-                  flags) < 0) {
-    throw ZException(fmt::format("libjpeg-turbo: compressing image: {}", tjGetErrorStr2(tjInstance)),
-                     ZException::Option::CheckErrno);
-  }
-
+  const int dataPrecision = dataPrecisionForWrite(img.info());
   auto outfile = openFile(filename, "wb");
-  if (fwrite(jpegBuf, jpegSize, 1, outfile.get()) < 1) {
-    throw ZException("error writing output jpeg file", ZException::Option::CheckErrno);
+
+  struct jpeg_compress_struct cinfo;
+  my_error_mgr jerr;
+  createcinfo(cinfo, jerr);
+  auto guard1 = folly::makeGuard([&cinfo]() {
+    jpeg_destroy_compress(&cinfo);
+  });
+
+  jpeg_stdio_dest(&cinfo, outfile.get());
+  configureCompression(cinfo, img, dataPrecision, paras);
+
+  jpeg_start_compress(&cinfo, TRUE);
+  if (img.bytesPerVoxel() == 1) {
+    writeImgToJpeg<JSAMPLE, uint8_t>(cinfo, img, dataPrecision);
+  } else if (dataPrecision <= 8) {
+    writeImgToJpeg<JSAMPLE, uint16_t>(cinfo, img, dataPrecision);
+  } else if (dataPrecision <= 12) {
+    writeImgToJpeg<J12SAMPLE, uint16_t>(cinfo, img, dataPrecision);
+  } else {
+    writeImgToJpeg<J16SAMPLE, uint16_t>(cinfo, img, dataPrecision);
   }
+  jpeg_finish_compress(&cinfo);
 }
 
 bool ZImgJpeg::supportRead() const
@@ -634,7 +850,7 @@ bool ZImgJpeg::supportWrite() const
   return true;
 }
 
-void ZImgJpeg::readMemInfo(uint8_t* mem, size_t size, ZImgInfo& info)
+ZImgInfo ZImgJpeg::readMemInfo(std::span<const uint8_t> jpegBytes)
 {
   struct jpeg_decompress_struct cinfo;
   my_error_mgr jerr;
@@ -646,12 +862,14 @@ void ZImgJpeg::readMemInfo(uint8_t* mem, size_t size, ZImgInfo& info)
     jpeg_destroy_decompress(&cinfo);
   });
 
-  startReading(mem, size, cinfo);
+  startReading(jpegBytes, cinfo);
 
+  ZImgInfo info;
   readInfoFromJpeg(cinfo, info);
+  return info;
 }
 
-void ZImgJpeg::readMemImg(uint8_t* mem, size_t size, uint8_t* des, size_t desSize)
+void ZImgJpeg::readMemImg(std::span<const uint8_t> jpegBytes, std::span<uint8_t> des)
 {
   struct jpeg_decompress_struct cinfo;
   my_error_mgr jerr;
@@ -663,16 +881,16 @@ void ZImgJpeg::readMemImg(uint8_t* mem, size_t size, uint8_t* des, size_t desSiz
     jpeg_destroy_decompress(&cinfo);
   });
 
-  startReading(mem, size, cinfo);
+  startReading(jpegBytes, cinfo);
 
   ZImg img;
   readImgFromJpeg(cinfo, img, ZImgRegion(), getOrientation(cinfo));
 
-  if (desSize < img.byteNumber()) {
+  if (des.size() < img.byteNumber()) {
     throw ZException("buffer space is not enough");
   }
 
-  std::copy_n(img.channelData<uint8_t>(0), img.byteNumber(), des);
+  std::copy_n(img.channelData<uint8_t>(0), img.byteNumber(), des.data());
 }
 
 } // namespace nim

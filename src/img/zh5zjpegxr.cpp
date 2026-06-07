@@ -2,6 +2,7 @@
 
 #include "zimgjpegxr.h"
 #include <QTemporaryFile>
+#include <span>
 
 #define H5Z_class_t_vers 2
 #include "hdf5.h"
@@ -21,12 +22,12 @@ static size_t H5Z_filter_jpegxr(unsigned int flags,
   try {
     if (flags & H5Z_FLAG_REVERSE) {
       // read data, e.g., decompress data
-      ZImgInfo info;
-      ZImgJpegXR::readMemInfo(*buf, *buf_size, info);
+      const std::span<const uint8_t> jpegXRBytes(static_cast<const uint8_t*>(*buf), nbytes);
+      ZImgInfo info = ZImgJpegXR::readMemInfo(jpegXRBytes);
       if (nullptr == (outBuf = H5allocate_memory(info.byteNumber(), false))) {
         throw ZException("error calling H5allocate_memory");
       }
-      ZImgJpegXR::readMemImg(*buf, nbytes, outBuf, info.byteNumber());
+      ZImgJpegXR::readMemImg(jpegXRBytes, std::span<uint8_t>(static_cast<uint8_t*>(outBuf), info.byteNumber()));
 
       H5free_memory(*buf);
       *buf = outBuf;
@@ -53,8 +54,8 @@ static size_t H5Z_filter_jpegxr(unsigned int flags,
       //        VLOG(1) << QFile(tempFile.fileName()).size();
       //      }
 
-      auto memBuf = std::make_unique_for_overwrite<std::byte[]>(info.byteNumber());
-      auto byteWritten = ZImgJpegXR::writeImgToMem(img, paras, memBuf.get(), info.byteNumber());
+      auto memBuf = std::make_unique_for_overwrite<uint8_t[]>(info.byteNumber());
+      auto byteWritten = ZImgJpegXR::writeImgToMem(img, paras, std::span<uint8_t>(memBuf.get(), info.byteNumber()));
       // VLOG(1) << byteWritten;
       if (byteWritten > info.byteNumber()) {
         throw ZException("compression overflow");

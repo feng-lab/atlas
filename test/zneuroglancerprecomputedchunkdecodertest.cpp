@@ -1,13 +1,7 @@
 #include "zneuroglancerprecomputedchunkdecoder.h"
 #include "zneuroglancerprecomputed.h"
-#include "zexception.h"
-#include "zimg.h"
 
 #include <gtest/gtest.h>
-
-#include <QDir>
-#include <QFile>
-#include <QTemporaryDir>
 
 #include <cstdint>
 #include <span>
@@ -15,41 +9,6 @@
 
 namespace nim {
 namespace {
-
-std::vector<uint8_t> encodeRgb8PngToMemory(size_t width, size_t height, const std::vector<uint8_t>& interleavedRgb)
-{
-  if (width == 0 || height == 0) {
-    throw ZException("invalid PNG dims");
-  }
-  if (interleavedRgb.size() != width * height * 3) {
-    throw ZException("invalid rgb size");
-  }
-
-  ZImgInfo info(width, height, 1, 3, 1, 1, VoxelFormat::Unsigned);
-  ZImg img(info);
-  const size_t pixelCount = width * height;
-  for (size_t i = 0; i < pixelCount; ++i) {
-    img.channelData<uint8_t>(0)[i] = interleavedRgb[i * 3 + 0];
-    img.channelData<uint8_t>(1)[i] = interleavedRgb[i * 3 + 1];
-    img.channelData<uint8_t>(2)[i] = interleavedRgb[i * 3 + 2];
-  }
-
-  QTemporaryDir tmp;
-  if (!tmp.isValid()) {
-    throw ZException("failed to create temporary PNG directory");
-  }
-
-  const QString path = QDir(tmp.path()).filePath(QStringLiteral("fixture.png"));
-  img.save(path, FileFormat::Png);
-
-  QFile file(path);
-  if (!file.open(QIODevice::ReadOnly)) {
-    throw ZException("failed to open temporary PNG fixture");
-  }
-
-  const QByteArray bytes = file.readAll();
-  return std::vector<uint8_t>(bytes.begin(), bytes.end());
-}
 
 std::vector<uint8_t> makeConstantCompressoChunkBytes(size_t sx, size_t sy, size_t sz, uint8_t value)
 {
@@ -106,72 +65,6 @@ std::vector<uint8_t> makeConstantCompressoChunkBytes(size_t sx, size_t sy, size_
 }
 
 } // namespace
-
-TEST(ZNeuroglancerPrecomputedChunkDecoder, DecodePngRgb8ToRawPlanar)
-{
-  const size_t width = 2;
-  const size_t height = 2;
-  const std::vector<uint8_t> interleaved = {
-    // row 0
-    1, 2, 3, 4, 5, 6,
-    // row 1
-    7, 8, 9, 10, 11, 12,
-  };
-
-  const auto pngBytes = encodeRgb8PngToMemory(width, height, interleaved);
-  const auto raw =
-    ZNeuroglancerPrecomputedChunkDecoder::decodePngToRaw(std::span<const uint8_t>(pngBytes.data(), pngBytes.size()),
-                                                         /*expectedVoxelCount=*/width * height,
-                                                         /*expectedChannels=*/3,
-                                                         /*bytesPerVoxel=*/1);
-
-  const std::vector<uint8_t> expectedPlanar = {
-    // R
-    1, 4, 7, 10,
-    // G
-    2, 5, 8, 11,
-    // B
-    3, 6, 9, 12,
-  };
-  EXPECT_EQ(raw, expectedPlanar);
-}
-
-TEST(ZNeuroglancerPrecomputedChunkDecoder, DecodePngRejectsInvalidPayload)
-{
-  const std::vector<uint8_t> notPng = {'n', 'o', 't', '-', 'p', 'n', 'g'};
-  EXPECT_THROW(
-    {
-      (void)ZNeuroglancerPrecomputedChunkDecoder::decodePngToRaw(std::span<const uint8_t>(notPng.data(), notPng.size()),
-                                                                 /*expectedVoxelCount=*/1,
-                                                                 /*expectedChannels=*/1,
-                                                                 /*bytesPerVoxel=*/1);
-    },
-    ZException);
-}
-
-TEST(ZNeuroglancerPrecomputedChunkDecoder, DecodePngRejectsTruncatedPayloadAfterHeader)
-{
-  const size_t width = 4;
-  const size_t height = 4;
-  std::vector<uint8_t> interleaved(width * height * 3);
-  for (size_t i = 0; i < interleaved.size(); ++i) {
-    interleaved[i] = static_cast<uint8_t>(i);
-  }
-
-  auto pngBytes = encodeRgb8PngToMemory(width, height, interleaved);
-  ASSERT_GT(pngBytes.size(), 16u);
-  pngBytes.resize(pngBytes.size() - 16);
-
-  EXPECT_THROW(
-    {
-      (void)ZNeuroglancerPrecomputedChunkDecoder::decodePngToRaw(
-        std::span<const uint8_t>(pngBytes.data(), pngBytes.size()),
-        /*expectedVoxelCount=*/width * height,
-        /*expectedChannels=*/3,
-        /*bytesPerVoxel=*/1);
-    },
-    ZException);
-}
 
 TEST(ZNeuroglancerPrecomputedChunkDecoder, DecodeCompressoMinimalConstantChunk)
 {

@@ -1,20 +1,16 @@
 #include "zneuroglancerprecomputedchunkdecoder.h"
 
 #include "zexception.h"
+#include "zimgjpeg.h"
 #include "zlog.h"
-
-#include <png.h>
-#include <turbojpeg.h>
 
 #include <algorithm>
 #include <array>
 #include <bit>
-#include <csetjmp>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <limits>
-#include <memory>
 #include <vector>
 
 namespace nim {
@@ -58,220 +54,6 @@ T readLE(const uint8_t* p)
 
 } // namespace
 
-namespace {
-
-struct PngReadState
-{
-  const uint8_t* data = nullptr;
-  size_t size = 0;
-  size_t offset = 0;
-};
-
-struct PngDecodeState;
-
-struct PngReadPack
-{
-  png_structp pngPtr = nullptr;
-  png_infop infoPtr = nullptr;
-  png_infop endPtr = nullptr;
-
-  ~PngReadPack()
-  {
-    if (pngPtr) {
-      png_destroy_read_struct(&pngPtr, &infoPtr, &endPtr);
-    }
-  }
-};
-
-struct PngDecodeState
-{
-  PngReadPack png;
-  PngReadState readState;
-  std::string errorMessage;
-  std::vector<uint8_t> interleaved;
-  std::vector<png_bytep> rowPointers;
-};
-
-void pngReadErrorFunction(png_structp pngPtr, const char* message)
-{
-  auto* state = static_cast<PngDecodeState*>(png_get_error_ptr(pngPtr));
-  if (state) {
-    state->errorMessage = fmt::format("Libpng error: {}", message ? message : "<unknown>");
-  }
-  longjmp(png_jmpbuf(pngPtr), 1);
-}
-
-void pngReadWarningFunction(png_structp, const char* message)
-{
-  // Keep libpng warnings out of logs in a hot decode path; errors are surfaced via exceptions.
-  (void)message;
-}
-
-void pngReadCallback(png_structp pngPtr, png_bytep outBytes, png_size_t byteCountToRead)
-{
-  auto* st = static_cast<PngReadState*>(png_get_io_ptr(pngPtr));
-  if (!st || !st->data) {
-    png_error(pngPtr, "Invalid PNG read state");
-    return;
-  }
-  if (byteCountToRead > st->size || st->offset > st->size - static_cast<size_t>(byteCountToRead)) {
-    png_error(pngPtr, "PNG read out of range");
-    return;
-  }
-  std::memcpy(outBytes, st->data + st->offset, static_cast<size_t>(byteCountToRead));
-  st->offset += static_cast<size_t>(byteCountToRead);
-}
-
-} // namespace
-
-std::vector<uint8_t> ZNeuroglancerPrecomputedChunkDecoder::decodePngToRaw(std::span<const uint8_t> pngBytes,
-                                                                          size_t expectedVoxelCount,
-                                                                          size_t expectedChannels,
-                                                                          size_t bytesPerVoxel)
-{
-  if (expectedVoxelCount == 0) {
-    throw ZException("Invalid PNG decode request: expectedVoxelCount must be > 0");
-  }
-  if (expectedChannels == 0 || expectedChannels > 4) {
-    throw ZException(fmt::format("Invalid PNG decode request: expectedChannels must be 1..4 (got {})", expectedChannels));
-  }
-  if (bytesPerVoxel != 1 && bytesPerVoxel != 2) {
-    throw ZException(fmt::format("Invalid PNG decode request: bytesPerVoxel must be 1 or 2 (got {})", bytesPerVoxel));
-  }
-  if (pngBytes.empty()) {
-    throw ZException("Invalid PNG chunk: empty payload");
-  }
-
-  auto decodeState = std::make_unique<PngDecodeState>();
-  decodeState->png.pngPtr =
-    png_create_read_struct(PNG_LIBPNG_VER_STRING, decodeState.get(), pngReadErrorFunction, pngReadWarningFunction);
-  if (decodeState->png.pngPtr) {
-    decodeState->png.infoPtr = png_create_info_struct(decodeState->png.pngPtr);
-    decodeState->png.endPtr = png_create_info_struct(decodeState->png.pngPtr);
-  }
-  if (!decodeState->png.pngPtr || !decodeState->png.infoPtr || !decodeState->png.endPtr) {
-    throw ZException("Libpng: failed to create read struct");
-  }
-  if (setjmp(png_jmpbuf(decodeState->png.pngPtr))) {
-    const std::string message = decodeState->errorMessage.empty() ? "Libpng decode failed" : decodeState->errorMessage;
-    throw ZException(message);
-  }
-
-  decodeState->readState.data = pngBytes.data();
-  decodeState->readState.size = pngBytes.size();
-  decodeState->readState.offset = 0;
-
-  png_set_read_fn(decodeState->png.pngPtr, &decodeState->readState, pngReadCallback);
-  png_read_info(decodeState->png.pngPtr, decodeState->png.infoPtr);
-
-  const png_uint_32 widthU32 = png_get_image_width(decodeState->png.pngPtr, decodeState->png.infoPtr);
-  const png_uint_32 heightU32 = png_get_image_height(decodeState->png.pngPtr, decodeState->png.infoPtr);
-  if (widthU32 == 0 || heightU32 == 0) {
-    throw ZException(fmt::format("Invalid PNG chunk dimensions: width={}, height={}", widthU32, heightU32));
-  }
-  const size_t width = static_cast<size_t>(widthU32);
-  const size_t height = static_cast<size_t>(heightU32);
-  const size_t area = checkedMul(width, height, "PNG pixel count");
-  if (area != expectedVoxelCount) {
-    throw ZException(fmt::format("PNG chunk pixel count mismatch: got {} pixels ({}x{}), expected {}",
-                                 area,
-                                 width,
-                                 height,
-                                 expectedVoxelCount));
-  }
-
-  const png_byte bitDepth = png_get_bit_depth(decodeState->png.pngPtr, decodeState->png.infoPtr);
-  const png_byte colorType = png_get_color_type(decodeState->png.pngPtr, decodeState->png.infoPtr);
-
-  if (!(bitDepth == 1 || bitDepth == 2 || bitDepth == 4 || bitDepth == 8 || bitDepth == 16)) {
-    throw ZException(fmt::format("Invalid PNG bit depth: {}", static_cast<int>(bitDepth)));
-  }
-
-  size_t dataWidth = (bitDepth <= 8) ? 1 : 2;
-  size_t numChannels = 1;
-  switch (colorType) {
-  case PNG_COLOR_TYPE_GRAY:
-    numChannels = 1;
-    break;
-  case PNG_COLOR_TYPE_RGB:
-    if (bitDepth != 8 && bitDepth != 16) {
-      throw ZException(fmt::format("Invalid PNG bit depth {} for RGB", static_cast<int>(bitDepth)));
-    }
-    numChannels = 3;
-    break;
-  case PNG_COLOR_TYPE_PALETTE:
-    if (bitDepth > 8) {
-      throw ZException(fmt::format("Invalid PNG bit depth {} for palette", static_cast<int>(bitDepth)));
-    }
-    dataWidth = 1;
-    numChannels = 3;
-    break;
-  case PNG_COLOR_TYPE_GRAY_ALPHA:
-    if (bitDepth != 8 && bitDepth != 16) {
-      throw ZException(fmt::format("Invalid PNG bit depth {} for grayscale+alpha", static_cast<int>(bitDepth)));
-    }
-    numChannels = 2;
-    break;
-  case PNG_COLOR_TYPE_RGB_ALPHA:
-    if (bitDepth != 8 && bitDepth != 16) {
-      throw ZException(fmt::format("Invalid PNG bit depth {} for RGBA", static_cast<int>(bitDepth)));
-    }
-    numChannels = 4;
-    break;
-  default:
-    throw ZException(fmt::format("Unsupported PNG color type {}", static_cast<int>(colorType)));
-  }
-
-  if (bytesPerVoxel != dataWidth) {
-    throw ZException(fmt::format("PNG chunk bytesPerVoxel mismatch: decoded {}, expected {}", dataWidth, bytesPerVoxel));
-  }
-  if (numChannels != expectedChannels) {
-    throw ZException(fmt::format("PNG chunk channel mismatch: decoded {}, expected {}", numChannels, expectedChannels));
-  }
-
-  if (colorType == PNG_COLOR_TYPE_PALETTE) {
-    png_set_palette_to_rgb(decodeState->png.pngPtr);
-  }
-  if (colorType == PNG_COLOR_TYPE_GRAY && bitDepth < 8) {
-    png_set_packing(decodeState->png.pngPtr);
-  }
-  if (bitDepth == 16) {
-    // PNG stores 16-bit samples in big-endian order. Neuroglancer expects little-endian raw data.
-    png_set_swap(decodeState->png.pngPtr);
-  }
-  png_set_interlace_handling(decodeState->png.pngPtr);
-  png_read_update_info(decodeState->png.pngPtr, decodeState->png.infoPtr);
-
-  const size_t rowBytes = static_cast<size_t>(png_get_rowbytes(decodeState->png.pngPtr, decodeState->png.infoPtr));
-  const size_t expectedRowBytes = checkedMul(checkedMul(width, expectedChannels, "PNG row pixels"), bytesPerVoxel, "PNG row bytes");
-  if (rowBytes != expectedRowBytes) {
-    throw ZException(fmt::format("PNG chunk row byte mismatch: decoded rowBytes={}, expected {}", rowBytes, expectedRowBytes));
-  }
-
-  decodeState->interleaved.resize(checkedMul(rowBytes, height, "PNG decoded bytes"));
-  decodeState->rowPointers.resize(height);
-  for (size_t y = 0; y < height; ++y) {
-    decodeState->rowPointers[y] = decodeState->interleaved.data() + y * rowBytes;
-  }
-
-  png_read_image(decodeState->png.pngPtr, decodeState->rowPointers.data());
-  png_read_end(decodeState->png.pngPtr, decodeState->png.endPtr);
-
-  if (expectedChannels == 1) {
-    return std::move(decodeState->interleaved);
-  }
-
-  std::vector<uint8_t> planar(checkedMul(checkedMul(area, expectedChannels, "PNG planar elements"), bytesPerVoxel, "PNG planar bytes"));
-  for (size_t i = 0; i < area; ++i) {
-    for (size_t c = 0; c < expectedChannels; ++c) {
-      const size_t srcOffset = (i * expectedChannels + c) * bytesPerVoxel;
-      const size_t dstOffset = (c * area + i) * bytesPerVoxel;
-      std::memcpy(planar.data() + dstOffset, decodeState->interleaved.data() + srcOffset, bytesPerVoxel);
-    }
-  }
-  return planar;
-}
-
 std::vector<uint8_t> ZNeuroglancerPrecomputedChunkDecoder::decodeJpegToRaw(std::span<const uint8_t> jpegBytes,
                                                                            size_t expectedVoxelCount,
                                                                            size_t expectedChannels)
@@ -285,86 +67,28 @@ std::vector<uint8_t> ZNeuroglancerPrecomputedChunkDecoder::decodeJpegToRaw(std::
   if (jpegBytes.empty()) {
     throw ZException("Invalid JPEG chunk: empty payload");
   }
-  if (jpegBytes.size() > static_cast<size_t>(std::numeric_limits<unsigned long>::max())) {
-    throw ZException("Invalid JPEG chunk: payload too large");
+
+  ZImgInfo info = ZImgJpeg::readMemInfo(jpegBytes);
+  if (info.depth != 1 || info.numTimes != 1 || info.voxelFormat != VoxelFormat::Unsigned || info.bytesPerVoxel != 1) {
+    throw ZException(fmt::format("Invalid JPEG chunk image type: {}", info));
   }
 
-  tjhandle handle = tjInitDecompress();
-  if (!handle) {
-    throw ZException("libjpeg-turbo: tjInitDecompress failed");
-  }
-  auto handleGuard = std::unique_ptr<void, decltype(&tjDestroy)>(handle, &tjDestroy);
-
-  int width = 0;
-  int height = 0;
-  int subsamp = 0;
-  int colorspace = 0;
-  if (tjDecompressHeader3(handle,
-                          reinterpret_cast<const unsigned char*>(jpegBytes.data()),
-                          static_cast<unsigned long>(jpegBytes.size()),
-                          &width,
-                          &height,
-                          &subsamp,
-                          &colorspace) < 0) {
-    throw ZException(fmt::format("libjpeg-turbo: decode header failed: {}", tjGetErrorStr2(handle)));
-  }
-  if (width <= 0 || height <= 0) {
-    throw ZException(fmt::format("Invalid JPEG chunk dimensions: width={}, height={}", width, height));
-  }
-
-  const size_t area = static_cast<size_t>(width) * static_cast<size_t>(height);
+  const size_t area = checkedMul(info.width, info.height, "JPEG pixel count");
   if (area != expectedVoxelCount) {
     throw ZException(fmt::format("JPEG chunk pixel count mismatch: got {} pixels ({}x{}), expected {}",
                                  area,
-                                 width,
-                                 height,
+                                 info.width,
+                                 info.height,
                                  expectedVoxelCount));
   }
-
-  size_t actualComponents = 0;
-  switch (colorspace) {
-  case TJCS_GRAY:
-    actualComponents = 1;
-    break;
-  case TJCS_CMYK:
-  case TJCS_YCCK:
-    actualComponents = 4;
-    break;
-  default:
-    actualComponents = 3;
-    break;
-  }
-  if (actualComponents != expectedChannels) {
-    throw ZException(fmt::format("JPEG chunk component mismatch: got {} components, expected {}",
-                                 actualComponents,
-                                 expectedChannels));
+  if (info.numChannels != expectedChannels) {
+    throw ZException(
+      fmt::format("JPEG chunk component mismatch: got {} components, expected {}", info.numChannels, expectedChannels));
   }
 
-  const int pixelFormat = (expectedChannels == 1) ? TJPF_GRAY : TJPF_RGB;
-  std::vector<uint8_t> interleaved(area * expectedChannels);
-  if (tjDecompress2(handle,
-                    reinterpret_cast<const unsigned char*>(jpegBytes.data()),
-                    static_cast<unsigned long>(jpegBytes.size()),
-                    interleaved.data(),
-                    width,
-                    /*pitch=*/0,
-                    height,
-                    pixelFormat,
-                    /*flags=*/0) < 0) {
-    throw ZException(fmt::format("libjpeg-turbo: decode failed: {}", tjGetErrorStr2(handle)));
-  }
-
-  if (expectedChannels == 1) {
-    return interleaved;
-  }
-
-  std::vector<uint8_t> planar(area * 3);
-  for (size_t i = 0; i < area; ++i) {
-    planar[i] = interleaved[i * 3 + 0];
-    planar[i + area] = interleaved[i * 3 + 1];
-    planar[i + 2 * area] = interleaved[i * 3 + 2];
-  }
-  return planar;
+  std::vector<uint8_t> out(checkedMul(area, expectedChannels, "JPEG decoded bytes"));
+  ZImgJpeg::readMemImg(jpegBytes, std::span<uint8_t>(out.data(), out.size()));
+  return out;
 }
 
 std::vector<uint8_t> ZNeuroglancerPrecomputedChunkDecoder::decodeCompressoToRaw(std::span<const uint8_t> bytes,

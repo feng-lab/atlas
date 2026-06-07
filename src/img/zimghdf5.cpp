@@ -18,6 +18,7 @@
 #include <array>
 #include <bit>
 #include <limits>
+#include <span>
 #include <string>
 #include <utility>
 #include <boost/unordered/unordered_flat_map.hpp>
@@ -1016,7 +1017,8 @@ void readRawHDF5ChunkToImg(const QString& filename,
   readRawHDF5Bytes(filename, mmf, inputFileStream, hdf5Tile.offset, hdf5Tile.length, scratch.compressedBuffer.data());
 
   if (hdf5Tile.compression == Compression::JPEGXR) {
-    ZImgJpegXR::readMemImg(scratch.compressedBuffer.data(), hdf5Tile.length, img.timeData(0), img.timeByteNumber());
+    ZImgJpegXR::readMemImg(std::span<const uint8_t>(scratch.compressedBuffer.data(), hdf5Tile.length),
+                           std::span<uint8_t>(img.timeData<uint8_t>(0), img.timeByteNumber()));
     return;
   }
   if (hdf5Tile.compression == Compression::ZSTD) {

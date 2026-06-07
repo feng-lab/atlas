@@ -7,6 +7,7 @@
 #include <QDir>
 #include <QFile>
 #include <QTemporaryDir>
+#include <span>
 #include <vector>
 
 namespace nim {
@@ -87,19 +88,17 @@ TEST(ZImgOpenImageIO, ReadsPngFromMemory)
   ASSERT_TRUE(file.open(QIODevice::ReadOnly));
   QByteArray bytes = file.readAll();
   ASSERT_GT(bytes.size(), 0);
+  const std::span<const uint8_t> oiioBytes(reinterpret_cast<const uint8_t*>(bytes.constData()),
+                                           static_cast<size_t>(bytes.size()));
 
-  ZImgInfo info;
-  ZImgOpenImageIO::readMemInfo(reinterpret_cast<const uint8_t*>(bytes.constData()), bytes.size(), info);
+  ZImgInfo info = ZImgOpenImageIO::readMemInfo(oiioBytes);
   ASSERT_EQ(info.width, 5u);
   ASSERT_EQ(info.height, 4u);
   ASSERT_EQ(info.numChannels, 3u);
   ASSERT_EQ(info.byteNumber(), 5u * 4u * 3u);
 
   std::vector<uint8_t> decoded(info.byteNumber());
-  ZImgOpenImageIO::readMemImg(reinterpret_cast<const uint8_t*>(bytes.constData()),
-                              bytes.size(),
-                              decoded.data(),
-                              decoded.size());
+  ZImgOpenImageIO::readMemImg(oiioBytes, std::span<uint8_t>(decoded.data(), decoded.size()));
   ZImg img;
   img.wrapData(decoded.data(), info);
   EXPECT_EQ(*img.data<uint8_t>(0, 0, 0, 0), 0u);

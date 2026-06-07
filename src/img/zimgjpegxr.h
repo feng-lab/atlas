@@ -2,6 +2,10 @@
 
 #include "zimgformat.h"
 
+#include <cstddef>
+#include <cstdint>
+#include <span>
+
 namespace nim {
 
 class ZImgJpegXR : public ZImgFormat
@@ -46,11 +50,11 @@ public:
 
   void writeImg(const QString& filename, const ZImg& img, const ZImgWriteParameters& paras) override;
 
-  static void readMemInfo(void* mem, size_t size, ZImgInfo& info);
+  static ZImgInfo readMemInfo(std::span<const uint8_t> jpegXRBytes);
 
-  static void readMemImg(void* mem, size_t size, void* des, size_t desSize);
+  static void readMemImg(std::span<const uint8_t> jpegXRBytes, std::span<uint8_t> des);
 
-  static size_t writeImgToMem(const ZImg& img, const ZImgWriteParameters& paras, void* mem, size_t size);
+  static size_t writeImgToMem(const ZImg& img, const ZImgWriteParameters& paras, std::span<uint8_t> dest);
 
 protected:
   static void checkBeforeWriting(const ZImgInfo& info, const ZImgWriteParameters& paras);

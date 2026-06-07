@@ -1619,7 +1619,7 @@ The tables below include the common names, vendor names, and aliases users usual
 | Amira, AmiraMesh | `.am`, `.amiramesh` | Scientific visualization volumes, meshes, or fields. | Dependency-backed. |
 | FITS, Flexible Image Transport System | `.fits`, `.fts` | Astronomy/scientific image arrays. | Dependency-backed. |
 | PNG, Portable Network Graphics | `.png` | Lossless 2D raster images. | Native Atlas reader/writer; also dependency-backed in some paths. |
-| JPEG, JPG, JFIF | `.jpg`, `.jpeg`, `.jpe`, `.jif` | Lossy 2D raster images and previews. | Native Atlas JPEG reader/writer. Avoid JPEG for quantitative source volumes because compression is lossy. |
+| JPEG, JPG, JFIF | `.jpg`, `.jpeg`, `.jpe`, `.jif` | 2D raster images and previews, including 8-bit JPEG, 12-bit lossy JPEG, and 16-bit lossless JPEG. | Native Atlas JPEG reader/writer. Avoid 8-bit and 12-bit JPEG for quantitative source volumes because those modes are lossy; 16-bit Atlas JPEG output uses the lossless JPEG process. |
 | JPEG 2000 | `.jp2`, `.j2k`, `.j2c`, `.jpf`, `.jpx`, `.j2ki`, `.j2kr` | Wavelet-compressed 2D images and microscopy tiles. | Dependency-backed. Codec support can vary by build. |
 | JPEG XR, Windows Media Photo, HD Photo | `.jxr`, `.wdp`, `.hdp` | Microsoft JPEG XR/HD Photo images. | Native Atlas JPEG XR reader/writer and dependency fallback. |
 | OpenEXR | `.exr` | High-dynamic-range raster images. | OpenImageIO-backed. |
@@ -1710,7 +1710,7 @@ The tables below include the common names, vendor names, and aliases users usual
 | HDF5-backed Atlas image | `.nim`, `.h5` | Atlas native HDF5 reader/writer | Atlas image-pack storage backed by HDF5. Useful for chunked internal image data. |
 | MetaImage | `.mha`, `.mhd` | Atlas native MetaImage reader and ITK ImageIO | Kitware MetaImage headers/data. `.mha` is single-file; `.mhd` typically references a sidecar raw payload. |
 | PNG | `.png` | Atlas native PNG reader/writer and dependency fallbacks | Common 2D image format. For volumetric work, use stacks or a volume-capable container. |
-| JPEG | `.jpg`, `.jpeg`, `.jpe`, `.jif` | Atlas JPEG reader and dependency fallbacks | Lossy 2D image formats. |
+| JPEG | `.jpg`, `.jpeg`, `.jpe`, `.jif` | Atlas JPEG reader and dependency fallbacks | 8-bit and 12-bit lossy JPEG plus 16-bit lossless JPEG. |
 | JPEG XR | `.jxr`, `.wdp`, `.hdp` | Atlas native JPEG XR reader and dependency fallbacks | 2D image format also exposed by dependency readers depending on build. |
 | ITK scientific/medical formats | Common examples: `.nii`, `.nii.gz`, `.nrrd`, `.nhdr`, `.mha`, `.mhd`, `.mrc`, `.mrcs`, `.mnc`, `.fdf` | ITK ImageIO factories | ITK discovers registered ImageIO factories at runtime. Build configuration controls which factories are present; DICOM-style suffixes appear only when the corresponding ImageIO support is enabled. |
 | OpenImageIO general images and camera RAW | Common examples: `.bmp`, `.gif`, `.exr`, `.hdr`, `.webp`, `.psd`, `.tga`, `.jp2`, `.j2k`, `.jxl`, `.pbm`, `.pgm`, `.ppm`, `.arw`, `.cr2`, `.dng`, `.nef`, `.orf`, `.raf`, `.rw2` | OpenImageIO with Atlas-managed codec dependencies | Broad read support for general 2D images and camera RAW-style files. |
