@@ -342,6 +342,92 @@ jobs:
           restore-keys: |
             testdata-
 
+      - name: Enable Windows crash dumps
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $dumpDir = Join-Path $env:RUNNER_TEMP 'atlas-crash-dumps'
+          New-Item -ItemType Directory -Force -Path $dumpDir | Out-Null
+
+          $werKey = 'HKCU:\Software\Microsoft\Windows\Windows Error Reporting\LocalDumps'
+          New-Item -Path $werKey -Force | Out-Null
+          New-ItemProperty -Path $werKey -Name DumpFolder -Value $dumpDir -PropertyType ExpandString -Force | Out-Null
+          New-ItemProperty -Path $werKey -Name DumpType -Value 2 -PropertyType DWord -Force | Out-Null
+          New-ItemProperty -Path $werKey -Name DumpCount -Value 64 -PropertyType DWord -Force | Out-Null
+
+          "ATLAS_CRASH_DUMP_DIR=$dumpDir" >> $env:GITHUB_ENV
+          Write-Host "Windows crash dumps will be written to $dumpDir"
+
+      - name: Report image IO environment
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          function Format-PathStatus([string]$Name, [string]$Value) {
+            if ([string]::IsNullOrEmpty($Value)) {
+              return ''
+            }
+            if ($Value.StartsWith('ocio://', [System.StringComparison]::OrdinalIgnoreCase)) {
+              return ' uri=true'
+            }
+
+            $pathListVars = @('OPENIMAGEIO_FONTS', 'OPENIMAGEIO_PLUGIN_PATH', 'OIIO_LIBRARY_PATH')
+            if ($pathListVars -contains $Name) {
+              $parts = $Value -split [System.IO.Path]::PathSeparator | Where-Object { $_ }
+              $existing = @($parts | Where-Object { Test-Path -LiteralPath $_ }).Count
+              return " path_entries=$($parts.Count) existing_entries=$existing"
+            }
+
+            $pathVars = @('OCIO', 'SystemRoot', 'LOCALAPPDATA', 'USERPROFILE', 'TEMP', 'TMP')
+            if ($pathVars -contains $Name) {
+              $exists = Test-Path -LiteralPath $Value
+              return " path_exists=$exists"
+            }
+
+            return ''
+          }
+
+          $names = @(
+            'OCIO',
+            'OCIO_ACTIVE_DISPLAYS',
+            'OCIO_ACTIVE_VIEWS',
+            'OCIO_LOGGING_LEVEL',
+            'OCIO_OPTIMIZATION_FLAGS',
+            'OCIO_USER_CATEGORIES',
+            'OCIO_DISABLE_ALL_CACHES',
+            'OCIO_DISABLE_PROCESSOR_CACHES',
+            'OCIO_DISABLE_CACHE_FALLBACK',
+            'OIIO_DISABLE_OCIO',
+            'OIIO_DISABLE_BUILTIN_OCIO_CONFIGS',
+            'OIIO_DEBUG_COLOR',
+            'OIIO_DEBUG_ALL',
+            'OIIO_USTRING_CLEANUP',
+            'OPENIMAGEIO_OPTIONS',
+            'OPENIMAGEIO_FONTS',
+            'OPENIMAGEIO_PLUGIN_PATH',
+            'OIIO_LIBRARY_PATH',
+            'OPENIMAGEIO_THREADS',
+            'CUE_THREADS',
+            'OPENIMAGEIO_LOG_TIMES',
+            'OPENIMAGEIO_DEBUG',
+            'OPENIMAGEIO_DEBUG_FILE',
+            'SystemRoot',
+            'LOCALAPPDATA',
+            'USERPROFILE',
+            'TEMP',
+            'TMP'
+          )
+
+          foreach ($name in $names) {
+            $value = [System.Environment]::GetEnvironmentVariable($name)
+            if ([string]::IsNullOrEmpty($value)) {
+              Write-Host ("{0}: set=false" -f $name)
+            } else {
+              $pathStatus = Format-PathStatus $name $value
+              Write-Host ("{0}: set=true length={1}{2}" -f $name, $value.Length, $pathStatus)
+            }
+          }
+
       - name: Build and deploy Atlas
         env:
           QT_OPENGL: software
@@ -354,6 +440,17 @@ jobs:
           cd "$env:GITHUB_WORKSPACE"
           python util/build_and_deploy_atlas.py
           if ($LASTEXITCODE -ne 0) { Write-Error "build_and_deploy_atlas failed with exit code $LASTEXITCODE"; exit $LASTEXITCODE }
+
+      - name: Upload Windows test diagnostics
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-test-diagnostics
+          path: |
+            ${{ env.ATLAS_CRASH_DUMP_DIR }}
+            cmake-build-release-ninja/Testing/Temporary
+          if-no-files-found: ignore
+          retention-days: 7
 
       - name: Publish artifacts to R2
         shell: bash -l {0}
