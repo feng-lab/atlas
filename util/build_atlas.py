@@ -1,6 +1,7 @@
 import argparse
 import logging
 import os
+import shlex
 import subprocess
 
 import atlas_pypi
@@ -11,6 +12,14 @@ from download_atlas_runtime_assets import download_atlas_runtime_assets
 from logger import setup_logger
 
 logger = logging.getLogger(__name__)
+
+
+def _ctest_command() -> list[str]:
+    cmd = [common_dirs.get_ctest_binary(), "--extra-verbose"]
+    extra_args = os.environ.get("ATLAS_CTEST_EXTRA_ARGS", "").strip()
+    if extra_args:
+        cmd.extend(shlex.split(extra_args))
+    return cmd
 
 
 def _git_describe(repo_dir: str) -> str | None:
@@ -246,8 +255,10 @@ def build_atlas(
             # Network tests are opt-in. Force them off by default so CI/self-hosted
             # runners don't fail when outbound access is restricted.
             env["ATLAS_ENABLE_NETWORK_TESTS"] = "1" if enable_network_tests else "0"
+            ctest_cmd = _ctest_command()
+            logger.info("ctest command: %s", " ".join(ctest_cmd))
             subprocess.run(
-                [common_dirs.get_ctest_binary(), "--extra-verbose"],
+                ctest_cmd,
                 cwd=common_dirs.atlas_build_dir(),
                 shell=False,
                 check=True,
@@ -293,8 +304,10 @@ def build_atlas(
             # Network tests are opt-in. Force them off by default so CI/self-hosted
             # runners don't fail when outbound access is restricted.
             env["ATLAS_ENABLE_NETWORK_TESTS"] = "1" if enable_network_tests else "0"
+            ctest_cmd = _ctest_command()
+            logger.info("ctest command: %s", " ".join(ctest_cmd))
             subprocess.run(
-                [common_dirs.get_ctest_binary(), "--extra-verbose"],
+                ctest_cmd,
                 cwd=common_dirs.atlas_build_dir(),
                 shell=False,
                 check=True,
