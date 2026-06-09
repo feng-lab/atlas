@@ -304,27 +304,25 @@ Neuroglancer Precomputed (HTTP)
 
 Testing (Linking Atlas Code)
 
-- Atlas is still a Qt GUI app. Common code now builds as three static libraries to keep Windows COFF archives well under 4GB with LTCG enabled, while maintaining clean backend boundaries:
-  - `atlas_core` (STATIC) — non‑graphics/core code (UI, data, utilities). Carries all include dirs/defs/link deps used across Atlas.
-  - `atlas_z3d` (STATIC) — shared/OpenGL 3D code (`Z3D*`). Links to `atlas_core` and inherits its usage requirements.
-  - `atlas_vulkan` (STATIC) — Vulkan‑only code (`ZVulkan*`). Links to `atlas_core` and inherits its usage requirements.
-  - `atlas_lib` (INTERFACE) — umbrella target that links all of the above, preserving a single consumer dependency.
-- Prefer linking tests against the smallest Atlas library set that satisfies the test:
-  - Core-only tests should link `atlas_core`.
-  - Z3D/OpenGL tests should link `atlas_z3d` + `atlas_core`.
-  - Vulkan-only tests should link `atlas_vulkan` + `atlas_core`.
-  - Use `atlas_lib` when a single consumer target is preferred or when a test truly needs both render backends.
-- Usage in CMake (already wired in `test/test.cmake`):
-  - `add_atlas_core_gtest_executable(name)` links `GTest::gtest_main` and `atlas_core`.
-  - `add_atlas_z3d_gtest_executable(name)` links `GTest::gtest_main`, `atlas_z3d`, and `atlas_core`.
-  - `add_atlas_vulkan_gtest_executable(name)` links `GTest::gtest_main`, `atlas_vulkan`, and `atlas_core`.
-  - `add_atlas_gtest_executable(name)` links `GTest::gtest_main` and `atlas_lib` (full umbrella).
-  - For headless Qt runs, the tests default to `QT_QPA_PLATFORM=minimal`.
+- Atlas is still a Qt GUI app. Most toolchains build the non-entry-point application code as one static `atlas_lib`.
+  Classic MSVC uses a split-library workaround internally to keep Windows COFF archives under the 4GB LTCG limit, but
+  tests should still consume the `atlas_lib` umbrella unless a narrower target is intentionally exposed for that
+  platform-specific split.
+- Atlas test binaries use the custom `atlas_test_main` target from `test/test.cmake`, not `GTest::gtest_main`.
+  `atlas_test_main` compiles `test/ztestmain.cpp` once and shares that object across test executables. The shared main
+  parses Atlas/Abseil flags and installs the `ZImgInit` test environment, which keeps Bio-Formats/JRE-backed tests and
+  image-runtime shutdown behavior consistent with the application.
+- Test data and third-party runtime paths are provided through the shared `atlas_test_paths` target. Use the helpers in
+  `test/test.cmake` rather than adding `ztestmain.cpp` or those compile definitions directly to a new executable:
+  - `atlas_test_main` publishes `atlas_test_paths`, `GTest::gtest`, and `img`.
+  - `add_gtest_executable(name)` links `atlas_test_main`.
+  - `add_atlas_gtest_executable(name)` links `atlas_test_main` plus `atlas_lib` (full Atlas umbrella).
+  - Custom-main tools that include `test/ztest.h`, such as `zbenchmark`, should link `atlas_test_paths` directly.
 - Runtime resources (shaders/assets) remain app-packaged; unit tests around Vulkan/RAII pipeline contracts do not depend on runtime discovery.
 - GPU/UI-heavy tests should be gated/opt-in and prefer offscreen surfaces or SwiftShader where available.
 - Neuroglancer precomputed E2E tests:
   - `test/zneuroglancerprecomputede2etest.cpp` is a networked smoke test (public GCS URLs) gated by `ATLAS_ENABLE_NETWORK_TESTS=1`.
-  - The same test file exercises both HTTP backends. Atlas test binaries use `GTest::gtest_main` rather than the app main, so backend selection is set inside the test with Abseil flags instead of relying on test-binary command-line flag parsing.
+  - The same test file exercises both HTTP backends. Atlas test binaries use the test main rather than the app main, so backend selection is set inside the test with Abseil flags instead of relying on application flagfile setup.
 Agents: Preview Screenshots
 
 - The Python agent tools expose a headless preview renderer for 3D animation verification.

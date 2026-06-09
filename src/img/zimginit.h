@@ -11,12 +11,12 @@ public:
                                   const QString& jreDIR = "",
                                   const QString& jarsDIR = "",
                                   bool verbose = true);
+
+  // Explicit runtime teardown must run before process/static destruction begins.
   static void shutdown() noexcept;
 
 private:
   ZImgInit(const QString& resourcesDIR, const QString& jreDIR, const QString& jarsDIR, bool verbose);
-
-  ~ZImgInit();
 };
 
 } // namespace nim

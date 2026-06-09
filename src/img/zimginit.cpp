@@ -60,7 +60,6 @@ ZImgInit::ZImgInit(const QString& resourcesDIR, const QString& jreDIR, const QSt
 {
   if (!ZLogInit::isInitialized()) {
     ZLogInit::instance("zimg"s);
-    LOG(WARNING) << "Atlas logging was not initialized; initialized it from ZImgInit";
   }
 
   if (jarsDIR.isEmpty()) {
@@ -168,21 +167,19 @@ void ZImgInit::shutdown() noexcept
     return;
   }
 
+  // OIIO requires explicit shutdown before static destruction starts; its
+  // fallback teardown can otherwise deadlock on Windows while stopping worker
+  // pools.
   ZImgOpenImageIO::shutdownRuntime();
-}
 
-ZImgInit::~ZImgInit()
-{
 #ifdef ZIMG_USE_FFTW
   fftw_cleanup_threads();
 #endif
 
-  shutdown();
-
   // Do not manually tear down Folly singletons here.
   //
   // Folly already registers an atexit handler to destroy its singleton vault.
-  // Calling destroyInstancesFinal() from this destructor can run before other
+  // Calling destroyInstancesFinal() from ZImgInit shutdown can run before other
   // subsystems (e.g. the HTTP client/event-base thread) have fully shut down,
   // which can lead to use-after-destroy crashes in background threads.
 }
