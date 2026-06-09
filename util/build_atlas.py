@@ -22,6 +22,14 @@ def _ctest_command() -> list[str]:
     return cmd
 
 
+def _append_cmake_cache_string_from_env(cmd: list[str], env_name: str) -> None:
+    value = os.environ.get(env_name, "").strip()
+    if not value:
+        return
+    logger.info("Forwarding %s to CMake.", env_name)
+    cmd.append(f"-D{env_name}:STRING={value}")
+
+
 def _git_describe(repo_dir: str) -> str | None:
     try:
         res = subprocess.run(
@@ -190,6 +198,7 @@ def build_atlas(
             "-DATLAS_ENABLE_CUSTOM_COMMAND:BOOL=" + ("ON" if debug_version else "OFF"),
         ]
     )
+    _append_cmake_cache_string_from_env(cmakecmd, "CMAKE_TEST_LAUNCHER")
     cmakecmd.extend([common_dirs.atlas_repository_dir()])
 
     print(cmakecmd)

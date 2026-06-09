@@ -342,12 +342,34 @@ jobs:
           restore-keys: |
             testdata-
 
-      - name: Enable Windows crash dumps
+      - name: Prepare Windows test dump capture
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
           $dumpDir = Join-Path $env:RUNNER_TEMP 'atlas-crash-dumps'
           New-Item -ItemType Directory -Force -Path $dumpDir | Out-Null
+
+          [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+          $procdumpRoot = Join-Path $env:RUNNER_TEMP 'procdump'
+          $procdumpZip = Join-Path $env:RUNNER_TEMP 'procdump.zip'
+          for ($attempt = 1; $attempt -le 3; ++$attempt) {
+            try {
+              Invoke-WebRequest `
+                -Uri 'https://download.sysinternals.com/files/Procdump.zip' `
+                -OutFile $procdumpZip
+              break
+            } catch {
+              if ($attempt -eq 3) {
+                throw
+              }
+              Start-Sleep -Seconds (5 * $attempt)
+            }
+          }
+          Expand-Archive -Force -Path $procdumpZip -DestinationPath $procdumpRoot
+          $procdump = Join-Path $procdumpRoot 'procdump64.exe'
+          if (!(Test-Path -LiteralPath $procdump)) {
+            throw "Expected ProcDump at $procdump"
+          }
 
           $werKey = 'HKCU:\Software\Microsoft\Windows\Windows Error Reporting\LocalDumps'
           New-Item -Path $werKey -Force | Out-Null
@@ -355,8 +377,12 @@ jobs:
           New-ItemProperty -Path $werKey -Name DumpType -Value 2 -PropertyType DWord -Force | Out-Null
           New-ItemProperty -Path $werKey -Name DumpCount -Value 64 -PropertyType DWord -Force | Out-Null
 
+          $launcher = @($procdump, '-accepteula', '-ma', '-e', '-x', $dumpDir) -join ';'
           "ATLAS_CRASH_DUMP_DIR=$dumpDir" >> $env:GITHUB_ENV
+          "ATLAS_PROCDUMP_EXE=$procdump" >> $env:GITHUB_ENV
+          "CMAKE_TEST_LAUNCHER=$launcher" >> $env:GITHUB_ENV
           Write-Host "Windows crash dumps will be written to $dumpDir"
+          Write-Host "CTest executable launcher: $launcher"
 
       - name: Report image IO environment
         shell: pwsh
@@ -442,6 +468,30 @@ jobs:
           cd "$env:GITHUB_WORKSPACE"
           python util/build_and_deploy_atlas.py
           if ($LASTEXITCODE -ne 0) { Write-Error "build_and_deploy_atlas failed with exit code $LASTEXITCODE"; exit $LASTEXITCODE }
+
+      - name: List Windows test diagnostics
+        if: ${{ failure() }}
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Continue'
+          if ($env:ATLAS_CRASH_DUMP_DIR -and (Test-Path -LiteralPath $env:ATLAS_CRASH_DUMP_DIR)) {
+            Write-Host "Crash dump directory: $env:ATLAS_CRASH_DUMP_DIR"
+            Get-ChildItem -LiteralPath $env:ATLAS_CRASH_DUMP_DIR -Recurse -Force |
+              Select-Object FullName, Length, LastWriteTime |
+              Format-Table -AutoSize
+          } else {
+            Write-Host 'Crash dump directory is missing or was not configured.'
+          }
+
+          $ctestTemp = Join-Path $env:GITHUB_WORKSPACE 'cmake-build-release-ninja/Testing/Temporary'
+          if (Test-Path -LiteralPath $ctestTemp) {
+            Write-Host "CTest temporary directory: $ctestTemp"
+            Get-ChildItem -LiteralPath $ctestTemp -Recurse -Force |
+              Select-Object FullName, Length, LastWriteTime |
+              Format-Table -AutoSize
+          } else {
+            Write-Host 'CTest temporary directory does not exist.'
+          }
 
       - name: Upload Windows test diagnostics
         if: ${{ failure() }}
