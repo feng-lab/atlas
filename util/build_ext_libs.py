@@ -3957,6 +3957,48 @@ def build_openimageio(src_dir: str, install_dir: str):
             patch_condition=is_windows,
         ),
         FilePatcher(
+            orig_file=os.path.join(src_dir, "src", "cmake", "dependency_utils.cmake"),
+            from_texts=[
+                """    # Configure the package
+    if (${PROJECT_NAME}_DEPENDENCY_BUILD_VERBOSE)
+"""
+            ],
+            to_texts=[
+                """    if ("${pkgname}" STREQUAL "Robinmap")
+        set (_atlas_robin_hash_header "${${pkgname}_LOCAL_SOURCE_DIR}/${_pkg_SOURCE_SUBDIR}/include/tsl/robin_hash.h")
+        file (READ "${_atlas_robin_hash_header}" _atlas_robin_hash_text)
+        set (_atlas_robin_hash_before [=[
+  bucket_entry* static_empty_bucket_ptr() noexcept {
+    static bucket_entry empty_bucket(true);
+    tsl_rh_assert(empty_bucket.empty());
+    return &empty_bucket;
+  }
+]=])
+        set (_atlas_robin_hash_after [=[
+  bucket_entry* static_empty_bucket_ptr() noexcept {
+    alignas(bucket_entry) static unsigned char
+        empty_bucket_storage[sizeof(bucket_entry)];
+    static bucket_entry* const empty_bucket =
+        ::new (static_cast<void*>(&empty_bucket_storage[0])) bucket_entry(true);
+
+    tsl_rh_assert(empty_bucket->empty());
+    return empty_bucket;
+  }
+]=])
+        if (NOT _atlas_robin_hash_text MATCHES "static bucket_entry empty_bucket\\\\(true\\\\);")
+            message (FATAL_ERROR "Robinmap robin_hash.h no longer has the expected static empty bucket sentinel")
+        endif ()
+        string (REPLACE "${_atlas_robin_hash_before}" "${_atlas_robin_hash_after}" _atlas_robin_hash_text "${_atlas_robin_hash_text}")
+        file (WRITE "${_atlas_robin_hash_header}" "${_atlas_robin_hash_text}")
+    endif ()
+
+    # Configure the package
+    if (${PROJECT_NAME}_DEPENDENCY_BUILD_VERBOSE)
+"""
+            ],
+            patch_condition=is_windows,
+        ),
+        FilePatcher(
             orig_file=os.path.join(src_dir, "src", "cmake", "externalpackages.cmake"),
             from_texts=[
                 """checked_find_package (TIFF REQUIRED
