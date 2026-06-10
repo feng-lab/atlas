@@ -216,7 +216,7 @@ struct BlockedSessionManifestLoadResult
     }
     res.ratio = {rx, ry, rz};
 
-    const double zToXYRatio = json::value_to<double>(requireNumber(jo, "z_scale"));
+    const double zToXYRatio = requireNumber(jo, "z_scale").to_number<double>();
     if (!std::isfinite(zToXYRatio) || !(zToXYRatio > 0.0)) {
       throw ZException(fmt::format("Invalid z_scale: expected a finite number > 0, got {}.", zToXYRatio));
     }

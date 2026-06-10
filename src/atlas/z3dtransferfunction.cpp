@@ -231,7 +231,7 @@ void Z3DTransferFunctionParameter::readValue(const json::value& jsonValue)
         toVal(keyObj.at("colorL").as_string(), key.m_colorL);
         toVal(keyObj.at("colorR").as_string(), key.m_colorR);
       } else {
-        key.m_intensity = json::value_to<double>(keyObj.at("intensity"));
+        key.m_intensity = keyObj.at("intensity").to_number<double>();
         key.m_colorL = json::value_to<glm::col4>(keyObj.at("colorL"));
         key.m_colorR = json::value_to<glm::col4>(keyObj.at("colorR"));
       }

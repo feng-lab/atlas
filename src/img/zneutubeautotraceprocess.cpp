@@ -305,7 +305,7 @@ void ZNeutubeAutoTraceProcess::read(const json::object& jo)
     m_inputImageSource = ZImgSource(json::value_to<QString>(inputImagePathIt->value()));
   }
   if (auto it = jo.find("z_scale"); it != jo.end()) {
-    setZToXYRatio(json::value_to<double>(it->value()));
+    setZToXYRatio(it->value().to_number<double>());
   }
   if (auto it = jo.find("signal_downsample_ratio"); it != jo.end() && it->value().is_array()) {
     const auto& a = it->value().as_array();
@@ -347,16 +347,16 @@ void ZNeutubeAutoTraceProcess::read(const json::object& jo)
     const auto& ao = it->value().as_object();
     TraceConfig cfg;
     if (auto f = ao.find("minAutoScore"); f != ao.end()) {
-      cfg.minAutoScore = json::value_to<double>(f->value());
+      cfg.minAutoScore = f->value().to_number<double>();
     }
     if (auto f = ao.find("minManualScore"); f != ao.end()) {
-      cfg.minManualScore = json::value_to<double>(f->value());
+      cfg.minManualScore = f->value().to_number<double>();
     }
     if (auto f = ao.find("minSeedScore"); f != ao.end()) {
-      cfg.minSeedScore = json::value_to<double>(f->value());
+      cfg.minSeedScore = f->value().to_number<double>();
     }
     if (auto f = ao.find("min2dScore"); f != ao.end()) {
-      cfg.min2dScore = json::value_to<double>(f->value());
+      cfg.min2dScore = f->value().to_number<double>();
     }
     if (auto f = ao.find("refit"); f != ao.end()) {
       cfg.refit = json::value_to<bool>(f->value());
@@ -386,7 +386,7 @@ void ZNeutubeAutoTraceProcess::read(const json::object& jo)
       cfg.chainScreenCount = json::value_to<int>(f->value());
     }
     if (auto f = ao.find("maxEucDist"); f != ao.end()) {
-      cfg.maxEucDist = json::value_to<double>(f->value());
+      cfg.maxEucDist = f->value().to_number<double>();
     }
     setAlgoConfigOverrides(cfg);
   } else {

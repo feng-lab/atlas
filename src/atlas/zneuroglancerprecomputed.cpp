@@ -313,15 +313,10 @@ std::array<double, 3> requireDouble3(const json::object& obj, const char* key)
   }
   std::array<double, 3> out{};
   for (size_t i = 0; i < 3; ++i) {
-    if (arr[i].is_double()) {
-      out[i] = arr[i].as_double();
-    } else if (arr[i].is_int64()) {
-      out[i] = static_cast<double>(arr[i].as_int64());
-    } else if (arr[i].is_uint64()) {
-      out[i] = static_cast<double>(arr[i].as_uint64());
-    } else {
+    if (!arr[i].is_number()) {
       throw ZException(fmt::format("Invalid '{}' in neuroglancer info: expected numeric", key));
     }
+    out[i] = arr[i].to_number<double>();
   }
   return out;
 }

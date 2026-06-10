@@ -142,7 +142,7 @@ std::vector<Z3DViewSettingParamOps::ValidateResult> Z3DViewSettingParamOps::vali
         r.reason = QString("type_mismatch: expected number got %1").arg(QString::fromStdString(jsonTypeName(v)));
         return r;
       }
-      const int ival = static_cast<int>(std::floor(v.as_double() + 0.5));
+      const int ival = static_cast<int>(std::floor(v.to_number<double>() + 0.5));
       if (!optII->hasOption(ival)) {
         r.ok = false;
         r.reason = QString("option_invalid: %1").arg(ival);
@@ -196,21 +196,21 @@ std::vector<Z3DViewSettingParamOps::ValidateResult> Z3DViewSettingParamOps::vali
 
     if (auto dp = dynamic_cast<ZDoubleParameter*>(target)) {
       if (v.is_number()) {
-        double x = v.as_double();
+        double x = v.to_number<double>();
         x = std::clamp(x, dp->rangeMin(), dp->rangeMax());
         setNormalized(x);
         normalized = true;
       }
     } else if (auto fp = dynamic_cast<ZFloatParameter*>(target)) {
       if (v.is_number()) {
-        double x = v.as_double();
+        double x = v.to_number<double>();
         x = std::clamp(x, static_cast<double>(fp->rangeMin()), static_cast<double>(fp->rangeMax()));
         setNormalized(x);
         normalized = true;
       }
     } else if (auto ip = dynamic_cast<ZIntParameter*>(target)) {
       if (v.is_number()) {
-        double x = v.as_double();
+        double x = v.to_number<double>();
         x = std::clamp(x, static_cast<double>(ip->rangeMin()), static_cast<double>(ip->rangeMax()));
         setNormalized(std::floor(x + 0.5));
         normalized = true;
@@ -221,7 +221,7 @@ std::vector<Z3DViewSettingParamOps::ValidateResult> Z3DViewSettingParamOps::vali
         auto mx = v2->rangeMax();
         json::array arr;
         for (size_t i = 0; i < 2; ++i) {
-          double x = v.as_array()[i].is_number() ? v.as_array()[i].as_double() : 0.0;
+          double x = v.as_array()[i].is_number() ? v.as_array()[i].to_number<double>() : 0.0;
           x = std::clamp(x, static_cast<double>(mn[i]), static_cast<double>(mx[i]));
           arr.emplace_back(x);
         }
@@ -234,7 +234,7 @@ std::vector<Z3DViewSettingParamOps::ValidateResult> Z3DViewSettingParamOps::vali
         auto mx = v3->rangeMax();
         json::array arr;
         for (size_t i = 0; i < 3; ++i) {
-          double x = v.as_array()[i].is_number() ? v.as_array()[i].as_double() : 0.0;
+          double x = v.as_array()[i].is_number() ? v.as_array()[i].to_number<double>() : 0.0;
           x = std::clamp(x, static_cast<double>(mn[i]), static_cast<double>(mx[i]));
           arr.emplace_back(x);
         }
@@ -247,7 +247,7 @@ std::vector<Z3DViewSettingParamOps::ValidateResult> Z3DViewSettingParamOps::vali
         auto mx = v4->rangeMax();
         json::array arr;
         for (size_t i = 0; i < 4; ++i) {
-          double x = v.as_array()[i].is_number() ? v.as_array()[i].as_double() : 0.0;
+          double x = v.as_array()[i].is_number() ? v.as_array()[i].to_number<double>() : 0.0;
           x = std::clamp(x, static_cast<double>(mn[i]), static_cast<double>(mx[i]));
           arr.emplace_back(x);
         }
@@ -280,7 +280,7 @@ std::vector<Z3DViewSettingParamOps::ValidateResult> Z3DViewSettingParamOps::vali
               if (!el.is_number()) {
                 return std::nullopt;
               }
-              arr.emplace_back(el.as_double());
+              arr.emplace_back(el.to_number<double>());
             }
             return arr;
           };

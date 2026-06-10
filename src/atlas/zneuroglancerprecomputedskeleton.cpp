@@ -86,15 +86,10 @@ glm::mat4 parseTransform(const json::object& obj)
   float* out = glm::value_ptr(m);
   for (size_t i = 0; i < 12; ++i) {
     const auto& v = arr[i];
-    if (v.is_double()) {
-      out[i] = static_cast<float>(v.as_double());
-    } else if (v.is_int64()) {
-      out[i] = static_cast<float>(v.as_int64());
-    } else if (v.is_uint64()) {
-      out[i] = static_cast<float>(v.as_uint64());
-    } else {
+    if (!v.is_number()) {
       throw ZException("Invalid 'transform' in neuroglancer skeleton info (expected numbers)");
     }
+    out[i] = v.to_number<float>();
   }
 
   // Neuroglancer TS fills the first 12 elements and then transposes (gl-matrix uses column-major).

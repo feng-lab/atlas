@@ -121,7 +121,7 @@ bool ZParameterKey::readValue(const json::value& value)
     LOG(WARNING) << "Invalid key " << jsonToFormattedString(obj) << " time, type and value are required field.";
     return false;
   }
-  m_time = json::value_to<double>(obj.at("time"));
+  m_time = obj.at("time").to_number<double>();
   m_type->select(json::value_to<QString>(obj.at("type")));
   updateEasingCurve();
   m_value->readValue(obj.at("value"));

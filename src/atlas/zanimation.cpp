@@ -1254,7 +1254,7 @@ void ZAnimation::readContent(const QString& fn, const QString& jsonKey, bool sho
     for (const auto& [key, value] : animationObj) {
       QString qkey = QString::fromUtf8(key.data(), key.size());
       if (key == "Duration") {
-        setDurationImpl(json::value_to<double>(value));
+        setDurationImpl(value.to_number<double>());
       } else if (key == "Background" || key == "Axis" || key == "Lighting") {
         auto aniObj = std::make_unique<AnimationObj>(qkey, json::value());
         aniObj->uniqueId = m_nextUniqueId++;
@@ -1515,7 +1515,7 @@ void ZAnimation::restoreFromUndoSnapshot(const UndoSnapshot& snapshot)
     CHECK(false) << "Undo snapshot missing objects";
   }
 
-  const double duration = json::value_to<double>(snapshot.state.at(kUndoDuration));
+  const double duration = snapshot.state.at(kUndoDuration).to_number<double>();
   setDurationImpl(duration);
 
   const auto& nextUniqueV = snapshot.state.at(kUndoNextUniqueId);

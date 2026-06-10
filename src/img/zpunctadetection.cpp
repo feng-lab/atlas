@@ -728,28 +728,28 @@ void ZPunctaDetection::read(const json::object& jo)
                json::value_to<size_t>(jo.at("puncta_channel")),
                json::value_to<size_t>(jo.at("t")),
                json::value_to<size_t>(jo.at("scene")),
-               json::value_to<double>(jo.at("voxel_size_in_um_x")),
-               json::value_to<double>(jo.at("voxel_size_in_um_y")),
-               json::value_to<double>(jo.at("voxel_size_in_um_z")));
+               jo.at("voxel_size_in_um_x").to_number<double>(),
+               jo.at("voxel_size_in_um_y").to_number<double>(),
+               jo.at("voxel_size_in_um_z").to_number<double>());
 
   // parameters
   setPunctaThreshold(json::value_to<int>(jo.at("puncta_threshold")));
   setSomaPunctaThreshold(json::value_to<int>(jo.at("soma_puncta_threshold")));
   setSplitThreshold(json::value_to<int>(jo.at("split_size_threshold")));
-  setConfidenceRegionForRadiusEstimate(json::value_to<double>(jo.at("conf_radius")));
-  setConfidenceRegionForOverlapArea(json::value_to<double>(jo.at("conf_overlap_area")));
-  setOverlapRateThreshold(json::value_to<double>(jo.at("overlap_rate_threshold")));
+  setConfidenceRegionForRadiusEstimate(jo.at("conf_radius").to_number<double>());
+  setConfidenceRegionForOverlapArea(jo.at("conf_overlap_area").to_number<double>());
+  setOverlapRateThreshold(jo.at("overlap_rate_threshold").to_number<double>());
   setSeedSizeThreshold(json::value_to<int>(jo.at("seed_size_threshold")));
   setUseMultithreading(jo.at("use_multithreading").as_bool());
 
   // parameters for soma detection
   setDendriteChannel(json::value_to<int>(jo.at("dendrite_channel")));
-  setMaxDendriteTubeRadiusInUm(json::value_to<double>(jo.at("max_dendrite_tube_radius")));
-  setDendriteThreshold(json::value_to<double>(jo.at("dendrite_threshold")));
+  setMaxDendriteTubeRadiusInUm(jo.at("max_dendrite_tube_radius").to_number<double>());
+  setDendriteThreshold(jo.at("dendrite_threshold").to_number<double>());
 
   // parameters for assign puncta to swc tree
-  setMaxDistToBranchInUm(json::value_to<double>(jo.at("max_dist_to_branch")));
-  setAmbiguousFactor(json::value_to<double>(jo.at("ambiguous_factor")));
+  setMaxDistToBranchInUm(jo.at("max_dist_to_branch").to_number<double>());
+  setAmbiguousFactor(jo.at("ambiguous_factor").to_number<double>());
 
   setSwcFiles(json::value_to<QStringList>(jo.at("swc_paths")));
 

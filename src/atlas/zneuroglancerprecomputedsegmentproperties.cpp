@@ -338,15 +338,10 @@ std::shared_ptr<ZNeuroglancerPrecomputedSegmentProperties> ZNeuroglancerPrecompu
       } else if (p.type == PropertyType::Number) {
         p.numberValues.reserve(valuesArr.size());
         for (const auto& vv : valuesArr) {
-          if (vv.is_double()) {
-            p.numberValues.push_back(vv.as_double());
-          } else if (vv.is_int64()) {
-            p.numberValues.push_back(static_cast<double>(vv.as_int64()));
-          } else if (vv.is_uint64()) {
-            p.numberValues.push_back(static_cast<double>(vv.as_uint64()));
-          } else {
+          if (!vv.is_number()) {
             throw ZException("Invalid segment properties info: number property.values must contain numbers");
           }
+          p.numberValues.push_back(vv.to_number<double>());
         }
       } else if (p.type == PropertyType::Tags) {
         p.tagIndicesValues.resize(valuesArr.size());

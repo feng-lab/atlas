@@ -542,9 +542,9 @@ int ZRunNeuTuCommand2::run(int argc, char* argv[], const QString& jsonDirPath)
     }
 
     if (auto it = inputJson.find("z_to_xy_ratio"); it != inputJson.end() && it->value().is_number()) {
-      args.zToXYRatioOverride = json::value_to<double>(it->value());
+      args.zToXYRatioOverride = it->value().to_number<double>();
     } else if (auto zscaleIt = inputJson.find("zscale"); zscaleIt != inputJson.end() && zscaleIt->value().is_number()) {
-      args.zToXYRatioOverride = json::value_to<double>(zscaleIt->value());
+      args.zToXYRatioOverride = zscaleIt->value().to_number<double>();
     }
 
     if (auto signalDownsampleIt = inputJson.find("signal_downsample_ratio"); signalDownsampleIt != inputJson.end()) {

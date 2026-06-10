@@ -470,12 +470,8 @@ static google::protobuf::Value jsonToPb(const json::value& jv)
     v.set_null_value(google::protobuf::NullValue::NULL_VALUE);
   } else if (jv.is_bool()) {
     v.set_bool_value(jv.as_bool());
-  } else if (jv.is_double()) {
-    v.set_number_value(jv.as_double());
-  } else if (jv.is_int64()) {
-    v.set_number_value(static_cast<double>(jv.as_int64()));
-  } else if (jv.is_uint64()) {
-    v.set_number_value(static_cast<double>(jv.as_uint64()));
+  } else if (jv.is_number()) {
+    v.set_number_value(jv.to_number<double>());
   } else if (jv.is_string()) {
     v.set_string_value(std::string(jv.as_string()));
   } else if (jv.is_array()) {

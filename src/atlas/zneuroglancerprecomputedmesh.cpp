@@ -101,16 +101,10 @@ double requireDouble(const json::object& obj, const char* key)
     throw ZException(fmt::format("Missing '{}' in neuroglancer mesh info", key));
   }
   const auto& v = it->value();
-  if (v.is_double()) {
-    return v.as_double();
+  if (!v.is_number()) {
+    throw ZException(fmt::format("Invalid '{}' in neuroglancer mesh info (expected number)", key));
   }
-  if (v.is_int64()) {
-    return static_cast<double>(v.as_int64());
-  }
-  if (v.is_uint64()) {
-    return static_cast<double>(v.as_uint64());
-  }
-  throw ZException(fmt::format("Invalid '{}' in neuroglancer mesh info (expected number)", key));
+  return v.to_number<double>();
 }
 
 glm::mat4 parseTransform(const json::object& obj)
@@ -131,15 +125,10 @@ glm::mat4 parseTransform(const json::object& obj)
   float* out = glm::value_ptr(m);
   for (size_t i = 0; i < 12; ++i) {
     const auto& v = arr[i];
-    if (v.is_double()) {
-      out[i] = static_cast<float>(v.as_double());
-    } else if (v.is_int64()) {
-      out[i] = static_cast<float>(v.as_int64());
-    } else if (v.is_uint64()) {
-      out[i] = static_cast<float>(v.as_uint64());
-    } else {
+    if (!v.is_number()) {
       throw ZException("Invalid 'transform' in neuroglancer mesh info (expected numbers)");
     }
+    out[i] = v.to_number<float>();
   }
 
   // Neuroglancer TS fills the first 12 elements and then transposes (gl-matrix uses column-major).

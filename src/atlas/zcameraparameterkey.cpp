@@ -71,7 +71,7 @@ bool ZCameraParameterKey::readValue(const json::value& value)
         LOG(WARNING) << "Invalid camera TCB value " << name << "; expected numeric value in [-1, 1]";
         return false;
       }
-      const double v = it->as_double();
+      const double v = it->to_number<double>();
       if (!std::isfinite(v) || v < -1.0 || v > 1.0) {
         LOG(WARNING) << "Invalid camera TCB value " << name << "=" << v << "; expected [-1, 1]";
         return false;

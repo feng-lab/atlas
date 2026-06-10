@@ -28,15 +28,10 @@ template<typename T>
   for (size_t i = 0; i < 3; ++i) {
     const auto& v = arr[i];
     if constexpr (std::is_same_v<T, double>) {
-      if (v.is_double()) {
-        out[i] = v.as_double();
-      } else if (v.is_int64()) {
-        out[i] = static_cast<double>(v.as_int64());
-      } else if (v.is_uint64()) {
-        out[i] = static_cast<double>(v.as_uint64());
-      } else {
+      if (!v.is_number()) {
         return std::nullopt;
       }
+      out[i] = v.to_number<double>();
     } else {
       if (v.is_int64()) {
         out[i] = static_cast<T>(v.as_int64());

@@ -75,16 +75,10 @@ uint64_t requireUint64(const json::object& obj, const char* key)
 
 double numberToDouble(const json::value& v, const char* what)
 {
-  if (v.is_double()) {
-    return v.as_double();
+  if (!v.is_number()) {
+    throw ZException(fmt::format("Invalid {} in neuroglancer annotations info (expected number)", what));
   }
-  if (v.is_int64()) {
-    return static_cast<double>(v.as_int64());
-  }
-  if (v.is_uint64()) {
-    return static_cast<double>(v.as_uint64());
-  }
-  throw ZException(fmt::format("Invalid {} in neuroglancer annotations info (expected number)", what));
+  return v.to_number<double>();
 }
 
 uint64_t numberToUint64(const json::value& v, const char* what)
@@ -459,16 +453,10 @@ std::shared_ptr<ZNeuroglancerPrecomputedAnnotationsSource> ZNeuroglancerPrecompu
     if (arr.size() != 2) {
       throw ZException("Invalid neuroglancer annotations info: dimensions value must be length-2 array");
     }
-    double scale = 0.0;
-    if (arr[0].is_double()) {
-      scale = arr[0].as_double();
-    } else if (arr[0].is_int64()) {
-      scale = static_cast<double>(arr[0].as_int64());
-    } else if (arr[0].is_uint64()) {
-      scale = static_cast<double>(arr[0].as_uint64());
-    } else {
+    if (!arr[0].is_number()) {
       throw ZException("Invalid neuroglancer annotations info: dimensions scale must be numeric");
     }
+    double scale = arr[0].to_number<double>();
     if (!(scale > 0.0) || !std::isfinite(scale)) {
       throw ZException("Invalid neuroglancer annotations info: dimensions scale must be finite and > 0");
     }

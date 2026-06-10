@@ -837,7 +837,7 @@ void ZStitchImage::read(const json::object& jo)
   if (jo.contains("concatenate_only") && jo.at("concatenate_only").as_bool()) {
     setConcatenateOnly();
   }
-  setMaxOverlapRate(json::value_to<double>(jo.at("max_overlap_rate")));
+  setMaxOverlapRate(jo.at("max_overlap_rate").to_number<double>());
 
   if (jo.contains("tile_grid")) {
     setTileGrid(json::value_to<ZImg>(jo.at("tile_grid")));

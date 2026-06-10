@@ -78,6 +78,25 @@ TEST(ZCutSpanParameterTest, ReadValueSeedsRangeWhenUnbound)
   EXPECT_FALSE(p.pinUpper());
 }
 
+TEST(ZCutSpanParameterTest, ReadValueAcceptsIntegerJsonForFloatingSpan)
+{
+  ZCutSpanParameter p("Global X Cut");
+
+  json::object obj;
+  obj["Mode StringIntOption"] = "Absolute";
+  obj["Pin Lower Bool"] = false;
+  obj["Pin Upper Bool"] = false;
+  obj["Normalized [0..1] DoubleSpan"] = json::array{0, 1};
+  obj["Range FloatSpan"] = json::array{12, 34};
+
+  p.readValue(obj);
+
+  EXPECT_FLOAT_EQ(p.minimum(), 12.0f);
+  EXPECT_FLOAT_EQ(p.maximum(), 34.0f);
+  EXPECT_FLOAT_EQ(p.get()[0], 12.0f);
+  EXPECT_FLOAT_EQ(p.get()[1], 34.0f);
+}
+
 TEST(ZParameterAnimationTest, RemoveRedundantKeysAlwaysKeepsLastKey)
 {
   // Use a trivial float track: four identical keys should compress to just the
@@ -95,4 +114,24 @@ TEST(ZParameterAnimationTest, RemoveRedundantKeysAlwaysKeepsLastKey)
   EXPECT_DOUBLE_EQ(anim.keys().front()->time(), 0.0);
   EXPECT_DOUBLE_EQ(anim.keys().back()->time(), 3.0);
   EXPECT_TRUE(anim.keys().front()->value().jsonValue() == anim.keys().back()->value().jsonValue());
+}
+
+TEST(ZParameterAnimationTest, ReadValueAcceptsIntegerJsonForFloatingKeyTimeAndValue)
+{
+  json::object key;
+  key["time"] = 5;
+  key["type"] = "Linear";
+  key["value"] = 1;
+
+  json::object track;
+  track["keys"] = json::array{key};
+
+  std::unique_ptr<ZParameterAnimation> anim(ZParameterAnimation::create("Opacity Float", track));
+  ASSERT_TRUE(anim);
+  ASSERT_EQ(anim->numKeys(), 1);
+  EXPECT_DOUBLE_EQ(anim->keys().front()->time(), 5.0);
+
+  const auto* value = dynamic_cast<const ZFloatParameter*>(&anim->keys().front()->value());
+  ASSERT_TRUE(value);
+  EXPECT_FLOAT_EQ(value->get(), 1.0f);
 }

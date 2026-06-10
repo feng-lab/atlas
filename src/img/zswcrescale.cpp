@@ -79,17 +79,17 @@ void ZSwcRescale::read(const json::object& jo)
   m_outputSwcFilename = json::value_to<QString>(jo.at("output_swc"));
 
   const auto& s = jo.at("settings").as_object();
-  m_settings.preTranslateX = json::value_to<double>(s.at("pre_translate_x"));
-  m_settings.preTranslateY = json::value_to<double>(s.at("pre_translate_y"));
-  m_settings.preTranslateZ = json::value_to<double>(s.at("pre_translate_z"));
+  m_settings.preTranslateX = s.at("pre_translate_x").to_number<double>();
+  m_settings.preTranslateY = s.at("pre_translate_y").to_number<double>();
+  m_settings.preTranslateZ = s.at("pre_translate_z").to_number<double>();
 
-  m_settings.scaleX = json::value_to<double>(s.at("scale_x"));
-  m_settings.scaleY = json::value_to<double>(s.at("scale_y"));
-  m_settings.scaleZ = json::value_to<double>(s.at("scale_z"));
+  m_settings.scaleX = s.at("scale_x").to_number<double>();
+  m_settings.scaleY = s.at("scale_y").to_number<double>();
+  m_settings.scaleZ = s.at("scale_z").to_number<double>();
 
-  m_settings.postTranslateX = json::value_to<double>(s.at("post_translate_x"));
-  m_settings.postTranslateY = json::value_to<double>(s.at("post_translate_y"));
-  m_settings.postTranslateZ = json::value_to<double>(s.at("post_translate_z"));
+  m_settings.postTranslateX = s.at("post_translate_x").to_number<double>();
+  m_settings.postTranslateY = s.at("post_translate_y").to_number<double>();
+  m_settings.postTranslateZ = s.at("post_translate_z").to_number<double>();
 
   m_settings.scaleRadius = json::value_to<bool>(s.at("scale_radius"));
 }

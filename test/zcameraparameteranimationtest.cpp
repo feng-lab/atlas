@@ -291,3 +291,35 @@ TEST(ZCameraParameterAnimationTest, RejectsOutOfRangeTcbOnRead)
   value.as_object()["rotBias"] = "bad";
   EXPECT_FALSE(loaded.readValue(value));
 }
+
+TEST(ZCameraParameterAnimationTest, ReadValueAcceptsIntegerJsonForCameraNumbers)
+{
+  json::object cameraValue;
+  cameraValue["Center Position Vec3"] = json::array{4, 5, 6};
+  cameraValue["Eye Position Vec3"] = json::array{1, 2, 3};
+  cameraValue["Eye Separation Angle Float"] = 8;
+  cameraValue["Field of View Float"] = 45;
+  cameraValue["Projection Type StringIntOption"] = "Perspective";
+  cameraValue["Up Vector Vec3"] = json::array{0, 1, 0};
+
+  json::object keyValue;
+  keyValue["posBias"] = 0;
+  keyValue["posContinuity"] = 0;
+  keyValue["posTension"] = 0;
+  keyValue["rotBias"] = 0;
+  keyValue["rotContinuity"] = 0;
+  keyValue["rotTension"] = 0;
+  keyValue["time"] = 5;
+  keyValue["type"] = "Linear";
+  keyValue["value"] = cameraValue;
+
+  ZCameraParameterKey loaded;
+  ASSERT_TRUE(loaded.readValue(keyValue));
+  EXPECT_DOUBLE_EQ(loaded.time(), 5.0);
+  EXPECT_FLOAT_EQ(loaded.posTension(), 0.0f);
+  EXPECT_FLOAT_EQ(loaded.rotBias(), 0.0f);
+
+  const auto& cameraParam = dynamic_cast<const Z3DCameraParameter&>(loaded.value());
+  expectVecNear(cameraParam.get().eye(), glm::vec3(1.0f, 2.0f, 3.0f), 0.0f);
+  expectVecNear(cameraParam.get().center(), glm::vec3(4.0f, 5.0f, 6.0f), 0.0f);
+}

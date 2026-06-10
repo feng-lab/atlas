@@ -8,7 +8,7 @@
 
 - User Guide: [Atlas User Guide](docs/USER_GUIDE.md)
 - Developer Guide: [Atlas Developer Guide](docs/DEVELOPER_GUIDE.md)
-- Agents Guide: [Atlas Agents (Unified)](docs/AGENTS_GUIDE.md)
+- Agents Guide: [Atlas Agents](docs/AGENTS_GUIDE.md)
 
 ## Installation
 ### All: Python >=3.12 (required for build scripts)

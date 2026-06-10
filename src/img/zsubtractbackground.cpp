@@ -200,7 +200,7 @@ void ZSubtractBackground::read(const json::object& jo)
   m_inputImagePath = json::value_to<QString>(jo.at("input_image"));
   m_outputImagePath = json::value_to<QString>(jo.at("output_image"));
   m_channel = static_cast<int>(json::value_to<int64_t>(jo.at("channel")));
-  m_minForegroundRatio = json::value_to<double>(jo.at("min_foreground_ratio"));
+  m_minForegroundRatio = jo.at("min_foreground_ratio").to_number<double>();
   m_maxIterations = static_cast<int>(json::value_to<int64_t>(jo.at("max_iterations")));
 }
 

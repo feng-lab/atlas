@@ -376,7 +376,7 @@ Z3DAnimationDoc::KeyOpResult Z3DAnimationDoc::setKey(size_t animationId,
     } else if (value.is_uint64()) {
       ival = static_cast<int>(value.as_uint64());
     } else {
-      ival = static_cast<int>(std::floor(value.as_double() + 0.5));
+      ival = static_cast<int>(std::floor(value.to_number<double>() + 0.5));
     }
     const bool allowed = std::ranges::any_of(spec.intOptions, [&](int o) { return o == ival; });
     if (!allowed) {

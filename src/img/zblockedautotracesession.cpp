@@ -175,7 +175,7 @@ void atomicWriteJsonObjectOrThrow(const QString& finalPath, const json::object& 
     throw ZException("Invalid LocalNeuroseg.pos: expected array[3]");
   }
   const auto& a = it->value().as_array();
-  out.pos = {json::value_to<double>(a.at(0)), json::value_to<double>(a.at(1)), json::value_to<double>(a.at(2))};
+  out.pos = {a.at(0).to_number<double>(), a.at(1).to_number<double>(), a.at(2).to_number<double>()};
 
   return out;
 }
@@ -373,16 +373,16 @@ TraceConfig ZBlockedAutoTraceSession::traceConfigFromJsonOrThrow(const json::obj
 {
   TraceConfig cfg;
   if (auto it = o.find("minAutoScore"); it != o.end()) {
-    cfg.minAutoScore = json::value_to<double>(it->value());
+    cfg.minAutoScore = it->value().to_number<double>();
   }
   if (auto it = o.find("minManualScore"); it != o.end()) {
-    cfg.minManualScore = json::value_to<double>(it->value());
+    cfg.minManualScore = it->value().to_number<double>();
   }
   if (auto it = o.find("minSeedScore"); it != o.end()) {
-    cfg.minSeedScore = json::value_to<double>(it->value());
+    cfg.minSeedScore = it->value().to_number<double>();
   }
   if (auto it = o.find("min2dScore"); it != o.end()) {
-    cfg.min2dScore = json::value_to<double>(it->value());
+    cfg.min2dScore = it->value().to_number<double>();
   }
 
   if (auto it = o.find("refit"); it != o.end()) {
@@ -415,7 +415,7 @@ TraceConfig ZBlockedAutoTraceSession::traceConfigFromJsonOrThrow(const json::obj
     cfg.chainScreenCount = json::value_to<int>(it->value());
   }
   if (auto it = o.find("maxEucDist"); it != o.end()) {
-    cfg.maxEucDist = json::value_to<double>(it->value());
+    cfg.maxEucDist = it->value().to_number<double>();
   }
 
   return cfg;

@@ -98,20 +98,6 @@ void applyAnnotationPropertiesToPunctum(const ZNeuroglancerPrecomputedAnnotation
   }
 }
 
-[[nodiscard]] std::optional<double> jsonNumberAsDouble(const json::value& v)
-{
-  if (v.is_double()) {
-    return v.as_double();
-  }
-  if (v.is_int64()) {
-    return static_cast<double>(v.as_int64());
-  }
-  if (v.is_uint64()) {
-    return static_cast<double>(v.as_uint64());
-  }
-  return std::nullopt;
-}
-
 [[nodiscard]] std::optional<glm::dvec3> jsonArray3AsDvec3(const json::value& v)
 {
   if (!v.is_array()) {
@@ -121,10 +107,10 @@ void applyAnnotationPropertiesToPunctum(const ZNeuroglancerPrecomputedAnnotation
   if (a.size() != 3) {
     return std::nullopt;
   }
-  const auto x = jsonNumberAsDouble(a[0]);
-  const auto y = jsonNumberAsDouble(a[1]);
-  const auto z = jsonNumberAsDouble(a[2]);
-  if (!x || !y || !z) {
+  const auto x = a[0].try_to_number<double>();
+  const auto y = a[1].try_to_number<double>();
+  const auto z = a[2].try_to_number<double>();
+  if (x.has_error() || y.has_error() || z.has_error()) {
     return std::nullopt;
   }
   return glm::dvec3{*x, *y, *z};

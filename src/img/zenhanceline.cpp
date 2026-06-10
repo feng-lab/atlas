@@ -250,7 +250,7 @@ void ZEnhanceLine::read(const json::object& jo)
   m_inputImagePath = json::value_to<QString>(jo.at("input_image"));
   m_outputImagePath = json::value_to<QString>(jo.at("output_image"));
   m_channel = static_cast<int>(json::value_to<int64_t>(jo.at("channel")));
-  m_sigma = json::value_to<double>(jo.at("sigma"));
+  m_sigma = jo.at("sigma").to_number<double>();
 }
 
 void ZEnhanceLine::write(json::object& jo) const

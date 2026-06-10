@@ -500,9 +500,9 @@ inline ZImgInfo tag_invoke(const json::value_to_tag<ZImgInfo>&, const json::valu
   info.voxelFormat = stringToEnum<VoxelFormat>(jv.at("voxelFormat").as_string());
   info.validBitCount = json::value_to<size_t>(jv.at("validBitCount"));
   info.voxelSizeUnit = stringToEnum<VoxelSizeUnit>(jv.at("voxelSizeUnit").as_string());
-  info.voxelSizeX = json::value_to<double>(jv.at("voxelSizeX"));
-  info.voxelSizeY = json::value_to<double>(jv.at("voxelSizeY"));
-  info.voxelSizeZ = json::value_to<double>(jv.at("voxelSizeZ"));
+  info.voxelSizeX = jv.at("voxelSizeX").to_number<double>();
+  info.voxelSizeY = jv.at("voxelSizeY").to_number<double>();
+  info.voxelSizeZ = jv.at("voxelSizeZ").to_number<double>();
   info.timeStamps = json::value_to<std::vector<double>>(jv.at("timeStamps"));
   info.channelNames = json::value_to<std::vector<std::string>>(jv.at("channelNames"));
   info.channelColors = json::value_to<std::vector<col4>>(jv.at("channelColors"));

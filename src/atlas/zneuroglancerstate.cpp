@@ -76,16 +76,10 @@ namespace {
     return std::nullopt;
   }
   const json::value& v = it->value();
-  if (v.is_double()) {
-    return v.as_double();
+  if (!v.is_number()) {
+    return std::nullopt;
   }
-  if (v.is_int64()) {
-    return static_cast<double>(v.as_int64());
-  }
-  if (v.is_uint64()) {
-    return static_cast<double>(v.as_uint64());
-  }
-  return std::nullopt;
+  return v.to_number<double>();
 }
 
 void collectSourceUrls(const json::value& v, QStringList* out)
