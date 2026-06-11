@@ -91,6 +91,20 @@ def make_parallel_jobs_arg() -> str:
     return "-j" + str(parallel_jobs_count())
 
 
+def cmake_ignore_prefix_paths() -> list[str]:
+    paths = ["/usr/local"]
+    if is_mac():
+        paths.append("/opt/homebrew")
+    return paths
+
+
+def cmake_ignore_paths() -> list[str]:
+    paths = ["/usr/local/bin"]
+    if is_mac():
+        paths.append("/opt/homebrew/bin")
+    return paths
+
+
 def _clang_major_env() -> str:
     # Allow CI to control clang version
     return os.environ.get("ATLAS_CLANG_MAJOR") or os.environ.get("LLVM_VERSION") or "22"
@@ -961,8 +975,8 @@ def get_cmake_cmd_common_part(
             get_cmake_binary(),  # '-E', 'echo',
             "-DCMAKE_BUILD_TYPE=Release",
             "-DCMAKE_PREFIX_PATH=" + ext_build_dir(),
-            "-DCMAKE_IGNORE_PREFIX_PATH=/usr/local",
-            "-DCMAKE_IGNORE_PATH=/usr/local/bin",
+            "-DCMAKE_IGNORE_PREFIX_PATH=" + ";".join(cmake_ignore_prefix_paths()),
+            "-DCMAKE_IGNORE_PATH=" + ";".join(cmake_ignore_paths()),
             "-DCMAKE_MODULE_PATH=" + ext_build_dir(),
             "-DCMAKE_INSTALL_PREFIX=" + install_dir,
             "" if no_hidden_visibility else "-DCMAKE_VISIBILITY_INLINES_HIDDEN=ON",
@@ -1004,8 +1018,8 @@ def get_cmake_cmd_common_part(
             # CMAKE_SYSTEM_PROCESSOR. In Rosetta/x86_64 shells, CMake can
             # still report CMAKE_SYSTEM_PROCESSOR=x86_64 for an arm64 target.
             "-DCMAKE_PREFIX_PATH=" + ext_build_dir(),
-            "-DCMAKE_IGNORE_PREFIX_PATH=/usr/local",
-            "-DCMAKE_IGNORE_PATH=/usr/local/bin",
+            "-DCMAKE_IGNORE_PREFIX_PATH=" + ";".join(cmake_ignore_prefix_paths()),
+            "-DCMAKE_IGNORE_PATH=" + ";".join(cmake_ignore_paths()),
             "-DCMAKE_FIND_FRAMEWORK=LAST",
             "-DCMAKE_MODULE_PATH=" + ext_build_dir(),
             "-DCMAKE_INSTALL_PREFIX=" + install_dir,
@@ -1996,6 +2010,7 @@ def build_xz(src_dir: str, install_dir: str):
                 "-DBUILD_SHARED_LIBS:BOOL=OFF",
                 "-DCREATE_XZ_SYMLINKS:BOOL=OFF",
                 "-DCREATE_LZMA_SYMLINKS:BOOL=OFF",
+                "-DXZ_NLS:BOOL=OFF",
                 "-DENABLE_SMALL:BOOL=OFF",
                 src_dir,
             ]
@@ -2013,6 +2028,7 @@ def build_xz(src_dir: str, install_dir: str):
                         "-DBUILD_SHARED_LIBS:BOOL=OFF",
                         "-DCREATE_XZ_SYMLINKS:BOOL=OFF",
                         "-DCREATE_LZMA_SYMLINKS:BOOL=OFF",
+                        "-DXZ_NLS:BOOL=OFF",
                         "-DENABLE_SMALL:BOOL=OFF",
                         src_dir,
                     ]

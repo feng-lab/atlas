@@ -78,7 +78,7 @@ runs:
         set -euo pipefail
         # CI stability: avoid Homebrew network updates (and ensure brew install doesn't auto-update).
         # Core tools and build prerequisites for macOS (see readme.md)
-        brew install unrar p7zip git golang autoconf || true
+        brew install p7zip git golang autoconf || true
 
     - name: Cache Vulkan SDK (installed)
       if: ${{ inputs.enable-cache == 'true' && inputs.force-setup == 'true' }}
@@ -213,17 +213,6 @@ runs:
           python -m aqt install-tool --outputdir "$HOME/Qt" mac desktop tools_ifw qt.tools.ifw.47
         fi
         ls -la "$HOME/Qt" || true
-
-    - name: Cache atlas test data
-      if: ${{ inputs.enable-cache == 'true' }}
-      uses: actions/cache@v5
-      with:
-        enableCrossOsArchive: true
-        path: |
-          atlas_test_data
-        key: ${{ format('testdata-{0}', hashFiles('util/atlas_test_data_filelist.py')) }}
-        restore-keys: |
-          testdata-
 
     - name: Build external deps
       # Only rebuild external deps when we did not get an exact cache hit

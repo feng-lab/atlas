@@ -1,5 +1,10 @@
 name: macOS Build and Publish
 description: Build Atlas, publish artifacts, and optionally clean up on self-hosted runners.
+inputs:
+  cache-test-data:
+    description: Restore/save atlas_test_data through GitHub cache before build_and_deploy_atlas.py.
+    required: false
+    default: "false"
 runs:
   using: composite
   steps:
@@ -106,6 +111,17 @@ runs:
             echo "EOF"
           } >> "$GITHUB_ENV"
         fi
+
+    - name: Cache atlas test data
+      if: ${{ inputs.cache-test-data == 'true' }}
+      uses: actions/cache@v5
+      with:
+        enableCrossOsArchive: true
+        path: |
+          atlas_test_data
+        key: ${{ format('testdata-{0}', hashFiles('util/atlas_test_data_filelist.py')) }}
+        restore-keys: |
+          testdata-
 
     - name: Build and deploy Atlas
       shell: bash -l {0}

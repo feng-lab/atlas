@@ -27,7 +27,7 @@ CPython is supported as long as the wheel continues to target that configured
     # if xcode command line tools are already installed, disable it:
     sudo xcode-select -switch /Applications/Xcode.app`
     # some required packages
-    brew install unrar p7zip git golang autoconf
+    brew install p7zip git golang autoconf
     ```
 * install qt6 (by aqt or installer from the qt website)
     ```bash
@@ -82,7 +82,7 @@ CPython is supported as long as the wheel continues to target that configured
          libcurl4-openssl-dev \
          libxcb-xinerama0 libxkbcommon0 libfontconfig1 libxcb-icccm4 libxcb-keysyms1 libxcb-image0 \
          libxcb-render-util0 libxcb-shape0 libxcb-xkb1 libxkbcommon-x11-0 \
-         unrar golang-go
+         golang-go
     ```
 * install LLVM/clang (Atlas currently builds with clang on Linux; GitHub Actions uses clang 22)
     ```bash
