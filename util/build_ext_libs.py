@@ -392,7 +392,14 @@ def create_universal_binaries(
     arm64_install_dir, final_install_dir, remove_dylib: bool = False
 ):
     assert is_mac()
-    logger.info(f"{arm64_install_dir} to {final_install_dir}")
+    logger.info(
+        "merge universal binaries from %s into %s",
+        arm64_install_dir,
+        final_install_dir,
+    )
+    copied_files = 0
+    deleted_files = 0
+    merged_files = 0
     for root, dirs, files in os.walk(arm64_install_dir):
         for name in files:
             filename = os.path.join(root, name)
@@ -403,6 +410,7 @@ def create_universal_binaries(
                     )
                     logger.info(f"deleting {target_filename}")
                     os.remove(target_filename)
+                    deleted_files += 1
                 continue
             if (
                 filename.endswith(".a")
@@ -426,13 +434,16 @@ def create_universal_binaries(
                 if name.startswith("libtegra_hal.a"):
                     logger.info(f"copy {filename} to {target_filename}")
                     shutil.copyfile(filename, target_filename)
+                    copied_files += 1
                     continue
                 if remove_dylib and filename.endswith(".dylib"):
                     logger.info(f"deleting {target_filename}")
                     os.remove(target_filename)
+                    deleted_files += 1
                 elif not os.path.exists(target_filename):
                     logger.info(f"copy {filename} to {target_filename}")
                     shutil.copyfile(filename, target_filename)
+                    copied_files += 1
                 else:
                     logger.info(f"merge {filename} to {target_filename}")
                     subprocess.run(
@@ -447,7 +458,14 @@ def create_universal_binaries(
                         shell=False,
                         check=True,
                     )
+                    merged_files += 1
     _merge_universal_headers(arm64_install_dir, final_install_dir)
+    logger.info(
+        "finished universal binary merge: merged=%d copied=%d deleted=%d",
+        merged_files,
+        copied_files,
+        deleted_files,
+    )
 
 
 def build_macos_split_or_single(src_dir: str, install_dir: str, build_arch):
@@ -765,11 +783,16 @@ def get_common_build_flags(
         osx_sysroot = r"/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk"
         assert os.path.exists(osx_sysroot)
 
-        arch_flag = " -mavx "
+        # Some third-party build scripts invoke clang directly with CFLAGS
+        # instead of going through CMake's compile rules. Carry the target
+        # architecture in the raw flags for split-arch builds so hardware flags
+        # such as -mavx are interpreted for the intended target on Apple Silicon
+        # hosts.
+        arch_flag = " -arch x86_64 -mavx "
         if universal:
             arch_flag = " -mavx -mcpu=apple-m1 "
         elif arm64_only:
-            arch_flag = " -mcpu=apple-m1 "
+            arch_flag = " -arch arm64 -mcpu=apple-m1 "
 
         res["CC"] = "clang"
         res["CFLAGS"] = (
@@ -3491,14 +3514,14 @@ def build_libpng(src_dir: str, install_dir: str):
     try:
         patch_manager.apply_patches()
 
+        libpng_cmake_options = [
+            "-DPNG_TESTS:BOOL=OFF",
+            "-DPNG_SHARED:BOOL=OFF",
+            "-DPNG_FRAMEWORK:BOOL=OFF",
+        ]
+
         cmakecmd = get_cmake_cmd_common_part(install_dir)
-        cmakecmd.extend(
-            [
-                "-DPNG_TESTS:BOOL=OFF",
-                "-DPNG_SHARED:BOOL=OFF",
-                "-DPNG_FRAMEWORK:BOOL=OFF",
-            ]
-        )
+        cmakecmd.extend(libpng_cmake_options)
         cmakecmd.extend([src_dir])
         build_and_install_cmakecmd(cmakecmd, build_dir)
 
@@ -3508,15 +3531,7 @@ def build_libpng(src_dir: str, install_dir: str):
 
             try:
                 cmakecmd = get_cmake_cmd_common_part(arm64_install_dir, arm64_only=True)
-
-                cmakecmd.extend(
-                    [
-                        "-DPNG_TESTS:BOOL=OFF",
-                        "-DPNG_SHARED:BOOL=OFF",
-                        "-DPNG_FRAMEWORK:BOOL=OFF",
-                        "-DCMAKE_OSX_INTERNAL_ARCHITECTURES=arm64",
-                    ]
-                )
+                cmakecmd.extend(libpng_cmake_options)
                 cmakecmd.extend([src_dir])
 
                 build_and_install_cmakecmd(cmakecmd, build_dir)

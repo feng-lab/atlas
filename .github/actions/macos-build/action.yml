@@ -1,6 +1,16 @@
 name: macOS Build and Publish
-description: Build Atlas, publish artifacts, and optionally clean up on self-hosted runners.
+description: Install macOS build SDKs, build Atlas, publish artifacts, and optionally clean up on self-hosted runners.
 inputs:
+  qt-version:
+    description: Qt version to install
+    required: true
+  vulkan-version:
+    description: Vulkan SDK version to install/validate
+    required: true
+  enable-cache:
+    description: Enable actions/cache restore/save for build-time SDKs.
+    required: false
+    default: "true"
   cache-test-data:
     description: Restore/save atlas_test_data through GitHub cache before build_and_deploy_atlas.py.
     required: false
@@ -8,6 +18,99 @@ inputs:
 runs:
   using: composite
   steps:
+    - name: Cache Vulkan SDK (installed)
+      if: ${{ inputs.enable-cache == 'true' }}
+      uses: actions/cache@v5
+      with:
+        path: |
+          ~/VulkanSDK/${{ inputs.vulkan-version }}
+        key: ${{ runner.os }}-vulkan-${{ inputs.vulkan-version }}
+
+    - name: Install Vulkan SDK (LunarG macOS CLI)
+      shell: bash -l {0}
+      env:
+        VULKAN_SDK_VERSION: ${{ inputs.vulkan-version }}
+      run: |
+        set -euo pipefail
+
+        mkdir -p "$HOME/VulkanSDK"
+        if [ -d "$HOME/VulkanSDK/${VULKAN_SDK_VERSION}" ]; then
+          echo "Vulkan SDK already present under \$HOME/VulkanSDK/${VULKAN_SDK_VERSION}"
+          ls -R "$HOME/VulkanSDK/${VULKAN_SDK_VERSION}" || true
+          exit 0
+        fi
+
+        VULKAN_SDK_MAC_URL="https://sdk.lunarg.com/sdk/download/${VULKAN_SDK_VERSION}/mac/vulkansdk-macos-${VULKAN_SDK_VERSION}.zip"
+        ZIP="/tmp/vulkansdk-macos-${VULKAN_SDK_VERSION}.zip"
+        echo "Downloading Vulkan SDK from: ${VULKAN_SDK_MAC_URL}"
+        /usr/bin/curl -fL "${VULKAN_SDK_MAC_URL}" -o "${ZIP}"
+
+        UNPACK_DIR="/tmp/vulkansdk-macos-${VULKAN_SDK_VERSION}"
+        rm -rf "${UNPACK_DIR}"
+        mkdir -p "${UNPACK_DIR}"
+        /usr/bin/unzip -q "${ZIP}" -d "${UNPACK_DIR}"
+
+        APP_PATH="${UNPACK_DIR}/vulkansdk-macOS-${VULKAN_SDK_VERSION}.app"
+        if [ ! -d "${APP_PATH}" ]; then
+          echo "Expected app bundle not found at ${APP_PATH}" >&2
+          exit 1
+        fi
+
+        APP_BIN="${APP_PATH}/Contents/MacOS/vulkansdk-macOS-${VULKAN_SDK_VERSION}"
+        if [ ! -x "${APP_BIN}" ]; then
+          echo "Vulkan SDK installer binary not executable at ${APP_BIN}" >&2
+          exit 1
+        fi
+
+        INSTALL_ROOT="$HOME/VulkanSDK/${VULKAN_SDK_VERSION}"
+        mkdir -p "${INSTALL_ROOT}"
+
+        echo "Running Vulkan SDK installer CLI (user-level install under \$HOME):"
+        echo "  ${APP_BIN} --root \"${INSTALL_ROOT}\" --accept-licenses --default-answer --confirm-command install com.lunarg.vulkan.core com.lunarg.vulkan.vma"
+
+        "${APP_BIN}" \
+          --root "${INSTALL_ROOT}" \
+          --accept-licenses \
+          --default-answer \
+          --confirm-command \
+          install com.lunarg.vulkan.core com.lunarg.vulkan.vma
+
+        # Remove temporary installer payloads from /tmp to avoid buildup on self-hosted runners.
+        rm -rf "${UNPACK_DIR}" "${ZIP}" || true
+
+        ls -R "${INSTALL_ROOT}" || true
+
+    - name: Cache Qt (installed)
+      if: ${{ inputs.enable-cache == 'true' }}
+      uses: actions/cache@v5
+      with:
+        path: |
+          ~/Qt/${{ inputs.qt-version }}
+          ~/Qt/Tools/QtInstallerFramework
+        key: ${{ runner.os }}-qt-${{ inputs.qt-version }}
+
+    - name: Install Qt 6 (aqt)
+      shell: bash -l {0}
+      env:
+        QT_VERSION: ${{ inputs.qt-version }}
+      run: |
+        set -euo pipefail
+        eval "$(conda shell.bash hook)"
+        conda activate atlas-ci
+        python -m pip install --no-cache-dir aqtinstall
+        mkdir -p "$HOME/Qt"
+        if [ -d "$HOME/Qt/${QT_VERSION}/macos" ]; then
+          echo "Qt already cached"
+        else
+          python -m aqt install-qt --outputdir "$HOME/Qt" mac desktop "${QT_VERSION}" clang_64
+        fi
+        if [ -d "$HOME/Qt/Tools/QtInstallerFramework" ]; then
+          echo "Qt IFW cached"
+        else
+          python -m aqt install-tool --outputdir "$HOME/Qt" mac desktop tools_ifw qt.tools.ifw.47
+        fi
+        ls -la "$HOME/Qt" || true
+
     - name: Configure macOS signing + notarization
       shell: bash -l {0}
       run: |

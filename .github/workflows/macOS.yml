@@ -27,7 +27,7 @@ env:
   # Pin a Vulkan SDK version for the ~/VulkanSDK layout
   VULKAN_SDK_VERSION: 1.4.341.1
   # Centralize Qt version to keep parity with Linux/Windows CI
-  QT_VERSION: "6.9.3"
+  QT_VERSION: "6.9.2"
   # Minimum Python version used by CI build environments
   PYTHON_VERSION_MIN: "3.12"
   # CI stability: disable Homebrew auto-update (avoids transient network failures during `brew install`).
@@ -72,11 +72,8 @@ jobs:
       - name: Prepare macOS environment
         uses: ./.github/actions/macos-env
         with:
-          qt-version: ${{ env.QT_VERSION }}
-          vulkan-version: ${{ env.VULKAN_SDK_VERSION }}
-          force-setup: "true"
+          mode: combined
           enable-cache: "false"
-          build-extlibs: "true"
           python-version: ${{ env.PYTHON_VERSION_MIN }}
 
       - name: Ensure GitHub CLI
@@ -95,6 +92,10 @@ jobs:
 
       - name: Build and publish
         uses: ./.github/actions/macos-build
+        with:
+          qt-version: ${{ env.QT_VERSION }}
+          vulkan-version: ${{ env.VULKAN_SDK_VERSION }}
+          enable-cache: "false"
 
   build-env:
     needs: determine-mode
@@ -115,10 +116,7 @@ jobs:
       - name: Prepare macOS environment
         uses: ./.github/actions/macos-env
         with:
-          qt-version: ${{ env.QT_VERSION }}
-          vulkan-version: ${{ env.VULKAN_SDK_VERSION }}
-          force-setup: "false"
-          build-extlibs: "true"
+          mode: extlibs
           enable-cache: "true"
           python-version: ${{ env.PYTHON_VERSION_MIN }}
 
@@ -146,14 +144,14 @@ jobs:
       - name: Prepare macOS environment
         uses: ./.github/actions/macos-env
         with:
-          qt-version: ${{ env.QT_VERSION }}
-          vulkan-version: ${{ env.VULKAN_SDK_VERSION }}
-          force-setup: "true"
-          build-extlibs: "false"
+          mode: build
           enable-cache: "true"
           python-version: ${{ env.PYTHON_VERSION_MIN }}
 
       - name: Build and publish
         uses: ./.github/actions/macos-build
         with:
+          qt-version: ${{ env.QT_VERSION }}
+          vulkan-version: ${{ env.VULKAN_SDK_VERSION }}
+          enable-cache: "true"
           cache-test-data: "true"

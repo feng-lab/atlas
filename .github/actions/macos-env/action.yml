@@ -1,20 +1,9 @@
 name: macOS Env Setup
-description: Prepare macOS toolchain, caches, and optional external deps for Atlas builds.
+description: Prepare macOS toolchain, 3rdparty cache, and optional external deps by CI job mode.
 inputs:
-  qt-version:
-    description: Qt version to install
+  mode:
+    description: "Setup mode: extlibs prepares the 3rdparty cache, build prepares final build tooling without rebuilding extlibs, combined does both."
     required: true
-  vulkan-version:
-    description: Vulkan SDK version to install/validate
-    required: true
-  force-setup:
-    description: Run setup steps even when the 3rdparty cache is hit
-    required: false
-    default: "false"
-  build-extlibs:
-    description: Build external deps when the 3rdparty cache is missed
-    required: false
-    default: "false"
   enable-cache:
     description: Enable actions/cache restore/save (GitHub cache service). If false, uses a local on-disk cache for 3rdparty build outputs.
     required: false
@@ -25,6 +14,20 @@ inputs:
 runs:
   using: composite
   steps:
+    - name: Validate mode
+      shell: bash
+      env:
+        MODE: ${{ inputs.mode }}
+      run: |
+        case "${MODE}" in
+          extlibs|build|combined)
+            ;;
+          *)
+            echo "Error: unsupported macos-env mode '${MODE}'. Expected one of: extlibs, build, combined." >&2
+            exit 1
+            ;;
+        esac
+
     - name: Cache 3rdparty build
       id: cache-extlibs
       if: ${{ inputs.enable-cache == 'true' }}
@@ -35,6 +38,7 @@ runs:
         key: ${{ runner.os }}-ext-${{ hashFiles('util/atlas_deps_filelist.py') }}
 
     - name: Cache 3rdparty build (local on-disk)
+      id: cache-extlibs-local
       if: ${{ inputs.enable-cache == 'false' }}
       shell: bash -l {0}
       env:
@@ -56,21 +60,32 @@ runs:
           echo "Restoring local extlibs cache for '${CACHE_PATH_REL}' from: ${archive}"
           rm -rf -- "${GITHUB_WORKSPACE%/}/${CACHE_PATH_REL}" 2>/dev/null || true
           if tar -C "${GITHUB_WORKSPACE%/}" -xzf "${archive}"; then
-            if [ -n "${GITHUB_ENV:-}" ]; then
-              echo "ATLAS_EXTLIBS_LOCAL_CACHE_HIT=true" >> "$GITHUB_ENV"
-            else
-              echo "Warning: GITHUB_ENV is not set; cannot persist local extlibs cache hit flag." >&2
-            fi
+            echo "cache-hit=true" >> "$GITHUB_OUTPUT"
           else
             echo "Warning: failed to restore local extlibs cache archive; rebuilding and re-packaging." >&2
             rm -f -- "${archive}" 2>/dev/null || true
+            echo "cache-hit=false" >> "$GITHUB_OUTPUT"
           fi
         else
           echo "Local extlibs cache miss for key: ${CACHE_KEY}"
+          echo "cache-hit=false" >> "$GITHUB_OUTPUT"
+        fi
+
+    - name: Resolve 3rdparty cache state
+      id: extlibs-cache
+      shell: bash
+      env:
+        GITHUB_CACHE_HIT: ${{ steps.cache-extlibs.outputs.cache-hit }}
+        LOCAL_CACHE_HIT: ${{ steps.cache-extlibs-local.outputs.cache-hit }}
+      run: |
+        if [ "${GITHUB_CACHE_HIT}" = "true" ] || [ "${LOCAL_CACHE_HIT}" = "true" ]; then
+          echo "hit=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "hit=false" >> "$GITHUB_OUTPUT"
         fi
 
     - name: Install base packages (Homebrew)
-      if: ${{ inputs.force-setup == 'true' || steps.cache-extlibs.outputs.cache-hit != 'true' }}
+      if: ${{ inputs.mode == 'build' || inputs.mode == 'combined' || steps.extlibs-cache.outputs.hit != 'true' }}
       shell: bash -l {0}
       env:
         HOMEBREW_NO_AUTO_UPDATE: "1"
@@ -80,71 +95,8 @@ runs:
         # Core tools and build prerequisites for macOS (see readme.md)
         brew install p7zip git golang autoconf || true
 
-    - name: Cache Vulkan SDK (installed)
-      if: ${{ inputs.enable-cache == 'true' && inputs.force-setup == 'true' }}
-      uses: actions/cache@v5
-      with:
-        path: |
-          ~/VulkanSDK/${{ inputs.vulkan-version }}
-        key: ${{ runner.os }}-vulkan-${{ inputs.vulkan-version }}
-
-    - name: Install Vulkan SDK (LunarG macOS CLI)
-      if: ${{ inputs.force-setup == 'true' }}
-      shell: bash -l {0}
-      env:
-        VULKAN_SDK_VERSION: ${{ inputs.vulkan-version }}
-      run: |
-        set -euo pipefail
-
-        mkdir -p "$HOME/VulkanSDK"
-        if [ -d "$HOME/VulkanSDK/${VULKAN_SDK_VERSION}" ]; then
-          echo "Vulkan SDK already present under \$HOME/VulkanSDK/${VULKAN_SDK_VERSION}"
-          ls -R "$HOME/VulkanSDK/${VULKAN_SDK_VERSION}" || true
-          exit 0
-        fi
-
-        VULKAN_SDK_MAC_URL="https://sdk.lunarg.com/sdk/download/${VULKAN_SDK_VERSION}/mac/vulkansdk-macos-${VULKAN_SDK_VERSION}.zip"
-        ZIP="/tmp/vulkansdk-macos-${VULKAN_SDK_VERSION}.zip"
-        echo "Downloading Vulkan SDK from: ${VULKAN_SDK_MAC_URL}"
-        /usr/bin/curl -fL "${VULKAN_SDK_MAC_URL}" -o "${ZIP}"
-
-        UNPACK_DIR="/tmp/vulkansdk-macos-${VULKAN_SDK_VERSION}"
-        rm -rf "${UNPACK_DIR}"
-        mkdir -p "${UNPACK_DIR}"
-        /usr/bin/unzip -q "${ZIP}" -d "${UNPACK_DIR}"
-
-        APP_PATH="${UNPACK_DIR}/vulkansdk-macOS-${VULKAN_SDK_VERSION}.app"
-        if [ ! -d "${APP_PATH}" ]; then
-          echo "Expected app bundle not found at ${APP_PATH}" >&2
-          exit 1
-        fi
-
-        APP_BIN="${APP_PATH}/Contents/MacOS/vulkansdk-macOS-${VULKAN_SDK_VERSION}"
-        if [ ! -x "${APP_BIN}" ]; then
-          echo "Vulkan SDK installer binary not executable at ${APP_BIN}" >&2
-          exit 1
-        fi
-
-        INSTALL_ROOT="$HOME/VulkanSDK/${VULKAN_SDK_VERSION}"
-        mkdir -p "${INSTALL_ROOT}"
-
-        echo "Running Vulkan SDK installer CLI (user-level install under \$HOME):"
-        echo "  ${APP_BIN} --root \"${INSTALL_ROOT}\" --accept-licenses --default-answer --confirm-command install com.lunarg.vulkan.core com.lunarg.vulkan.vma"
-
-        "${APP_BIN}" \
-          --root "${INSTALL_ROOT}" \
-          --accept-licenses \
-          --default-answer \
-          --confirm-command \
-          install com.lunarg.vulkan.core com.lunarg.vulkan.vma
-
-        # Remove temporary installer payloads from /tmp to avoid buildup on self-hosted runners
-        rm -rf "${UNPACK_DIR}" "${ZIP}" || true
-
-        ls -R "${INSTALL_ROOT}" || true
-
     - name: Detect existing conda
-      if: ${{ inputs.force-setup == 'true' || steps.cache-extlibs.outputs.cache-hit != 'true' }}
+      if: ${{ inputs.mode == 'build' || inputs.mode == 'combined' || steps.extlibs-cache.outputs.hit != 'true' }}
       id: detect-conda
       shell: bash
       run: |
@@ -155,7 +107,7 @@ runs:
         fi
 
     - name: Setup Miniconda
-      if: ${{ (inputs.force-setup == 'true' || steps.cache-extlibs.outputs.cache-hit != 'true') && steps.detect-conda.outputs.found != 'true' }}
+      if: ${{ (inputs.mode == 'build' || inputs.mode == 'combined' || steps.extlibs-cache.outputs.hit != 'true') && steps.detect-conda.outputs.found != 'true' }}
       uses: conda-incubator/setup-miniconda@v4
       with:
         auto-update-conda: true
@@ -164,7 +116,7 @@ runs:
         channels: defaults
 
     - name: Create/Reset atlas-ci conda env
-      if: ${{ inputs.force-setup == 'true' || steps.cache-extlibs.outputs.cache-hit != 'true' }}
+      if: ${{ inputs.mode == 'build' || inputs.mode == 'combined' || steps.extlibs-cache.outputs.hit != 'true' }}
       shell: bash -l {0}
       run: |
         conda info || true
@@ -172,7 +124,7 @@ runs:
         conda create -n atlas-ci -y python=${{ inputs.python-version }}
 
     - name: Install conda tooling
-      if: ${{ inputs.force-setup == 'true' || steps.cache-extlibs.outputs.cache-hit != 'true' }}
+      if: ${{ inputs.mode == 'build' || inputs.mode == 'combined' || steps.extlibs-cache.outputs.hit != 'true' }}
       shell: bash -l {0}
       run: |
         eval "$(conda shell.bash hook)"
@@ -181,50 +133,15 @@ runs:
         conda update --all -y
         conda install -y anaconda-client conda-build pip
         python -m pip install --upgrade pip
-        python -m pip install --no-cache-dir aqtinstall requests packaging boto3
+        python -m pip install --no-cache-dir requests packaging boto3
         conda clean --all -y
-
-    - name: Cache Qt (installed)
-      if: ${{ inputs.enable-cache == 'true' && inputs.force-setup == 'true' }}
-      uses: actions/cache@v5
-      with:
-        path: |
-          ~/Qt/${{ inputs.qt-version }}
-          ~/Qt/Tools/QtInstallerFramework
-        key: ${{ runner.os }}-qt-${{ inputs.qt-version }}
-
-    - name: Install Qt 6 (aqt)
-      if: ${{ inputs.force-setup == 'true' }}
-      shell: bash -l {0}
-      env:
-        QT_VERSION: ${{ inputs.qt-version }}
-      run: |
-        eval "$(conda shell.bash hook)"
-        conda activate atlas-ci
-        mkdir -p "$HOME/Qt"
-        if [ -d "$HOME/Qt/${QT_VERSION}/macos" ]; then
-          echo "Qt already cached"
-        else
-          python -m aqt install-qt --outputdir "$HOME/Qt" mac desktop ${QT_VERSION} clang_64
-        fi
-        if [ -d "$HOME/Qt/Tools/QtInstallerFramework" ]; then
-          echo "Qt IFW cached"
-        else
-          python -m aqt install-tool --outputdir "$HOME/Qt" mac desktop tools_ifw qt.tools.ifw.47
-        fi
-        ls -la "$HOME/Qt" || true
 
     - name: Build external deps
       # Only rebuild external deps when we did not get an exact cache hit
-      if: ${{ inputs.build-extlibs == 'true' && steps.cache-extlibs.outputs.cache-hit != 'true' }}
+      if: ${{ (inputs.mode == 'extlibs' || inputs.mode == 'combined') && steps.extlibs-cache.outputs.hit != 'true' }}
       shell: bash -l {0}
       run: |
         set -euo pipefail
-
-        if [ "${ATLAS_EXTLIBS_LOCAL_CACHE_HIT:-}" = "true" ]; then
-          echo "External deps already restored from local cache; skipping build_ext_libs.py."
-          exit 0
-        fi
 
         eval "$(conda shell.bash hook)"
         conda activate atlas-ci
@@ -232,18 +149,13 @@ runs:
         python util/build_ext_libs.py all
 
     - name: Save 3rdparty build (local on-disk)
-      if: ${{ success() && inputs.enable-cache == 'false' && inputs.build-extlibs == 'true' }}
+      if: ${{ success() && inputs.enable-cache == 'false' && (inputs.mode == 'extlibs' || inputs.mode == 'combined') && steps.extlibs-cache.outputs.hit != 'true' }}
       shell: bash -l {0}
       env:
         CACHE_KEY: ${{ runner.os }}-ext-${{ hashFiles('util/atlas_deps_filelist.py') }}
         CACHE_PATH_REL: src/3rdparty/build
       run: |
         set -euo pipefail
-
-        if [ "${ATLAS_EXTLIBS_LOCAL_CACHE_HIT:-}" = "true" ]; then
-          echo "External deps restored from local cache; skipping packaging."
-          exit 0
-        fi
 
         src="${GITHUB_WORKSPACE%/}/${CACHE_PATH_REL}"
         if [ ! -d "${src}" ]; then
