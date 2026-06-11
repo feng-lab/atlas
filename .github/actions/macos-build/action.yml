@@ -107,7 +107,7 @@ runs:
         if [ -d "$HOME/Qt/Tools/QtInstallerFramework" ]; then
           echo "Qt IFW cached"
         else
-          python -m aqt install-tool --outputdir "$HOME/Qt" mac desktop tools_ifw qt.tools.ifw.47
+          bash "${GITHUB_WORKSPACE}/util/install_qt_ifw_macos.sh"
         fi
         ls -la "$HOME/Qt" || true
 

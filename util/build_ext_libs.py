@@ -4,10 +4,12 @@ import glob
 import json
 import logging
 import os
+import re
 import shutil
 import stat
 import subprocess
 import sys
+import tempfile
 from collections import OrderedDict, deque
 from pathlib import Path
 
@@ -388,6 +390,115 @@ def _merge_universal_headers(arm64_install_dir: str, final_install_dir: str):
         logger.info(f"verified {identical_headers} universal headers are identical")
 
 
+def _lipo_architectures(filename: str) -> list[str]:
+    result = subprocess.run(
+        ["lipo", "-archs", filename],
+        shell=False,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        detail = result.stderr.strip() or result.stdout.strip()
+        raise RuntimeError(
+            f"Unable to inspect Mach-O architectures for {filename}: {detail}"
+        )
+    return result.stdout.split()
+
+
+def _remove_lipo_architectures(
+    filename: str, architectures: list[str]
+) -> tuple[str, list[str]]:
+    temporary_files = []
+    current_filename = filename
+    target_dir = os.path.dirname(filename)
+    for architecture in architectures:
+        with tempfile.NamedTemporaryFile(
+            dir=target_dir, delete=False
+        ) as temporary_file:
+            next_filename = temporary_file.name
+        temporary_files.append(next_filename)
+        subprocess.run(
+            [
+                "lipo",
+                current_filename,
+                "-remove",
+                architecture,
+                "-output",
+                next_filename,
+            ],
+            shell=False,
+            check=True,
+        )
+        current_filename = next_filename
+    return current_filename, temporary_files
+
+
+def _merge_macho_binary(source_filename: str, target_filename: str) -> bool:
+    source_architectures = _lipo_architectures(source_filename)
+    target_architectures = _lipo_architectures(target_filename)
+    duplicate_architectures = [
+        architecture
+        for architecture in source_architectures
+        if architecture in target_architectures
+    ]
+
+    if duplicate_architectures:
+        target_only_architectures = [
+            architecture
+            for architecture in target_architectures
+            if architecture not in duplicate_architectures
+        ]
+        if not target_only_architectures:
+            logger.info(
+                "replace %s with %s; both contain architecture(s): %s",
+                target_filename,
+                source_filename,
+                " ".join(duplicate_architectures),
+            )
+            shutil.copyfile(source_filename, target_filename)
+            return False
+
+        stripped_target_filename, temporary_files = _remove_lipo_architectures(
+            target_filename, duplicate_architectures
+        )
+        logger.info(
+            "replace duplicate architecture(s) %s in %s before merging %s",
+            " ".join(duplicate_architectures),
+            target_filename,
+            source_filename,
+        )
+    else:
+        stripped_target_filename = target_filename
+        temporary_files = []
+
+    with tempfile.NamedTemporaryFile(
+        dir=os.path.dirname(target_filename), delete=False
+    ) as temporary_output_file:
+        output_filename = temporary_output_file.name
+    temporary_files.append(output_filename)
+    try:
+        subprocess.run(
+            [
+                "lipo",
+                "-create",
+                source_filename,
+                stripped_target_filename,
+                "-output",
+                output_filename,
+            ],
+            shell=False,
+            check=True,
+        )
+        os.replace(output_filename, target_filename)
+        temporary_files.remove(output_filename)
+        return True
+    finally:
+        for temporary_file in temporary_files:
+            if os.path.exists(temporary_file):
+                os.remove(temporary_file)
+
+
 def create_universal_binaries(
     arm64_install_dir, final_install_dir, remove_dylib: bool = False
 ):
@@ -400,6 +511,7 @@ def create_universal_binaries(
     copied_files = 0
     deleted_files = 0
     merged_files = 0
+    replaced_files = 0
     for root, dirs, files in os.walk(arm64_install_dir):
         for name in files:
             filename = os.path.join(root, name)
@@ -431,11 +543,7 @@ def create_universal_binaries(
                 ):  # text file
                     continue
                 target_filename = filename.replace(arm64_install_dir, final_install_dir)
-                if name.startswith("libtegra_hal.a"):
-                    logger.info(f"copy {filename} to {target_filename}")
-                    shutil.copyfile(filename, target_filename)
-                    copied_files += 1
-                    continue
+                os.makedirs(os.path.dirname(target_filename), exist_ok=True)
                 if remove_dylib and filename.endswith(".dylib"):
                     logger.info(f"deleting {target_filename}")
                     os.remove(target_filename)
@@ -446,23 +554,15 @@ def create_universal_binaries(
                     copied_files += 1
                 else:
                     logger.info(f"merge {filename} to {target_filename}")
-                    subprocess.run(
-                        [
-                            "lipo",
-                            "-create",
-                            filename,
-                            target_filename,
-                            "-output",
-                            target_filename,
-                        ],
-                        shell=False,
-                        check=True,
-                    )
-                    merged_files += 1
+                    if _merge_macho_binary(filename, target_filename):
+                        merged_files += 1
+                    else:
+                        replaced_files += 1
     _merge_universal_headers(arm64_install_dir, final_install_dir)
     logger.info(
-        "finished universal binary merge: merged=%d copied=%d deleted=%d",
+        "finished universal binary merge: merged=%d replaced=%d copied=%d deleted=%d",
         merged_files,
+        replaced_files,
         copied_files,
         deleted_files,
     )
@@ -5558,19 +5658,9 @@ void vtkBoundingBox::ComputeBounds(
 
 def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
+    opencv_install_namespace = "opencv5"
 
     patches = [
-        FilePatcher(
-            orig_file=os.path.join(
-                src_dir, "modules", "videoio", "src", "cap_msmf.cpp"
-            ),
-            from_texts=[
-                r"#include <initguid.h>",
-            ],
-            to_texts=[
-                "#include <initguid.h>\n#include <ks.h>\n",
-            ],
-        ),
         FilePatcher(
             orig_file=os.path.join(src_dir, "cmake", "OpenCVFindMKL.cmake"),
             from_texts=[
@@ -5584,12 +5674,12 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str):
             ],
         ),
         FilePatcher(
-            orig_file=os.path.join(src_dir, "modules", "calib3d", "CMakeLists.txt"),
+            orig_file=os.path.join(src_dir, "modules", "core", "CMakeLists.txt"),
             from_texts=[r"${LAPACK_LIBRARIES}"],
             to_texts=[r""],
         ),
         FilePatcher(
-            orig_file=os.path.join(src_dir, "modules", "core", "CMakeLists.txt"),
+            orig_file=os.path.join(src_dir, "modules", "geometry", "CMakeLists.txt"),
             from_texts=[r"${LAPACK_LIBRARIES}"],
             to_texts=[r""],
         ),
@@ -5599,22 +5689,275 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str):
     try:
         patch_manager.apply_patches()
 
+        def merge_opencv_universal_cmake_exports(
+            arm64_install_dir: str, final_install_dir: str
+        ):
+            def cmake_expected_targets(modules_text: str) -> list[str]:
+                match = re.search(
+                    r"foreach\(_cmake_expected_target IN ITEMS ([^\n)]+)\)",
+                    modules_text,
+                )
+                if not match:
+                    raise RuntimeError("Unable to find OpenCV expected target list")
+                return match.group(1).split()
+
+            def replace_cmake_expected_targets(
+                modules_text: str, targets: list[str]
+            ) -> str:
+                replacement = (
+                    "foreach(_cmake_expected_target IN ITEMS " + " ".join(targets) + ")"
+                )
+                return re.sub(
+                    r"foreach\(_cmake_expected_target IN ITEMS [^\n)]+\)",
+                    replacement,
+                    modules_text,
+                    count=1,
+                )
+
+            def merge_cmake_target_names(
+                final_targets: list[str], arm64_targets: list[str]
+            ) -> list[str]:
+                merged_targets = list(final_targets)
+                insert_index = next(
+                    (
+                        idx
+                        for idx, target in enumerate(merged_targets)
+                        if target.startswith("opencv_") or target.startswith("ocv.")
+                    ),
+                    len(merged_targets),
+                )
+                for target in arm64_targets:
+                    if target not in merged_targets:
+                        merged_targets.insert(insert_index, target)
+                        insert_index += 1
+                return merged_targets
+
+            def extract_cmake_target_block(
+                modules_text: str, target: str
+            ) -> str | None:
+                pattern = (
+                    rf"(?ms)^# Create imported target {re.escape(target)}\n"
+                    r".*?(?=^# Create imported target |^# Load information for "
+                    r"each installed configuration\.|^# Cleanup temporary "
+                    r"variables\.|\Z)"
+                )
+                match = re.search(pattern, modules_text)
+                return match.group(0) if match else None
+
+            def extract_cmake_release_target_block(
+                release_text: str, target: str
+            ) -> str | None:
+                pattern = (
+                    rf'(?ms)^# Import target "{re.escape(target)}" for '
+                    r'configuration "Release"\n'
+                    r'.*?(?=^# Import target "|^# Commands beyond this point|\Z)'
+                )
+                match = re.search(pattern, release_text)
+                return match.group(0) if match else None
+
+            def insert_before_required_marker(
+                text: str, marker: str, insertion: str
+            ) -> str:
+                marker_index = text.find(marker)
+                if marker_index < 0:
+                    raise RuntimeError(f"Unable to find insertion marker: {marker}")
+                return text[:marker_index] + insertion + text[marker_index:]
+
+            def cmake_target_property(block: str, property_name: str) -> str | None:
+                match = re.search(
+                    rf'{re.escape(property_name)}\s+"((?:\\.|[^"])*)"', block
+                )
+                return match.group(1) if match else None
+
+            def replace_cmake_target_property(
+                block: str, property_name: str, property_value: str
+            ) -> str:
+                return re.sub(
+                    rf'({re.escape(property_name)}\s+")((?:\\.|[^"])*)(")',
+                    lambda match: f"{match.group(1)}{property_value}{match.group(3)}",
+                    block,
+                    count=1,
+                )
+
+            def merge_cmake_list_values(final_value: str, arm64_value: str) -> str:
+                merged_values = []
+                for value in [*final_value.split(";"), *arm64_value.split(";")]:
+                    if value and value not in merged_values:
+                        merged_values.append(value)
+                return ";".join(merged_values)
+
+            def merge_opencv_modules_cmake(
+                final_modules_text: str, arm64_modules_text: str
+            ) -> str:
+                final_targets = cmake_expected_targets(final_modules_text)
+                arm64_targets = cmake_expected_targets(arm64_modules_text)
+                merged_targets = merge_cmake_target_names(final_targets, arm64_targets)
+                merged_modules_text = replace_cmake_expected_targets(
+                    final_modules_text, merged_targets
+                )
+
+                missing_targets = [
+                    target for target in arm64_targets if target not in final_targets
+                ]
+                missing_target_blocks = []
+                for target in missing_targets:
+                    block = extract_cmake_target_block(arm64_modules_text, target)
+                    if block is None:
+                        raise RuntimeError(
+                            f"Unable to find arm64 OpenCV target block: {target}"
+                        )
+                    missing_target_blocks.append(block.rstrip() + "\n\n")
+                if missing_target_blocks:
+                    merged_modules_text = insert_before_required_marker(
+                        merged_modules_text,
+                        "\n# Create imported target opencv_core",
+                        "".join(missing_target_blocks),
+                    )
+
+                for target in merged_targets:
+                    final_block = extract_cmake_target_block(
+                        merged_modules_text, target
+                    )
+                    arm64_block = extract_cmake_target_block(arm64_modules_text, target)
+                    if final_block is None or arm64_block is None:
+                        continue
+                    final_links = cmake_target_property(
+                        final_block, "INTERFACE_LINK_LIBRARIES"
+                    )
+                    arm64_links = cmake_target_property(
+                        arm64_block, "INTERFACE_LINK_LIBRARIES"
+                    )
+                    if final_links is None or arm64_links is None:
+                        continue
+                    merged_links = merge_cmake_list_values(final_links, arm64_links)
+                    if merged_links == final_links:
+                        continue
+                    new_block = replace_cmake_target_property(
+                        final_block, "INTERFACE_LINK_LIBRARIES", merged_links
+                    )
+                    merged_modules_text = merged_modules_text.replace(
+                        final_block, new_block, 1
+                    )
+
+                return merged_modules_text
+
+            def merge_opencv_modules_release_cmake(
+                final_release_text: str,
+                arm64_modules_text: str,
+                arm64_release_text: str,
+                missing_targets: list[str],
+            ) -> str:
+                missing_release_blocks = []
+                for target in missing_targets:
+                    block = extract_cmake_release_target_block(
+                        arm64_release_text, target
+                    )
+                    if block is None:
+                        target_block = extract_cmake_target_block(
+                            arm64_modules_text, target
+                        )
+                        if (
+                            target_block is not None
+                            and " INTERFACE IMPORTED" in target_block
+                        ):
+                            continue
+                        raise RuntimeError(
+                            f"Unable to find arm64 OpenCV release target block: "
+                            f"{target}"
+                        )
+                    missing_release_blocks.append(block.rstrip() + "\n\n")
+                if not missing_release_blocks:
+                    return final_release_text
+                return insert_before_required_marker(
+                    final_release_text,
+                    '\n# Import target "opencv_core" for configuration "Release"',
+                    "".join(missing_release_blocks),
+                )
+
+            def write_text_with_diff(path: str, new_text: str):
+                old_text = Path(path).read_text(encoding="utf-8", errors="ignore")
+                if old_text == new_text:
+                    return
+                Path(path).write_text(new_text, encoding="utf-8")
+                logger.info(
+                    "".join(
+                        difflib.unified_diff(
+                            old_text.splitlines(keepends=True),
+                            new_text.splitlines(keepends=True),
+                            fromfile=path,
+                            tofile="<new>",
+                        )
+                    )
+                )
+
+            cmake_relpath = os.path.join("lib", "cmake", opencv_install_namespace)
+            final_cmake_dir = os.path.join(final_install_dir, cmake_relpath)
+            arm64_cmake_dir = os.path.join(arm64_install_dir, cmake_relpath)
+
+            final_modules_file = os.path.join(final_cmake_dir, "OpenCVModules.cmake")
+            arm64_modules_file = os.path.join(arm64_cmake_dir, "OpenCVModules.cmake")
+            final_release_file = os.path.join(
+                final_cmake_dir, "OpenCVModules-release.cmake"
+            )
+            arm64_release_file = os.path.join(
+                arm64_cmake_dir, "OpenCVModules-release.cmake"
+            )
+
+            final_modules_text = Path(final_modules_file).read_text(
+                encoding="utf-8", errors="ignore"
+            )
+            arm64_modules_text = _normalize_arm64_install_paths(
+                Path(arm64_modules_file).read_bytes(),
+                arm64_install_dir,
+                final_install_dir,
+            ).decode("utf-8", errors="ignore")
+            final_release_text = Path(final_release_file).read_text(
+                encoding="utf-8", errors="ignore"
+            )
+            arm64_release_text = _normalize_arm64_install_paths(
+                Path(arm64_release_file).read_bytes(),
+                arm64_install_dir,
+                final_install_dir,
+            ).decode("utf-8", errors="ignore")
+
+            final_targets = cmake_expected_targets(final_modules_text)
+            arm64_targets = cmake_expected_targets(arm64_modules_text)
+            missing_targets = [
+                target for target in arm64_targets if target not in final_targets
+            ]
+
+            merged_modules_text = merge_opencv_modules_cmake(
+                final_modules_text, arm64_modules_text
+            )
+            merged_release_text = merge_opencv_modules_release_cmake(
+                final_release_text,
+                arm64_modules_text,
+                arm64_release_text,
+                missing_targets,
+            )
+
+            write_text_with_diff(final_modules_file, merged_modules_text)
+            write_text_with_diff(final_release_file, merged_release_text)
+
         def get_cmakecmd_options(arm64_build: bool = False):
             cmakecmd_options = [
                 "-DOPENCV_SKIP_CMAKE_CXX_STANDARD:BOOL=ON",
                 "-DHAVE_CXX11:BOOL=ON",
+                "-DHAVE_CXX17:BOOL=ON",
                 "-DOPENCV_ENABLE_NONFREE:BOOL=OFF",
                 "-DOPENCV_FORCE_3RDPARTY_BUILD:BOOL=OFF",
+                "-DBUILD_LIST:STRING=core,imgproc",
                 "-DBUILD_ZLIB:BOOL=OFF",
                 "-DBUILD_TIFF:BOOL=OFF",
                 "-DBUILD_JASPER:BOOL=OFF",
                 "-DBUILD_JPEG:BOOL=OFF",
                 "-DBUILD_PNG:BOOL=OFF",
-                "-DBUILD_OPENEXR:BOOL=ON",
+                "-DBUILD_OPENEXR:BOOL=OFF",
                 "-DBUILD_WEBP:BOOL=OFF",
                 "-DBUILD_OPENJPEG:BOOL=OFF",
                 "-DBUILD_PROTOBUF:BOOL=OFF",
                 "-DWITH_1394:BOOL=OFF",
+                "-DWITH_ADE:BOOL=OFF",
                 "-DWITH_VTK:BOOL=OFF",
                 "-DWITH_CUDA:BOOL=OFF",
                 "-DWITH_EIGEN:BOOL=ON",
@@ -5624,10 +5967,14 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str):
                 "-DWITH_OPENJPEG:BOOL=ON",
                 "-DWITH_JPEG:BOOL=ON",
                 "-DWITH_WEBP:BOOL=ON",
-                "-DWITH_OPENEXR:BOOL=ON",
+                "-DWITH_OPENEXR:BOOL=OFF",
                 "-DWITH_PNG:BOOL=ON",
                 "-DWITH_TBB:BOOL=ON",
                 "-DWITH_TIFF:BOOL=OFF",
+                "-DWITH_QT:BOOL=OFF",
+                "-DWITH_OPENGL:BOOL=OFF",
+                "-DWITH_GTK:BOOL=OFF",
+                "-DWITH_WIN32UI:BOOL=OFF",
                 "-DWITH_OPENCL:BOOL=OFF",
                 "-DWITH_OPENCL_SVM:BOOL=OFF",
                 "-DWITH_OPENCLAMDFFT:BOOL=OFF",
@@ -5644,6 +5991,7 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str):
                 "-DWITH_QUIRC:BOOL=OFF",
                 "-DBUILD_SHARED_LIBS:BOOL=OFF",
                 "-DBUILD_opencv_apps:BOOL=OFF",
+                "-DBUILD_opencv_highgui:BOOL=OFF",
                 "-DBUILD_opencv_js:BOOL=OFF",
                 "-DBUILD_DOCS:BOOL=OFF",
                 "-DBUILD_EXAMPLES:BOOL=OFF",
@@ -5654,25 +6002,28 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str):
                 "-DBUILD_FAT_JAVA_LIB:BOOL=OFF",
                 "-DBUILD_JAVA:BOOL=OFF",
                 "-DENABLE_PRECOMPILED_HEADERS:BOOL=OFF",
-                "-DBUILD_opencv_video:BOOL=ON",
-                "-DBUILD_opencv_videoio:BOOL=ON",
                 "-DBUILD_opencv_ts:BOOL=OFF",
                 "-DBUILD_opencv_dnn:BOOL=OFF",
                 "-DBUILD_opencv_world:BOOL=OFF",
-                "-DBUILD_opencv_python2:BOOL=OFF",
                 "-DBUILD_opencv_python3:BOOL=OFF",
                 "-DPYTHON3_EXECUTABLE=" + sys.executable,
                 "-DBUILD_opencv_java:BOOL=OFF",
-                "-DBUILD_opencv_calib3d:BOOL=OFF",
                 "-DBUILD_opencv_stereo:BOOL=OFF",
-                "-DBUILD_opencv_dnn_objdetect:BOOL=OFF",
-                "-DBUILD_opencv_hdf:BOOL=OFF",
-                "-DBUILD_opencv_matlab:BOOL=OFF",
-                "-DBUILD_opencv_sfm:BOOL=OFF",
-                "-DBUILD_opencv_videostab:BOOL=ON",
-                "-DBUILD_opencv_xfeatures2d:BOOL=ON",
-                "-DBUILD_opencv_freetype:BOOL=OFF",
+                "-DHIGHGUI_ENABLE_PLUGINS:BOOL=OFF",
             ]
+
+            if is_mac():
+                # OpenCV keys CPU feature detection off CMAKE_SYSTEM_PROCESSOR,
+                # which follows the Apple Silicon CI host even while configuring
+                # Atlas' x86_64 slice. Provide the slice architecture explicitly.
+                cmakecmd_options.extend(
+                    [
+                        "-DOPENCV_SKIP_SYSTEM_PROCESSOR_DETECTION:BOOL=ON",
+                        "-DX86_64:BOOL=" + ("OFF" if arm64_build else "ON"),
+                        "-DAARCH64:BOOL=" + ("ON" if arm64_build else "OFF"),
+                        "-DARM:BOOL=OFF",
+                    ]
+                )
 
             cmakecmd_options.extend(
                 [
@@ -5690,30 +6041,19 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str):
                 cmakecmd_options.extend(
                     [
                         "-DBUILD_WITH_STATIC_CRT:BOOL=OFF",
-                        "-DWITH_WIN32UI:BOOL=OFF",
-                        "-DOpenJPEG_DIR=" + ext_build_dir() + "\\lib\\openjpeg-2.4",
-                        "-DOPENCV_EXTRA_MODULES_PATH:PATH="
-                        + src_contrib_dir
-                        + "\\modules",
                     ]
                 )
             elif is_linux():
                 cmakecmd_options.extend(
                     [
-                        "-DWITH_V4L:BOOL=ON",
+                        "-DWITH_V4L:BOOL=OFF",
                         "-DWITH_PTHREADS_PF:BOOL=OFF",
-                        "-DOPENCV_EXTRA_MODULES_PATH:PATH="
-                        + src_contrib_dir
-                        + "/modules",
                     ]
                 )
             else:
                 cmakecmd_options.extend(
                     [
                         "-DWITH_PTHREADS_PF:BOOL=OFF",
-                        "-DOPENCV_EXTRA_MODULES_PATH:PATH="
-                        + src_contrib_dir
-                        + "/modules",
                     ]
                 )
 
@@ -5740,6 +6080,7 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str):
                 cmakecmd.extend([src_dir])
                 build_and_install_cmakecmd(cmakecmd, build_dir)
                 create_universal_binaries(arm64_install_dir, install_dir)
+                merge_opencv_universal_cmake_exports(arm64_install_dir, install_dir)
             finally:
                 print()
                 rm_tree(arm64_install_dir)
@@ -5754,7 +6095,11 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str):
             )
         else:
             orig_file_2 = os.path.join(
-                install_dir, "lib", "cmake", "opencv4", "OpenCVModules.cmake"
+                install_dir,
+                "lib",
+                "cmake",
+                opencv_install_namespace,
+                "OpenCVModules.cmake",
             )
 
         patch_file(

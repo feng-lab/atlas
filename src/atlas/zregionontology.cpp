@@ -12,6 +12,7 @@
 // #include <CGAL/Gray_level_image_3.h>
 // #include <CGAL/Implicit_surface_3.h>
 // #include <CGAL/exceptions.h>
+#include <opencv2/geometry.hpp>
 #include <opencv2/imgproc.hpp>
 #include <vtkDiscreteMarchingCubes.h>
 #include <vtkDiscreteFlyingEdges3D.h>

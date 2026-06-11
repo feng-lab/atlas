@@ -224,12 +224,11 @@ set_property(SOURCE ${PROTO_SRCS} ${GRPC_SRCS} PROPERTY SKIP_AUTOGEN ON)
 #message(STATUS "HDF5_INCLUDE_DIR: ${HDF5_INCLUDE_DIR}")
 
 set(OpenCV_STATIC ON)
-find_package(OpenCV REQUIRED COMPONENTS imgproc core
+find_package(OpenCV REQUIRED COMPONENTS imgproc
              PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build NO_DEFAULT_PATH)
 message(STATUS "OpenCV_INCLUDE_DIRS: ${OpenCV_INCLUDE_DIRS}")
 message(STATUS "OpenCV_LIBS: ${OpenCV_LIBS}")
 print_target_properties(opencv_imgproc)
-print_target_properties(opencv_core)
 
 find_package(GLBINDING REQUIRED
              PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build NO_DEFAULT_PATH)

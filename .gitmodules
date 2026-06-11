@@ -53,11 +53,11 @@
 [submodule "src/3rdparty/opencv"]
 	path = src/3rdparty/opencv
 	url = https://github.com/opencv/opencv.git
-	branch = 4.x
+	branch = 5.x
 [submodule "src/3rdparty/opencv_contrib"]
 	path = src/3rdparty/opencv_contrib
 	url = https://github.com/opencv/opencv_contrib.git
-	branch = 4.x
+	branch = 5.x
 [submodule "src/3rdparty/grpc"]
 	path = src/3rdparty/grpc
 	url = https://github.com/grpc/grpc.git
