@@ -1652,80 +1652,26 @@ def _macos_notarize_qtifw_package_dir(package_dir: str) -> None:
         )
 
 
-_THIRD_PARTY_LICENSE_FILENAME_SUBSTRINGS: tuple[str, ...] = (
-    "license",
-    "licence",
-    "copying",
-    "notice",
-    "copyright",
-)
-
-_THIRD_PARTY_LICENSE_SEARCH_SUBDIRS: tuple[str, ...] = (
-    "",
-    ".github",
-    "docs",
-    "doc",
-    "Documentation",
-    "cmake",
-    "release",
-)
-
-
-def _is_license_filename(name: str) -> bool:
-    lower = name.lower()
-    return any(s in lower for s in _THIRD_PARTY_LICENSE_FILENAME_SUBSTRINGS)
-
-
-def _collect_third_party_license_files_for_component(
-    component_dir: str,
-) -> list[tuple[str, str]]:
-    """Collect license-like files for a single component directory.
-
-    Returns a list of (src_path, rel_path) where rel_path is relative to component_dir.
-    """
-    results: dict[str, str] = {}
-    for subdir in _THIRD_PARTY_LICENSE_SEARCH_SUBDIRS:
-        scan_dir = component_dir if not subdir else os.path.join(component_dir, subdir)
-        if not os.path.isdir(scan_dir):
-            continue
-        for entry in sorted(os.listdir(scan_dir)):
-            src_path = os.path.join(scan_dir, entry)
-            if not os.path.isfile(src_path):
-                continue
-            if not _is_license_filename(entry):
-                continue
-            rel_path = os.path.relpath(src_path, component_dir)
-            # Preserve the first-seen file for a given relative path.
-            results.setdefault(rel_path, src_path)
-    return [(src, rel) for rel, src in sorted(results.items())]
-
-
 def _copy_third_party_licenses_to_resources(resources_dir: str) -> None:
-    """Copy third-party license texts into <Resources>/licenses for deployment bundles."""
-    repo_root = common_dirs.atlas_repository_dir()
-    third_party_root = os.path.join(repo_root, "src", "3rdparty")
-    if not os.path.isdir(third_party_root):
-        raise RuntimeError(f"Third-party directory not found: {third_party_root}")
+    """Copy the license bundle produced by build_ext_libs.py into Resources."""
+    src_root = build_ext_libs.third_party_license_bundle_dir()
+    if not os.path.isdir(src_root):
+        raise RuntimeError(
+            "Third-party license bundle not found: "
+            f"{src_root}. Run util/build_ext_libs.py all, or refresh the "
+            "cached src/3rdparty/build artifact before deploying."
+        )
+
+    has_license_files = any(files for _, _, files in os.walk(src_root))
+    if not has_license_files:
+        raise RuntimeError(
+            "Third-party license bundle is empty: "
+            f"{src_root}. Run util/build_ext_libs.py all before deploying."
+        )
 
     dst_root = os.path.join(resources_dir, "licenses")
     shutil.rmtree(dst_root, ignore_errors=True)
-    os.makedirs(dst_root, exist_ok=True)
-
-    for name in sorted(os.listdir(third_party_root)):
-        component_dir = os.path.join(third_party_root, name)
-        if not os.path.isdir(component_dir):
-            continue
-        if name in {"build", "conda_build"}:
-            continue
-
-        license_files = _collect_third_party_license_files_for_component(component_dir)
-        if not license_files:
-            continue
-
-        for src_path, rel_path in license_files:
-            dst_path = os.path.join(dst_root, name, rel_path)
-            os.makedirs(os.path.dirname(dst_path), exist_ok=True)
-            shutil.copy2(src_path, dst_path)
+    shutil.copytree(src_root, dst_root)
 
 
 def _download_runtime_licenses(dst_runtime_dir: str) -> None:

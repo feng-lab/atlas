@@ -488,6 +488,106 @@ def glob_remove(files: str):
         logger.info(f"{file} removed")
 
 
+_THIRD_PARTY_LICENSE_FILENAME_SUBSTRINGS: tuple[str, ...] = (
+    "license",
+    "licence",
+    "copying",
+    "notice",
+    "copyright",
+)
+
+_THIRD_PARTY_LICENSE_SEARCH_SUBDIRS: tuple[str, ...] = (
+    "",
+    ".github",
+    "docs",
+    "doc",
+    "Documentation",
+    "cmake",
+    "release",
+)
+
+_THIRD_PARTY_LICENSE_SOURCE_SKIP_DIRS: frozenset[str] = frozenset(
+    {
+        "build",
+        "conda_build",
+    }
+)
+
+
+def third_party_license_bundle_dir() -> str:
+    return os.path.join(ext_build_dir(), "licenses", "thirdparty")
+
+
+def _is_third_party_license_filename(name: str) -> bool:
+    lower = name.lower()
+    return any(s in lower for s in _THIRD_PARTY_LICENSE_FILENAME_SUBSTRINGS)
+
+
+def _collect_third_party_license_files_for_component(
+    component_dir: str,
+) -> list[tuple[str, str]]:
+    results: dict[str, str] = {}
+    for subdir in _THIRD_PARTY_LICENSE_SEARCH_SUBDIRS:
+        scan_dir = component_dir if not subdir else os.path.join(component_dir, subdir)
+        if not os.path.isdir(scan_dir):
+            continue
+        for entry in sorted(os.listdir(scan_dir)):
+            src_path = os.path.join(scan_dir, entry)
+            if not os.path.isfile(src_path):
+                continue
+            if not _is_third_party_license_filename(entry):
+                continue
+            rel_path = os.path.relpath(src_path, component_dir)
+            results.setdefault(rel_path, src_path)
+    return [(src, rel) for rel, src in sorted(results.items())]
+
+
+def copy_third_party_license_files(component_name: str, component_dir: str) -> None:
+    if not os.path.isdir(component_dir):
+        logger.warning(
+            "third-party license source for %s does not exist: %s",
+            component_name,
+            component_dir,
+        )
+        return
+
+    license_files = _collect_third_party_license_files_for_component(component_dir)
+    dst_component_dir = os.path.join(third_party_license_bundle_dir(), component_name)
+    shutil.rmtree(dst_component_dir, ignore_errors=True)
+    if not license_files:
+        logger.info(
+            "no license-like files found for %s in %s", component_name, component_dir
+        )
+        return
+
+    for src_path, rel_path in license_files:
+        dst_path = os.path.join(dst_component_dir, rel_path)
+        os.makedirs(os.path.dirname(dst_path), exist_ok=True)
+        shutil.copy2(src_path, dst_path)
+    logger.info(
+        "copied %d license file(s) for %s",
+        len(license_files),
+        component_name,
+    )
+
+
+def update_third_party_license_bundle_from_sources() -> None:
+    """Refresh bundled licenses from materialized src/3rdparty sources.
+
+    The bundle is intentionally not cleared here: Windows external deps are built
+    in split CI jobs, and the second job restores this folder from the first job's
+    src/3rdparty/build cache before adding licenses for later source dirs.
+    """
+    third_party_root = ext_dir()
+    for component_name in sorted(os.listdir(third_party_root)):
+        if component_name in _THIRD_PARTY_LICENSE_SOURCE_SKIP_DIRS:
+            continue
+        component_dir = os.path.join(third_party_root, component_name)
+        if not os.path.isdir(component_dir):
+            continue
+        copy_third_party_license_files(component_name, component_dir)
+
+
 def _curl_root_dir_from_package(package_name: str) -> str:
     package_folder = get_package_top_level_folder(package_name)
     if package_folder:
@@ -7127,6 +7227,8 @@ def build_libs(libs: OrderedDict, use_asan: bool):
                 logger.info("no or-tools")
             else:
                 build_or_tools(src_dir, ext_build_dir())
+
+    update_third_party_license_bundle_from_sources()
 
 
 def parse_inputs(argv: list):
