@@ -13,6 +13,10 @@
 #endif
 
 #define VULKAN_HPP_NO_CONSTRUCTORS
+// Vulkan-Hpp's generated to_string helpers use std::format when available.
+// Apple libc++ exposes that path before all formatter internals are available
+// for Atlas' macOS 12 deployment target, so keep enum logging in Atlas code.
+#define VULKAN_HPP_NO_TO_STRING
 #include <vulkan/vulkan_raii.hpp>
 #include <vma/vk_mem_alloc.h>
 

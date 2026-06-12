@@ -129,7 +129,7 @@ void ZVulkanFrameExecutor::waitForCompletion(ActiveFrame& frame)
   auto& vkDevice = m_device.context().device();
   const auto waitResult = vkDevice.waitForFences({*frame.fence()}, true, kFenceTimeoutNs);
   if (waitResult != vk::Result::eSuccess) {
-    LOG(WARNING) << "Frame executor waitForFences returned " << vk::to_string(waitResult);
+    LOG(WARNING) << "Frame executor waitForFences returned " << enumOrUnderlying(waitResult, 16);
   }
   frame.m_frame->inFlight = false;
   runCompletionCallbacks(*frame.m_frame);
@@ -149,7 +149,7 @@ void ZVulkanFrameExecutor::waitForAllInFlight()
     }
     const auto waitResult = vkDevice.waitForFences({*frame.fence}, true, kFenceTimeoutNs);
     if (waitResult != vk::Result::eSuccess) {
-      LOG(WARNING) << "Frame executor waitForFences returned " << vk::to_string(waitResult);
+      LOG(WARNING) << "Frame executor waitForFences returned " << enumOrUnderlying(waitResult, 16);
     }
     frame.inFlight = false;
     runCompletionCallbacks(frame);
@@ -208,7 +208,7 @@ void ZVulkanFrameExecutor::pollCompletions(std::vector<void*>* completedKeys)
       continue;
     }
     if (status != vk::Result::eSuccess) {
-      LOG(WARNING) << "Frame executor poll waitForFences returned " << vk::to_string(status);
+      LOG(WARNING) << "Frame executor poll waitForFences returned " << enumOrUnderlying(status, 16);
     }
     frame.inFlight = false;
     runCompletionCallbacks(frame);
@@ -270,7 +270,7 @@ ZVulkanFrameExecutor::Frame& ZVulkanFrameExecutor::acquireFrame()
   if (frame.inFlight) {
     const auto waitResult = vkDevice.waitForFences({*frame.fence}, true, kFenceTimeoutNs);
     if (waitResult != vk::Result::eSuccess) {
-      LOG(WARNING) << "Frame executor waitForFences returned " << vk::to_string(waitResult);
+      LOG(WARNING) << "Frame executor waitForFences returned " << enumOrUnderlying(waitResult, 16);
     } else {
       // Debug note: with frames_in_flight=1, acquiring this slot means the
       // previous submission finished (fence signaled) before we start
@@ -359,7 +359,7 @@ void ZVulkanFrameExecutor::executeImmediate(const std::function<void(vk::raii::C
   // executeImmediate behaviour.
   const auto waitResult2 = device.waitForFences({*fence}, true, kFenceTimeoutNs);
   if (waitResult2 != vk::Result::eSuccess) {
-    LOG(WARNING) << "Immediate executor waitForFences returned " << vk::to_string(waitResult2);
+    LOG(WARNING) << "Immediate executor waitForFences returned " << enumOrUnderlying(waitResult2, 16);
   }
 }
 

@@ -417,7 +417,7 @@ ZVulkanDevice::ZVulkanDevice(ZVulkanContext& context)
     bool supported = !domains.empty();
     std::string domList;
     for (size_t i = 0; i < domains.size(); ++i) {
-      domList += vk::to_string(domains[i]);
+      domList += fmt::format("{}", enumOrUnderlying(domains[i], 16));
       if (i + 1 < domains.size()) {
         domList += ",";
       }

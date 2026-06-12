@@ -7529,7 +7529,7 @@ void Z3DRendererVulkanBackend::collectFrameTimings(FrameResources& frame)
         message += fmt::format(" | gpu:{} {:.3f} ms", scope.label, ms);
       }
     } else {
-      VLOG(1) << "Vulkan query results unavailable: " << vk::to_string(result);
+      VLOG(1) << "Vulkan query results unavailable: " << enumOrUnderlying(result, 16);
     }
   } else if (collectGpuTimestamps) {
     VLOG(1) << "No GPU timestamp scopes recorded this frame";

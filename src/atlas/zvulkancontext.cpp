@@ -456,7 +456,9 @@ void ZVulkanContext::logGpuInfo() const
                    props.driverVersion);
     fmt::format_to(std::back_inserter(summary), "     Vendor ID:                0x{:04x}\n", props.vendorID);
     fmt::format_to(std::back_inserter(summary), "     Device ID:                0x{:04x}\n", props.deviceID);
-    fmt::format_to(std::back_inserter(summary), "     Device Type:              {}\n", vk::to_string(props.deviceType));
+    fmt::format_to(std::back_inserter(summary),
+                   "     Device Type:              {}\n",
+                   enumOrUnderlying(props.deviceType, 16));
     fmt::format_to(std::back_inserter(summary),
                    "     Device-Local Memory:      {} MB\n",
                    deviceLocalMemoryBytes / (1024 * 1024));
@@ -795,7 +797,7 @@ void ZVulkanContext::pickPhysicalDevice()
                              p.driverVersion);
     LOG(INFO) << fmt::format("      Vendor ID:            0x{:04x}", p.vendorID);
     LOG(INFO) << fmt::format("      Device ID:            0x{:04x}", p.deviceID);
-    LOG(INFO) << fmt::format("      Device Type:          {}", vk::to_string(p.deviceType));
+    LOG(INFO) << fmt::format("      Device Type:          {}", enumOrUnderlying(p.deviceType, 16));
     LOG(INFO) << fmt::format("      Device-Local Memory:  {} MB", infos[i].deviceLocalMemoryBytes / (1024 * 1024));
     LOG(INFO) << "-------------------------";
   }
