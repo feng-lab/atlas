@@ -9,6 +9,11 @@ build:
   number: 0
   # Mark as Python-version independent (ABI3). Requires recent conda-build.
   python_version_independent: true
+  # The macOS wheel payload is universal2 and is published to both macOS conda
+  # subdirs. Avoid running the opposite-architecture Python just to precompile
+  # bytecode; Python can generate .pyc files at import time.
+  skip_compile_pyc:
+    - "*.py"
 
 requirements:
   build:
@@ -24,10 +29,6 @@ requirements:
   run:
     - python >=3.12
     - numpy >=1.26
-
-test:
-
-outputs:
 
 about:
   home: https://feng-lab.github.io

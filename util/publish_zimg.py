@@ -1,12 +1,16 @@
 import argparse
 import importlib.util
+import json
 import logging
 import os
+import platform
 import shlex
 import shutil
 import subprocess
 import sys
 import tempfile
+import urllib.error
+import urllib.request
 import zipfile
 from pathlib import Path
 
@@ -18,6 +22,14 @@ import common_dirs
 from logger import setup_logger
 
 logger = logging.getLogger(__name__)
+
+_ANACONDA_API_URL = "https://api.anaconda.org"
+_ANACONDA_OWNER = "fenglab"
+_ANACONDA_PACKAGE = "zimg"
+# Keep a balanced recent history per platform while reclaiming Anaconda.org quota.
+_CONDA_KEEP_PER_SUBDIR_AFTER_UPLOAD = 5
+_ANACONDA_PACKAGE_API_TIMEOUT_SECONDS = 60
+_MACOS_CONDA_TARGET_SUBDIRS = ("osx-64", "osx-arm64")
 
 
 def _run_checked(
@@ -36,6 +48,149 @@ def _run_checked(
         raise RuntimeError(
             f"Command failed (exit={e.returncode}): {' '.join(display)}"
         ) from None
+
+
+def _native_conda_subdir() -> str:
+    machine = platform.machine().lower()
+    if common_dirs.is_windows():
+        return "win-64"
+    if common_dirs.is_linux():
+        return "linux-aarch64" if machine in {"aarch64", "arm64"} else "linux-64"
+    if common_dirs.is_mac():
+        return "osx-arm64" if machine == "arm64" else "osx-64"
+    raise RuntimeError(f"Unsupported platform for conda zimg pruning: {sys.platform}")
+
+
+def _conda_target_subdirs() -> list[str]:
+    if common_dirs.is_mac():
+        return list(_MACOS_CONDA_TARGET_SUBDIRS)
+    return [_native_conda_subdir()]
+
+
+def _subdir_from_anaconda_file(record: dict) -> str:
+    attrs = record.get("attrs")
+    if isinstance(attrs, dict):
+        subdir = attrs.get("subdir")
+        if isinstance(subdir, str) and subdir:
+            return subdir
+
+    basename = record.get("basename")
+    if isinstance(basename, str) and "/" in basename:
+        return basename.split("/", 1)[0]
+
+    return ""
+
+
+def _anaconda_conda_files(
+    *,
+    owner: str,
+    package: str,
+    token: str | None,
+) -> list[dict[str, str]]:
+    url = f"{_ANACONDA_API_URL}/package/{owner}/{package}"
+    headers = {"Accept": "application/json"}
+    if token:
+        headers["Authorization"] = f"token {token}"
+    request = urllib.request.Request(url, headers=headers)
+    try:
+        with urllib.request.urlopen(
+            request, timeout=_ANACONDA_PACKAGE_API_TIMEOUT_SECONDS
+        ) as response:
+            payload = json.load(response)
+    except urllib.error.HTTPError as e:
+        body = e.read().decode("utf-8", errors="replace")
+        raise RuntimeError(
+            f"Failed to list Anaconda package files for {owner}/{package}: HTTP {e.code}\n{body}"
+        ) from None
+    except urllib.error.URLError as e:
+        raise RuntimeError(
+            f"Failed to list Anaconda package files for {owner}/{package}: {e}"
+        ) from None
+
+    raw_files = payload.get("files", [])
+    if not isinstance(raw_files, list):
+        raise RuntimeError(
+            f"Unexpected Anaconda package response for {owner}/{package}: files is not a list"
+        )
+
+    files: list[dict[str, str]] = []
+    for raw in raw_files:
+        if not isinstance(raw, dict):
+            continue
+        if raw.get("type") != "conda" and raw.get("distribution_type") != "conda":
+            continue
+        basename = raw.get("basename")
+        version = raw.get("version")
+        upload_time = raw.get("upload_time")
+        subdir = _subdir_from_anaconda_file(raw)
+        if (
+            not isinstance(basename, str)
+            or not basename
+            or not isinstance(version, str)
+            or not version
+            or not isinstance(upload_time, str)
+            or not upload_time
+            or not subdir
+        ):
+            logger.warning("Skipping malformed Anaconda file record: %s", raw)
+            continue
+        files.append(
+            {
+                "version": version,
+                "basename": basename,
+                "upload_time": upload_time,
+                "subdir": subdir,
+            }
+        )
+
+    return files
+
+
+def _prune_anaconda_zimg_for_subdir(
+    *,
+    target_subdir: str,
+    token: str,
+    anaconda_exe: str,
+) -> None:
+    same_subdir_files = [
+        file
+        for file in _anaconda_conda_files(
+            owner=_ANACONDA_OWNER,
+            package=_ANACONDA_PACKAGE,
+            token=token,
+        )
+        if file["subdir"] == target_subdir
+    ]
+    same_subdir_files.sort(
+        key=lambda file: (file["upload_time"], file["version"], file["basename"]),
+        reverse=True,
+    )
+
+    # The pending upload counts toward the retention target, so keep one fewer
+    # existing package before uploading the replacement/new file.
+    keep_existing = _CONDA_KEEP_PER_SUBDIR_AFTER_UPLOAD - 1
+    files_to_remove = list(reversed(same_subdir_files[keep_existing:]))
+
+    logger.info(
+        "Conda prune: subdir=%s existing=%d keep_after_upload=%d remove=%d",
+        target_subdir,
+        len(same_subdir_files),
+        _CONDA_KEEP_PER_SUBDIR_AFTER_UPLOAD,
+        len(files_to_remove),
+    )
+    for file in files_to_remove:
+        spec = (
+            f"{_ANACONDA_OWNER}/{_ANACONDA_PACKAGE}/"
+            f"{file['version']}/{file['basename']}"
+        )
+        logger.info("Conda prune: removing old package %s", spec)
+        env = os.environ.copy()
+        env["ANACONDA_API_TOKEN"] = token
+        _run_checked(
+            [anaconda_exe, "remove", "--force", spec],
+            env=env,
+            display_cmd=["anaconda", "remove", "--force", spec],
+        )
 
 
 def _prepend_search_path(env: dict[str, str], *, key: str, dir_path: Path) -> None:
@@ -515,15 +670,27 @@ def main() -> int:
         )
         if want_conda_upload:
             # Dry-run: print the command we'd run without checking tool/env availability.
-            conda_cmd_display = [
-                "conda-build",
-                "--token",
-                "$ANACONDA_API_TOKEN",
-                "zimg-recipe",
-            ]
-            logger.info("Conda build command: %s", " ".join(conda_cmd_display))
+            for target_subdir in _conda_target_subdirs():
+                conda_cmd_display = [
+                    f"CONDA_SUBDIR={target_subdir}",
+                    "conda-build",
+                    "--token",
+                    "$ANACONDA_API_TOKEN",
+                    "--user",
+                    _ANACONDA_OWNER,
+                    "zimg-recipe",
+                ]
+                logger.info(
+                    "Conda build command (%s): %s",
+                    target_subdir,
+                    " ".join(conda_cmd_display),
+                )
             logger.info(
-                "Conda upload: enabled by policy (requires ANACONDA_API_TOKEN and conda-build)"
+                "Conda prune before upload: matching conda subdir only; keep_after_upload=%d",
+                _CONDA_KEEP_PER_SUBDIR_AFTER_UPLOAD,
+            )
+            logger.info(
+                "Conda upload: enabled by policy (requires ANACONDA_API_TOKEN, conda-build, and anaconda-client)"
             )
         else:
             assert conda_policy_skip_reason is not None
@@ -636,6 +803,7 @@ def main() -> int:
     if want_conda_upload:
         conda_token = os.environ.get("ANACONDA_API_TOKEN", "").strip()
         conda_build_exe = shutil.which("conda-build")
+        anaconda_exe = shutil.which("anaconda")
 
         conda_source_dir: Path | None = None
         conda_cmd: list[str] | None = None
@@ -645,26 +813,32 @@ def main() -> int:
             conda_skip_reason = "ANACONDA_API_TOKEN not set"
         elif conda_build_exe is None:
             conda_skip_reason = "conda-build not found on PATH"
+        elif anaconda_exe is None:
+            conda_skip_reason = "anaconda-client CLI not found on PATH"
         else:
             conda_source_dir = Path(common_dirs.ext_conda_build_dir())
             conda_cmd = [
-                "conda-build",
+                conda_build_exe,
                 "--token",
                 conda_token,
                 "--user",
-                "fenglab",
+                _ANACONDA_OWNER,
                 "zimg-recipe",
             ]
             conda_cmd_display = [
                 "conda-build",
                 "--token",
                 "$ANACONDA_API_TOKEN",
+                "--user",
+                _ANACONDA_OWNER,
                 "zimg-recipe",
             ]
 
         if conda_skip_reason is None:
             assert conda_cmd is not None
             assert conda_source_dir is not None
+            assert anaconda_exe is not None
+            assert conda_build_exe is not None
             wheel_path = wheels[0]
             bioformats_jar_path = (
                 repo_root
@@ -681,13 +855,34 @@ def main() -> int:
                 bioformats_jar_path=bioformats_jar_path,
             )
             logger.info("Staged conda package dir: %s", staged_dir)
-            _run_checked(conda_cmd, cwd=repo_root, display_cmd=conda_cmd_display)
+            for target_subdir in _conda_target_subdirs():
+                logger.info("Conda upload target subdir: %s", target_subdir)
+                _prune_anaconda_zimg_for_subdir(
+                    target_subdir=target_subdir,
+                    token=conda_token,
+                    anaconda_exe=anaconda_exe,
+                )
+                conda_env = os.environ.copy()
+                conda_env["CONDA_SUBDIR"] = target_subdir
+                _run_checked(
+                    conda_cmd,
+                    cwd=repo_root,
+                    env=conda_env,
+                    display_cmd=[
+                        f"CONDA_SUBDIR={target_subdir}",
+                        *conda_cmd_display,
+                    ],
+                )
         else:
             logger.warning("Skipping conda build/upload (%s)", conda_skip_reason)
             if conda_skip_reason == "conda-build not found on PATH":
                 logger.warning(
                     "To enable conda uploads, install `conda-build` and `anaconda-client` "
                     "(e.g. in a conda env) and ensure `conda-build` is on PATH."
+                )
+            if conda_skip_reason == "anaconda-client CLI not found on PATH":
+                logger.warning(
+                    "To enable conda uploads, install `anaconda-client` in the active environment."
                 )
     else:
         assert conda_policy_skip_reason is not None
