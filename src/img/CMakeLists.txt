@@ -266,7 +266,7 @@ target_compile_definitions(${LIBRARY_NAME} PUBLIC EIGEN_NO_DEBUG EIGEN_DONT_PARA
 target_compile_definitions(${LIBRARY_NAME} PUBLIC lapack_complex_float=std::complex<float>
         lapack_complex_double=std::complex<double>)
 target_compile_definitions(${LIBRARY_NAME} PUBLIC QT_NO_KEYWORDS QT_USE_QSTRINGBUILDER QT_NO_CAST_FROM_BYTEARRAY
-        QT_NO_CAST_TO_ASCII QT_NO_VERSION_TAGGING)
+        QT_NO_CAST_TO_ASCII QT_NO_VERSION_TAGGING QT_NO_STD_FORMAT_SUPPORT)
 target_compile_definitions(${LIBRARY_NAME} PUBLIC BOOST_CONTAINER_NO_LIB BOOST_JSON_NO_LIB)
 
 set_source_files_properties(zimgpng.cpp PROPERTIES INCLUDE_DIRECTORIES "${PNG_INCLUDE_DIRS}")
