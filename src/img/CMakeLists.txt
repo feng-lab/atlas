@@ -26,6 +26,7 @@ set(IMG_SOURCES
         zimagearch.h
         zimageavx.h zimageavx.cpp
         zimagehwy.h zimagehwy.cpp
+        zimageresizehwy.h zimageresizehwy.cpp
         zimagefilterkernel.h zimagefilterkernel.cpp
         zimagesse3.h zimagesse3.cpp
         zimg.h zimg.cpp

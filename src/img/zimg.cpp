@@ -1,14 +1,28 @@
 #include "zimg.h"
 
+#include "zcpuinfo.h"
 #include "zimgio.h"
 #include "zlog.h"
 #include "zimage3dutils.h"
+#include "zimageresizehwy.h"
 #include "zstatisticsutils.h"
 #include "zrandom.h"
 #include "zbenchtimer.h"
+#include <absl/flags/flag.h>
 #include <QFileInfo>
 #include <folly/ScopeGuard.h>
 #include <algorithm>
+#include <cstdint>
+#include <limits>
+#include <type_traits>
+
+ABSL_FLAG(bool, zimg_enable_highway_resize, true, "Use the Highway image resize backend.");
+
+ABSL_FLAG(uint64_t,
+          zimg_highway_resize_max_extra_bytes,
+          0,
+          "Maximum extra temporary memory for the Highway image resize backend. 0 uses 50% of the configured CPU "
+          "memory budget.");
 
 namespace {
 
@@ -33,6 +47,29 @@ struct MaxOp
 } // namespace
 
 namespace nim {
+
+namespace {
+
+uint64_t effectiveHighwayResizeExtraMemoryBudget()
+{
+  // Runtime flag edits are applied on the next app restart, so collapse the
+  // enable flag and max-memory flag into one process-lifetime budget.
+  static const uint64_t budget = [] {
+    if (!absl::GetFlag(FLAGS_zimg_enable_highway_resize)) {
+      return uint64_t{0};
+    }
+
+    const uint64_t configured = absl::GetFlag(FLAGS_zimg_highway_resize_max_extra_bytes);
+    if (configured != 0) {
+      return configured;
+    }
+
+    return ZCpuInfo::instance().nPhysicalRAM / 2;
+  }();
+  return budget;
+}
+
+} // namespace
 
 template<>
 std::string ZImgMetadataBase<ZImgMetatag>::toString() const
@@ -1645,23 +1682,47 @@ ZImg ZImg::resized(size_t desWidth,
   info.depth = desDepth;
 
   res = ZImg(info);
+  const uint64_t highwayResizeBudget = effectiveHighwayResizeExtraMemoryBudget();
   imgTypeDispatcher(m_info, [&, this]<typename TVoxel>() {
     for (size_t t = 0; t < numTimes(); ++t) {
       for (size_t c = 0; c < numChannels(); ++c) {
         if (res.depth() == depth()) {
+          const bool useHighwayResize =
+            highwayResizeBudget != 0 &&
+            image2DResizeHighwayExtraBytes(height(),
+                                           res.width(),
+                                           res.height(),
+                                           interpolant,
+                                           antialiasing,
+                                           antialiasingForNearest,
+                                           useMultithreading ? ZCpuInfo::instance().nLogicalCores : 1) <=
+              highwayResizeBudget;
           for (size_t z = 0; z < depth(); ++z) {
             // ZBenchTimer bt;
             // bt.start();
-            image2DResize(planeData<TVoxel>(z, c, t),
-                          width(),
-                          height(),
-                          res.planeData<TVoxel>(z, c, t),
-                          res.width(),
-                          res.height(),
-                          interpolant,
-                          antialiasing,
-                          antialiasingForNearest,
-                          useMultithreading);
+            if (useHighwayResize) {
+              image2DResizeHighway(planeData<TVoxel>(z, c, t),
+                                   width(),
+                                   height(),
+                                   res.planeData<TVoxel>(z, c, t),
+                                   res.width(),
+                                   res.height(),
+                                   interpolant,
+                                   antialiasing,
+                                   antialiasingForNearest,
+                                   useMultithreading);
+            } else {
+              image2DResize(planeData<TVoxel>(z, c, t),
+                            width(),
+                            height(),
+                            res.planeData<TVoxel>(z, c, t),
+                            res.width(),
+                            res.height(),
+                            interpolant,
+                            antialiasing,
+                            antialiasingForNearest,
+                            useMultithreading);
+            }
             // bt.stopAndPrint();
             //           bt.reset();
             //           bt.start();
@@ -1671,18 +1732,37 @@ ZImg ZImg::resized(size_t desWidth,
             //           bt.stopAndPrint();
           }
         } else {
-          image3DResize(channelData<TVoxel>(c, t),
-                        width(),
-                        height(),
-                        depth(),
-                        res.channelData<TVoxel>(c, t),
-                        res.width(),
-                        res.height(),
-                        res.depth(),
-                        interpolant,
-                        antialiasing,
-                        antialiasingForNearest,
-                        useMultithreading);
+          const bool useHighwayResize =
+            highwayResizeBudget != 0 &&
+            image3DResizeHighwayExtraBytes<TVoxel>(height(), res.width(), res.height(), res.depth()) <=
+              highwayResizeBudget;
+          if (useHighwayResize) {
+            image3DResizeHighway(channelData<TVoxel>(c, t),
+                                 width(),
+                                 height(),
+                                 depth(),
+                                 res.channelData<TVoxel>(c, t),
+                                 res.width(),
+                                 res.height(),
+                                 res.depth(),
+                                 interpolant,
+                                 antialiasing,
+                                 antialiasingForNearest,
+                                 useMultithreading);
+          } else {
+            image3DResize(channelData<TVoxel>(c, t),
+                          width(),
+                          height(),
+                          depth(),
+                          res.channelData<TVoxel>(c, t),
+                          res.width(),
+                          res.height(),
+                          res.depth(),
+                          interpolant,
+                          antialiasing,
+                          antialiasingForNearest,
+                          useMultithreading);
+          }
         }
       }
     }

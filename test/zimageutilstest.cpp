@@ -1,8 +1,164 @@
 #include "zimage2dutils.h"
 #include "zimage3dutils.h"
 #include "zimg.h"
+#include "zimageresizehwy.h"
 #include "zimgregioniterator.h"
 #include "ztest.h"
+
+#include <algorithm>
+#include <cstdint>
+#include <cmath>
+#include <limits>
+#include <type_traits>
+
+namespace {
+
+template<typename T>
+nim::ZImg makeSyntheticResizeImage(size_t width, size_t height, size_t depth)
+{
+  nim::ZImgInfo info(width, height, depth);
+  info.setVoxelFormat<T>();
+  nim::ZImg img(info);
+
+  T* data = img.timeData<T>(0);
+  for (size_t i = 0; i < img.timeVoxelNumber(); ++i) {
+    const double value =
+      0.5 + 0.5 * std::sin(static_cast<double>(i) * 0.071) * std::cos(static_cast<double>(i % width) * 0.113);
+    if constexpr (std::is_integral_v<T>) {
+      if constexpr (std::is_signed_v<T>) {
+        data[i] = static_cast<T>(std::llround((value - 0.5) * 100.0));
+      } else {
+        const uint64_t maxValue =
+          std::min<uint64_t>(static_cast<uint64_t>(std::numeric_limits<T>::max()), static_cast<uint64_t>(200));
+        data[i] = static_cast<T>(std::llround(value * static_cast<double>(maxValue)));
+      }
+    } else {
+      data[i] = static_cast<T>(value);
+    }
+  }
+
+  return img;
+}
+
+template<typename T>
+double resizeParityTolerance()
+{
+  if constexpr (std::is_integral_v<T>) {
+    return 1.0;
+  } else {
+    return 1.0e-9;
+  }
+}
+
+template<typename T>
+void expectImagesNear(const nim::ZImg& expected, const nim::ZImg& actual)
+{
+  ASSERT_TRUE(expected.info().isSameSize(actual.info()));
+  ASSERT_TRUE(expected.info().isSameType(actual.info()));
+
+  const T* expectedData = expected.timeData<T>(0);
+  const T* actualData = actual.timeData<T>(0);
+  for (size_t i = 0; i < expected.timeVoxelNumber(); ++i) {
+    EXPECT_NEAR(static_cast<double>(expectedData[i]), static_cast<double>(actualData[i]), resizeParityTolerance<T>())
+      << "voxel " << i;
+  }
+}
+
+template<typename T>
+void expectResizeMatchesReference(const nim::ZImg& img,
+                                  size_t outWidth,
+                                  size_t outHeight,
+                                  size_t outDepth,
+                                  nim::Interpolant interpolant,
+                                  bool antialiasing,
+                                  bool antialiasingForNearest)
+{
+  nim::ZImgInfo outInfo = img.info();
+  outInfo.voxelSizeX *= static_cast<double>(outInfo.width) / outWidth;
+  outInfo.voxelSizeY *= static_cast<double>(outInfo.height) / outHeight;
+  outInfo.voxelSizeZ *= static_cast<double>(outInfo.depth) / outDepth;
+  outInfo.width = outWidth;
+  outInfo.height = outHeight;
+  outInfo.depth = outDepth;
+
+  nim::ZImg expected(outInfo);
+  nim::ZImg actual(outInfo);
+  if (outDepth == img.depth()) {
+    for (size_t t = 0; t < img.numTimes(); ++t) {
+      for (size_t c = 0; c < img.numChannels(); ++c) {
+        for (size_t z = 0; z < img.depth(); ++z) {
+          nim::image2DResize(img.planeData<T>(z, c, t),
+                             img.width(),
+                             img.height(),
+                             expected.planeData<T>(z, c, t),
+                             outWidth,
+                             outHeight,
+                             interpolant,
+                             antialiasing,
+                             antialiasingForNearest,
+                             true);
+          nim::image2DResizeHighway(img.planeData<T>(z, c, t),
+                                    img.width(),
+                                    img.height(),
+                                    actual.planeData<T>(z, c, t),
+                                    outWidth,
+                                    outHeight,
+                                    interpolant,
+                                    antialiasing,
+                                    antialiasingForNearest,
+                                    true);
+        }
+      }
+    }
+  } else {
+    for (size_t t = 0; t < img.numTimes(); ++t) {
+      for (size_t c = 0; c < img.numChannels(); ++c) {
+        nim::image3DResize(img.channelData<T>(c, t),
+                           img.width(),
+                           img.height(),
+                           img.depth(),
+                           expected.channelData<T>(c, t),
+                           outWidth,
+                           outHeight,
+                           outDepth,
+                           interpolant,
+                           antialiasing,
+                           antialiasingForNearest,
+                           true);
+        nim::image3DResizeHighway(img.channelData<T>(c, t),
+                                  img.width(),
+                                  img.height(),
+                                  img.depth(),
+                                  actual.channelData<T>(c, t),
+                                  outWidth,
+                                  outHeight,
+                                  outDepth,
+                                  interpolant,
+                                  antialiasing,
+                                  antialiasingForNearest,
+                                  true);
+      }
+    }
+  }
+
+  expectImagesNear<T>(expected, actual);
+
+  const nim::ZImg integrated =
+    img.resized(outWidth, outHeight, outDepth, interpolant, antialiasing, antialiasingForNearest, true);
+  expectImagesNear<T>(expected, integrated);
+}
+
+template<typename T>
+void expectHighwayResizeSupportsType()
+{
+  const nim::ZImg img2D = makeSyntheticResizeImage<T>(32, 28, 2);
+  expectResizeMatchesReference<T>(img2D, 19, 17, img2D.depth(), nim::Interpolant::Linear, false, false);
+
+  const nim::ZImg img3D = makeSyntheticResizeImage<T>(18, 16, 10);
+  expectResizeMatchesReference<T>(img3D, 11, 12, 7, nim::Interpolant::Cubic, true, false);
+}
+
+} // namespace
 
 TEST(ZImageUtils, GaussianKernel2D)
 {
@@ -664,4 +820,40 @@ TEST(ZImageUtils, Resize3D)
   catch (const ZException& e) {
     LOG(WARNING) << e.what();
   }
+}
+
+TEST(ZImageUtils, HighwayResize2DMatchesReferenceForMultipleInterpolants)
+{
+  using namespace nim;
+
+  const ZImg img = makeSyntheticResizeImage<uint16_t>(64, 48, 3);
+
+  expectResizeMatchesReference<uint16_t>(img, 32, 24, img.depth(), Interpolant::Cubic, true, false);
+  expectResizeMatchesReference<uint16_t>(img, 37, 29, img.depth(), Interpolant::Linear, false, false);
+  expectResizeMatchesReference<uint16_t>(img, 23, 19, img.depth(), Interpolant::Nearest, false, true);
+}
+
+TEST(ZImageUtils, HighwayResize3DMatchesReferenceForMultipleInterpolants)
+{
+  using namespace nim;
+
+  const ZImg img = makeSyntheticResizeImage<double>(32, 40, 24);
+
+  expectResizeMatchesReference<double>(img, 20, 20, 20, Interpolant::Cubic, true, false);
+  expectResizeMatchesReference<double>(img, 27, 31, 17, Interpolant::Linear, false, false);
+  expectResizeMatchesReference<double>(img, 24, 30, 18, Interpolant::Lanczos2, true, false);
+}
+
+TEST(ZImageUtils, HighwayResizeSupportsAllZImgVoxelTypes)
+{
+  expectHighwayResizeSupportsType<uint8_t>();
+  expectHighwayResizeSupportsType<uint16_t>();
+  expectHighwayResizeSupportsType<uint32_t>();
+  expectHighwayResizeSupportsType<uint64_t>();
+  expectHighwayResizeSupportsType<int8_t>();
+  expectHighwayResizeSupportsType<int16_t>();
+  expectHighwayResizeSupportsType<int32_t>();
+  expectHighwayResizeSupportsType<int64_t>();
+  expectHighwayResizeSupportsType<float>();
+  expectHighwayResizeSupportsType<double>();
 }

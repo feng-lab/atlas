@@ -4,7 +4,10 @@
 #include "zconcurrentlrucache.h"
 #include "z3dblockidcollector.h"
 #include "zimgbioformats.h"
+#include "zimage2dutils.h"
+#include "zimage3dutils.h"
 #include "zimagehwy.h"
+#include "zimageresizehwy.h"
 #include "zimginit.h"
 #include "zimgregion.h"
 #include "zlog.h"
@@ -43,6 +46,10 @@
 
 ABSL_DECLARE_FLAG(bool, atlas_bioformats_bridge_diagnostics);
 ABSL_DECLARE_FLAG(int32_t, atlas_bioformats_bridge_io_timeout_ms);
+ABSL_FLAG(bool,
+          atlas_resize_3d_exact_benchmark,
+          false,
+          "Enable exact-size 3D cubic-AA resize benchmarks, which allocate multi-GB working sets.");
 
 namespace nim {
 
@@ -626,6 +633,819 @@ static void addImageConvolutionBench()
                                     BM_image_convolution_hwy_3d_full);
     }
   }
+}
+
+struct ImageResize2DHalfBenchCase
+{
+  std::string name;
+  size_t width;
+  size_t height;
+};
+
+struct ImageResize3DTargetBenchCase
+{
+  std::string name;
+  size_t width;
+  size_t height;
+  size_t depth;
+  size_t outWidth;
+  size_t outHeight;
+  size_t outDepth;
+};
+
+struct ImageResize3DVisBlockBenchCase
+{
+  std::string name;
+  size_t width;
+  size_t height;
+  size_t depth;
+  size_t outWidth;
+  size_t outHeight;
+  size_t outDepth;
+};
+
+struct ImageResize2DPyramidBenchCase
+{
+  std::string name;
+  size_t width;
+  size_t height;
+  size_t stopThreshold;
+};
+
+struct ImageResize2DLevel
+{
+  size_t width;
+  size_t height;
+};
+
+struct ResizeKernelWidths
+{
+  size_t x = 0;
+  size_t y = 0;
+  size_t z = 0;
+};
+
+template<typename T>
+std::vector<T> makeImageResizeBenchData(size_t count)
+{
+  std::vector<T> data(count);
+  for (size_t i = 0; i < data.size(); ++i) {
+    const double value = (imageConvolutionBenchValue(i) + 1.0) * 0.5;
+    if constexpr (std::is_integral_v<T>) {
+      data[i] = static_cast<T>(std::llround(value * static_cast<double>(std::numeric_limits<T>::max())));
+    } else {
+      data[i] = static_cast<T>(value);
+    }
+  }
+  return data;
+}
+
+template<typename T>
+T imageResizeBenchConstantValue()
+{
+  if constexpr (std::is_integral_v<T>) {
+    return static_cast<T>(std::numeric_limits<T>::max() / 2);
+  } else {
+    return static_cast<T>(0.5);
+  }
+}
+
+template<typename T>
+std::vector<T> makeImageResizePyramidBenchData(size_t count)
+{
+  constexpr size_t kConstantFillThreshold = 1'000'000'000;
+  if (count >= kConstantFillThreshold) {
+    return std::vector<T>(count, imageResizeBenchConstantValue<T>());
+  }
+  return makeImageResizeBenchData<T>(count);
+}
+
+template<typename T>
+std::vector<T> makeImageResize3DVisBlockBenchData(size_t count)
+{
+  std::vector<T> data(count);
+  for (size_t i = 0; i < data.size(); ++i) {
+    const uint64_t hash = static_cast<uint64_t>(i) * 11400714819323198485ull + 0x9e3779b97f4a7c15ull;
+    if constexpr (std::is_integral_v<T>) {
+      constexpr uint64_t range = static_cast<uint64_t>(std::numeric_limits<T>::max()) + 1ull;
+      data[i] = static_cast<T>((hash >> 32u) % range);
+    } else {
+      constexpr double scale = 1.0 / static_cast<double>(0xFFFFFFu);
+      data[i] = static_cast<T>(static_cast<double>((hash >> 40u) & 0xFFFFFFu) * scale);
+    }
+  }
+  return data;
+}
+
+template<typename T>
+double maxResizeAbsDiff(const std::vector<T>& expected, const std::vector<T>& actual)
+{
+  CHECK(expected.size() == actual.size());
+  double maxDiff = 0.0;
+  for (size_t i = 0; i < expected.size(); ++i) {
+    maxDiff = std::max(maxDiff, std::abs(static_cast<double>(expected[i]) - static_cast<double>(actual[i])));
+  }
+  return maxDiff;
+}
+
+template<typename T>
+double resizeValidationTolerance()
+{
+  if constexpr (std::is_integral_v<T>) {
+    return 1.0;
+  } else {
+    return 1.0e-9;
+  }
+}
+
+ResizeKernelWidths resize2DKernelWidths(size_t width, size_t height, size_t outWidth, size_t outHeight)
+{
+  std::vector<double> weights;
+  std::vector<size_t> indices;
+  bool kernelIsTrivial = false;
+  ResizeKernelWidths widths;
+  _resizeContributions(width, outWidth, Interpolant::Cubic, true, weights, indices, widths.x, kernelIsTrivial);
+  _resizeContributions(height, outHeight, Interpolant::Cubic, true, weights, indices, widths.y, kernelIsTrivial);
+  return widths;
+}
+
+ResizeKernelWidths
+resize3DKernelWidths(size_t width, size_t height, size_t depth, size_t outWidth, size_t outHeight, size_t outDepth)
+{
+  std::vector<double> weights;
+  std::vector<size_t> indices;
+  bool kernelIsTrivial = false;
+  ResizeKernelWidths widths;
+  _resizeContributions(width, outWidth, Interpolant::Cubic, true, weights, indices, widths.x, kernelIsTrivial);
+  _resizeContributions(height, outHeight, Interpolant::Cubic, true, weights, indices, widths.y, kernelIsTrivial);
+  _resizeContributions(depth, outDepth, Interpolant::Cubic, true, weights, indices, widths.z, kernelIsTrivial);
+  return widths;
+}
+
+std::vector<ImageResize2DLevel> resize2DPyramidLevels(size_t width, size_t height, size_t stopThreshold)
+{
+  std::vector<ImageResize2DLevel> levels;
+  while (width >= stopThreshold || height >= stopThreshold) {
+    width = (width + 1) / 2;
+    height = (height + 1) / 2;
+    levels.push_back({width, height});
+  }
+  return levels;
+}
+
+size_t totalResize2DPyramidOutputPixels(const std::vector<ImageResize2DLevel>& levels)
+{
+  size_t count = 0;
+  for (const auto& level : levels) {
+    count += level.width * level.height;
+  }
+  return count;
+}
+
+size_t totalResize2DPyramidInputPixels(size_t width, size_t height, const std::vector<ImageResize2DLevel>& levels)
+{
+  size_t count = width * height;
+  for (size_t i = 0; i + 1 < levels.size(); ++i) {
+    count += levels[i].width * levels[i].height;
+  }
+  return count;
+}
+
+template<typename T>
+void validateImageResize2DHalfHwy()
+{
+  static const bool validated = [] {
+    constexpr size_t width = 64;
+    constexpr size_t height = 48;
+    std::vector<T> img = makeImageResizeBenchData<T>(width * height);
+    std::vector<T> expected((width / 2) * (height / 2));
+    std::vector<T> actual(expected.size());
+    image2DResize(img.data(),
+                  width,
+                  height,
+                  expected.data(),
+                  width / 2,
+                  height / 2,
+                  Interpolant::Cubic,
+                  true,
+                  false,
+                  true);
+    image2DResizeHighway(img.data(),
+                         width,
+                         height,
+                         actual.data(),
+                         width / 2,
+                         height / 2,
+                         Interpolant::Cubic,
+                         true,
+                         false,
+                         true);
+    CHECK_LE(maxResizeAbsDiff(expected, actual), resizeValidationTolerance<T>());
+    return true;
+  }();
+  CHECK(validated);
+}
+
+template<typename T>
+void validateImageResize2DPyramidHwy()
+{
+  static const bool validated = [] {
+    constexpr size_t width = 65;
+    constexpr size_t height = 73;
+    constexpr size_t stopThreshold = 16;
+    std::vector<T> current = makeImageResizeBenchData<T>(width * height);
+    std::vector<T> hwy = current;
+    size_t currentWidth = width;
+    size_t currentHeight = height;
+    for (const auto& level : resize2DPyramidLevels(width, height, stopThreshold)) {
+      std::vector<T> expected(level.width * level.height);
+      std::vector<T> actual(level.width * level.height);
+      image2DResize(current.data(),
+                    currentWidth,
+                    currentHeight,
+                    expected.data(),
+                    level.width,
+                    level.height,
+                    Interpolant::Cubic,
+                    true,
+                    false,
+                    true);
+      image2DResizeHighway(hwy.data(),
+                           currentWidth,
+                           currentHeight,
+                           actual.data(),
+                           level.width,
+                           level.height,
+                           Interpolant::Cubic,
+                           true,
+                           false,
+                           true);
+      CHECK_LE(maxResizeAbsDiff(expected, actual), resizeValidationTolerance<T>());
+      current = std::move(expected);
+      hwy = std::move(actual);
+      currentWidth = level.width;
+      currentHeight = level.height;
+    }
+    return true;
+  }();
+  CHECK(validated);
+}
+
+template<typename T>
+void validateImageResize3DHwy()
+{
+  static const bool validated = [] {
+    constexpr size_t width = 32;
+    constexpr size_t height = 40;
+    constexpr size_t depth = 24;
+    constexpr size_t outWidth = 20;
+    constexpr size_t outHeight = 20;
+    constexpr size_t outDepth = 20;
+    std::vector<T> img = makeImageResizeBenchData<T>(width * height * depth);
+    std::vector<T> expected(outWidth * outHeight * outDepth);
+    std::vector<T> actual(expected.size());
+    image3DResize(img.data(),
+                  width,
+                  height,
+                  depth,
+                  expected.data(),
+                  outWidth,
+                  outHeight,
+                  outDepth,
+                  Interpolant::Cubic,
+                  true,
+                  false,
+                  true);
+    image3DResizeHighway(img.data(),
+                         width,
+                         height,
+                         depth,
+                         actual.data(),
+                         outWidth,
+                         outHeight,
+                         outDepth,
+                         Interpolant::Cubic,
+                         true,
+                         false,
+                         true);
+    CHECK_LE(maxResizeAbsDiff(expected, actual), resizeValidationTolerance<T>());
+    return true;
+  }();
+  CHECK(validated);
+}
+
+template<typename T>
+void validateImageResize3DVisBlockHwy()
+{
+  static const bool validated = [] {
+    constexpr size_t width = 48;
+    constexpr size_t height = 56;
+    constexpr size_t depth = 96;
+    constexpr size_t outWidth = 32;
+    constexpr size_t outHeight = 32;
+    constexpr size_t outDepth = 24;
+    std::vector<T> img = makeImageResize3DVisBlockBenchData<T>(width * height * depth);
+    std::vector<T> expected(outWidth * outHeight * outDepth);
+    std::vector<T> actual(expected.size());
+    image3DResize(img.data(),
+                  width,
+                  height,
+                  depth,
+                  expected.data(),
+                  outWidth,
+                  outHeight,
+                  outDepth,
+                  Interpolant::Cubic,
+                  true,
+                  false,
+                  false);
+    image3DResizeHighway(img.data(),
+                         width,
+                         height,
+                         depth,
+                         actual.data(),
+                         outWidth,
+                         outHeight,
+                         outDepth,
+                         Interpolant::Cubic,
+                         true,
+                         false,
+                         false);
+    CHECK_LE(maxResizeAbsDiff(expected, actual), resizeValidationTolerance<T>());
+    return true;
+  }();
+  CHECK(validated);
+}
+
+template<typename T>
+static void BM_image_resize_2d_half_current_cubic_aa(benchmark::State& state, ImageResize2DHalfBenchCase benchCase)
+{
+  const size_t outWidth = benchCase.width / 2;
+  const size_t outHeight = benchCase.height / 2;
+  const ResizeKernelWidths kernelWidths = resize2DKernelWidths(benchCase.width, benchCase.height, outWidth, outHeight);
+  std::vector<T> img = makeImageResizeBenchData<T>(benchCase.width * benchCase.height);
+  std::vector<T> imgOut(outWidth * outHeight);
+
+  for (auto _ : state) {
+    image2DResize(img.data(),
+                  benchCase.width,
+                  benchCase.height,
+                  imgOut.data(),
+                  outWidth,
+                  outHeight,
+                  Interpolant::Cubic,
+                  true,
+                  false,
+                  true);
+    benchmark::DoNotOptimize(imgOut.data());
+    benchmark::ClobberMemory();
+  }
+
+  state.SetItemsProcessed(state.iterations() * static_cast<int64_t>(imgOut.size()));
+  state.SetBytesProcessed(state.iterations() * static_cast<int64_t>(img.size() * sizeof(T)));
+  state.counters["x_taps"] = static_cast<double>(kernelWidths.x);
+  state.counters["y_taps"] = static_cast<double>(kernelWidths.y);
+}
+
+template<typename T>
+static void BM_image_resize_2d_half_hwy_cubic_aa(benchmark::State& state, ImageResize2DHalfBenchCase benchCase)
+{
+  validateImageResize2DHalfHwy<T>();
+
+  const size_t outWidth = benchCase.width / 2;
+  const size_t outHeight = benchCase.height / 2;
+  const ResizeKernelWidths kernelWidths = resize2DKernelWidths(benchCase.width, benchCase.height, outWidth, outHeight);
+  std::vector<T> img = makeImageResizeBenchData<T>(benchCase.width * benchCase.height);
+  std::vector<T> imgOut(outWidth * outHeight);
+
+  for (auto _ : state) {
+    image2DResizeHighway(img.data(),
+                         benchCase.width,
+                         benchCase.height,
+                         imgOut.data(),
+                         outWidth,
+                         outHeight,
+                         Interpolant::Cubic,
+                         true,
+                         false,
+                         true);
+    benchmark::DoNotOptimize(imgOut.data());
+    benchmark::ClobberMemory();
+  }
+
+  state.SetItemsProcessed(state.iterations() * static_cast<int64_t>(imgOut.size()));
+  state.SetBytesProcessed(state.iterations() * static_cast<int64_t>(img.size() * sizeof(T)));
+  state.counters["x_taps"] = static_cast<double>(kernelWidths.x);
+  state.counters["y_taps"] = static_cast<double>(kernelWidths.y);
+}
+
+template<typename T>
+static void BM_image_resize_2d_pyramid_current_cubic_aa(benchmark::State& state,
+                                                        ImageResize2DPyramidBenchCase benchCase)
+{
+  const auto levels = resize2DPyramidLevels(benchCase.width, benchCase.height, benchCase.stopThreshold);
+  const size_t totalOutputPixels = totalResize2DPyramidOutputPixels(levels);
+  const size_t totalInputPixels = totalResize2DPyramidInputPixels(benchCase.width, benchCase.height, levels);
+  std::vector<T> base = makeImageResizePyramidBenchData<T>(benchCase.width * benchCase.height);
+
+  for (auto _ : state) {
+    std::vector<std::vector<T>> pyramid;
+    pyramid.reserve(levels.size());
+    const T* src = base.data();
+    size_t srcWidth = benchCase.width;
+    size_t srcHeight = benchCase.height;
+    for (const auto& level : levels) {
+      std::vector<T> out(level.width * level.height);
+      image2DResize(src,
+                    srcWidth,
+                    srcHeight,
+                    out.data(),
+                    level.width,
+                    level.height,
+                    Interpolant::Cubic,
+                    true,
+                    false,
+                    true);
+      pyramid.push_back(std::move(out));
+      src = pyramid.back().data();
+      srcWidth = level.width;
+      srcHeight = level.height;
+    }
+    benchmark::DoNotOptimize(pyramid.back().data());
+    benchmark::ClobberMemory();
+  }
+
+  state.SetItemsProcessed(state.iterations() * static_cast<int64_t>(totalOutputPixels));
+  state.SetBytesProcessed(state.iterations() * static_cast<int64_t>(totalInputPixels * sizeof(T)));
+  state.counters["levels"] = static_cast<double>(levels.size());
+}
+
+template<typename T>
+static void BM_image_resize_2d_pyramid_hwy_cubic_aa(benchmark::State& state, ImageResize2DPyramidBenchCase benchCase)
+{
+  validateImageResize2DPyramidHwy<T>();
+
+  const auto levels = resize2DPyramidLevels(benchCase.width, benchCase.height, benchCase.stopThreshold);
+  const size_t totalOutputPixels = totalResize2DPyramidOutputPixels(levels);
+  const size_t totalInputPixels = totalResize2DPyramidInputPixels(benchCase.width, benchCase.height, levels);
+  std::vector<T> base = makeImageResizePyramidBenchData<T>(benchCase.width * benchCase.height);
+
+  for (auto _ : state) {
+    std::vector<std::vector<T>> pyramid;
+    pyramid.reserve(levels.size());
+    const T* src = base.data();
+    size_t srcWidth = benchCase.width;
+    size_t srcHeight = benchCase.height;
+    for (const auto& level : levels) {
+      std::vector<T> out(level.width * level.height);
+      image2DResizeHighway(src,
+                           srcWidth,
+                           srcHeight,
+                           out.data(),
+                           level.width,
+                           level.height,
+                           Interpolant::Cubic,
+                           true,
+                           false,
+                           true);
+      pyramid.push_back(std::move(out));
+      src = pyramid.back().data();
+      srcWidth = level.width;
+      srcHeight = level.height;
+    }
+    benchmark::DoNotOptimize(pyramid.back().data());
+    benchmark::ClobberMemory();
+  }
+
+  state.SetItemsProcessed(state.iterations() * static_cast<int64_t>(totalOutputPixels));
+  state.SetBytesProcessed(state.iterations() * static_cast<int64_t>(totalInputPixels * sizeof(T)));
+  state.counters["levels"] = static_cast<double>(levels.size());
+}
+
+template<typename T>
+static void BM_image_resize_3d_target_current_cubic_aa(benchmark::State& state, ImageResize3DTargetBenchCase benchCase)
+{
+  if (!absl::GetFlag(FLAGS_atlas_resize_3d_exact_benchmark)) {
+    state.SkipWithError("pass --atlas_resize_3d_exact_benchmark=true to enable exact-size 3D resize benchmarks");
+    return;
+  }
+
+  const ResizeKernelWidths kernelWidths = resize3DKernelWidths(benchCase.width,
+                                                               benchCase.height,
+                                                               benchCase.depth,
+                                                               benchCase.outWidth,
+                                                               benchCase.outHeight,
+                                                               benchCase.outDepth);
+  std::vector<T> img = makeImageResizeBenchData<T>(benchCase.width * benchCase.height * benchCase.depth);
+  std::vector<T> imgOut(benchCase.outWidth * benchCase.outHeight * benchCase.outDepth);
+
+  for (auto _ : state) {
+    image3DResize(img.data(),
+                  benchCase.width,
+                  benchCase.height,
+                  benchCase.depth,
+                  imgOut.data(),
+                  benchCase.outWidth,
+                  benchCase.outHeight,
+                  benchCase.outDepth,
+                  Interpolant::Cubic,
+                  true,
+                  false,
+                  true);
+    benchmark::DoNotOptimize(imgOut.data());
+    benchmark::ClobberMemory();
+  }
+
+  state.SetItemsProcessed(state.iterations() * static_cast<int64_t>(imgOut.size()));
+  state.SetBytesProcessed(state.iterations() * static_cast<int64_t>(img.size() * sizeof(T)));
+  state.counters["x_taps"] = static_cast<double>(kernelWidths.x);
+  state.counters["y_taps"] = static_cast<double>(kernelWidths.y);
+  state.counters["z_taps"] = static_cast<double>(kernelWidths.z);
+}
+
+template<typename T>
+static void BM_image_resize_3d_target_hwy_cubic_aa(benchmark::State& state, ImageResize3DTargetBenchCase benchCase)
+{
+  if (!absl::GetFlag(FLAGS_atlas_resize_3d_exact_benchmark)) {
+    state.SkipWithError("pass --atlas_resize_3d_exact_benchmark=true to enable exact-size 3D resize benchmarks");
+    return;
+  }
+  validateImageResize3DHwy<T>();
+
+  const ResizeKernelWidths kernelWidths = resize3DKernelWidths(benchCase.width,
+                                                               benchCase.height,
+                                                               benchCase.depth,
+                                                               benchCase.outWidth,
+                                                               benchCase.outHeight,
+                                                               benchCase.outDepth);
+  std::vector<T> img = makeImageResizeBenchData<T>(benchCase.width * benchCase.height * benchCase.depth);
+  std::vector<T> imgOut(benchCase.outWidth * benchCase.outHeight * benchCase.outDepth);
+
+  for (auto _ : state) {
+    image3DResizeHighway(img.data(),
+                         benchCase.width,
+                         benchCase.height,
+                         benchCase.depth,
+                         imgOut.data(),
+                         benchCase.outWidth,
+                         benchCase.outHeight,
+                         benchCase.outDepth,
+                         Interpolant::Cubic,
+                         true,
+                         false,
+                         true);
+    benchmark::DoNotOptimize(imgOut.data());
+    benchmark::ClobberMemory();
+  }
+
+  state.SetItemsProcessed(state.iterations() * static_cast<int64_t>(imgOut.size()));
+  state.SetBytesProcessed(state.iterations() * static_cast<int64_t>(img.size() * sizeof(T)));
+  state.counters["x_taps"] = static_cast<double>(kernelWidths.x);
+  state.counters["y_taps"] = static_cast<double>(kernelWidths.y);
+  state.counters["z_taps"] = static_cast<double>(kernelWidths.z);
+}
+
+template<typename T>
+static void BM_image_resize_3d_vis_block_current_cubic_aa(benchmark::State& state,
+                                                          ImageResize3DVisBlockBenchCase benchCase)
+{
+  const ResizeKernelWidths kernelWidths = resize3DKernelWidths(benchCase.width,
+                                                               benchCase.height,
+                                                               benchCase.depth,
+                                                               benchCase.outWidth,
+                                                               benchCase.outHeight,
+                                                               benchCase.outDepth);
+  std::vector<T> img = makeImageResize3DVisBlockBenchData<T>(benchCase.width * benchCase.height * benchCase.depth);
+  std::vector<T> imgOut(benchCase.outWidth * benchCase.outHeight * benchCase.outDepth);
+
+  for (auto _ : state) {
+    image3DResize(img.data(),
+                  benchCase.width,
+                  benchCase.height,
+                  benchCase.depth,
+                  imgOut.data(),
+                  benchCase.outWidth,
+                  benchCase.outHeight,
+                  benchCase.outDepth,
+                  Interpolant::Cubic,
+                  true,
+                  false,
+                  false);
+    benchmark::DoNotOptimize(imgOut.data());
+    benchmark::ClobberMemory();
+  }
+
+  state.SetItemsProcessed(state.iterations() * static_cast<int64_t>(imgOut.size()));
+  state.SetBytesProcessed(state.iterations() * static_cast<int64_t>(img.size() * sizeof(T)));
+  state.counters["x_taps"] = static_cast<double>(kernelWidths.x);
+  state.counters["y_taps"] = static_cast<double>(kernelWidths.y);
+  state.counters["z_taps"] = static_cast<double>(kernelWidths.z);
+}
+
+template<typename T>
+static void BM_image_resize_3d_vis_block_hwy_cubic_aa(benchmark::State& state, ImageResize3DVisBlockBenchCase benchCase)
+{
+  validateImageResize3DVisBlockHwy<T>();
+
+  const ResizeKernelWidths kernelWidths = resize3DKernelWidths(benchCase.width,
+                                                               benchCase.height,
+                                                               benchCase.depth,
+                                                               benchCase.outWidth,
+                                                               benchCase.outHeight,
+                                                               benchCase.outDepth);
+  std::vector<T> img = makeImageResize3DVisBlockBenchData<T>(benchCase.width * benchCase.height * benchCase.depth);
+  std::vector<T> imgOut(benchCase.outWidth * benchCase.outHeight * benchCase.outDepth);
+
+  for (auto _ : state) {
+    image3DResizeHighway(img.data(),
+                         benchCase.width,
+                         benchCase.height,
+                         benchCase.depth,
+                         imgOut.data(),
+                         benchCase.outWidth,
+                         benchCase.outHeight,
+                         benchCase.outDepth,
+                         Interpolant::Cubic,
+                         true,
+                         false,
+                         false);
+    benchmark::DoNotOptimize(imgOut.data());
+    benchmark::ClobberMemory();
+  }
+
+  state.SetItemsProcessed(state.iterations() * static_cast<int64_t>(imgOut.size()));
+  state.SetBytesProcessed(state.iterations() * static_cast<int64_t>(img.size() * sizeof(T)));
+  state.counters["x_taps"] = static_cast<double>(kernelWidths.x);
+  state.counters["y_taps"] = static_cast<double>(kernelWidths.y);
+  state.counters["z_taps"] = static_cast<double>(kernelWidths.z);
+}
+
+template<typename T>
+void registerImageResize2DHalfTypeBenches(std::string_view typeName)
+{
+  constexpr std::array<size_t, 3> imageSizes = {512, 1024, 2048};
+  for (const size_t size : imageSizes) {
+    ImageResize2DHalfBenchCase currentBenchCase{
+      fmt::format("ImageResize2DHalf/Current/CubicAA/{}/{}x{}_to_{}x{}", typeName, size, size, size / 2, size / 2),
+      size,
+      size};
+    benchmark::RegisterBenchmark(currentBenchCase.name.c_str(),
+                                 &BM_image_resize_2d_half_current_cubic_aa<T>,
+                                 currentBenchCase)
+      ->Unit(benchmark::kMicrosecond);
+
+    ImageResize2DHalfBenchCase hwyBenchCase{fmt::format("ImageResize2DHalf/HighwaySeparable/CubicAA/{}/{}x{}_to_{}x{}",
+                                                        typeName,
+                                                        size,
+                                                        size,
+                                                        size / 2,
+                                                        size / 2),
+                                            size,
+                                            size};
+    benchmark::RegisterBenchmark(hwyBenchCase.name.c_str(), &BM_image_resize_2d_half_hwy_cubic_aa<T>, hwyBenchCase)
+      ->Unit(benchmark::kMicrosecond);
+  }
+}
+
+template<typename T>
+void registerImageResize2DPyramidTypeBenches(std::string_view typeName)
+{
+  const std::array<std::tuple<std::string_view, size_t, size_t>, 2> cases = {
+    std::tuple<std::string_view, size_t, size_t>{"21000x24000_to_lt512",   21000,  24000 },
+    std::tuple<std::string_view, size_t, size_t>{"110000x120000_to_lt512", 110000, 120000},
+  };
+
+  for (const auto& [caseName, width, height] : cases) {
+    ImageResize2DPyramidBenchCase currentBenchCase{
+      fmt::format("ImageResize2DPyramid/Current/CubicAA/{}/{}", typeName, caseName),
+      width,
+      height,
+      512};
+    benchmark::RegisterBenchmark(currentBenchCase.name.c_str(),
+                                 &BM_image_resize_2d_pyramid_current_cubic_aa<T>,
+                                 currentBenchCase)
+      ->Unit(benchmark::kMillisecond)
+      ->Iterations(1);
+
+    ImageResize2DPyramidBenchCase hwyBenchCase{
+      fmt::format("ImageResize2DPyramid/HighwaySeparable/CubicAA/{}/{}", typeName, caseName),
+      width,
+      height,
+      512};
+    benchmark::RegisterBenchmark(hwyBenchCase.name.c_str(), &BM_image_resize_2d_pyramid_hwy_cubic_aa<T>, hwyBenchCase)
+      ->Unit(benchmark::kMillisecond)
+      ->Iterations(1);
+  }
+}
+
+template<typename T>
+void registerImageResize3DTargetTypeBenches(std::string_view typeName)
+{
+  ImageResize3DTargetBenchCase currentBenchCase{
+    fmt::format("ImageResize3DTarget/Current/CubicAA/{}/800x1000x600_to_512x512x512", typeName),
+    800,
+    1000,
+    600,
+    512,
+    512,
+    512};
+  benchmark::RegisterBenchmark(currentBenchCase.name.c_str(),
+                               &BM_image_resize_3d_target_current_cubic_aa<T>,
+                               currentBenchCase)
+    ->Unit(benchmark::kMillisecond)
+    ->Iterations(1);
+
+  ImageResize3DTargetBenchCase hwyBenchCase{
+    fmt::format("ImageResize3DTarget/HighwayPlaneFirst/CubicAA/{}/800x1000x600_to_512x512x512", typeName),
+    800,
+    1000,
+    600,
+    512,
+    512,
+    512};
+  benchmark::RegisterBenchmark(hwyBenchCase.name.c_str(), &BM_image_resize_3d_target_hwy_cubic_aa<T>, hwyBenchCase)
+    ->Unit(benchmark::kMillisecond)
+    ->Iterations(1);
+}
+
+template<typename T>
+void registerImageResize3DVisBlockTypeBenches(std::string_view typeName)
+{
+  const std::array<std::tuple<std::string_view, size_t, size_t, size_t, size_t, size_t, size_t>, 4> cases = {
+    std::tuple<std::string_view, size_t, size_t, size_t, size_t, size_t, size_t>{"zonly_block64_z2000",
+                                                                                 64,  64,
+                                                                                 2000, 64,
+                                                                                 64,  64 },
+    std::tuple<std::string_view, size_t, size_t, size_t, size_t, size_t, size_t>{"xy2_block64_z2000",
+                                                                                 128, 128,
+                                                                                 2000, 64,
+                                                                                 64,  64 },
+    std::tuple<std::string_view, size_t, size_t, size_t, size_t, size_t, size_t>{"zonly_block128_z2000",
+                                                                                 128, 128,
+                                                                                 2000, 128,
+                                                                                 128, 128},
+    std::tuple<std::string_view, size_t, size_t, size_t, size_t, size_t, size_t>{"xy2_block128_z2000",
+                                                                                 256, 256,
+                                                                                 2000, 128,
+                                                                                 128, 128},
+  };
+
+  for (const auto& [caseName, width, height, depth, outWidth, outHeight, outDepth] : cases) {
+    ImageResize3DVisBlockBenchCase currentBenchCase{
+      fmt::format("ImageResize3DVisBlock/Current/CubicAA_SingleThread/{}/{}/{}x{}x{}_to_{}x{}x{}",
+                  typeName,
+                  caseName,
+                  width,
+                  height,
+                  depth,
+                  outWidth,
+                  outHeight,
+                  outDepth),
+      width,
+      height,
+      depth,
+      outWidth,
+      outHeight,
+      outDepth};
+    benchmark::RegisterBenchmark(currentBenchCase.name.c_str(),
+                                 &BM_image_resize_3d_vis_block_current_cubic_aa<T>,
+                                 currentBenchCase)
+      ->Unit(benchmark::kMillisecond)
+      ->Iterations(1);
+
+    ImageResize3DVisBlockBenchCase hwyBenchCase{
+      fmt::format("ImageResize3DVisBlock/HighwayPlaneFirst/CubicAA_SingleThread/{}/{}/{}x{}x{}_to_{}x{}x{}",
+                  typeName,
+                  caseName,
+                  width,
+                  height,
+                  depth,
+                  outWidth,
+                  outHeight,
+                  outDepth),
+      width,
+      height,
+      depth,
+      outWidth,
+      outHeight,
+      outDepth};
+    benchmark::RegisterBenchmark(hwyBenchCase.name.c_str(), &BM_image_resize_3d_vis_block_hwy_cubic_aa<T>, hwyBenchCase)
+      ->Unit(benchmark::kMillisecond)
+      ->Iterations(1);
+  }
+}
+
+static void addImageResizeBench()
+{
+  registerImageResize2DHalfTypeBenches<uint8_t>("uint8");
+  registerImageResize2DHalfTypeBenches<uint16_t>("uint16");
+  registerImageResize2DHalfTypeBenches<double>("double");
+  registerImageResize2DPyramidTypeBenches<uint8_t>("uint8");
+  registerImageResize2DPyramidTypeBenches<uint16_t>("uint16");
+  registerImageResize3DTargetTypeBenches<uint8_t>("uint8");
+  registerImageResize3DTargetTypeBenches<uint16_t>("uint16");
+  registerImageResize3DVisBlockTypeBenches<uint8_t>("uint8");
+  registerImageResize3DVisBlockTypeBenches<uint16_t>("uint16");
 }
 
 static void BM_vectorLoopRange(benchmark::State& state)
@@ -1431,6 +2251,7 @@ int main(int argc, char* argv[])
   addSaturateMulBench();
   addSaturateAddSubBench();
   addImageConvolutionBench();
+  addImageResizeBench();
   addVectorLoopBench();
   addLockBench();
   addConcurrentLRUCacheBench();
