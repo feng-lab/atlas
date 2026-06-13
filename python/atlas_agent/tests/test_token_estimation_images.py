@@ -9,6 +9,7 @@ SRC_DIR = ROOT_DIR / "src"
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
+from atlas_agent.model_policy import DEFAULT_MODEL  # type: ignore  # noqa: E402
 from atlas_agent.responses_tool_loop import _estimate_request_tokens  # type: ignore  # noqa: E402
 
 
@@ -61,13 +62,13 @@ def test_estimate_request_tokens_does_not_scale_with_inline_base64_image_bytes()
     ]
 
     est_big = _estimate_request_tokens(
-        model_name="gpt-5.2",
+        model_name=DEFAULT_MODEL,
         instructions="system",
         input_items=items_big,
         tools=[],
     )
     est_small = _estimate_request_tokens(
-        model_name="gpt-5.2",
+        model_name=DEFAULT_MODEL,
         instructions="system",
         input_items=items_small,
         tools=[],

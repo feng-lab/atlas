@@ -40,6 +40,11 @@ from .llm_usage import (
     LlmUsageTotals,
     extract_usage_delta_from_response,
 )
+from .model_policy import (
+    guess_model_effective_input_budget_tokens,
+    model_context_window_tokens,
+    model_effective_context_window_tokens,
+)
 from .responses_tool_loop import (
     ToolLoopCallbacks,
     ToolLoopNonConverged,
@@ -289,34 +294,6 @@ def _message(*, role: str, text: str) -> dict[str, Any]:
         "role": role_s,
         "content": [{"type": part_type, "text": str(text)}],
     }
-
-
-def _guess_model_effective_input_budget_tokens(model: str) -> int | None:
-    """Best-effort effective *input* token budget guess from model name.
-
-    This is only used for proactive prompt-budget compaction when the provider
-    does not expose model token limits (total context window and/or max output).
-
-    If the provider later returns an explicit "maximum context length is N tokens"
-    error, we persist that value and prefer it over this guess.
-    """
-
-    m = (model or "").strip().lower()
-    if not m:
-        return None
-    # Very old / small-window models
-    if m.startswith("gpt-3.5"):
-        return 16_384
-    # Modern OpenAI-style naming families (best-effort; update as needed)
-    if m.startswith(("gpt-4o", "gpt-4.1", "gpt-4")):
-        return 128_000
-    if m.startswith("gpt-5"):
-        # GPT-5 family defaults to a larger context window than GPT-4o.
-        return 272_000
-    if m.startswith(("o3", "o4")):
-        return 128_000
-    # Unknown provider/model: fall back to a reasonable modern default.
-    return 128_000
 
 
 @dataclass
@@ -2516,11 +2493,12 @@ class ChatTeam:
 
                     This is the single number that drives proactive compaction decisions.
                     We log it once to avoid spamming session.jsonl, and we record a coarse
-                    method (one of 4) so debugging doesn't require reproducing compaction:
+                    method (one of 5) so debugging doesn't require reproducing compaction:
                     - session_meta
                     - provider_models_retrieve
                     - context_length_error
                     - name_guess
+                    - model_policy
                     """
 
                     mn = str(model_name or "").strip()
@@ -2532,6 +2510,7 @@ class ChatTeam:
                         "provider_models_retrieve",
                         "context_length_error",
                         "name_guess",
+                        "model_policy",
                     }:
                         return
                     try:
@@ -2798,6 +2777,30 @@ class ChatTeam:
                                 except Exception:
                                     pass
 
+                    policy_context_window = model_context_window_tokens(model_name)
+                    if policy_context_window is not None:
+                        if total_context_window_tokens is None:
+                            total_context_window_tokens = int(policy_context_window)
+                        else:
+                            total_context_window_tokens = min(
+                                int(total_context_window_tokens),
+                                int(policy_context_window),
+                            )
+
+                    policy_effective = model_effective_context_window_tokens(model_name)
+                    if policy_effective is not None:
+                        effective_cap = int(policy_effective)
+                        if total_context_window_tokens is not None:
+                            effective_cap = min(
+                                effective_cap, int(total_context_window_tokens)
+                            )
+                        if (
+                            effective_input_budget_tokens is None
+                            or int(effective_input_budget_tokens) > effective_cap
+                        ):
+                            effective_input_budget_tokens = effective_cap
+                            effective_method = "model_policy"
+
                     # Compute effective input budget when total+max_output are known.
                     if (
                         effective_input_budget_tokens is None
@@ -2816,7 +2819,7 @@ class ChatTeam:
 
                     # Fall back to a conservative name-based effective-input guess only when needed.
                     if effective_input_budget_tokens is None:
-                        guessed_eff = _guess_model_effective_input_budget_tokens(
+                        guessed_eff = guess_model_effective_input_budget_tokens(
                             model_name
                         )
                         if (
@@ -2853,6 +2856,23 @@ class ChatTeam:
                             )
                         except Exception:
                             auto_compact_tokens = None
+                    elif (
+                        auto_compact_tokens is not None
+                        and effective_input_budget_tokens is not None
+                    ):
+                        try:
+                            max_auto_compact_tokens = max(
+                                1,
+                                (
+                                    int(effective_input_budget_tokens)
+                                    * DEFAULT_AUTO_COMPACT_RATIO_NUMERATOR
+                                )
+                                // DEFAULT_AUTO_COMPACT_RATIO_DENOMINATOR,
+                            )
+                            if int(auto_compact_tokens) > int(max_auto_compact_tokens):
+                                auto_compact_tokens = int(max_auto_compact_tokens)
+                        except Exception:
+                            pass
 
                     # If we didn't have a persisted effective input budget, persist a
                     # best-effort value for this session so future turns/resumes can

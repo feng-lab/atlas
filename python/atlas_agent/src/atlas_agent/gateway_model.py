@@ -5,33 +5,14 @@ from __future__ import annotations
 Some OpenAI-compatible gateways occasionally return Responses/Chat payloads that
 are missing the routed model name (resp["model"]) or report an unexpected model.
 
-For OpenAI models, this is usually an upstream routing/proxy issue. We treat it
-as a transient error and retry cleanly (discarding the response).
+For model families that require gateway validation, this is usually an upstream
+routing/proxy issue. We treat it as a transient error and retry cleanly
+(discarding the response).
 """
 
 import re
 
-
-def normalize_model_id(raw: str | None) -> str:
-    """Best-effort normalization for gateway-reported model ids.
-
-    Gateways may decorate model names (e.g. vendor prefixes like "openai/gpt-5.2"
-    or "openai:gpt-5.2"). We try to normalize without being overly clever.
-    """
-
-    s = str(raw or "").strip()
-    if not s:
-        return ""
-    # Drop any trailing annotations (rare but seen in some gateways).
-    s = s.split()[0]
-    # Strip vendor prefixes (keep the last segment).
-    #
-    # Note: do not split on '@' here. Some gateways use '@' to attach routing
-    # metadata or versions (e.g., model@YYYY-MM-DD). Treat it as part of the id.
-    for sep in ("/", ":"):
-        if sep in s:
-            s = s.split(sep)[-1]
-    return s.strip().lower()
+from .model_policy import normalize_model_id
 
 
 _DATE_SUFFIX_RE = re.compile(r"^(?P<base>.+)-(?P<date>\d{4}-\d{2}-\d{2}|\d{8})$")
@@ -53,26 +34,13 @@ def _split_date_suffix(model_id: str) -> tuple[str, str | None]:
     return (base, date)
 
 
-def openai_model_requires_gateway_model(requested_model: str | None) -> bool:
-    """Return true when missing/mismatched gateway model should be treated as fatal."""
-
-    m = normalize_model_id(requested_model)
-    if not m:
-        return False
-    if m.startswith("gpt-"):
-        return True
-    if m.startswith(("o1", "o3", "o4")):
-        return True
-    return False
-
-
 def gateway_model_matches_requested(
     requested_model: str | None, gateway_model: str | None
 ) -> bool:
-    """Date-aware model match for OpenAI models.
+    """Date-aware model match for gateway-reported models.
 
     Gateways may return:
-    - a vendor-prefixed id (e.g. "openai/gpt-5.2")
+    - a vendor-prefixed id (e.g. "openai/<model>")
     - a date-suffixed id (e.g. "gpt-4o-2024-08-06")
 
     We want to accept *date suffix* differences when the user requested the base

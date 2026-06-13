@@ -19,7 +19,13 @@ from ..defaults import (
 )
 from ..gateway_model import (
     gateway_model_matches_requested,
-    openai_model_requires_gateway_model,
+)
+from ..model_policy import (
+    model_context_window_tokens,
+    model_effective_context_window_tokens,
+    model_requires_gateway_model,
+    model_supports_reasoning_summaries,
+    model_supports_text_verbosity,
 )
 from ..provider_tool_schema import (
     convert_tools_to_responses_wire,
@@ -580,15 +586,40 @@ class LLMClient:
             except Exception:
                 effective_input_budget = None
 
-        if auto_compact is None and effective_input_budget is not None:
+        policy_context_window = model_context_window_tokens(model_id)
+        if policy_context_window is not None:
+            if total_context_window is None:
+                total_context_window = int(policy_context_window)
+            else:
+                total_context_window = min(
+                    int(total_context_window), int(policy_context_window)
+                )
+
+        policy_effective = model_effective_context_window_tokens(model_id)
+        if policy_effective is not None:
+            effective_cap = int(policy_effective)
+            if total_context_window is not None:
+                effective_cap = min(effective_cap, int(total_context_window))
+            if (
+                effective_input_budget is None
+                or int(effective_input_budget) > effective_cap
+            ):
+                effective_input_budget = effective_cap
+
+        if effective_input_budget is not None:
             try:
-                auto_compact = max(
+                default_auto_compact = max(
                     1,
                     (int(effective_input_budget) * DEFAULT_AUTO_COMPACT_RATIO_NUMERATOR)
                     // DEFAULT_AUTO_COMPACT_RATIO_DENOMINATOR,
                 )
             except Exception:
-                auto_compact = None
+                default_auto_compact = None
+            if default_auto_compact is not None:
+                if auto_compact is None:
+                    auto_compact = int(default_auto_compact)
+                else:
+                    auto_compact = min(int(auto_compact), int(default_auto_compact))
 
         out = ModelTokenBudgets(
             model=model_id,
@@ -653,14 +684,12 @@ class LLMClient:
         that are unlikely to implement them.
         """
 
-        m = (self.model or "").strip().lower()
-        return m.startswith("gpt-5") or m.startswith("o3") or m.startswith("o4-mini")
+        return model_supports_reasoning_summaries(self.model)
 
     def _model_supports_text_verbosity(self) -> bool:
         """Best-effort: text.verbosity is currently a GPT-5 family control."""
 
-        m = (self.model or "").strip().lower()
-        return m.startswith("gpt-5")
+        return model_supports_text_verbosity(self.model)
 
     @staticmethod
     def _normalize_tools_for_responses(
@@ -1115,7 +1144,7 @@ class LLMClient:
         if text_verbosity is not None:
             params["text"] = {"verbosity": str(text_verbosity)}
 
-        require_gateway_model = openai_model_requires_gateway_model(self.model)
+        require_gateway_model = model_requires_gateway_model(self.model)
         max_tries = max(1, int(GATEWAY_MODEL_DETECTION_MAX_RETRIES))
         last_gateway_model: str | None = None
         last_reason: str | None = None
@@ -1140,8 +1169,8 @@ class LLMClient:
 
             data = self._to_plain_dict(resp)
 
-            # Gateway model validation (OpenAI models only): if the gateway fails to report a
-            # routed model name, or reports an unexpected one, treat it as a transient
+            # Gateway model validation: if the gateway fails to report a routed
+            # model name, or reports an unexpected one, treat it as a transient
             # upstream issue and retry cleanly.
             gateway_model = data.get("model") if isinstance(data, dict) else None
             last_gateway_model = (
@@ -1279,7 +1308,7 @@ class LLMClient:
         if max_tokens is not None:
             params["max_tokens"] = int(max_tokens)
         client = self._ensure_client()
-        require_gateway_model = openai_model_requires_gateway_model(self.model)
+        require_gateway_model = model_requires_gateway_model(self.model)
         max_tries = max(1, int(GATEWAY_MODEL_DETECTION_MAX_RETRIES))
         last_gateway_model: str | None = None
         last_reason: str | None = None

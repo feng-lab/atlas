@@ -36,8 +36,9 @@ TRANSIENT_NETWORK_BACKOFF_MAX_SECONDS = 600.0
 FINAL_OUTPUT_CONTINUE_MAX_CALLS = 8
 
 # Some OpenAI-compatible gateways occasionally return a response payload that is
-# missing the routed model name (resp["model"]). For OpenAI models, this strongly
-# suggests the request did not fully reach (or return from) the intended backend.
+# missing the routed model name (resp["model"]). For model families that require
+# gateway validation, this strongly suggests the request did not fully reach (or
+# return from) the intended backend.
 #
 # We treat this (and related gateway/proxy errors) as recoverable and allow a long
 # retry loop, bounded by TRANSIENT_NETWORK_BACKOFF_MAX_SECONDS per attempt.

@@ -10,6 +10,7 @@ if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
 from atlas_agent.agent_team.base import LLMClient  # type: ignore  # noqa: E402
+from atlas_agent.model_policy import DEFAULT_MODEL  # type: ignore  # noqa: E402
 
 
 class _DummyResponses:
@@ -49,7 +50,7 @@ def test_llm_client_retries_internal_responses_create_when_gateway_model_missing
                     ]
                 },
                 {
-                    "model": "gpt-5.2",
+                    "model": DEFAULT_MODEL,
                     "output": [
                         {
                             "type": "message",
@@ -60,7 +61,7 @@ def test_llm_client_retries_internal_responses_create_when_gateway_model_missing
                 },
             ]
         )
-        llm = LLMClient(api_key="sk-test", model="gpt-5.2")
+        llm = LLMClient(api_key="sk-test", model=DEFAULT_MODEL)
         llm._client = _DummyOpenAIClient(responses)
 
         text, resp = llm.complete_text_with_response(
@@ -68,7 +69,7 @@ def test_llm_client_retries_internal_responses_create_when_gateway_model_missing
         )
         assert text == "Done."
         assert isinstance(resp, dict)
-        assert resp.get("model") == "gpt-5.2"
+        assert resp.get("model") == DEFAULT_MODEL
         assert responses.calls == 2
     finally:
         base_mod.TRANSIENT_NETWORK_BACKOFF_SECONDS = prev_backoff
@@ -94,7 +95,7 @@ def test_llm_client_retries_internal_responses_create_when_gateway_model_mismatc
                     ],
                 },
                 {
-                    "model": "gpt-5.2",
+                    "model": DEFAULT_MODEL,
                     "output": [
                         {
                             "type": "message",
@@ -105,7 +106,7 @@ def test_llm_client_retries_internal_responses_create_when_gateway_model_mismatc
                 },
             ]
         )
-        llm = LLMClient(api_key="sk-test", model="gpt-5.2")
+        llm = LLMClient(api_key="sk-test", model=DEFAULT_MODEL)
         llm._client = _DummyOpenAIClient(responses)
 
         text, resp = llm.complete_text_with_response(
@@ -113,7 +114,7 @@ def test_llm_client_retries_internal_responses_create_when_gateway_model_mismatc
         )
         assert text == "Done."
         assert isinstance(resp, dict)
-        assert resp.get("model") == "gpt-5.2"
+        assert resp.get("model") == DEFAULT_MODEL
         assert responses.calls == 2
     finally:
         base_mod.TRANSIENT_NETWORK_BACKOFF_SECONDS = prev_backoff

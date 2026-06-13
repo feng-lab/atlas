@@ -10,6 +10,7 @@ if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
 from atlas_agent.agent_team.base import LLMClient  # type: ignore  # noqa: E402
+from atlas_agent.model_policy import DEFAULT_MODEL  # type: ignore  # noqa: E402
 
 
 class _DummyModels:
@@ -68,6 +69,23 @@ def test_llm_client_model_token_budgets_computes_effective_from_total_minus_max_
     assert b.max_output_tokens == 128_000
     assert b.effective_input_budget_tokens == 272_000
     assert b.auto_compact_tokens == 244_800
+
+
+def test_llm_client_model_token_budgets_caps_default_model_to_policy_context_window():
+    client = _DummyOpenAIClient(
+        {
+            "context_window": 1_050_000,
+            "max_output_tokens": 128_000,
+        }
+    )
+    llm = LLMClient(api_key="sk-test", model=DEFAULT_MODEL)
+    llm._client = client
+
+    b = llm.get_model_token_budgets(DEFAULT_MODEL)
+    assert b.total_context_window_tokens == 272_000
+    assert b.max_output_tokens == 128_000
+    assert b.effective_input_budget_tokens == 258_400
+    assert b.auto_compact_tokens == 232_560
 
 
 def test_llm_client_model_token_budgets_supports_nested_and_string_values():

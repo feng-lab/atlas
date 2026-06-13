@@ -17,8 +17,9 @@ Overview
 
 Quickstart
 - Run chat (only command):
-  - `atlas-agent --model gpt-5.2` (console UI by default)
-  - Optional plain REPL (no styling): `atlas-agent --plain --model gpt-5.2`
+  - `atlas-agent` (console UI by default)
+  - Optional plain REPL (no styling): `atlas-agent --plain`
+  - Override the centralized default model with `--model <model>` when needed.
 
 Docs Discovery (runtime)
 - Atlas ships markdown docs inside the app bundle (same content as `docs/` in the repo).
@@ -64,7 +65,7 @@ Codegen Toggle
 - Code generation helpers are disabled by default and gated behind a flag. Enable with `--enable-codegen` when invoking the chat agent. When disabled, the `python_write_and_run` tool is hidden and calls are rejected.
 
 Web Search (optional)
-- Atlas Agent can optionally expose the OpenAI Responses API built-in `web_search` tool (Codex-style) to let the model look things up.
+- Atlas Agent can optionally expose the OpenAI Responses API built-in `web_search` tool to let the model look things up.
 - Enable with `--web-search cached` (cached content; no live internet) or `--web-search live` (allows live internet access; provider-controlled).
 - What “cached” means: the model can issue search/browse actions, but the provider will serve cached results (no external browsing from your machine and no live outbound internet fetch). This is usually more deterministic and privacy-friendly than live browsing.
 - Default is `--web-search off`.
@@ -96,7 +97,7 @@ Natural Language Examples
   - "Color of file soma.ply from red to blue during time 5-8 seconds"
 
 Atlas Agent (live)
-- Start: `atlas-agent --model gpt-5.2` (starts a console UI by default).
+- Start: `atlas-agent` (starts a console UI by default).
   - If Atlas is not running, the CLI attempts to launch it from a common install location and then waits for the RPC server.
 - Long/complex tasks: set `--max-rounds 0` to allow the Executor phase to run an unbounded number of tool-loop rounds (no “did not converge after max_rounds” failures). Otherwise increase `--max-rounds` as needed.
 - Runtime loop (streaming tool loop):

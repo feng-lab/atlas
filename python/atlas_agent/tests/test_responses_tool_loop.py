@@ -16,6 +16,7 @@ from atlas_agent.responses_tool_loop import (  # type: ignore  # noqa: E402
     ToolLoopCallbacks,
     run_responses_tool_loop,
 )
+from atlas_agent.model_policy import DEFAULT_MODEL  # type: ignore  # noqa: E402
 
 
 class DummyLLM:
@@ -411,15 +412,15 @@ def test_tool_loop_retries_on_incomplete_chunked_read():
     assert llm.calls == 2
 
 
-def test_tool_loop_retries_when_gateway_model_missing_for_openai_models():
+def test_tool_loop_retries_when_gateway_model_missing_for_validated_models():
     import atlas_agent.responses_tool_loop as rtl  # type: ignore
 
     class GatewayFlakyLLM(DummyLLM):
         def __init__(self, scripted):
             super().__init__(scripted)
-            # Simulate an OpenAI model request where the gateway is expected to
+            # Simulate a model request where the gateway is expected to
             # report resp["model"].
-            self.model = "gpt-5.2"
+            self.model = DEFAULT_MODEL
 
     llm = GatewayFlakyLLM(
         [
@@ -438,7 +439,7 @@ def test_tool_loop_retries_when_gateway_model_missing_for_openai_models():
             },
             {
                 "response": {
-                    "model": "gpt-5.2",
+                    "model": DEFAULT_MODEL,
                     "output": [
                         {
                             "type": "message",
@@ -483,18 +484,18 @@ def test_tool_loop_retries_when_gateway_model_missing_for_openai_models():
     assert out.assistant_text == "Done."
     assert llm.calls == 2
     # Only the accepted response should emit meta.
-    assert seen_meta == [{"call_index": 0, "model": "gpt-5.2"}]
+    assert seen_meta == [{"call_index": 0, "model": DEFAULT_MODEL}]
     # The second attempt should not include the discarded assistant output.
     assert llm.seen_input_items[1] == llm.seen_input_items[0]
 
 
-def test_tool_loop_retries_when_gateway_model_mismatched_for_openai_models():
+def test_tool_loop_retries_when_gateway_model_mismatched_for_validated_models():
     import atlas_agent.responses_tool_loop as rtl  # type: ignore
 
     class GatewayMismatchLLM(DummyLLM):
         def __init__(self, scripted):
             super().__init__(scripted)
-            self.model = "gpt-5.2"
+            self.model = DEFAULT_MODEL
 
     llm = GatewayMismatchLLM(
         [
@@ -514,7 +515,7 @@ def test_tool_loop_retries_when_gateway_model_mismatched_for_openai_models():
             },
             {
                 "response": {
-                    "model": "gpt-5.2",
+                    "model": DEFAULT_MODEL,
                     "output": [
                         {
                             "type": "message",
@@ -558,7 +559,7 @@ def test_tool_loop_retries_when_gateway_model_mismatched_for_openai_models():
 
     assert out.assistant_text == "Done."
     assert llm.calls == 2
-    assert seen_meta == [{"call_index": 0, "model": "gpt-5.2"}]
+    assert seen_meta == [{"call_index": 0, "model": DEFAULT_MODEL}]
     assert llm.seen_input_items[1] == llm.seen_input_items[0]
 
 

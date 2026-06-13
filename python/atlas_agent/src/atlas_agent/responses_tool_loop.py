@@ -10,7 +10,11 @@ from typing import Any, Callable, Dict, List, Optional, Protocol
 
 from .gateway_model import (
     gateway_model_matches_requested,
-    openai_model_requires_gateway_model,
+)
+from .model_policy import (
+    ImageTokenCostPatchModel,
+    image_token_cost_profile_for_model,
+    model_requires_gateway_model,
 )
 
 from .provider_tool_schema import (
@@ -78,70 +82,6 @@ def _redact_inline_image_data_urls(value: Any) -> Any:
     return value
 
 
-@dataclass(frozen=True)
-class _ImageTokenCostTileModel:
-    base_tokens: int
-    tile_tokens: int
-
-
-@dataclass(frozen=True)
-class _ImageTokenCostPatchModel:
-    multiplier: float
-
-
-def _image_token_cost_profile_for_model(
-    model_name: str | None,
-) -> _ImageTokenCostTileModel | _ImageTokenCostPatchModel | None:
-    """Best-effort OpenAI image token profile for proactive estimation.
-
-    Reference: OpenAI "Images and Vision" docs (Calculating costs).
-    This is intentionally partial and only covers commonly used OpenAI models.
-    Unknown models return None (caller may fall back to byte-based heuristics).
-    """
-
-    m = str(model_name or "").strip().lower()
-    if not m:
-        return None
-
-    # Patch-based models (32px patches, capped at 1536 patches), with per-model multipliers.
-    # Order matters: these prefixes overlap with broader families (e.g. gpt-5*).
-    if m.startswith("gpt-4.1-mini"):
-        return _ImageTokenCostPatchModel(multiplier=1.6)
-    if m.startswith("gpt-4.1-nano"):
-        return _ImageTokenCostPatchModel(multiplier=2.0)
-    if m.startswith("o4-mini"):
-        return _ImageTokenCostPatchModel(multiplier=1.72)
-    if m.startswith("gpt-5-mini"):
-        return _ImageTokenCostPatchModel(multiplier=1.62)
-    if m.startswith("gpt-5-nano"):
-        return _ImageTokenCostPatchModel(multiplier=2.0)
-
-    # Tile-based models (512px tiles), with base + tile tokens.
-    # Order matters: gpt-4o-mini must be checked before gpt-4o.
-    if m.startswith("gpt-4o-mini"):
-        return _ImageTokenCostTileModel(base_tokens=2833, tile_tokens=5667)
-    if m.startswith("computer-use-preview"):
-        return _ImageTokenCostTileModel(base_tokens=65, tile_tokens=129)
-    if m.startswith("gpt-5-chat-latest"):
-        return _ImageTokenCostTileModel(base_tokens=70, tile_tokens=140)
-    if m.startswith("gpt-5"):
-        return _ImageTokenCostTileModel(base_tokens=70, tile_tokens=140)
-    if m.startswith("gpt-4.5"):
-        return _ImageTokenCostTileModel(base_tokens=85, tile_tokens=170)
-    if m.startswith("gpt-4.1"):
-        return _ImageTokenCostTileModel(base_tokens=85, tile_tokens=170)
-    if m.startswith("gpt-4o"):
-        return _ImageTokenCostTileModel(base_tokens=85, tile_tokens=170)
-    if m.startswith("o1-pro"):
-        return _ImageTokenCostTileModel(base_tokens=75, tile_tokens=150)
-    if m.startswith("o1"):
-        return _ImageTokenCostTileModel(base_tokens=75, tile_tokens=150)
-    if m.startswith("o3"):
-        return _ImageTokenCostTileModel(base_tokens=75, tile_tokens=150)
-
-    return None
-
-
 def _estimate_image_tokens_tile_model(
     *,
     width_px: int,
@@ -187,29 +127,31 @@ def _estimate_image_tokens_tile_model(
 
 
 def _estimate_image_tokens_patch_model(
-    *, width_px: int, height_px: int, multiplier: float
+    *, width_px: int, height_px: int, multiplier: float, patch_budget: int
 ) -> int:
     """Estimate image token cost for patch-based vision models."""
 
     w = max(1, int(width_px))
     h = max(1, int(height_px))
+    budget = max(1, int(patch_budget))
 
-    # Patch rules (OpenAI docs): split into 32px patches, cap at 1536 patches.
+    # Patch rules (OpenAI docs): split into 32px patches, then cap at the
+    # model/detail-specific patch budget.
     def patch_count(width: int, height: int) -> int:
         return int(math.ceil(width / 32.0)) * int(math.ceil(height / 32.0))
 
     patches = patch_count(w, h)
-    if patches > 1536:
-        # Downscale so that patch_count <= 1536, preserving aspect ratio.
+    if patches > budget:
+        # Downscale so that patch_count <= budget, preserving aspect ratio.
         # Start from the ideal scale factor, then shrink slightly if ceil() pushes us over.
-        scale = math.sqrt(1536.0 / float(patches))
+        scale = math.sqrt(float(budget) / float(patches))
         w2 = max(1, int(math.floor(float(w) * scale)))
         h2 = max(1, int(math.floor(float(h) * scale)))
         patches = patch_count(w2, h2)
 
         # ceil() effects can still leave us slightly above; nudge down deterministically.
         guard = 0
-        while patches > 1536 and guard < 4096 and (w2 > 1 or h2 > 1):
+        while patches > budget and guard < 4096 and (w2 > 1 or h2 > 1):
             guard += 1
             if w2 >= h2 and w2 > 1:
                 w2 -= 1
@@ -221,29 +163,39 @@ def _estimate_image_tokens_patch_model(
     return int(math.ceil(tokens))
 
 
-def _estimate_image_tokens_openai(
+def _estimate_image_tokens_for_model(
     *,
     model_name: str | None,
     width_px: int | None,
     height_px: int | None,
     detail: str | None,
 ) -> int:
-    """Best-effort OpenAI image token estimate for proactive prompt sizing."""
+    """Best-effort model image token estimate for proactive prompt sizing."""
 
-    profile = _image_token_cost_profile_for_model(model_name)
+    profile = image_token_cost_profile_for_model(model_name)
     if profile is None:
         return 0
 
     # If dimensions are unavailable, use a conservative "large enough" default.
     # - Tile models: 768x768 yields a stable upper bound for most aspect ratios.
     # - Patch models: use the maximum patch budget (1536) when unknown.
-    if isinstance(profile, _ImageTokenCostPatchModel):
+    if isinstance(profile, ImageTokenCostPatchModel):
+        detail_s = str(detail or "auto").strip().lower()
+        patch_budget = profile.patch_budget_for_detail(detail_s)
+        if detail_s == "low":
+            return _estimate_image_tokens_patch_model(
+                width_px=512,
+                height_px=512,
+                multiplier=profile.multiplier,
+                patch_budget=patch_budget,
+            )
         if width_px is None or height_px is None or width_px <= 0 or height_px <= 0:
-            return int(math.ceil(1536.0 * float(profile.multiplier)))
+            return int(math.ceil(float(patch_budget) * float(profile.multiplier)))
         return _estimate_image_tokens_patch_model(
             width_px=int(width_px),
             height_px=int(height_px),
             multiplier=profile.multiplier,
+            patch_budget=patch_budget,
         )
 
     if width_px is None or height_px is None or width_px <= 0 or height_px <= 0:
@@ -401,7 +353,7 @@ def _estimate_image_tokens_in_input_items(
                 detail = part.get("detail")
                 if not isinstance(detail, str):
                     detail = None
-                image_tokens += _estimate_image_tokens_openai(
+                image_tokens += _estimate_image_tokens_for_model(
                     model_name=model_name,
                     width_px=None,
                     height_px=None,
@@ -427,7 +379,7 @@ def _estimate_image_tokens_in_input_items(
                 detail = part.get("detail")
                 if not isinstance(detail, str):
                     detail = None
-                image_tokens += _estimate_image_tokens_openai(
+                image_tokens += _estimate_image_tokens_for_model(
                     model_name=model_name,
                     width_px=w,
                     height_px=h,
@@ -1309,11 +1261,12 @@ def run_responses_tool_loop(
         assistant_chunks: list[str] = []
 
         requested_model = str(getattr(llm, "model", "") or "").strip()
-        require_gateway_model = openai_model_requires_gateway_model(requested_model)
+        require_gateway_model = model_requires_gateway_model(requested_model)
 
-        # Retry transient network/proxy drops. Additionally, for OpenAI models we treat
-        # missing `resp["model"]` as a gateway hiccup and retry cleanly (discarding the
-        # payload, not persisting any meta, and not appending output items).
+        # Retry transient network/proxy drops. Additionally, for model families
+        # that require gateway validation, treat missing `resp["model"]` as a
+        # gateway hiccup and retry cleanly (discarding the payload, not
+        # persisting any meta, and not appending output items).
         transient_network_tries = 0
         gateway_http_tries = 0
         rate_limit_tries = 0

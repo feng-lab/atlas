@@ -15,6 +15,7 @@ from atlas_agent.responses_tool_loop import (  # type: ignore  # noqa: E402
     ToolLoopCallbacks,
     run_responses_tool_loop,
 )
+from atlas_agent.model_policy import DEFAULT_MODEL  # type: ignore  # noqa: E402
 
 
 class DummyLLM:
@@ -68,7 +69,7 @@ def test_tool_loop_inline_images_are_ephemeral() -> None:
         [
             {
                 "response": {
-                    "model": "gpt-5.2",
+                    "model": DEFAULT_MODEL,
                     "output": [
                         {
                             "type": "function_call",
@@ -82,7 +83,7 @@ def test_tool_loop_inline_images_are_ephemeral() -> None:
             {
                 # Next call sees the image once and asks for another tool.
                 "response": {
-                    "model": "gpt-5.2",
+                    "model": DEFAULT_MODEL,
                     "output": [
                         {
                             "type": "function_call",
@@ -95,7 +96,7 @@ def test_tool_loop_inline_images_are_ephemeral() -> None:
             },
             {
                 "response": {
-                    "model": "gpt-5.2",
+                    "model": DEFAULT_MODEL,
                     "output": [
                         {
                             "type": "message",

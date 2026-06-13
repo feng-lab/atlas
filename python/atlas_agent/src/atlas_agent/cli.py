@@ -19,6 +19,7 @@ from .defaults import (
     DEFAULT_PLANNER_MAX_ROUNDS,
     DEFAULT_WEB_SEARCH_MODE,
 )
+from .model_policy import DEFAULT_MODEL
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -33,7 +34,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("cmd", nargs="?", help=argparse.SUPPRESS)
     parser.add_argument(
         "--model",
-        default="gpt-5.2",
+        default=DEFAULT_MODEL,
+        help=f"LLM model to use (default: {DEFAULT_MODEL}).",
     )
     parser.add_argument(
         "--wire-api",
