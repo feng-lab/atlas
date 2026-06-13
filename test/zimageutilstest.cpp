@@ -844,6 +844,17 @@ TEST(ZImageUtils, HighwayResize3DMatchesReferenceForMultipleInterpolants)
   expectResizeMatchesReference<double>(img, 24, 30, 18, Interpolant::Lanczos2, true, false);
 }
 
+TEST(ZImageUtils, HighwayResize3DIntegerOutputMatchesReference)
+{
+  using namespace nim;
+
+  const ZImg img8 = makeSyntheticResizeImage<uint8_t>(32, 40, 24);
+  expectResizeMatchesReference<uint8_t>(img8, 20, 20, 20, Interpolant::Cubic, true, false);
+
+  const ZImg img16 = makeSyntheticResizeImage<uint16_t>(32, 40, 24);
+  expectResizeMatchesReference<uint16_t>(img16, 27, 31, 17, Interpolant::Linear, false, false);
+}
+
 TEST(ZImageUtils, HighwayResizeSupportsAllZImgVoxelTypes)
 {
   expectHighwayResizeSupportsType<uint8_t>();

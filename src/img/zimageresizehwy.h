@@ -16,7 +16,14 @@ uint64_t image2DResizeHighwayExtraBytes(size_t height,
                                         size_t maxConcurrency);
 
 template<typename T>
-uint64_t image3DResizeHighwayExtraBytes(size_t height, size_t outWidth, size_t outHeight, size_t outDepth);
+uint64_t image3DResizeHighwayExtraBytes(size_t height,
+                                        size_t depth,
+                                        size_t outWidth,
+                                        size_t outHeight,
+                                        size_t outDepth,
+                                        Interpolant interpolant,
+                                        bool antialiasing,
+                                        bool antialiasingForNearest);
 
 template<typename T>
 void image2DResizeHighway(const T* img,

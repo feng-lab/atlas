@@ -1732,10 +1732,15 @@ ZImg ZImg::resized(size_t desWidth,
             //           bt.stopAndPrint();
           }
         } else {
-          const bool useHighwayResize =
-            highwayResizeBudget != 0 &&
-            image3DResizeHighwayExtraBytes<TVoxel>(height(), res.width(), res.height(), res.depth()) <=
-              highwayResizeBudget;
+          const bool useHighwayResize = highwayResizeBudget != 0 && image3DResizeHighwayExtraBytes<TVoxel>(
+                                                                      height(),
+                                                                      depth(),
+                                                                      res.width(),
+                                                                      res.height(),
+                                                                      res.depth(),
+                                                                      interpolant,
+                                                                      antialiasing,
+                                                                      antialiasingForNearest) <= highwayResizeBudget;
           if (useHighwayResize) {
             image3DResizeHighway(channelData<TVoxel>(c, t),
                                  width(),

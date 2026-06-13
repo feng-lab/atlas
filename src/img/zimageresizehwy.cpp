@@ -316,6 +316,21 @@ void addScaledPlane(double* HWY_RESTRICT accum,
 }
 
 template<typename T>
+void convertPlaneFromDouble(const double* HWY_RESTRICT src, size_t count, T* HWY_RESTRICT dst, bool useMultithreading)
+{
+  auto func = [&](const tbb::blocked_range<size_t>& range) {
+    for (size_t i = range.begin(); i != range.end(); ++i) {
+      dst[i] = saturate_cast<T>(src[i]);
+    }
+  };
+  if (useMultithreading) {
+    tbb::parallel_for(tbb::blocked_range<size_t>(0, count, 16 * 1024), func);
+  } else {
+    func(tbb::blocked_range<size_t>(0, count));
+  }
+}
+
+template<typename T>
 void resize2DToOutput(const T* HWY_RESTRICT img,
                       size_t width,
                       size_t height,
@@ -450,6 +465,101 @@ void resize3DToDouble(const T* HWY_RESTRICT img,
   }
 }
 
+template<typename T>
+void resize3DToOutputWindowed(const T* HWY_RESTRICT img,
+                              size_t width,
+                              size_t height,
+                              size_t depth,
+                              T* HWY_RESTRICT imgOut,
+                              size_t outWidth,
+                              size_t outHeight,
+                              size_t outDepth,
+                              const double* HWY_RESTRICT xWeights,
+                              const size_t* HWY_RESTRICT xIndices,
+                              size_t xKernelWidth,
+                              const double* HWY_RESTRICT yWeights,
+                              const size_t* HWY_RESTRICT yIndices,
+                              size_t yKernelWidth,
+                              const size_t* HWY_RESTRICT zContributionOffsets,
+                              const size_t* HWY_RESTRICT zContributionOutIndices,
+                              const double* HWY_RESTRICT zContributionWeights,
+                              const size_t* HWY_RESTRICT zFinalizeOffsets,
+                              const size_t* HWY_RESTRICT zFinalizeOutIndices,
+                              size_t maxActiveOutputPlanes,
+                              bool useMultithreading)
+{
+  CHECK(maxActiveOutputPlanes > 0);
+  const size_t sourcePlaneSize = checkedMulOrDie(width, height);
+  const size_t targetPlaneSize = checkedMulOrDie(outWidth, outHeight);
+  constexpr size_t npos = std::numeric_limits<size_t>::max();
+
+  std::vector<double> xTmp(checkedMulOrDie(height, outWidth));
+  std::vector<double> plane(targetPlaneSize);
+  std::vector<double> accum(checkedMulOrDie(maxActiveOutputPlanes, targetPlaneSize));
+  std::vector<size_t> slotByOutZ(outDepth, npos);
+  std::vector<size_t> slotOutZ(maxActiveOutputPlanes, npos);
+  std::vector<size_t> freeSlots(maxActiveOutputPlanes);
+  std::iota(freeSlots.begin(), freeSlots.end(), 0);
+
+  auto accumulatorForOutputZ = [&](size_t outZ) -> double* {
+    CHECK(outZ < outDepth);
+    size_t slot = slotByOutZ[outZ];
+    if (slot == npos) {
+      CHECK(!freeSlots.empty());
+      slot = freeSlots.back();
+      freeSlots.pop_back();
+      slotByOutZ[outZ] = slot;
+      slotOutZ[slot] = outZ;
+      double* slotData = accum.data() + slot * targetPlaneSize;
+      std::fill(slotData, slotData + targetPlaneSize, 0.0);
+    } else {
+      CHECK(slot < maxActiveOutputPlanes);
+      CHECK(slotOutZ[slot] == outZ);
+    }
+    return accum.data() + slot * targetPlaneSize;
+  };
+
+  for (size_t z = 0; z < depth; ++z) {
+    resizePlaneToDouble(img + z * sourcePlaneSize,
+                        width,
+                        height,
+                        xWeights,
+                        xIndices,
+                        xKernelWidth,
+                        yWeights,
+                        yIndices,
+                        yKernelWidth,
+                        plane.data(),
+                        outWidth,
+                        outHeight,
+                        xTmp.data(),
+                        useMultithreading);
+
+    for (size_t offset = zContributionOffsets[z]; offset < zContributionOffsets[z + 1]; ++offset) {
+      const size_t outZ = zContributionOutIndices[offset];
+      const double weight = zContributionWeights[offset];
+      addScaledPlane(accumulatorForOutputZ(outZ), plane.data(), targetPlaneSize, weight, useMultithreading);
+    }
+
+    for (size_t offset = zFinalizeOffsets[z]; offset < zFinalizeOffsets[z + 1]; ++offset) {
+      const size_t outZ = zFinalizeOutIndices[offset];
+      CHECK(outZ < outDepth);
+      const size_t slot = slotByOutZ[outZ];
+      CHECK(slot != npos);
+      CHECK(slot < maxActiveOutputPlanes);
+      CHECK(slotOutZ[slot] == outZ);
+
+      double* slotData = accum.data() + slot * targetPlaneSize;
+      convertPlaneFromDouble(slotData, targetPlaneSize, imgOut + outZ * targetPlaneSize, useMultithreading);
+      slotByOutZ[outZ] = npos;
+      slotOutZ[slot] = npos;
+      freeSlots.push_back(slot);
+    }
+  }
+
+  CHECK(freeSlots.size() == maxActiveOutputPlanes);
+}
+
 } // namespace detail
 
 #define ATLAS_DEFINE_RESIZE_TO_OUTPUT_FUNCTIONS(Suffix, Type)          \
@@ -495,72 +605,116 @@ ATLAS_DEFINE_RESIZE_TO_OUTPUT_FUNCTIONS(F64, double)
 
 #undef ATLAS_DEFINE_RESIZE_TO_OUTPUT_FUNCTIONS
 
-#define ATLAS_DEFINE_RESIZE_TO_DOUBLE_FUNCTIONS(Suffix, Type)                         \
-  void resize2D##Suffix##ToDouble(const Type* HWY_RESTRICT img,                       \
-                                  size_t width,                                       \
-                                  size_t height,                                      \
-                                  double* HWY_RESTRICT imgOut,                        \
-                                  size_t outWidth,                                    \
-                                  size_t outHeight,                                   \
-                                  const double* HWY_RESTRICT xWeights,                \
-                                  const size_t* HWY_RESTRICT xIndices,                \
-                                  size_t xKernelWidth,                                \
-                                  const double* HWY_RESTRICT yWeights,                \
-                                  const size_t* HWY_RESTRICT yIndices,                \
-                                  size_t yKernelWidth,                                \
-                                  bool useMultithreading)                             \
-  {                                                                                   \
-    detail::resize2DToDouble(img,                                                     \
-                             width,                                                   \
-                             height,                                                  \
-                             imgOut,                                                  \
-                             outWidth,                                                \
-                             outHeight,                                               \
-                             xWeights,                                                \
-                             xIndices,                                                \
-                             xKernelWidth,                                            \
-                             yWeights,                                                \
-                             yIndices,                                                \
-                             yKernelWidth,                                            \
-                             useMultithreading);                                      \
-  }                                                                                   \
-  void resize3D##Suffix##ToDouble(const Type* HWY_RESTRICT img,                       \
-                                  size_t width,                                       \
-                                  size_t height,                                      \
-                                  size_t depth,                                       \
-                                  double* HWY_RESTRICT imgOut,                        \
-                                  size_t outWidth,                                    \
-                                  size_t outHeight,                                   \
-                                  size_t outDepth,                                    \
-                                  const double* HWY_RESTRICT xWeights,                \
-                                  const size_t* HWY_RESTRICT xIndices,                \
-                                  size_t xKernelWidth,                                \
-                                  const double* HWY_RESTRICT yWeights,                \
-                                  const size_t* HWY_RESTRICT yIndices,                \
-                                  size_t yKernelWidth,                                \
-                                  const size_t* HWY_RESTRICT zContributionOffsets,    \
-                                  const size_t* HWY_RESTRICT zContributionOutIndices, \
-                                  const double* HWY_RESTRICT zContributionWeights,    \
-                                  bool useMultithreading)                             \
-  {                                                                                   \
-    detail::resize3DToDouble(img,                                                     \
-                             width,                                                   \
-                             height,                                                  \
-                             depth,                                                   \
-                             imgOut,                                                  \
-                             outWidth,                                                \
-                             outHeight,                                               \
-                             outDepth,                                                \
-                             xWeights,                                                \
-                             xIndices,                                                \
-                             xKernelWidth,                                            \
-                             yWeights,                                                \
-                             yIndices,                                                \
-                             yKernelWidth,                                            \
-                             zContributionOffsets,                                    \
-                             zContributionOutIndices,                                 \
-                             zContributionWeights,                                    \
-                             useMultithreading);                                      \
+#define ATLAS_DEFINE_RESIZE_TO_DOUBLE_FUNCTIONS(Suffix, Type)                                 \
+  void resize2D##Suffix##ToDouble(const Type* HWY_RESTRICT img,                               \
+                                  size_t width,                                               \
+                                  size_t height,                                              \
+                                  double* HWY_RESTRICT imgOut,                                \
+                                  size_t outWidth,                                            \
+                                  size_t outHeight,                                           \
+                                  const double* HWY_RESTRICT xWeights,                        \
+                                  const size_t* HWY_RESTRICT xIndices,                        \
+                                  size_t xKernelWidth,                                        \
+                                  const double* HWY_RESTRICT yWeights,                        \
+                                  const size_t* HWY_RESTRICT yIndices,                        \
+                                  size_t yKernelWidth,                                        \
+                                  bool useMultithreading)                                     \
+  {                                                                                           \
+    detail::resize2DToDouble(img,                                                             \
+                             width,                                                           \
+                             height,                                                          \
+                             imgOut,                                                          \
+                             outWidth,                                                        \
+                             outHeight,                                                       \
+                             xWeights,                                                        \
+                             xIndices,                                                        \
+                             xKernelWidth,                                                    \
+                             yWeights,                                                        \
+                             yIndices,                                                        \
+                             yKernelWidth,                                                    \
+                             useMultithreading);                                              \
+  }                                                                                           \
+  void resize3D##Suffix##ToDouble(const Type* HWY_RESTRICT img,                               \
+                                  size_t width,                                               \
+                                  size_t height,                                              \
+                                  size_t depth,                                               \
+                                  double* HWY_RESTRICT imgOut,                                \
+                                  size_t outWidth,                                            \
+                                  size_t outHeight,                                           \
+                                  size_t outDepth,                                            \
+                                  const double* HWY_RESTRICT xWeights,                        \
+                                  const size_t* HWY_RESTRICT xIndices,                        \
+                                  size_t xKernelWidth,                                        \
+                                  const double* HWY_RESTRICT yWeights,                        \
+                                  const size_t* HWY_RESTRICT yIndices,                        \
+                                  size_t yKernelWidth,                                        \
+                                  const size_t* HWY_RESTRICT zContributionOffsets,            \
+                                  const size_t* HWY_RESTRICT zContributionOutIndices,         \
+                                  const double* HWY_RESTRICT zContributionWeights,            \
+                                  bool useMultithreading)                                     \
+  {                                                                                           \
+    detail::resize3DToDouble(img,                                                             \
+                             width,                                                           \
+                             height,                                                          \
+                             depth,                                                           \
+                             imgOut,                                                          \
+                             outWidth,                                                        \
+                             outHeight,                                                       \
+                             outDepth,                                                        \
+                             xWeights,                                                        \
+                             xIndices,                                                        \
+                             xKernelWidth,                                                    \
+                             yWeights,                                                        \
+                             yIndices,                                                        \
+                             yKernelWidth,                                                    \
+                             zContributionOffsets,                                            \
+                             zContributionOutIndices,                                         \
+                             zContributionWeights,                                            \
+                             useMultithreading);                                              \
+  }                                                                                           \
+  void resize3D##Suffix##ToOutputWindowed(const Type* HWY_RESTRICT img,                       \
+                                          size_t width,                                       \
+                                          size_t height,                                      \
+                                          size_t depth,                                       \
+                                          Type* HWY_RESTRICT imgOut,                          \
+                                          size_t outWidth,                                    \
+                                          size_t outHeight,                                   \
+                                          size_t outDepth,                                    \
+                                          const double* HWY_RESTRICT xWeights,                \
+                                          const size_t* HWY_RESTRICT xIndices,                \
+                                          size_t xKernelWidth,                                \
+                                          const double* HWY_RESTRICT yWeights,                \
+                                          const size_t* HWY_RESTRICT yIndices,                \
+                                          size_t yKernelWidth,                                \
+                                          const size_t* HWY_RESTRICT zContributionOffsets,    \
+                                          const size_t* HWY_RESTRICT zContributionOutIndices, \
+                                          const double* HWY_RESTRICT zContributionWeights,    \
+                                          const size_t* HWY_RESTRICT zFinalizeOffsets,        \
+                                          const size_t* HWY_RESTRICT zFinalizeOutIndices,     \
+                                          size_t maxActiveOutputPlanes,                       \
+                                          bool useMultithreading)                             \
+  {                                                                                           \
+    detail::resize3DToOutputWindowed(img,                                                     \
+                                     width,                                                   \
+                                     height,                                                  \
+                                     depth,                                                   \
+                                     imgOut,                                                  \
+                                     outWidth,                                                \
+                                     outHeight,                                               \
+                                     outDepth,                                                \
+                                     xWeights,                                                \
+                                     xIndices,                                                \
+                                     xKernelWidth,                                            \
+                                     yWeights,                                                \
+                                     yIndices,                                                \
+                                     yKernelWidth,                                            \
+                                     zContributionOffsets,                                    \
+                                     zContributionOutIndices,                                 \
+                                     zContributionWeights,                                    \
+                                     zFinalizeOffsets,                                        \
+                                     zFinalizeOutIndices,                                     \
+                                     maxActiveOutputPlanes,                                   \
+                                     useMultithreading);                                      \
   }
 
 ATLAS_DEFINE_RESIZE_TO_DOUBLE_FUNCTIONS(U8, uint8_t)
@@ -615,6 +769,16 @@ HWY_EXPORT(resize3DI32ToDouble);
 HWY_EXPORT(resize3DI64ToDouble);
 HWY_EXPORT(resize3DF32ToDouble);
 HWY_EXPORT(resize3DF64ToDouble);
+HWY_EXPORT(resize3DU8ToOutputWindowed);
+HWY_EXPORT(resize3DU16ToOutputWindowed);
+HWY_EXPORT(resize3DU32ToOutputWindowed);
+HWY_EXPORT(resize3DU64ToOutputWindowed);
+HWY_EXPORT(resize3DI8ToOutputWindowed);
+HWY_EXPORT(resize3DI16ToOutputWindowed);
+HWY_EXPORT(resize3DI32ToOutputWindowed);
+HWY_EXPORT(resize3DI64ToOutputWindowed);
+HWY_EXPORT(resize3DF32ToOutputWindowed);
+HWY_EXPORT(resize3DF64ToOutputWindowed);
 
 namespace {
 
@@ -633,11 +797,12 @@ struct SourceZContributionTable
   std::vector<double> weights;
 };
 
-size_t checkedMulSizeOrDie(size_t a, size_t b)
+struct SourceZContributionFinalization
 {
-  CHECK(a == 0 || b <= std::numeric_limits<size_t>::max() / a);
-  return a * b;
-}
+  std::vector<size_t> offsets;
+  std::vector<size_t> outIndices;
+  size_t maxActiveOutputPlanes = 0;
+};
 
 bool checkedMulUint64(uint64_t a, uint64_t b, uint64_t& out)
 {
@@ -724,19 +889,54 @@ buildSourceZContributionTable(size_t depth, size_t outDepth, const ResizeContrib
   return table;
 }
 
-template<typename T>
-void convertFromDouble(const double* src, size_t count, T* dst, bool useMultithreading)
+SourceZContributionFinalization
+buildSourceZContributionFinalization(size_t depth, size_t outDepth, const SourceZContributionTable& table)
 {
-  auto func = [&](const tbb::blocked_range<size_t>& range) {
-    for (size_t i = range.begin(); i != range.end(); ++i) {
-      dst[i] = saturate_cast<T>(src[i]);
+  CHECK(table.offsets.size() == depth + 1);
+  constexpr size_t npos = std::numeric_limits<size_t>::max();
+
+  std::vector<size_t> firstSourceZ(outDepth, npos);
+  std::vector<size_t> lastSourceZ(outDepth, npos);
+  for (size_t z = 0; z < depth; ++z) {
+    for (size_t offset = table.offsets[z]; offset < table.offsets[z + 1]; ++offset) {
+      const size_t outZ = table.outIndices[offset];
+      CHECK(outZ < outDepth);
+      if (firstSourceZ[outZ] == npos) {
+        firstSourceZ[outZ] = z;
+      }
+      lastSourceZ[outZ] = z;
     }
-  };
-  if (useMultithreading) {
-    tbb::parallel_for(tbb::blocked_range<size_t>(0, count), func);
-  } else {
-    func(tbb::blocked_range<size_t>(0, count));
   }
+
+  std::vector<size_t> startCounts(depth, 0);
+  SourceZContributionFinalization finalization;
+  finalization.offsets.assign(depth + 1, 0);
+  for (size_t outZ = 0; outZ < outDepth; ++outZ) {
+    CHECK(firstSourceZ[outZ] != npos);
+    CHECK(lastSourceZ[outZ] != npos);
+    ++startCounts[firstSourceZ[outZ]];
+    ++finalization.offsets[lastSourceZ[outZ] + 1];
+  }
+
+  std::partial_sum(finalization.offsets.begin(), finalization.offsets.end(), finalization.offsets.begin());
+  finalization.outIndices.resize(finalization.offsets.back());
+  std::vector<size_t> cursors = finalization.offsets;
+  for (size_t outZ = 0; outZ < outDepth; ++outZ) {
+    finalization.outIndices[cursors[lastSourceZ[outZ]]++] = outZ;
+  }
+
+  size_t active = 0;
+  for (size_t z = 0; z < depth; ++z) {
+    active += startCounts[z];
+    finalization.maxActiveOutputPlanes = std::max(finalization.maxActiveOutputPlanes, active);
+    const size_t finalizeCount = finalization.offsets[z + 1] - finalization.offsets[z];
+    CHECK(active >= finalizeCount);
+    active -= finalizeCount;
+  }
+  CHECK(active == 0);
+  CHECK(finalization.maxActiveOutputPlanes > 0);
+
+  return finalization;
 }
 
 template<typename T>
@@ -880,6 +1080,61 @@ void dispatchResize3DToDouble(const T* img,
 }
 
 template<typename T>
+void dispatchResize3DToOutputWindowed(const T* img,
+                                      size_t width,
+                                      size_t height,
+                                      size_t depth,
+                                      T* imgOut,
+                                      size_t outWidth,
+                                      size_t outHeight,
+                                      size_t outDepth,
+                                      const ResizeContributions& xContributions,
+                                      const ResizeContributions& yContributions,
+                                      const SourceZContributionTable& sourceZContributions,
+                                      const SourceZContributionFinalization& sourceZFinalization,
+                                      bool useMultithreading)
+{
+#define ATLAS_DISPATCH_RESIZE_3D(Type, Function)                              \
+  if constexpr (std::is_same_v<T, Type>) {                                    \
+    HWY_DYNAMIC_DISPATCH(Function)(img,                                       \
+                                   width,                                     \
+                                   height,                                    \
+                                   depth,                                     \
+                                   imgOut,                                    \
+                                   outWidth,                                  \
+                                   outHeight,                                 \
+                                   outDepth,                                  \
+                                   xContributions.weights.data(),             \
+                                   xContributions.indices.data(),             \
+                                   xContributions.kernelWidth,                \
+                                   yContributions.weights.data(),             \
+                                   yContributions.indices.data(),             \
+                                   yContributions.kernelWidth,                \
+                                   sourceZContributions.offsets.data(),       \
+                                   sourceZContributions.outIndices.data(),    \
+                                   sourceZContributions.weights.data(),       \
+                                   sourceZFinalization.offsets.data(),        \
+                                   sourceZFinalization.outIndices.data(),     \
+                                   sourceZFinalization.maxActiveOutputPlanes, \
+                                   useMultithreading);                        \
+  }
+
+  ATLAS_DISPATCH_RESIZE_3D(uint8_t, resize3DU8ToOutputWindowed)
+  else ATLAS_DISPATCH_RESIZE_3D(uint16_t, resize3DU16ToOutputWindowed) else ATLAS_DISPATCH_RESIZE_3D(uint32_t, resize3DU32ToOutputWindowed) else ATLAS_DISPATCH_RESIZE_3D(uint64_t, resize3DU64ToOutputWindowed) else ATLAS_DISPATCH_RESIZE_3D(int8_t, resize3DI8ToOutputWindowed) else ATLAS_DISPATCH_RESIZE_3D(
+    int16_t,
+    resize3DI16ToOutputWindowed) else ATLAS_DISPATCH_RESIZE_3D(int32_t,
+                                                               resize3DI32ToOutputWindowed) else ATLAS_DISPATCH_RESIZE_3D(int64_t,
+                                                                                                                          resize3DI64ToOutputWindowed) else ATLAS_DISPATCH_RESIZE_3D(float,
+                                                                                                                                                                                     resize3DF32ToOutputWindowed) else ATLAS_DISPATCH_RESIZE_3D(double,
+                                                                                                                                                                                                                                                resize3DF64ToOutputWindowed) else
+  {
+    static_assert(AlwaysFalse<T>, "Unsupported Highway resize type");
+  }
+
+#undef ATLAS_DISPATCH_RESIZE_3D
+}
+
+template<typename T>
 void image2DResizeHighwayImpl(const T* img,
                               size_t width,
                               size_t height,
@@ -939,7 +1194,6 @@ void image3DResizeHighwayImpl(const T* img,
   const auto yContributions = resizeContributions(height, outHeight, interpolant, antialiasing, antialiasingForNearest);
   const auto zContributions = resizeContributions(depth, outDepth, interpolant, antialiasing, antialiasingForNearest);
   const auto sourceZContributions = buildSourceZContributionTable(depth, outDepth, zContributions);
-  const size_t outVoxelCount = checkedMulSizeOrDie(checkedMulSizeOrDie(outWidth, outHeight), outDepth);
 
   if constexpr (std::is_same_v<T, double>) {
     dispatchResize3DToDouble(img,
@@ -955,20 +1209,20 @@ void image3DResizeHighwayImpl(const T* img,
                              sourceZContributions,
                              useMultithreading);
   } else {
-    std::vector<double> tmp(outVoxelCount);
-    dispatchResize3DToDouble(img,
-                             width,
-                             height,
-                             depth,
-                             tmp.data(),
-                             outWidth,
-                             outHeight,
-                             outDepth,
-                             xContributions,
-                             yContributions,
-                             sourceZContributions,
-                             useMultithreading);
-    convertFromDouble(tmp.data(), tmp.size(), imgOut, useMultithreading);
+    const auto sourceZFinalization = buildSourceZContributionFinalization(depth, outDepth, sourceZContributions);
+    dispatchResize3DToOutputWindowed(img,
+                                     width,
+                                     height,
+                                     depth,
+                                     imgOut,
+                                     outWidth,
+                                     outHeight,
+                                     outDepth,
+                                     xContributions,
+                                     yContributions,
+                                     sourceZContributions,
+                                     sourceZFinalization,
+                                     useMultithreading);
   }
 }
 
@@ -1038,19 +1292,27 @@ uint64_t image2DResizeHighwayExtraBytes(size_t height,
 }
 
 template<typename T>
-uint64_t image3DResizeHighwayExtraBytes(size_t height, size_t outWidth, size_t outHeight, size_t outDepth)
+uint64_t image3DResizeHighwayExtraBytes(size_t height,
+                                        size_t depth,
+                                        size_t outWidth,
+                                        size_t outHeight,
+                                        size_t outDepth,
+                                        Interpolant interpolant,
+                                        bool antialiasing,
+                                        bool antialiasingForNearest)
 {
   CHECK(height > 0);
+  CHECK(depth > 0);
   CHECK(outWidth > 0);
   CHECK(outHeight > 0);
   CHECK(outDepth > 0);
 
   uint64_t xTmpElements = 0;
   uint64_t planeElements = 0;
-  uint64_t targetElements = 0;
+  uint64_t accumulatorElements = 0;
   uint64_t xTmpBytes = 0;
   uint64_t planeBytes = 0;
-  uint64_t targetTmpBytes = 0;
+  uint64_t accumulatorBytes = 0;
   uint64_t totalBytes = 0;
   if (!checkedMulUint64(static_cast<uint64_t>(height), static_cast<uint64_t>(outWidth), xTmpElements) ||
       !checkedMulUint64(static_cast<uint64_t>(outWidth), static_cast<uint64_t>(outHeight), planeElements) ||
@@ -1061,10 +1323,15 @@ uint64_t image3DResizeHighwayExtraBytes(size_t height, size_t outWidth, size_t o
   }
 
   if constexpr (!std::is_same_v<T, double>) {
+    const auto zContributions = resizeContributions(depth, outDepth, interpolant, antialiasing, antialiasingForNearest);
+    const auto sourceZContributions = buildSourceZContributionTable(depth, outDepth, zContributions);
+    const auto sourceZFinalization = buildSourceZContributionFinalization(depth, outDepth, sourceZContributions);
+    const uint64_t accumulatorPlaneCount = static_cast<uint64_t>(sourceZFinalization.maxActiveOutputPlanes);
+
     uint64_t withAccumulator = 0;
-    if (!checkedMulUint64(planeElements, static_cast<uint64_t>(outDepth), targetElements) ||
-        !checkedElementBytes(targetElements, sizeof(double), targetTmpBytes) ||
-        !checkedAddUint64(totalBytes, targetTmpBytes, withAccumulator)) {
+    if (!checkedMulUint64(planeElements, accumulatorPlaneCount, accumulatorElements) ||
+        !checkedElementBytes(accumulatorElements, sizeof(double), accumulatorBytes) ||
+        !checkedAddUint64(totalBytes, accumulatorBytes, withAccumulator)) {
       return std::numeric_limits<uint64_t>::max();
     }
     totalBytes = withAccumulator;
@@ -1126,7 +1393,8 @@ void image3DResizeHighway(const T* img,
 }
 
 #define ATLAS_INSTANTIATE_RESIZE_HIGHWAY(Type)                                                                   \
-  template uint64_t image3DResizeHighwayExtraBytes<Type>(size_t, size_t, size_t, size_t);                        \
+  template uint64_t                                                                                              \
+  image3DResizeHighwayExtraBytes<Type>(size_t, size_t, size_t, size_t, size_t, Interpolant, bool, bool);         \
   template void                                                                                                  \
   image2DResizeHighway<Type>(const Type*, size_t, size_t, Type*, size_t, size_t, Interpolant, bool, bool, bool); \
   template void image3DResizeHighway<                                                                            \

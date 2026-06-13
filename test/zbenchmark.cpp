@@ -1356,7 +1356,7 @@ void registerImageResize3DTargetTypeBenches(std::string_view typeName)
     ->Iterations(1);
 
   ImageResize3DTargetBenchCase hwyBenchCase{
-    fmt::format("ImageResize3DTarget/HighwayPlaneFirst/CubicAA/{}/800x1000x600_to_512x512x512", typeName),
+    fmt::format("ImageResize3DTarget/HighwayWindowedOutput/CubicAA/{}/800x1000x600_to_512x512x512", typeName),
     800,
     1000,
     600,
@@ -1410,11 +1410,10 @@ void registerImageResize3DVisBlockTypeBenches(std::string_view typeName)
     benchmark::RegisterBenchmark(currentBenchCase.name.c_str(),
                                  &BM_image_resize_3d_vis_block_current_cubic_aa<T>,
                                  currentBenchCase)
-      ->Unit(benchmark::kMillisecond)
-      ->Iterations(1);
+      ->Unit(benchmark::kMillisecond);
 
     ImageResize3DVisBlockBenchCase hwyBenchCase{
-      fmt::format("ImageResize3DVisBlock/HighwayPlaneFirst/CubicAA_SingleThread/{}/{}/{}x{}x{}_to_{}x{}x{}",
+      fmt::format("ImageResize3DVisBlock/HighwayWindowedOutput/CubicAA_SingleThread/{}/{}/{}x{}x{}_to_{}x{}x{}",
                   typeName,
                   caseName,
                   width,
@@ -1430,8 +1429,7 @@ void registerImageResize3DVisBlockTypeBenches(std::string_view typeName)
       outHeight,
       outDepth};
     benchmark::RegisterBenchmark(hwyBenchCase.name.c_str(), &BM_image_resize_3d_vis_block_hwy_cubic_aa<T>, hwyBenchCase)
-      ->Unit(benchmark::kMillisecond)
-      ->Iterations(1);
+      ->Unit(benchmark::kMillisecond);
   }
 }
 
