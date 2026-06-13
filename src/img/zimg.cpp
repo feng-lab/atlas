@@ -1683,20 +1683,32 @@ ZImg ZImg::resized(size_t desWidth,
 
   res = ZImg(info);
   const uint64_t highwayResizeBudget = effectiveHighwayResizeExtraMemoryBudget();
+  const bool resizePlaneByPlane = res.depth() == depth();
   imgTypeDispatcher(m_info, [&, this]<typename TVoxel>() {
+    // Common pyramid/vis-block resizes use small Highway scratch, but heavily anisotropic
+    // resizes can still allocate one wide X-pass scratch per worker. Keep the budget gate
+    // once per resized image/type to avoid falling into those pathological allocations.
+    const bool useHighwayResize =
+      highwayResizeBudget != 0 &&
+      (resizePlaneByPlane ? image2DResizeHighwayExtraBytes(height(),
+                                                           res.width(),
+                                                           res.height(),
+                                                           interpolant,
+                                                           antialiasing,
+                                                           antialiasingForNearest,
+                                                           useMultithreading ? ZCpuInfo::instance().nLogicalCores : 1)
+                          : image3DResizeHighwayExtraBytes<TVoxel>(height(),
+                                                                   depth(),
+                                                                   res.width(),
+                                                                   res.height(),
+                                                                   res.depth(),
+                                                                   interpolant,
+                                                                   antialiasing,
+                                                                   antialiasingForNearest)) <= highwayResizeBudget;
+
     for (size_t t = 0; t < numTimes(); ++t) {
       for (size_t c = 0; c < numChannels(); ++c) {
-        if (res.depth() == depth()) {
-          const bool useHighwayResize =
-            highwayResizeBudget != 0 &&
-            image2DResizeHighwayExtraBytes(height(),
-                                           res.width(),
-                                           res.height(),
-                                           interpolant,
-                                           antialiasing,
-                                           antialiasingForNearest,
-                                           useMultithreading ? ZCpuInfo::instance().nLogicalCores : 1) <=
-              highwayResizeBudget;
+        if (resizePlaneByPlane) {
           for (size_t z = 0; z < depth(); ++z) {
             // ZBenchTimer bt;
             // bt.start();
@@ -1732,15 +1744,6 @@ ZImg ZImg::resized(size_t desWidth,
             //           bt.stopAndPrint();
           }
         } else {
-          const bool useHighwayResize = highwayResizeBudget != 0 && image3DResizeHighwayExtraBytes<TVoxel>(
-                                                                      height(),
-                                                                      depth(),
-                                                                      res.width(),
-                                                                      res.height(),
-                                                                      res.depth(),
-                                                                      interpolant,
-                                                                      antialiasing,
-                                                                      antialiasingForNearest) <= highwayResizeBudget;
           if (useHighwayResize) {
             image3DResizeHighway(channelData<TVoxel>(c, t),
                                  width(),
