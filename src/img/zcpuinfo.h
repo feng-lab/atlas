@@ -37,9 +37,6 @@ public:
   bool bAVX = false;
   bool bAVX2 = false;
 
-  bool bAVX512F = false;
-  bool bAVX512BW = false;
-
 private:
   uint64_t m_realPhysicalRAM = 0;
 };

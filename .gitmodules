@@ -102,9 +102,6 @@
 	path = src/3rdparty/pocketfft
 	url = https://github.com/mreineck/pocketfft.git
 	branch = cpp
-[submodule "src/3rdparty/simde"]
-	path = src/3rdparty/simde
-	url = https://github.com/simd-everywhere/simde.git
 [submodule "src/3rdparty/oneTBB"]
 	path = src/3rdparty/oneTBB
 	url = https://github.com/oneapi-src/oneTBB.git

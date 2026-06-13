@@ -1,5 +1,6 @@
 #include "zcpuinfo.h"
 
+#include "zimagearch.h"
 #include "zlog.h"
 #include "zimginterface.h"
 #include <QProcess>
@@ -404,7 +405,7 @@ void logCPUInfo()
     fmt::format_to(std::back_inserter(message), " ({})", processor->linux_id);
 #endif
 
-#if CPUINFO_ARCH_X86 || CPUINFO_ARCH_X86_64
+#if ATLAS_IMG_ARCH_X86_64
     fmt::format_to(std::back_inserter(message), ": APIC ID 0x{:08x}\n", processor->apic_id);
 #else
     message += "\n";
@@ -491,7 +492,7 @@ void logCacheInfo()
 
 void logISAInfo()
 {
-#if CPUINFO_ARCH_X86_64
+#if ATLAS_IMG_ARCH_X86_64
   LOG(INFO) << "Scalar instructions:";
   LOG(INFO) << fmt::format("\tLAHF/SAHF: {}", cpuinfo_has_x86_lahf_sahf() ? "yes" : "no");
   LOG(INFO) << fmt::format("\tLZCNT: {}", cpuinfo_has_x86_lzcnt() ? "yes" : "no");
@@ -583,64 +584,29 @@ void logISAInfo()
   LOG(INFO) << fmt::format("\tCLWB: {}", cpuinfo_has_x86_clwb() ? "yes" : "no");
   LOG(INFO) << fmt::format("\tFXSAVE/FXSTOR: {}", cpuinfo_has_x86_fxsave() ? "yes" : "no");
   LOG(INFO) << fmt::format("\tXSAVE/XSTOR: {}", cpuinfo_has_x86_xsave() ? "yes" : "no");
-#endif /* CPUINFO_ARCH_X86 || CPUINFO_ARCH_X86_64 */
+#endif /* ATLAS_IMG_ARCH_X86_64 */
 
-#if CPUINFO_ARCH_ARM
-  LOG(INFO) << "Instruction sets:";
-  LOG(INFO) << fmt::format("\tThumb: {}", cpuinfo_has_arm_thumb() ? "yes" : "no");
-  LOG(INFO) << fmt::format("\tThumb 2: {}", cpuinfo_has_arm_thumb2() ? "yes" : "no");
-  LOG(INFO) << fmt::format("\tARMv5E: {}", cpuinfo_has_arm_v5e() ? "yes" : "no");
-  LOG(INFO) << fmt::format("\tARMv6: {}", cpuinfo_has_arm_v6() ? "yes" : "no");
-  LOG(INFO) << fmt::format("\tARMv6-K: {}", cpuinfo_has_arm_v6k() ? "yes" : "no");
-  LOG(INFO) << fmt::format("\tARMv7: {}", cpuinfo_has_arm_v7() ? "yes" : "no");
-  LOG(INFO) << fmt::format("\tARMv7 MP: {}", cpuinfo_has_arm_v7mp() ? "yes" : "no");
-  LOG(INFO) << fmt::format("\tARMv8: {}", cpuinfo_has_arm_v8() ? "yes" : "no");
-  LOG(INFO) << fmt::format("\tIDIV: {}", cpuinfo_has_arm_idiv() ? "yes" : "no");
-
-  LOG(INFO) << "Floating-Point support:";
-  LOG(INFO) << fmt::format("\tVFPv2: {}", cpuinfo_has_arm_vfpv2() ? "yes" : "no");
-  LOG(INFO) << fmt::format("\tVFPv3: {}", cpuinfo_has_arm_vfpv3() ? "yes" : "no");
-  LOG(INFO) << fmt::format("\tVFPv3+D32: {}", cpuinfo_has_arm_vfpv3_d32() ? "yes" : "no");
-  LOG(INFO) << fmt::format("\tVFPv3+FP16: {}", cpuinfo_has_arm_vfpv3_fp16() ? "yes" : "no");
-  LOG(INFO) << fmt::format("\tVFPv3+FP16+D32: {}", cpuinfo_has_arm_vfpv3_fp16_d32() ? "yes" : "no");
-  LOG(INFO) << fmt::format("\tVFPv4: {}", cpuinfo_has_arm_vfpv4() ? "yes" : "no");
-  LOG(INFO) << fmt::format("\tVFPv4+D32: {}", cpuinfo_has_arm_vfpv4_d32() ? "yes" : "no");
-  LOG(INFO) << fmt::format("\tVJCVT: {}", cpuinfo_has_arm_jscvt() ? "yes" : "no");
-
-  LOG(INFO) << "SIMD extensions:";
-  LOG(INFO) << fmt::format("\tWMMX: {}", cpuinfo_has_arm_wmmx() ? "yes" : "no");
-  LOG(INFO) << fmt::format("\tWMMX 2: {}", cpuinfo_has_arm_wmmx2() ? "yes" : "no");
-  LOG(INFO) << fmt::format("\tNEON: {}", cpuinfo_has_arm_neon() ? "yes" : "no");
-  LOG(INFO) << fmt::format("\tNEON-FP16: {}", cpuinfo_has_arm_neon_fp16() ? "yes" : "no");
-  LOG(INFO) << fmt::format("\tNEON-FMA: {}", cpuinfo_has_arm_neon_fma() ? "yes" : "no");
-  LOG(INFO) << fmt::format("\tNEON VQRDMLAH/VQRDMLSH: {}", cpuinfo_has_arm_neon_rdm() ? "yes" : "no");
-  LOG(INFO) << fmt::format("\tNEON FP16 arithmetics: {}", cpuinfo_has_arm_neon_fp16_arith() ? "yes" : "no");
-  LOG(INFO) << fmt::format("\tNEON complex: {}", cpuinfo_has_arm_fcma() ? "yes" : "no");
-  LOG(INFO) << fmt::format("\tNEON VSDOT/VUDOT: {}", cpuinfo_has_arm_neon_dot() ? "yes" : "no");
-  LOG(INFO) << fmt::format("\tNEON VFMLAL/VFMLSL: {}", cpuinfo_has_arm_fhm() ? "yes" : "no");
-
-  LOG(INFO) << "Cryptography extensions:";
-  LOG(INFO) << fmt::format("\tAES: {}", cpuinfo_has_arm_aes() ? "yes" : "no");
-  LOG(INFO) << fmt::format("\tSHA1: {}", cpuinfo_has_arm_sha1() ? "yes" : "no");
-  LOG(INFO) << fmt::format("\tSHA2: {}", cpuinfo_has_arm_sha2() ? "yes" : "no");
-  LOG(INFO) << fmt::format("\tPMULL: {}", cpuinfo_has_arm_pmull() ? "yes" : "no");
-  LOG(INFO) << fmt::format("\tCRC32: {}", cpuinfo_has_arm_crc32() ? "yes" : "no");
-#endif /* CPUINFO_ARCH_ARM */
-
-#if CPUINFO_ARCH_ARM64
+#if ATLAS_IMG_ARCH_ARM64
   LOG(INFO) << "Instruction sets:";
   LOG(INFO) << fmt::format("\tARM v8.1 atomics: {}", cpuinfo_has_arm_atomics() ? "yes" : "no");
-  LOG(INFO) << fmt::format("\tARM v8.1 SQRDMLxH: {}", cpuinfo_has_arm_neon_rdm() ? "yes" : "no");
   LOG(INFO) << fmt::format("\tARM v8.2 FP16 arithmetics: {}", cpuinfo_has_arm_fp16_arith() ? "yes" : "no");
-  LOG(INFO) << fmt::format("\tARM v8.2 FHM: {}", cpuinfo_has_arm_fhm() ? "yes" : "no");
   LOG(INFO) << fmt::format("\tARM v8.2 BF16: {}", cpuinfo_has_arm_bf16() ? "yes" : "no");
-  LOG(INFO) << fmt::format("\tARM v8.2 Int8 dot product: {}", cpuinfo_has_arm_neon_dot() ? "yes" : "no");
   LOG(INFO) << fmt::format("\tARM v8.2 Int8 matrix multiplication: {}", cpuinfo_has_arm_i8mm() ? "yes" : "no");
   LOG(INFO) << fmt::format("\tARM v8.3 JS conversion: {}", cpuinfo_has_arm_jscvt() ? "yes" : "no");
   LOG(INFO) << fmt::format("\tARM v8.3 complex: {}", cpuinfo_has_arm_fcma() ? "yes" : "no");
 
   LOG(INFO) << "SIMD extensions:";
+  LOG(INFO) << fmt::format("\tNEON: {}", cpuinfo_has_arm_neon() ? "yes" : "no");
+  LOG(INFO) << fmt::format("\tNEON-FP16: {}", cpuinfo_has_arm_neon_fp16() ? "yes" : "no");
+  LOG(INFO) << fmt::format("\tNEON-FMA: {}", cpuinfo_has_arm_neon_fma() ? "yes" : "no");
+  LOG(INFO) << fmt::format("\tNEON V8: {}", cpuinfo_has_arm_neon_v8() ? "yes" : "no");
+  LOG(INFO) << fmt::format("\tNEON VQRDMLAH/VQRDMLSH: {}", cpuinfo_has_arm_neon_rdm() ? "yes" : "no");
+  LOG(INFO) << fmt::format("\tNEON FP16 arithmetics: {}", cpuinfo_has_arm_neon_fp16_arith() ? "yes" : "no");
+  LOG(INFO) << fmt::format("\tNEON VSDOT/VUDOT: {}", cpuinfo_has_arm_neon_dot() ? "yes" : "no");
+  LOG(INFO) << fmt::format("\tNEON BF16: {}", cpuinfo_has_arm_neon_bf16() ? "yes" : "no");
+  LOG(INFO) << fmt::format("\tNEON VFMLAL/VFMLSL: {}", cpuinfo_has_arm_fhm() ? "yes" : "no");
   LOG(INFO) << fmt::format("\tARM SVE: {}", cpuinfo_has_arm_sve() ? "yes" : "no");
+  LOG(INFO) << fmt::format("\tARM SVE BF16: {}", cpuinfo_has_arm_sve_bf16() ? "yes" : "no");
   LOG(INFO) << fmt::format("\tARM SVE 2: {}", cpuinfo_has_arm_sve2() ? "yes" : "no");
 
   LOG(INFO) << "ARM SVE Capabilities:";
@@ -652,17 +618,6 @@ void logISAInfo()
   LOG(INFO) << fmt::format("\tSHA2: {}", cpuinfo_has_arm_sha2() ? "yes" : "no");
   LOG(INFO) << fmt::format("\tPMULL: {}", cpuinfo_has_arm_pmull() ? "yes" : "no");
   LOG(INFO) << fmt::format("\tCRC32: {}", cpuinfo_has_arm_crc32() ? "yes" : "no");
-#endif
-
-#if CPUINFO_ARCH_RISCV32 || CPUINFO_ARCH_RISCV64
-  LOG(INFO) << "Instruction sets:";
-  LOG(INFO) << fmt::format("\tBase Integer: {}", cpuinfo_has_riscv_i() ? "yes" : "no");
-  LOG(INFO) << fmt::format("\tInteger Multiply/Divide: {}", cpuinfo_has_riscv_m() ? "yes" : "no");
-  LOG(INFO) << fmt::format("\tAtomics: {}", cpuinfo_has_riscv_a() ? "yes" : "no");
-  LOG(INFO) << fmt::format("\tSingle-Precision Floating-Point: {}", cpuinfo_has_riscv_f() ? "yes" : "no");
-  LOG(INFO) << fmt::format("\tDouble-Precision Floating-Point: {}", cpuinfo_has_riscv_d() ? "yes" : "no");
-  LOG(INFO) << fmt::format("\tCompressed: {}", cpuinfo_has_riscv_c() ? "yes" : "no");
-  LOG(INFO) << fmt::format("\tVector: {}", cpuinfo_has_riscv_v() ? "yes" : "no");
 #endif
 }
 
@@ -817,18 +772,11 @@ void ZCpuInfo::setMemoryLimitInBytes(uint64_t n)
 
 void ZCpuInfo::detectCpuInfo()
 {
-#if CPUINFO_ARCH_X86_64
+#if ATLAS_IMG_ARCH_X86_64
   isX86_64 = true;
 
   bAVX = cpuinfo_has_x86_avx();
   bAVX2 = cpuinfo_has_x86_avx2();
-
-//  bAVX512F = cpuinfo_has_x86_avx512f();
-//  bAVX512BW = cpuinfo_has_x86_avx512bw();
-#endif
-
-#if CPUINFO_ARCH_ARM64
-  bAVX2 = true;
 #endif
 
   detectCoreAndThreadNumber();

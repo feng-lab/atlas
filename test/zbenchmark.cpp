@@ -4,6 +4,7 @@
 #include "zconcurrentlrucache.h"
 #include "z3dblockidcollector.h"
 #include "zimgbioformats.h"
+#include "zimagehwy.h"
 #include "zimginit.h"
 #include "zimgregion.h"
 #include "zlog.h"
@@ -37,6 +38,7 @@
 #include <string_view>
 #include <thread>
 #include <tuple>
+#include <type_traits>
 #include <vector>
 
 ABSL_DECLARE_FLAG(bool, atlas_bioformats_bridge_diagnostics);
@@ -210,6 +212,420 @@ static void addSaturateMulBench()
 #endif
   BENCHMARK(BM_saturate_mul_i32)->Range(8, 8 << 10);
   BENCHMARK(BM_saturate_mul_i16)->Range(8, 8 << 10);
+}
+
+enum class SaturateAddSubBenchMethod
+{
+  ScalarLoop,
+  HighwayPath,
+};
+
+enum class SaturateAddSubBenchOp
+{
+  Add,
+  Sub,
+};
+
+enum class SaturateAddSubBenchRhs
+{
+  Array,
+  Scalar,
+};
+
+template<typename T>
+T saturateAddSubBenchValue(size_t index)
+{
+  if constexpr (std::is_signed_v<T>) {
+    constexpr T min = std::numeric_limits<T>::lowest();
+    constexpr T max = std::numeric_limits<T>::max();
+    constexpr std::array<T, 12> values = {min,
+                                          static_cast<T>(min + 1),
+                                          static_cast<T>(-1000003),
+                                          static_cast<T>(-97),
+                                          static_cast<T>(-1),
+                                          static_cast<T>(0),
+                                          static_cast<T>(1),
+                                          static_cast<T>(97),
+                                          static_cast<T>(1000003),
+                                          static_cast<T>(max / 2),
+                                          static_cast<T>(max - 1),
+                                          max};
+    return values[index % values.size()];
+  } else {
+    constexpr T max = std::numeric_limits<T>::max();
+    constexpr std::array<T, 10> values = {static_cast<T>(0),
+                                          static_cast<T>(1),
+                                          static_cast<T>(7),
+                                          static_cast<T>(97),
+                                          static_cast<T>(max / 2),
+                                          static_cast<T>(max - max / 3),
+                                          static_cast<T>(max - 97),
+                                          static_cast<T>(max - 7),
+                                          static_cast<T>(max - 1),
+                                          max};
+    return values[index % values.size()];
+  }
+}
+
+template<typename T>
+void initializeSaturateAddSubBenchData(std::vector<T>& lhs, std::vector<T>& rhs)
+{
+  for (size_t i = 0; i < lhs.size(); ++i) {
+    lhs[i] = saturateAddSubBenchValue<T>(i * 7 + 3);
+    rhs[i] = saturateAddSubBenchValue<T>(i * 11 + 5);
+  }
+}
+
+template<typename T, SaturateAddSubBenchOp Op, SaturateAddSubBenchRhs Rhs>
+void runSaturateAddSubScalarLoop(const T* lhs, const T* rhs, T scalar, size_t count, T* result)
+{
+  if constexpr (Rhs == SaturateAddSubBenchRhs::Array) {
+    for (size_t i = 0; i < count; ++i) {
+      if constexpr (Op == SaturateAddSubBenchOp::Add) {
+        result[i] = saturate_add(lhs[i], rhs[i]);
+      } else {
+        result[i] = saturate_sub(lhs[i], rhs[i]);
+      }
+    }
+  } else {
+    for (size_t i = 0; i < count; ++i) {
+      if constexpr (Op == SaturateAddSubBenchOp::Add) {
+        result[i] = saturate_add(lhs[i], scalar);
+      } else {
+        result[i] = saturate_sub(lhs[i], scalar);
+      }
+    }
+  }
+}
+
+template<typename T, SaturateAddSubBenchOp Op, SaturateAddSubBenchRhs Rhs>
+void runSaturateAddSubHighwayPath(const T* lhs, const T* rhs, T scalar, size_t count, T* result)
+{
+  if constexpr (Rhs == SaturateAddSubBenchRhs::Array) {
+    if constexpr (Op == SaturateAddSubBenchOp::Add) {
+      saturate_add<T, const T>(lhs, rhs, count, result);
+    } else {
+      saturate_sub<T, const T>(lhs, rhs, count, result);
+    }
+  } else {
+    if constexpr (Op == SaturateAddSubBenchOp::Add) {
+      saturate_add<T, T>(lhs, scalar, count, result);
+    } else {
+      saturate_sub<T, T>(lhs, scalar, count, result);
+    }
+  }
+}
+
+template<typename T, SaturateAddSubBenchMethod Method, SaturateAddSubBenchOp Op, SaturateAddSubBenchRhs Rhs>
+static void BM_saturate_add_sub_array(benchmark::State& state)
+{
+  const size_t count = static_cast<size_t>(state.range(0));
+  constexpr size_t kPadding = 64;
+  constexpr size_t kLhsOffset = 3;
+  constexpr size_t kRhsOffset = 9;
+  constexpr size_t kResultOffset = 5;
+
+  std::vector<T> lhs(count + kPadding);
+  std::vector<T> rhs(count + kPadding);
+  std::vector<T> expected(count + kPadding);
+  std::vector<T> result(count + kPadding);
+  initializeSaturateAddSubBenchData(lhs, rhs);
+  const T scalar = saturateAddSubBenchValue<T>(17);
+
+  const T* lhsData = lhs.data() + kLhsOffset;
+  const T* rhsData = rhs.data() + kRhsOffset;
+  T* expectedData = expected.data() + kResultOffset;
+  T* resultData = result.data() + kResultOffset;
+
+  runSaturateAddSubScalarLoop<T, Op, Rhs>(lhsData, rhsData, scalar, count, expectedData);
+  runSaturateAddSubHighwayPath<T, Op, Rhs>(lhsData, rhsData, scalar, count, resultData);
+  if (!std::equal(expected.begin(), expected.end(), result.begin())) {
+    state.SkipWithError("scalar-loop and Highway saturate results differ");
+    return;
+  }
+
+  for (auto _ : state) {
+    if constexpr (Method == SaturateAddSubBenchMethod::ScalarLoop) {
+      runSaturateAddSubScalarLoop<T, Op, Rhs>(lhsData, rhsData, scalar, count, resultData);
+    } else {
+      runSaturateAddSubHighwayPath<T, Op, Rhs>(lhsData, rhsData, scalar, count, resultData);
+    }
+    benchmark::DoNotOptimize(resultData);
+    benchmark::ClobberMemory();
+  }
+
+  state.SetItemsProcessed(state.iterations() * static_cast<int64_t>(count));
+  const int64_t arraysTouched = Rhs == SaturateAddSubBenchRhs::Array ? 3 : 2;
+  state.SetBytesProcessed(state.iterations() * static_cast<int64_t>(count * sizeof(T)) * arraysTouched);
+}
+
+template<typename T, SaturateAddSubBenchOp Op, SaturateAddSubBenchRhs Rhs>
+void registerSaturateAddSubBenchPair(const char* typeName, const char* opName, const char* rhsName)
+{
+  constexpr std::array<int64_t, 12> args = {8, 16, 32, 64, 128, 256, 512, 1024, 4096, 65536, 262144, 1048576};
+
+  auto* scalarBench =
+    benchmark::RegisterBenchmark(fmt::format("SaturateAddSub/{}/scalar_loop/{}/{}", typeName, opName, rhsName).c_str(),
+                                 &BM_saturate_add_sub_array<T, SaturateAddSubBenchMethod::ScalarLoop, Op, Rhs>);
+  auto* highwayBench =
+    benchmark::RegisterBenchmark(fmt::format("SaturateAddSub/{}/highway_path/{}/{}", typeName, opName, rhsName).c_str(),
+                                 &BM_saturate_add_sub_array<T, SaturateAddSubBenchMethod::HighwayPath, Op, Rhs>);
+
+  for (const int64_t arg : args) {
+    scalarBench->Arg(arg);
+    highwayBench->Arg(arg);
+  }
+}
+
+template<typename T>
+void registerSaturateAddSubTypeBenches(const char* typeName)
+{
+  registerSaturateAddSubBenchPair<T, SaturateAddSubBenchOp::Add, SaturateAddSubBenchRhs::Array>(typeName,
+                                                                                                "add",
+                                                                                                "array_rhs");
+  registerSaturateAddSubBenchPair<T, SaturateAddSubBenchOp::Sub, SaturateAddSubBenchRhs::Array>(typeName,
+                                                                                                "sub",
+                                                                                                "array_rhs");
+  registerSaturateAddSubBenchPair<T, SaturateAddSubBenchOp::Add, SaturateAddSubBenchRhs::Scalar>(typeName,
+                                                                                                 "add",
+                                                                                                 "scalar_rhs");
+  registerSaturateAddSubBenchPair<T, SaturateAddSubBenchOp::Sub, SaturateAddSubBenchRhs::Scalar>(typeName,
+                                                                                                 "sub",
+                                                                                                 "scalar_rhs");
+}
+
+static void addSaturateAddSubBench()
+{
+  registerSaturateAddSubTypeBenches<uint32_t>("uint32");
+  registerSaturateAddSubTypeBenches<int32_t>("int32");
+  registerSaturateAddSubTypeBenches<uint64_t>("uint64");
+  registerSaturateAddSubTypeBenches<int64_t>("int64");
+}
+
+struct ImageConvolutionBenchCase
+{
+  std::string name;
+  size_t width;
+  size_t height;
+  size_t depth;
+  size_t kernelWidth;
+  size_t kernelHeight;
+  size_t kernelDepth;
+};
+
+double imageConvolutionBenchValue(size_t index)
+{
+  const uint64_t mixed = static_cast<uint64_t>(index + 1) * 2862933555777941757ULL + 3037000493ULL;
+  return static_cast<double>(mixed % 2003) * (1.0 / 1001.0) - 1.0;
+}
+
+std::vector<double> makeImageConvolutionBenchData(size_t count)
+{
+  std::vector<double> data(count);
+  for (size_t i = 0; i < data.size(); ++i) {
+    data[i] = imageConvolutionBenchValue(i);
+  }
+  return data;
+}
+
+std::vector<double> makeImageConvolutionBenchKernel(size_t count)
+{
+  std::vector<double> kernel(count);
+  double total = 0.0;
+  for (size_t i = 0; i < kernel.size(); ++i) {
+    kernel[i] = static_cast<double>((i * 17 + 11) % 29 + 1);
+    total += kernel[i];
+  }
+  for (double& value : kernel) {
+    value /= total;
+  }
+  return kernel;
+}
+
+static void BM_image_convolution_hwy_2d_row(benchmark::State& state, ImageConvolutionBenchCase benchCase)
+{
+  const size_t padImgWidth = benchCase.width + benchCase.kernelWidth - 1;
+  std::vector<double> padImg = makeImageConvolutionBenchData(padImgWidth * benchCase.height);
+  std::vector<double> kernel = makeImageConvolutionBenchKernel(benchCase.kernelWidth);
+  std::vector<double> imgOut(benchCase.width * benchCase.height);
+
+  for (auto _ : state) {
+    Image2DRowFilterForOneBlock_Hwy(padImg.data(),
+                                    padImgWidth,
+                                    kernel.data(),
+                                    benchCase.kernelWidth,
+                                    imgOut.data(),
+                                    benchCase.width,
+                                    0,
+                                    benchCase.height);
+    benchmark::DoNotOptimize(imgOut.data());
+    benchmark::ClobberMemory();
+  }
+
+  state.SetItemsProcessed(state.iterations() * static_cast<int64_t>(imgOut.size()));
+}
+
+static void BM_image_convolution_hwy_2d_full(benchmark::State& state, ImageConvolutionBenchCase benchCase)
+{
+  const size_t padImgWidth = benchCase.width + benchCase.kernelWidth - 1;
+  const size_t padImgHeight = benchCase.height + benchCase.kernelHeight - 1;
+  std::vector<double> padImg = makeImageConvolutionBenchData(padImgWidth * padImgHeight);
+  std::vector<double> kernel = makeImageConvolutionBenchKernel(benchCase.kernelWidth * benchCase.kernelHeight);
+  std::vector<double> imgOut(benchCase.width * benchCase.height);
+
+  for (auto _ : state) {
+    Image2DFilterForOneBlock_Hwy(padImg.data(),
+                                 padImgWidth,
+                                 kernel.data(),
+                                 benchCase.kernelWidth,
+                                 benchCase.kernelHeight,
+                                 imgOut.data(),
+                                 benchCase.width,
+                                 0,
+                                 benchCase.height);
+    benchmark::DoNotOptimize(imgOut.data());
+    benchmark::ClobberMemory();
+  }
+
+  state.SetItemsProcessed(state.iterations() * static_cast<int64_t>(imgOut.size()));
+}
+
+static void BM_image_convolution_hwy_3d_row(benchmark::State& state, ImageConvolutionBenchCase benchCase)
+{
+  const size_t padImgWidth = benchCase.width + benchCase.kernelWidth - 1;
+  const size_t padImgHeight = benchCase.height;
+  std::vector<double> padImg = makeImageConvolutionBenchData(padImgWidth * padImgHeight * benchCase.depth);
+  std::vector<double> kernel = makeImageConvolutionBenchKernel(benchCase.kernelWidth);
+  std::vector<double> imgOut(benchCase.width * benchCase.height * benchCase.depth);
+
+  for (auto _ : state) {
+    Image3DRowFilterForOneBlock_Hwy(padImg.data(),
+                                    padImgWidth,
+                                    padImgHeight,
+                                    kernel.data(),
+                                    benchCase.kernelWidth,
+                                    imgOut.data(),
+                                    benchCase.width,
+                                    benchCase.height,
+                                    0,
+                                    benchCase.depth);
+    benchmark::DoNotOptimize(imgOut.data());
+    benchmark::ClobberMemory();
+  }
+
+  state.SetItemsProcessed(state.iterations() * static_cast<int64_t>(imgOut.size()));
+}
+
+static void BM_image_convolution_hwy_3d_full(benchmark::State& state, ImageConvolutionBenchCase benchCase)
+{
+  const size_t padImgWidth = benchCase.width + benchCase.kernelWidth - 1;
+  const size_t padImgHeight = benchCase.height + benchCase.kernelHeight - 1;
+  const size_t padImgDepth = benchCase.depth + benchCase.kernelDepth - 1;
+  std::vector<double> padImg = makeImageConvolutionBenchData(padImgWidth * padImgHeight * padImgDepth);
+  std::vector<double> kernel =
+    makeImageConvolutionBenchKernel(benchCase.kernelWidth * benchCase.kernelHeight * benchCase.kernelDepth);
+  std::vector<double> imgOut(benchCase.width * benchCase.height * benchCase.depth);
+
+  for (auto _ : state) {
+    Image3DFilterForOneBlock_Hwy(padImg.data(),
+                                 padImgWidth,
+                                 padImgHeight,
+                                 kernel.data(),
+                                 benchCase.kernelWidth,
+                                 benchCase.kernelHeight,
+                                 benchCase.kernelDepth,
+                                 imgOut.data(),
+                                 benchCase.width,
+                                 benchCase.height,
+                                 0,
+                                 benchCase.depth);
+    benchmark::DoNotOptimize(imgOut.data());
+    benchmark::ClobberMemory();
+  }
+
+  state.SetItemsProcessed(state.iterations() * static_cast<int64_t>(imgOut.size()));
+}
+
+void registerImageConvolutionBench(const ImageConvolutionBenchCase& benchCase,
+                                   void (*benchFn)(benchmark::State&, ImageConvolutionBenchCase))
+{
+  benchmark::RegisterBenchmark(benchCase.name.c_str(), benchFn, benchCase)->Unit(benchmark::kMicrosecond);
+}
+
+static void addImageConvolutionBench()
+{
+  constexpr std::array<size_t, 4> imageSizes = {128, 256, 512, 1024};
+  constexpr std::array<size_t, 4> rowKernelWidths = {3, 5, 11, 31};
+  constexpr std::array<size_t, 3> fullKernelWidths = {3, 5, 11};
+  constexpr std::array<size_t, 3> full3DKernelWidths = {3, 5, 7};
+  constexpr std::array<std::tuple<size_t, size_t, size_t>, 3> row3DCases = {
+    std::tuple<size_t, size_t, size_t>{64,  64,  16},
+    std::tuple<size_t, size_t, size_t>{128, 128, 16},
+    std::tuple<size_t, size_t, size_t>{256, 256, 16}
+  };
+  constexpr std::array<std::tuple<size_t, size_t, size_t>, 3> full3DCases = {
+    std::tuple<size_t, size_t, size_t>{32,  32,  16},
+    std::tuple<size_t, size_t, size_t>{64,  64,  16},
+    std::tuple<size_t, size_t, size_t>{128, 128, 16}
+  };
+
+  for (const size_t size : imageSizes) {
+    for (const size_t kernelWidth : rowKernelWidths) {
+      registerImageConvolutionBench({fmt::format("ImageConvolutionHighway/2d_row/{}x{}/k{}", size, size, kernelWidth),
+                                     size,
+                                     size,
+                                     1,
+                                     kernelWidth,
+                                     1,
+                                     1},
+                                    BM_image_convolution_hwy_2d_row);
+    }
+
+    for (const size_t kernelWidth : fullKernelWidths) {
+      registerImageConvolutionBench(
+        {fmt::format("ImageConvolutionHighway/2d_full/{}x{}/k{}x{}", size, size, kernelWidth, kernelWidth),
+         size,
+         size,
+         1,
+         kernelWidth,
+         kernelWidth,
+         1},
+        BM_image_convolution_hwy_2d_full);
+    }
+  }
+
+  for (const auto& [width, height, depth] : row3DCases) {
+    for (const size_t kernelWidth : fullKernelWidths) {
+      registerImageConvolutionBench(
+        {fmt::format("ImageConvolutionHighway/3d_row/{}x{}x{}/k{}", width, height, depth, kernelWidth),
+         width,
+         height,
+         depth,
+         kernelWidth,
+         1,
+         1},
+        BM_image_convolution_hwy_3d_row);
+    }
+  }
+
+  for (const auto& [width, height, depth] : full3DCases) {
+    for (const size_t kernelWidth : full3DKernelWidths) {
+      registerImageConvolutionBench({fmt::format("ImageConvolutionHighway/3d_full/{}x{}x{}/k{}x{}x{}",
+                                                 width,
+                                                 height,
+                                                 depth,
+                                                 kernelWidth,
+                                                 kernelWidth,
+                                                 kernelWidth),
+                                     width,
+                                     height,
+                                     depth,
+                                     kernelWidth,
+                                     kernelWidth,
+                                     kernelWidth},
+                                    BM_image_convolution_hwy_3d_full);
+    }
+  }
 }
 
 static void BM_vectorLoopRange(benchmark::State& state)
@@ -1013,6 +1429,8 @@ int main(int argc, char* argv[])
 
   addRoundBench();
   addSaturateMulBench();
+  addSaturateAddSubBench();
+  addImageConvolutionBench();
   addVectorLoopBench();
   addLockBench();
   addConcurrentLRUCacheBench();

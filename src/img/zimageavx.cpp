@@ -1,39 +1,21 @@
 #include "zimageavx.h"
 
+#include "zimagearch.h"
 #include "zglobal.h"
-#ifdef _MSC_VER
-#include <cmath> // for simde
-#endif
-#include <simde/x86/avx.h>
+
+#if ATLAS_IMG_ARCH_X86_64
+#include <immintrin.h>
 
 namespace {
 
-__forceinline double hsum_double_avx(simde__m256d v)
+__forceinline double hsum_double_avx(__m256d v)
 {
-  auto vlow = simde_mm256_castpd256_pd128(v);
-  auto vhigh = simde_mm256_extractf128_pd(v, 1); // high 128
-  vlow = simde_mm_add_pd(vlow, vhigh); // reduce down to 128
+  auto vlow = _mm256_castpd256_pd128(v);
+  auto vhigh = _mm256_extractf128_pd(v, 1); // high 128
+  vlow = _mm_add_pd(vlow, vhigh); // reduce down to 128
 
-  auto high64 = simde_mm_unpackhi_pd(vlow, vlow);
-  return simde_mm_cvtsd_f64(simde_mm_add_sd(vlow, high64)); // reduce to scalar
-}
-
-__forceinline float hsum_float_sse3(simde__m128 v)
-{
-  auto shuf = simde_mm_movehdup_ps(v); // broadcast elements 3,1 to 2,0
-  auto sums = simde_mm_add_ps(v, shuf);
-  shuf = simde_mm_movehl_ps(shuf, sums); // high half -> low half
-  sums = simde_mm_add_ss(sums, shuf);
-  return simde_mm_cvtss_f32(sums);
-}
-
-[[maybe_unused]] __forceinline float hsum256_float_avx(simde__m256 v)
-{
-  auto vlow = simde_mm256_castps256_ps128(v);
-  auto vhigh = simde_mm256_extractf128_ps(v, 1); // high 128
-  vlow = simde_mm_add_ps(vlow, vhigh); // add the low 128
-  return hsum_float_sse3(vlow); // and inline the sse3 version, which is optimal for AVX
-  // (no wasted instructions, and all of them are the 4B minimum)
+  auto high64 = _mm_unpackhi_pd(vlow, vlow);
+  return _mm_cvtsd_f64(_mm_add_sd(vlow, high64)); // reduce to scalar
 }
 
 } // namespace
@@ -53,7 +35,7 @@ void Image2DFilterForOneBlock_AVX(const double* padImg,
   for (size_t j = rangeStart; j < rangeEnd; ++j) {
     for (size_t i = 0; i < imgOutWidth; ++i) {
       double sum = 0.0;
-      auto vsum = simde_mm256_set1_pd(0.0);
+      auto vsum = _mm256_set1_pd(0.0);
       // double sumTest = 0.0;
       for (size_t r = 0; r < kernelHeight; ++r) { // row by row
         const double* imgStart = padImg + (j + r) * padImgWidth + i;
@@ -63,10 +45,10 @@ void Image2DFilterForOneBlock_AVX(const double* padImg,
         size_t k;
         // process 4 elements per iteration
         for (k = 0; k < kernelWidth - 3; k += 4) {
-          auto va = simde_mm256_loadu_pd(imgStart + k);
-          auto vb = simde_mm256_loadu_pd(kernel + r * kernelWidth + k);
-          auto vs = simde_mm256_mul_pd(va, vb);
-          vsum = simde_mm256_add_pd(vsum, vs);
+          auto va = _mm256_loadu_pd(imgStart + k);
+          auto vb = _mm256_loadu_pd(kernel + r * kernelWidth + k);
+          auto vs = _mm256_mul_pd(va, vb);
+          vsum = _mm256_add_pd(vsum, vs);
         }
 
         // clean up any remaining elements
@@ -92,7 +74,7 @@ void Image2DRowFilterForOneBlock_AVX(const double* padImg,
   for (size_t j = rangeStart; j < rangeEnd; ++j) {
     for (size_t i = 0; i < imgOutWidth; ++i) {
       double sum = 0.0;
-      auto vsum = simde_mm256_set1_pd(0.0);
+      auto vsum = _mm256_set1_pd(0.0);
       // double sumTest = 0.0;
       const double* imgStart = padImg + j * padImgWidth + i;
 
@@ -101,10 +83,10 @@ void Image2DRowFilterForOneBlock_AVX(const double* padImg,
       size_t k;
       // process 4 elements per iteration
       for (k = 0; k < kernelWidth - 3; k += 4) {
-        auto va = simde_mm256_loadu_pd(imgStart + k);
-        auto vb = simde_mm256_load_pd(kernel + k);
-        auto vs = simde_mm256_mul_pd(va, vb);
-        vsum = simde_mm256_add_pd(vsum, vs);
+        auto va = _mm256_loadu_pd(imgStart + k);
+        auto vb = _mm256_load_pd(kernel + k);
+        auto vs = _mm256_mul_pd(va, vb);
+        vsum = _mm256_add_pd(vsum, vs);
       }
 
       // clean up any remaining elements
@@ -135,7 +117,7 @@ void Image3DFilterForOneBlock_AVX(const double* padImg,
     for (size_t j = 0; j < imgOutHeight; ++j) {
       for (size_t i = 0; i < imgOutWidth; ++i) {
         double sum = 0.0;
-        auto vsum = simde_mm256_set1_pd(0.0);
+        auto vsum = _mm256_set1_pd(0.0);
         // double sumTest = 0.0;
         for (size_t s = 0; s < kernelDepth; ++s) { // plane by plane
           for (size_t r = 0; r < kernelHeight; ++r) { // row by row
@@ -146,10 +128,10 @@ void Image3DFilterForOneBlock_AVX(const double* padImg,
             size_t k0;
             // process 4 elements per iteration
             for (k0 = 0; k0 < kernelWidth - 3; k0 += 4) {
-              auto va = simde_mm256_loadu_pd(imgStart + k0);
-              auto vb = simde_mm256_loadu_pd(kernel + r * kernelWidth + k0 + s * kernelWidth * kernelHeight);
-              auto vs = simde_mm256_mul_pd(va, vb);
-              vsum = simde_mm256_add_pd(vsum, vs);
+              auto va = _mm256_loadu_pd(imgStart + k0);
+              auto vb = _mm256_loadu_pd(kernel + r * kernelWidth + k0 + s * kernelWidth * kernelHeight);
+              auto vs = _mm256_mul_pd(va, vb);
+              vsum = _mm256_add_pd(vsum, vs);
             }
 
             // clean up any remaining elements
@@ -180,7 +162,7 @@ void Image3DRowFilterForOneBlock_AVX(const double* padImg,
     for (size_t j = 0; j < imgOutHeight; ++j) {
       for (size_t i = 0; i < imgOutWidth; ++i) {
         double sum = 0.0;
-        auto vsum = simde_mm256_set1_pd(0.0);
+        auto vsum = _mm256_set1_pd(0.0);
         // double sumTest = 0.0;
         const double* imgStart = padImg + j * padImgWidth + i + k * padImgWidth * padImgHeight;
 
@@ -189,10 +171,10 @@ void Image3DRowFilterForOneBlock_AVX(const double* padImg,
         size_t k0;
         // process 4 elements per iteration
         for (k0 = 0; k0 < kernelWidth - 3; k0 += 4) {
-          auto va = simde_mm256_loadu_pd(imgStart + k0);
-          auto vb = simde_mm256_load_pd(kernel + k0);
-          auto vs = simde_mm256_mul_pd(va, vb);
-          vsum = simde_mm256_add_pd(vsum, vs);
+          auto va = _mm256_loadu_pd(imgStart + k0);
+          auto vb = _mm256_load_pd(kernel + k0);
+          auto vs = _mm256_mul_pd(va, vb);
+          vsum = _mm256_add_pd(vsum, vs);
         }
 
         // clean up any remaining elements
@@ -208,3 +190,5 @@ void Image3DRowFilterForOneBlock_AVX(const double* padImg,
 }
 
 } // namespace nim
+
+#endif // ATLAS_IMG_ARCH_X86_64

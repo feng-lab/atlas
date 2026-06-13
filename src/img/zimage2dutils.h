@@ -2,9 +2,12 @@
 
 #include "zcpuinfo.h"
 #include "zlog.h"
+#include "zimagearch.h"
+#if ATLAS_IMG_ARCH_X86_64
 #include "zimagesse3.h"
 #include "zimageavx.h"
-#include "zimageavx512.h"
+#endif
+#include "zimagehwy.h"
 #include "zbenchtimer.h"
 #include "zimginterface.h"
 #include "zsaturateoperation.h"
@@ -423,17 +426,34 @@ struct Image2DFilterForOneBlock<double, double>
 
   void operator()(const tbb::blocked_range<size_t>& range) const
   {
-    if (ZCpuInfo::instance().bAVX512F && m_kernelWidth >= 8) {
-      Image2DFilterForOneBlock_AVX512(m_padImg,
-                                      m_padImgWidth,
-                                      m_kernel,
-                                      m_kernelWidth,
-                                      m_kernelHeight,
-                                      m_imgOut,
-                                      m_imgOutWidth,
-                                      range.begin(),
-                                      range.end());
-    } else if (m_kernelWidth >= 4) {
+#if ATLAS_IMG_ARCH_ARM64
+    if (m_kernelWidth >= 2) {
+      Image2DFilterForOneBlock_Hwy(m_padImg,
+                                   m_padImgWidth,
+                                   m_kernel,
+                                   m_kernelWidth,
+                                   m_kernelHeight,
+                                   m_imgOut,
+                                   m_imgOutWidth,
+                                   range.begin(),
+                                   range.end());
+      return;
+    }
+#elif ATLAS_IMG_ARCH_X86_64
+    const auto& cpuInfo = ZCpuInfo::instance();
+    if (cpuInfo.bAVX2 && m_kernelWidth >= 2) {
+      Image2DFilterForOneBlock_Hwy(m_padImg,
+                                   m_padImgWidth,
+                                   m_kernel,
+                                   m_kernelWidth,
+                                   m_kernelHeight,
+                                   m_imgOut,
+                                   m_imgOutWidth,
+                                   range.begin(),
+                                   range.end());
+      return;
+    }
+    if (cpuInfo.bAVX && m_kernelWidth >= 4) {
       Image2DFilterForOneBlock_AVX(m_padImg,
                                    m_padImgWidth,
                                    m_kernel,
@@ -443,7 +463,9 @@ struct Image2DFilterForOneBlock<double, double>
                                    m_imgOutWidth,
                                    range.begin(),
                                    range.end());
-    } else if (m_kernelWidth >= 2) {
+      return;
+    }
+    if (m_kernelWidth >= 2) {
       Image2DFilterForOneBlock_SSE3(m_padImg,
                                     m_padImgWidth,
                                     m_kernel,
@@ -453,16 +475,17 @@ struct Image2DFilterForOneBlock<double, double>
                                     m_imgOutWidth,
                                     range.begin(),
                                     range.end());
-    } else {
-      for (size_t j = range.begin(); j != range.end(); ++j) {
-        for (size_t i = 0; i < m_imgOutWidth; ++i) {
-          double sum = 0.0;
-          for (size_t r = 0; r < m_kernelHeight; ++r) { // row by row
-            const double* imgStart = m_padImg + (j + r) * m_padImgWidth + i;
-            sum = std::inner_product(imgStart, imgStart + m_kernelWidth, m_kernel + r * m_kernelWidth, sum);
-          }
-          m_imgOut[j * m_imgOutWidth + i] = sum;
+      return;
+    }
+#endif
+    for (size_t j = range.begin(); j != range.end(); ++j) {
+      for (size_t i = 0; i < m_imgOutWidth; ++i) {
+        double sum = 0.0;
+        for (size_t r = 0; r < m_kernelHeight; ++r) { // row by row
+          const double* imgStart = m_padImg + (j + r) * m_padImgWidth + i;
+          sum = std::inner_product(imgStart, imgStart + m_kernelWidth, m_kernel + r * m_kernelWidth, sum);
         }
+        m_imgOut[j * m_imgOutWidth + i] = sum;
       }
     }
   }
@@ -532,16 +555,32 @@ struct Image2DRowFilterForOneBlock<double, double>
 
   void operator()(const tbb::blocked_range<size_t>& range) const
   {
-    if (ZCpuInfo::instance().bAVX512F && m_kernelWidth >= 8) {
-      Image2DRowFilterForOneBlock_AVX512(m_padImg,
-                                         m_padImgWidth,
-                                         m_kernel,
-                                         m_kernelWidth,
-                                         m_imgOut,
-                                         m_imgOutWidth,
-                                         range.begin(),
-                                         range.end());
-    } else if (m_kernelWidth >= 4) {
+#if ATLAS_IMG_ARCH_ARM64
+    if (m_kernelWidth >= 2) {
+      Image2DRowFilterForOneBlock_Hwy(m_padImg,
+                                      m_padImgWidth,
+                                      m_kernel,
+                                      m_kernelWidth,
+                                      m_imgOut,
+                                      m_imgOutWidth,
+                                      range.begin(),
+                                      range.end());
+      return;
+    }
+#elif ATLAS_IMG_ARCH_X86_64
+    const auto& cpuInfo = ZCpuInfo::instance();
+    if (cpuInfo.bAVX2 && m_kernelWidth >= 2) {
+      Image2DRowFilterForOneBlock_Hwy(m_padImg,
+                                      m_padImgWidth,
+                                      m_kernel,
+                                      m_kernelWidth,
+                                      m_imgOut,
+                                      m_imgOutWidth,
+                                      range.begin(),
+                                      range.end());
+      return;
+    }
+    if (cpuInfo.bAVX && m_kernelWidth >= 4) {
       Image2DRowFilterForOneBlock_AVX(m_padImg,
                                       m_padImgWidth,
                                       m_kernel,
@@ -550,7 +589,9 @@ struct Image2DRowFilterForOneBlock<double, double>
                                       m_imgOutWidth,
                                       range.begin(),
                                       range.end());
-    } else if (m_kernelWidth >= 2) {
+      return;
+    }
+    if (m_kernelWidth >= 2) {
       Image2DRowFilterForOneBlock_SSE3(m_padImg,
                                        m_padImgWidth,
                                        m_kernel,
@@ -559,14 +600,15 @@ struct Image2DRowFilterForOneBlock<double, double>
                                        m_imgOutWidth,
                                        range.begin(),
                                        range.end());
-    } else {
-      for (size_t j = range.begin(); j != range.end(); ++j) {
-        for (size_t i = 0; i < m_imgOutWidth; ++i) {
-          double sum = 0.0;
-          const double* imgStart = m_padImg + j * m_padImgWidth + i;
-          sum = std::inner_product(imgStart, imgStart + m_kernelWidth, m_kernel, sum);
-          m_imgOut[j * m_imgOutWidth + i] = sum;
-        }
+      return;
+    }
+#endif
+    for (size_t j = range.begin(); j != range.end(); ++j) {
+      for (size_t i = 0; i < m_imgOutWidth; ++i) {
+        double sum = 0.0;
+        const double* imgStart = m_padImg + j * m_padImgWidth + i;
+        sum = std::inner_product(imgStart, imgStart + m_kernelWidth, m_kernel, sum);
+        m_imgOut[j * m_imgOutWidth + i] = sum;
       }
     }
   }

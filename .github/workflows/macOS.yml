@@ -27,7 +27,7 @@ env:
   # Pin a Vulkan SDK version for the ~/VulkanSDK layout
   VULKAN_SDK_VERSION: 1.4.341.1
   # Centralize Qt version to keep parity with Linux/Windows CI
-  QT_VERSION: "6.9.2"
+  QT_VERSION: "6.9.3"
   # Minimum Python version used by CI build environments
   PYTHON_VERSION_MIN: "3.12"
   # CI stability: disable Homebrew auto-update (avoids transient network failures during `brew install`).

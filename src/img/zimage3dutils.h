@@ -2,9 +2,12 @@
 
 #include "zcpuinfo.h"
 #include "zlog.h"
+#include "zimagearch.h"
+#if ATLAS_IMG_ARCH_X86_64
 #include "zimagesse3.h"
 #include "zimageavx.h"
-#include "zimageavx512.h"
+#endif
+#include "zimagehwy.h"
 #include "zimage2dutils.h"
 #include <tbb/parallel_for.h>
 #include <boost/align/aligned_allocator.hpp>
@@ -307,20 +310,40 @@ struct Image3DFilterForOneBlock<double, double>
 
   void operator()(const tbb::blocked_range<size_t>& range) const
   {
-    if (ZCpuInfo::instance().bAVX512F && m_kernelWidth >= 8) {
-      Image3DFilterForOneBlock_AVX512(m_padImg,
-                                      m_padImgWidth,
-                                      m_padImgHeight,
-                                      m_kernel,
-                                      m_kernelWidth,
-                                      m_kernelHeight,
-                                      m_kernelDepth,
-                                      m_imgOut,
-                                      m_imgOutWidth,
-                                      m_imgOutHeight,
-                                      range.begin(),
-                                      range.end());
-    } else if (m_kernelWidth >= 4) {
+#if ATLAS_IMG_ARCH_ARM64
+    if (m_kernelWidth >= 2) {
+      Image3DFilterForOneBlock_Hwy(m_padImg,
+                                   m_padImgWidth,
+                                   m_padImgHeight,
+                                   m_kernel,
+                                   m_kernelWidth,
+                                   m_kernelHeight,
+                                   m_kernelDepth,
+                                   m_imgOut,
+                                   m_imgOutWidth,
+                                   m_imgOutHeight,
+                                   range.begin(),
+                                   range.end());
+      return;
+    }
+#elif ATLAS_IMG_ARCH_X86_64
+    const auto& cpuInfo = ZCpuInfo::instance();
+    if (cpuInfo.bAVX2 && m_kernelWidth >= 2) {
+      Image3DFilterForOneBlock_Hwy(m_padImg,
+                                   m_padImgWidth,
+                                   m_padImgHeight,
+                                   m_kernel,
+                                   m_kernelWidth,
+                                   m_kernelHeight,
+                                   m_kernelDepth,
+                                   m_imgOut,
+                                   m_imgOutWidth,
+                                   m_imgOutHeight,
+                                   range.begin(),
+                                   range.end());
+      return;
+    }
+    if (cpuInfo.bAVX && m_kernelWidth >= 4) {
       Image3DFilterForOneBlock_AVX(m_padImg,
                                    m_padImgWidth,
                                    m_padImgHeight,
@@ -333,7 +356,9 @@ struct Image3DFilterForOneBlock<double, double>
                                    m_imgOutHeight,
                                    range.begin(),
                                    range.end());
-    } else if (m_kernelWidth >= 2) {
+      return;
+    }
+    if (m_kernelWidth >= 2) {
       Image3DFilterForOneBlock_SSE3(m_padImg,
                                     m_padImgWidth,
                                     m_padImgHeight,
@@ -346,23 +371,24 @@ struct Image3DFilterForOneBlock<double, double>
                                     m_imgOutHeight,
                                     range.begin(),
                                     range.end());
-    } else {
-      for (size_t k = range.begin(); k != range.end(); ++k) {
-        for (size_t j = 0; j < m_imgOutHeight; ++j) {
-          for (size_t i = 0; i < m_imgOutWidth; ++i) {
-            double sum = 0.0;
-            for (size_t s = 0; s < m_kernelDepth; ++s) { // plane by plane
-              for (size_t r = 0; r < m_kernelHeight; ++r) { // row by row
-                const double* imgStart =
-                  m_padImg + (j + r) * m_padImgWidth + i + (s + k) * m_padImgWidth * m_padImgHeight;
-                sum = std::inner_product(imgStart,
-                                         imgStart + m_kernelWidth,
-                                         m_kernel + r * m_kernelWidth + s * m_kernelWidth * m_kernelHeight,
-                                         sum);
-              }
+      return;
+    }
+#endif
+    for (size_t k = range.begin(); k != range.end(); ++k) {
+      for (size_t j = 0; j < m_imgOutHeight; ++j) {
+        for (size_t i = 0; i < m_imgOutWidth; ++i) {
+          double sum = 0.0;
+          for (size_t s = 0; s < m_kernelDepth; ++s) { // plane by plane
+            for (size_t r = 0; r < m_kernelHeight; ++r) { // row by row
+              const double* imgStart =
+                m_padImg + (j + r) * m_padImgWidth + i + (s + k) * m_padImgWidth * m_padImgHeight;
+              sum = std::inner_product(imgStart,
+                                       imgStart + m_kernelWidth,
+                                       m_kernel + r * m_kernelWidth + s * m_kernelWidth * m_kernelHeight,
+                                       sum);
             }
-            m_imgOut[j * m_imgOutWidth + i + k * m_imgOutWidth * m_imgOutHeight] = sum;
           }
+          m_imgOut[j * m_imgOutWidth + i + k * m_imgOutWidth * m_imgOutHeight] = sum;
         }
       }
     }
@@ -448,18 +474,36 @@ struct Image3DRowFilterForOneBlock<double, double>
 
   void operator()(const tbb::blocked_range<size_t>& range) const
   {
-    if (ZCpuInfo::instance().bAVX512F && m_kernelWidth >= 8) {
-      Image3DRowFilterForOneBlock_AVX512(m_padImg,
-                                         m_padImgWidth,
-                                         m_padImgHeight,
-                                         m_kernel,
-                                         m_kernelWidth,
-                                         m_imgOut,
-                                         m_imgOutWidth,
-                                         m_imgOutHeight,
-                                         range.begin(),
-                                         range.end());
-    } else if (m_kernelWidth >= 4) {
+#if ATLAS_IMG_ARCH_ARM64
+    if (m_kernelWidth >= 2) {
+      Image3DRowFilterForOneBlock_Hwy(m_padImg,
+                                      m_padImgWidth,
+                                      m_padImgHeight,
+                                      m_kernel,
+                                      m_kernelWidth,
+                                      m_imgOut,
+                                      m_imgOutWidth,
+                                      m_imgOutHeight,
+                                      range.begin(),
+                                      range.end());
+      return;
+    }
+#elif ATLAS_IMG_ARCH_X86_64
+    const auto& cpuInfo = ZCpuInfo::instance();
+    if (cpuInfo.bAVX2 && m_kernelWidth >= 2) {
+      Image3DRowFilterForOneBlock_Hwy(m_padImg,
+                                      m_padImgWidth,
+                                      m_padImgHeight,
+                                      m_kernel,
+                                      m_kernelWidth,
+                                      m_imgOut,
+                                      m_imgOutWidth,
+                                      m_imgOutHeight,
+                                      range.begin(),
+                                      range.end());
+      return;
+    }
+    if (cpuInfo.bAVX && m_kernelWidth >= 4) {
       Image3DRowFilterForOneBlock_AVX(m_padImg,
                                       m_padImgWidth,
                                       m_padImgHeight,
@@ -470,7 +514,9 @@ struct Image3DRowFilterForOneBlock<double, double>
                                       m_imgOutHeight,
                                       range.begin(),
                                       range.end());
-    } else if (m_kernelWidth >= 2) {
+      return;
+    }
+    if (m_kernelWidth >= 2) {
       Image3DRowFilterForOneBlock_SSE3(m_padImg,
                                        m_padImgWidth,
                                        m_padImgHeight,
@@ -481,15 +527,16 @@ struct Image3DRowFilterForOneBlock<double, double>
                                        m_imgOutHeight,
                                        range.begin(),
                                        range.end());
-    } else {
-      for (size_t k = range.begin(); k != range.end(); ++k) {
-        for (size_t j = 0; j < m_imgOutHeight; ++j) {
-          for (size_t i = 0; i < m_imgOutWidth; ++i) {
-            double sum = 0.0;
-            const double* imgStart = m_padImg + j * m_padImgWidth + i + k * m_padImgWidth * m_padImgHeight;
-            sum = std::inner_product(imgStart, imgStart + m_kernelWidth, m_kernel, sum);
-            m_imgOut[j * m_imgOutWidth + i + k * m_imgOutWidth * m_imgOutHeight] = sum;
-          }
+      return;
+    }
+#endif
+    for (size_t k = range.begin(); k != range.end(); ++k) {
+      for (size_t j = 0; j < m_imgOutHeight; ++j) {
+        for (size_t i = 0; i < m_imgOutWidth; ++i) {
+          double sum = 0.0;
+          const double* imgStart = m_padImg + j * m_padImgWidth + i + k * m_padImgWidth * m_padImgHeight;
+          sum = std::inner_product(imgStart, imgStart + m_kernelWidth, m_kernel, sum);
+          m_imgOut[j * m_imgOutWidth + i + k * m_imgOutWidth * m_imgOutHeight] = sum;
         }
       }
     }

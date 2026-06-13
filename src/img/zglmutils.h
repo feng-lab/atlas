@@ -4,14 +4,15 @@
 // for glm
 
 #include "zglobal.h"
+#include "zimagearch.h"
 #include "zjson.h"
 #include "zlog.h"
 #include "zstringutils.h"
 
 #define GLM_FORCE_CXX20
-#if defined(__aarch64__) || defined(_M_ARM64)
+#if ATLAS_IMG_ARCH_ARM64
 #define GLM_FORCE_NEON
-#else
+#elif ATLAS_IMG_ARCH_X86_64
 #define GLM_FORCE_AVX
 #endif
 // #define GLM_FORCE_INLINE

@@ -1,6 +1,8 @@
 #pragma once
 
-#if defined(ZIMG_USE_MKL) && (defined(__x86_64__) || defined(_M_X64) || defined(__amd64__))
+#include "zimagearch.h"
+
+#if defined(ZIMG_USE_MKL) && ATLAS_IMG_ARCH_X86_64
 #define ZIMG_MKL_ENABLED 1
 #else
 #define ZIMG_MKL_ENABLED 0

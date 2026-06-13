@@ -1,13 +1,14 @@
 #include "zimgncc.h"
 #include "zcommandlineflags.h"
 #include "zfft.h"
+#include "zimagearch.h"
 #include "ztest.h"
 #include <folly/ScopeGuard.h>
 
 ABSL_DECLARE_FLAG(bool, zimg_use_mkl_for_fft_if_available);
 ABSL_DECLARE_FLAG(uint32_t, zimg_global_fft_number_of_threads);
 
-#if defined(ZIMG_USE_MKL) && (defined(__x86_64__) || defined(_M_X64) || defined(__amd64__))
+#if defined(ZIMG_USE_MKL) && ATLAS_IMG_ARCH_X86_64
 
 TEST(ZImgNCC, normXCorr_S_mkl)
 {
@@ -187,4 +188,4 @@ TEST(ZImgNCC, fft_mkl_pocketfft)
   }
 }
 
-#endif // ZIMG_MKL_ENABLED
+#endif // defined(ZIMG_USE_MKL) && ATLAS_IMG_ARCH_X86_64

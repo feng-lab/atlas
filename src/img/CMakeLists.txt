@@ -23,7 +23,9 @@ set(IMG_SOURCES
         zglobal.h
         zimage2dutils.h zimage2dutils.cpp
         zimage3dutils.h
+        zimagearch.h
         zimageavx.h zimageavx.cpp
+        zimagehwy.h zimagehwy.cpp
         zimagefilterkernel.h zimagefilterkernel.cpp
         zimagesse3.h zimagesse3.cpp
         zimg.h zimg.cpp
@@ -149,8 +151,6 @@ set(IMG_SOURCES
         zminimumspanningtree.cpp zminimumspanningtree.h
         zmkl.h
         zsaturateoperation.cpp
-        zsaturateoperation_avx2.cpp zsaturateoperation_avx512.cpp zsaturateoperation_avx2.h zsaturateoperation_avx512.h
-        zimageavx512.h zimageavx512.cpp
         zmesh.h zmesh.cpp
         zmeshio.h zmeshio.cpp
         zmeshutils.h
@@ -368,11 +368,6 @@ if (WIN32)
 
     target_compile_options(${LIBRARY_NAME} PUBLIC /arch:AVX)
 
-    # for some files
-    set_source_files_properties(zimageavx512.cpp PROPERTIES COMPILE_FLAGS /arch:AVX512)
-    set_source_files_properties(zsaturateoperation_avx512.cpp PROPERTIES COMPILE_FLAGS /arch:AVX512)
-    set_source_files_properties(zsaturateoperation_avx2.cpp PROPERTIES COMPILE_FLAGS /arch:AVX2)
-
     set_source_files_properties(zimgjpegxr.cpp PROPERTIES COMPILE_DEFINITIONS "WIN32;DISABLE_PERF_MEASUREMENT")
 else (WIN32)
     target_compile_options(${LIBRARY_NAME} PUBLIC $<$<COMPILE_LANGUAGE:CXX>:-frtti>)
@@ -380,9 +375,9 @@ else (WIN32)
     target_compile_options(${LIBRARY_NAME} PUBLIC -Wall -Wextra)
     target_compile_options(${LIBRARY_NAME} PUBLIC -Waddress -Wdeprecated)
     if (APPLE)
-        target_compile_options(${LIBRARY_NAME} PUBLIC -mcpu=apple-m1 -mavx -fopenmp-simd -DSIMDE_ENABLE_OPENMP)
+        target_compile_options(${LIBRARY_NAME} PUBLIC -mcpu=apple-m1 -mavx)
     else ()
-        target_compile_options(${LIBRARY_NAME} PUBLIC -mavx -fopenmp-simd -DSIMDE_ENABLE_OPENMP)
+        target_compile_options(${LIBRARY_NAME} PUBLIC -mavx)
     endif ()
     target_compile_options(${LIBRARY_NAME} PUBLIC -fno-common)
 
@@ -413,11 +408,6 @@ else (WIN32)
         endif ()
     endif ()
 
-    # for some files
-    set_source_files_properties(zimageavx512.cpp PROPERTIES COMPILE_FLAGS -mavx512f)
-    set_source_files_properties(zsaturateoperation_avx512.cpp PROPERTIES COMPILE_FLAGS -mavx512bw)
-    set_source_files_properties(zsaturateoperation_avx2.cpp PROPERTIES COMPILE_FLAGS -mavx2)
-
     set_source_files_properties(zimgjpegxr.cpp PROPERTIES COMPILE_DEFINITIONS "__ANSI__;DISABLE_PERF_MEASUREMENT")
 
     set_source_files_properties(zregistrationoptimizer.cpp PROPERTIES COMPILE_FLAGS -Wno-shadow)
@@ -431,7 +421,7 @@ set(ATLAS_IMG_FORMAT_LINK_LIBRARIES
         WebP::webp
         OpenImageIO::OpenImageIO)
 
-target_link_libraries(${LIBRARY_NAME} PUBLIC ${ITK_LIBRARIES} cpuinfo::cpuinfo
+target_link_libraries(${LIBRARY_NAME} PUBLIC ${ITK_LIBRARIES} cpuinfo::cpuinfo hwy::hwy
         hdf5_cpp-static hdf5-static Ceres::ceres Folly::folly Eigen3::Eigen
         Boost::headers Boost::charconv
         absl::bits absl::int128

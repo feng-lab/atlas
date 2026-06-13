@@ -1,6 +1,7 @@
 #pragma once
 
 #include "zglobal.h"
+#include "zimagearch.h"
 #include "zioutils.h"
 #include "zrandom.h"
 #include "zlog.h"
@@ -9,7 +10,7 @@
 #pragma warning(push, 0)
 #endif
 
-#if !(defined(__APPLE__) && (defined(__aarch64__) || defined(__arm64__)))
+#if !(defined(__APPLE__) && ATLAS_IMG_ARCH_ARM64)
 #define EIGEN_USE_LAPACKE_STRICT
 #endif
 

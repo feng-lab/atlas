@@ -2700,6 +2700,30 @@ void saturate_add<int16_t, const int16_t>(const int16_t* x, const int16_t* y, si
 template<>
 void saturate_add<int16_t, int16_t>(const int16_t* x, int16_t y, size_t count, int16_t* res);
 
+template<>
+void saturate_add<uint32_t, const uint32_t>(const uint32_t* x, const uint32_t* y, size_t count, uint32_t* res);
+
+template<>
+void saturate_add<uint32_t, uint32_t>(const uint32_t* x, uint32_t y, size_t count, uint32_t* res);
+
+template<>
+void saturate_add<int32_t, const int32_t>(const int32_t* x, const int32_t* y, size_t count, int32_t* res);
+
+template<>
+void saturate_add<int32_t, int32_t>(const int32_t* x, int32_t y, size_t count, int32_t* res);
+
+template<>
+void saturate_add<uint64_t, const uint64_t>(const uint64_t* x, const uint64_t* y, size_t count, uint64_t* res);
+
+template<>
+void saturate_add<uint64_t, uint64_t>(const uint64_t* x, uint64_t y, size_t count, uint64_t* res);
+
+template<>
+void saturate_add<int64_t, const int64_t>(const int64_t* x, const int64_t* y, size_t count, int64_t* res);
+
+template<>
+void saturate_add<int64_t, int64_t>(const int64_t* x, int64_t y, size_t count, int64_t* res);
+
 // array version sub
 
 template<typename TVoxel1, typename TVoxel2>
@@ -2741,6 +2765,30 @@ void saturate_sub<int16_t, const int16_t>(const int16_t* x, const int16_t* y, si
 
 template<>
 void saturate_sub<int16_t, int16_t>(const int16_t* x, int16_t y, size_t count, int16_t* res);
+
+template<>
+void saturate_sub<uint32_t, const uint32_t>(const uint32_t* x, const uint32_t* y, size_t count, uint32_t* res);
+
+template<>
+void saturate_sub<uint32_t, uint32_t>(const uint32_t* x, uint32_t y, size_t count, uint32_t* res);
+
+template<>
+void saturate_sub<int32_t, const int32_t>(const int32_t* x, const int32_t* y, size_t count, int32_t* res);
+
+template<>
+void saturate_sub<int32_t, int32_t>(const int32_t* x, int32_t y, size_t count, int32_t* res);
+
+template<>
+void saturate_sub<uint64_t, const uint64_t>(const uint64_t* x, const uint64_t* y, size_t count, uint64_t* res);
+
+template<>
+void saturate_sub<uint64_t, uint64_t>(const uint64_t* x, uint64_t y, size_t count, uint64_t* res);
+
+template<>
+void saturate_sub<int64_t, const int64_t>(const int64_t* x, const int64_t* y, size_t count, int64_t* res);
+
+template<>
+void saturate_sub<int64_t, int64_t>(const int64_t* x, int64_t y, size_t count, int64_t* res);
 
 // array version mul
 

@@ -81,6 +81,10 @@ message(STATUS "MKL_LIBRARIES: ${MKL_LIBRARIES}")
 find_package(cpuinfo REQUIRED PATHS ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build NO_DEFAULT_PATH)
 print_target_properties(cpuinfo::cpuinfo)
 
+find_package(hwy CONFIG REQUIRED
+             PATHS ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build NO_DEFAULT_PATH)
+print_target_properties(hwy::hwy)
+
 set(JPEGTURBO_INCLUDE_DIRS ${JPEGTURBO_INCLUDE_DIRS}
     ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/include)
 find_package(libjpeg-turbo CONFIG REQUIRED

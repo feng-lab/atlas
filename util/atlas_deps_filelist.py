@@ -15,6 +15,11 @@ files_to_download = [
         "filename": "brotli-1.2.0.zip",
     },
     {
+        "expected_size": 3691557,
+        "expected_sha256": "36f672ab48ddb3c8555e9e89e16fe400cd7d16c6eb455a1a3d0c146a63ababdc",
+        "filename": "highway-1.4.0.tar.gz",
+    },
+    {
         "expected_size": 1882762,
         "expected_sha256": "ab38928f7f6248e2a98cc184956021acb927b16a0dee71b4d260dc040a4320ea",
         "filename": "libjxl-0.11.2.tar.gz",
@@ -118,11 +123,6 @@ files_to_download = [
         "expected_size": 87444418,
         "expected_sha256": "808ab43a0db04c8eec9ed7db12b90d7be1c8e2e75f4a060724d604a2043ccaf7",
         "filename": "cmake-4.3.2-macos-universal.tar.gz",
-    },
-    {
-        "expected_size": 2234665,
-        "expected_sha256": "7e0be78b8318e8bdbf6fa545d2ecb4c90f947df03f7aadc42c1967f019e63343",
-        "filename": "highway-1.2.0.tar.gz",
     },
     {
         "expected_size": 1746114,

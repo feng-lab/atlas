@@ -1691,14 +1691,6 @@ def build_reflect(src_dir: str, install_dir: str):
     shutil.copy2(os.path.join(src_dir, "reflect"), os.path.join(install_dir, "include"))
 
 
-def build_simde(src_dir: str, install_dir: str):
-    shutil.copytree(
-        os.path.join(src_dir, "simde"),
-        os.path.join(install_dir, "include", "simde"),
-        dirs_exist_ok=True,
-    )
-
-
 def build_glm(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
 
@@ -7171,10 +7163,6 @@ def build_libs(libs: OrderedDict, use_asan: bool):
             src_dir = os.path.join(ext_dir(), "reflect")
             build_reflect(src_dir, ext_build_dir())
 
-        if lib_name == "simde":
-            src_dir = os.path.join(ext_dir(), "simde")
-            build_simde(src_dir, ext_build_dir())
-
         if lib_name == "glm":
             src_dir = os.path.join(ext_dir(), "glm")
             build_glm(src_dir, ext_build_dir())
@@ -7622,7 +7610,6 @@ def parse_inputs(argv: list):
         "eigen",
         "pocketfft",
         "reflect",
-        "simde",
         "glm",
         "googletest",
         "cpuinfo",
