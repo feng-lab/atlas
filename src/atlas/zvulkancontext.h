@@ -121,6 +121,11 @@ public:
     return m_supportsDescriptorIndexingSampledImageUpdateAfterBind;
   }
 
+  [[nodiscard]] bool supportsCalibratedTimestamps() const
+  {
+    return m_supportsCalibratedTimestamps;
+  }
+
   // Bindless sampled-image table capacity policy:
   // - Requested capacities come from command-line flags (developer override).
   // - Effective capacities are clamped once per logical device creation to fit
@@ -198,6 +203,7 @@ private:
   QueueFamilyIndices m_queueFamilyIndices;
   bool m_supportsInlineAndSecondaryDynamicRendering = false;
   bool m_supportsDescriptorIndexingSampledImageUpdateAfterBind = false;
+  bool m_supportsCalibratedTimestamps = false;
 
   BindlessSampledImageCapacities m_requestedBindlessSampledImageCapacities{};
   BindlessSampledImageCapacities m_effectiveBindlessSampledImageCapacities{};

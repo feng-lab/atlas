@@ -1030,12 +1030,13 @@ void ZVulkanContext::createLogicalDevice()
   auto deviceExtensionProperties = m_physicalDevices[m_selectedDeviceIndex].enumerateDeviceExtensionProperties();
 #endif
 
-  // Optional: enable calibrated timestamps device extension when available
   // Optional: memory budgeting (VK_EXT_memory_budget). Used for cache residency decisions.
   if (isExtensionAvailable(VK_EXT_MEMORY_BUDGET_EXTENSION_NAME, deviceExtensionProperties)) {
     enabledExtensions.push_back(VK_EXT_MEMORY_BUDGET_EXTENSION_NAME);
   }
-  if (isExtensionAvailable(VK_EXT_CALIBRATED_TIMESTAMPS_EXTENSION_NAME, deviceExtensionProperties)) {
+  m_supportsCalibratedTimestamps =
+    isExtensionAvailable(VK_EXT_CALIBRATED_TIMESTAMPS_EXTENSION_NAME, deviceExtensionProperties);
+  if (m_supportsCalibratedTimestamps) {
     enabledExtensions.push_back(VK_EXT_CALIBRATED_TIMESTAMPS_EXTENSION_NAME);
   }
 

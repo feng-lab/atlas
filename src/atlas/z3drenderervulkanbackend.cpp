@@ -7457,7 +7457,8 @@ void Z3DRendererVulkanBackend::collectFrameTimings(FrameResources& frame)
 
   if (collectGpuTimestamps && frame.nextQuery > 0 && !frame.gpuScopes.empty()) {
     // Optional calibration: map GPU ticks to CPU nanoseconds for trace alignment
-    if (absl::GetFlag(FLAGS_atlas_perf_trace_calibrated)) {
+    const bool traceCalibrated = absl::GetFlag(FLAGS_atlas_perf_trace_calibrated);
+    if (traceCalibrated && m_sharedDevice->context().supportsCalibratedTimestamps()) {
       try {
         // Check time domain support
         auto& phys = m_sharedDevice->context().physicalDevice();
@@ -7507,6 +7508,8 @@ void Z3DRendererVulkanBackend::collectFrameTimings(FrameResources& frame)
           VLOG(2) << "VK calibration threw; falling back to uncalibrated timestamps";
         }
       }
+    } else if (traceCalibrated && VLOG_IS_ON(2)) {
+      VLOG(2) << "VK calibration skipped: VK_EXT_calibrated_timestamps is not available on the selected device";
     }
     const auto [result, queryData] = frame.queryPool.getResults<uint64_t>(0,
                                                                           frame.nextQuery,

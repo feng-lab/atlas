@@ -412,23 +412,30 @@ ZVulkanDevice::ZVulkanDevice(ZVulkanContext& context)
     m_framesInFlight);
   LOG(INFO) << fmt::format("VK device allocation limits: maxMemoryAllocationSize={}B",
                            static_cast<uint64_t>(m_maxMemoryAllocationSize));
-  try {
-    auto domains = phys.getCalibrateableTimeDomainsEXT();
-    bool supported = !domains.empty();
-    std::string domList;
-    for (size_t i = 0; i < domains.size(); ++i) {
-      domList += fmt::format("{}", enumOrUnderlying(domains[i], 16));
-      if (i + 1 < domains.size()) {
-        domList += ",";
+  // This extension query is logging-only, and some Windows loader/ICD combinations fail-fast
+  // instead of throwing when the entry point is called without device support.
+  if (m_context.supportsCalibratedTimestamps()) {
+    try {
+      auto domains = phys.getCalibrateableTimeDomainsEXT();
+      bool supported = !domains.empty();
+      std::string domList;
+      for (size_t i = 0; i < domains.size(); ++i) {
+        domList += fmt::format("{}", enumOrUnderlying(domains[i], 16));
+        if (i + 1 < domains.size()) {
+          domList += ",";
+        }
       }
+      const float ts = (props.limits.timestampPeriod > 0.0f) ? props.limits.timestampPeriod : 1.0f;
+      LOG(INFO) << "VK calibrated timestamps: supported=" << supported << " domains=[" << domList
+                << "] timestampPeriod=" << ts << " ns/tick";
     }
+    catch (...) {
+      const float ts = (props.limits.timestampPeriod > 0.0f) ? props.limits.timestampPeriod : 1.0f;
+      LOG(INFO) << "VK calibrated timestamps: query failed; timestampPeriod=" << ts << " ns/tick";
+    }
+  } else {
     const float ts = (props.limits.timestampPeriod > 0.0f) ? props.limits.timestampPeriod : 1.0f;
-    LOG(INFO) << "VK calibrated timestamps: supported=" << supported << " domains=[" << domList
-              << "] timestampPeriod=" << ts << " ns/tick";
-  }
-  catch (...) {
-    const float ts = (props.limits.timestampPeriod > 0.0f) ? props.limits.timestampPeriod : 1.0f;
-    LOG(INFO) << "VK calibrated timestamps: query not available; timestampPeriod=" << ts << " ns/tick";
+    LOG(INFO) << "VK calibrated timestamps: extension not available; timestampPeriod=" << ts << " ns/tick";
   }
 }
 
