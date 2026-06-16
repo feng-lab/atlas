@@ -36,9 +36,33 @@ env:
   LIB_BUILD_PYTHON_VERSION: "3.14"
 
 jobs:
-  build-env:
+  ext-cache-probe:
     runs-on: ubuntu-22.04
     if: ${{ github.event_name != 'create' || github.ref_type == 'tag' }}
+    outputs:
+      hit: ${{ steps.cache-extlibs-probe.outputs.cache-hit }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event_name == 'create' && github.event.ref || github.ref }}
+          fetch-depth: 1
+          sparse-checkout: |
+            util/atlas_deps_filelist.py
+          sparse-checkout-cone-mode: false
+
+      - name: Probe 3rdparty build cache
+        id: cache-extlibs-probe
+        uses: actions/cache/restore@v5
+        with:
+          path: |
+            src/3rdparty/build
+          key: ${{ runner.os }}-ext-${{ env.CLANG_MAJOR }}-${{ hashFiles('util/atlas_deps_filelist.py') }}
+          lookup-only: true
+
+  build-env:
+    runs-on: ubuntu-22.04
+    needs: ext-cache-probe
+    if: ${{ (github.event_name != 'create' || github.ref_type == 'tag') && needs.ext-cache-probe.outputs.hit != 'true' }}
     steps:
       - name: Disable Git autocrlf
         shell: bash -l {0}
@@ -144,8 +168,10 @@ jobs:
 
   build:
     runs-on: ubuntu-22.04
-    needs: build-env
-    if: ${{ github.event_name != 'create' || github.ref_type == 'tag' }}
+    needs:
+      - ext-cache-probe
+      - build-env
+    if: ${{ always() && (github.event_name != 'create' || github.ref_type == 'tag') && needs.ext-cache-probe.result == 'success' && (needs.build-env.result == 'success' || needs.build-env.result == 'skipped') }}
     permissions:
       contents: write
     steps:

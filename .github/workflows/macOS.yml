@@ -97,9 +97,35 @@ jobs:
           vulkan-version: ${{ env.VULKAN_SDK_VERSION }}
           enable-cache: "false"
 
-  build-env:
+  ext-cache-probe:
     needs: determine-mode
     if: ${{ (github.event_name != 'create' || github.ref_type == 'tag') && needs.determine-mode.outputs.mode == 'github' }}
+    runs-on: macos-15
+    outputs:
+      hit: ${{ steps.cache-extlibs-probe.outputs.cache-hit }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event_name == 'create' && github.event.ref || github.ref }}
+          fetch-depth: 1
+          sparse-checkout: |
+            util/atlas_deps_filelist.py
+          sparse-checkout-cone-mode: false
+
+      - name: Probe 3rdparty build cache
+        id: cache-extlibs-probe
+        uses: actions/cache/restore@v5
+        with:
+          path: |
+            src/3rdparty/build
+          key: ${{ runner.os }}-ext-${{ hashFiles('util/atlas_deps_filelist.py') }}
+          lookup-only: true
+
+  build-env:
+    needs:
+      - determine-mode
+      - ext-cache-probe
+    if: ${{ (github.event_name != 'create' || github.ref_type == 'tag') && needs.determine-mode.outputs.mode == 'github' && needs.ext-cache-probe.outputs.hit != 'true' }}
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v5
@@ -123,8 +149,9 @@ jobs:
   build:
     needs:
       - determine-mode
+      - ext-cache-probe
       - build-env
-    if: ${{ (github.event_name != 'create' || github.ref_type == 'tag') && needs.determine-mode.outputs.mode == 'github' }}
+    if: ${{ always() && (github.event_name != 'create' || github.ref_type == 'tag') && needs.determine-mode.outputs.mode == 'github' && needs.ext-cache-probe.result == 'success' && (needs.build-env.result == 'success' || needs.build-env.result == 'skipped') }}
     runs-on: macos-15
     permissions:
       contents: write
