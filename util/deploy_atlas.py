@@ -2503,20 +2503,6 @@ def build_atlas_installer():
             )
             target_folder = os.path.join(out_folder, "packages")
             if os.path.exists(os.path.join(target_folder, suffix)):
-                shutil.rmtree(os.path.join(target_folder, suffix), ignore_errors=False)
-            shutil.copytree(
-                os.path.join(common_dirs.deploy_target_dir(), suffix),
-                os.path.join(target_folder, suffix),
-                symlinks=True,
-            )
-        elif common_dirs.is_windows():
-            out_folder = common_dirs.static_deploy_folder()
-            shutil.copy2(
-                os.path.join(common_dirs.deploy_target_dir(), installer_zip_name),
-                os.path.join(out_folder, "installers", installer_zip_name),
-            )
-            target_folder = os.path.join(out_folder, "packages")
-            if os.path.exists(os.path.join(target_folder, suffix)):
                 shutil.rmtree(
                     os.path.join(target_folder, suffix),
                     ignore_errors=False,

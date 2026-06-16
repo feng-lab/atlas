@@ -258,6 +258,52 @@ jobs:
           }
           Get-ChildItem -Force "C:\VulkanSDK\$env:VULKAN_SDK_VERSION" | Select-Object FullName
 
+      - name: Install SwiftShader Vulkan ICD
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $dest = 'C:\SwiftShader'
+          $zip = Join-Path $env:TEMP 'swiftshader-win64.zip'
+          $version = '5.0.0.1'
+          $releaseTag = '20260413'
+          $expectedSha = '61a5fee9f55f51374ae418fcbcc281d435d10e8ba466bccba3997d1773ae0bea'
+          $url = "https://github.com/jakoch/rasterizers/releases/download/$releaseTag/swiftshader-win64-$version.zip"
+          Write-Host "Downloading SwiftShader from: $url"
+          Remove-Item -Recurse -Force $dest -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Force -Path $dest | Out-Null
+          curl.exe -L --fail --retry 3 --output $zip $url
+          if ($LASTEXITCODE -ne 0) { Write-Error "SwiftShader download failed with exit code $LASTEXITCODE"; exit $LASTEXITCODE }
+          $actualSha = (Get-FileHash -Path $zip -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($actualSha -ne $expectedSha) {
+            Write-Error "SwiftShader archive SHA256 mismatch. Expected $expectedSha, got $actualSha"
+          }
+          Expand-Archive -Path $zip -DestinationPath $dest -Force
+          foreach ($file in @('vk_swiftshader.dll', 'vk_swiftshader_icd.json', 'vulkan-1.dll')) {
+            $path = Join-Path $dest $file
+            if (-not (Test-Path $path)) {
+              Write-Error "SwiftShader file missing: $path"
+            }
+          }
+          Get-ChildItem -Force $dest | Select-Object FullName
+
+      - name: Verify SwiftShader Vulkan ICD
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $icd = 'C:\SwiftShader\vk_swiftshader_icd.json'
+          if (-not (Test-Path $icd)) {
+            Write-Error "SwiftShader ICD manifest not found: $icd"
+          }
+          $env:Path = "C:\SwiftShader;$env:Path"
+          $env:VK_DRIVER_FILES = $icd
+          $summary = & "C:\VulkanSDK\$env:VULKAN_SDK_VERSION\Bin\vulkaninfoSDK.exe" --summary 2>&1
+          $exitCode = $LASTEXITCODE
+          $summary | ForEach-Object { Write-Host $_ }
+          if ($exitCode -ne 0) { Write-Error "vulkaninfoSDK failed with exit code $exitCode"; exit $exitCode }
+          if (-not (($summary | Out-String) -match 'SwiftShader')) {
+            Write-Error "vulkaninfoSDK did not enumerate SwiftShader"
+          }
+
       - name: Setup conda
         uses: conda-incubator/setup-miniconda@v4
         with:
@@ -344,10 +390,11 @@ jobs:
 
       - name: Build and deploy Atlas
         env:
-          QT_OPENGL: software
+          VK_DRIVER_FILES: C:\SwiftShader\vk_swiftshader_icd.json
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
+          $env:Path = "C:\SwiftShader;$env:Path"
           $condaHook = (& conda 'shell.powershell' 'hook') | Out-String
           Invoke-Expression $condaHook
           conda activate atlas-ci

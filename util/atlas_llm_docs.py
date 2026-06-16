@@ -39,9 +39,10 @@ def dump_schema_with_atlas(
         "--run_dump_animation3d_schema",
         "--dump_output_dir",
         str(out_dir),
+        "--atlas_default_render_backend=vulkan",
+        "-platform",
+        "offscreen",
     ]
-    if common_dirs.is_linux():
-        args += ["-platform", "offscreen"]
     return subprocess.run(args, check=False)
 
 

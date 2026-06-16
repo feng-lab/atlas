@@ -96,7 +96,8 @@ jobs:
             zsh build-essential git zip unzip rsync p7zip-full \
             nasm gperf patchelf \
             libcurl4-openssl-dev \
-            libgl1-mesa-dev libxrender-dev libxcursor-dev libglfw3-dev \
+            libgl1-mesa-dev mesa-vulkan-drivers \
+            libxrender-dev libxcursor-dev libglfw3-dev \
             libfreetype6-dev libfontconfig1-dev \
             libxkbcommon0 libxkbcommon-x11-0 \
             libxcb-xinerama0 libxcb-icccm4 libxcb-keysyms1 libxcb-image0 \
@@ -195,7 +196,8 @@ jobs:
             zsh build-essential git zip unzip rsync p7zip-full \
             nasm gperf patchelf \
             libcurl4-openssl-dev \
-            libgl1-mesa-dev libxrender-dev libxcursor-dev libglfw3-dev \
+            libgl1-mesa-dev mesa-vulkan-drivers \
+            libxrender-dev libxcursor-dev libglfw3-dev \
             libfreetype6-dev libfontconfig1-dev \
             libxkbcommon0 libxkbcommon-x11-0 \
             libxcb-xinerama0 libxcb-icccm4 libxcb-keysyms1 libxcb-image0 \
