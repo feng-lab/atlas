@@ -245,14 +245,14 @@ json::object loadJsonObject(const QString& file)
 
 void saveJsonObject(const json::object& jo, const QString& file)
 {
-  auto fs = openOFStream(file, std::ios_base::out);
+  auto fs = openOFStream(file, std::ios_base::out | std::ios_base::binary);
   PrettyJsonPrinter printer(fs);
   printer.print(jo);
 }
 
 void saveJsonArray(const json::array& ja, const QString& file)
 {
-  auto fs = openOFStream(file, std::ios_base::out);
+  auto fs = openOFStream(file, std::ios_base::out | std::ios_base::binary);
   PrettyJsonPrinter printer(fs);
   printer.print(ja);
 }
