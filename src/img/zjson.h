@@ -58,6 +58,8 @@ json::object loadJsonObject(const QString& file);
 
 void saveJsonObject(const json::object& jo, const QString& file);
 
+void saveJsonObjectAtomic(const json::object& jo, const QString& file);
+
 void saveJsonArray(const json::array& ja, const QString& file);
 
 // Stable type tags for diagnostics (RPC errors, logs, etc.).

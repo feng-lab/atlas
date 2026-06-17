@@ -1365,21 +1365,6 @@ void ZAnimation::writeContent(const QString& fn, const QString& jsonKey)
     // Redundant-key cleanup is a destructive edit (it can delete keys) and must
     // remain an explicit user action via the UI button.
 
-    QFileInfo fi(fn);
-    QString nName;
-    for (int i = 0; i < 10000000; ++i) {
-#ifdef _MSC_VER
-      nName =
-        fi.absolutePath() + QString("\\") + fi.baseName() + QString("_WritingTmp%1_.").arg(i) + fi.completeSuffix();
-#else
-      nName =
-        fi.absolutePath() + QString("/") + fi.baseName() + QString("_WritingTmp%1_.").arg(i) + fi.completeSuffix();
-#endif
-      if (!QFile::exists(nName)) {
-        break;
-      }
-    }
-
     json::object animationObj;
     animationObj["Version"] = 1.0;
 
@@ -1435,12 +1420,7 @@ void ZAnimation::writeContent(const QString& fn, const QString& jsonKey)
     json::object saveObj;
     saveObj[jsonKey.toStdString()] = animationObj;
 
-    saveJsonObject(saveObj, nName);
-
-    if ((QFile::exists(fn) && !QFile::remove(fn)) || !QFile::rename(nName, fn)) {
-      throw ZException(fmt::format("Can not replace old file {} with new file {}", nName, fn),
-                       ZException::Option::CheckErrno);
-    }
+    saveJsonObjectAtomic(saveObj, fn);
   }
   catch (const ZException& e) {
     throw ZException(fmt::format("Can not save animation {}: {}", fn, e.what()));

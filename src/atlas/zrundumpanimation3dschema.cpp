@@ -15,17 +15,17 @@
 #include "zcameraparameterkey.h"
 #include "zimg.h"
 #include "zimgio.h"
+#include "zioutils.h"
 #include "zmeshio.h"
 #include "zpunctaio.h"
 #include <QTemporaryDir>
-#include <QFile>
-#include <QTextStream>
 #include <QCoreApplication>
 #include <QFileInfo>
 #include <QDir>
 #include "zcommandlineflags.h"
 #include <cctype>
 #include <set>
+#include <string_view>
 
 ABSL_FLAG(bool, run_dump_animation3d_schema, false, "Dump Animation3D JSON Schema + capabilities and exit");
 ABSL_FLAG(std::string,
@@ -384,15 +384,10 @@ json::object buildSchema(const json::object& paramSchemas,
 
 } // namespace
 
-static QString writeTextFile(const QString& path, const QString& content)
+static QString writeTextFile(const QString& path, std::string_view content)
 {
-  QFile f(path);
-  if (!f.open(QIODevice::WriteOnly | QIODevice::Truncate | QIODevice::Text)) {
-    throw nim::ZException("Can not write file", nim::ZException::Option::CheckErrno);
-  }
-  QTextStream ts(&f);
-  ts << content;
-  f.close();
+  std::ofstream fs = nim::openOFStream(path);
+  nim::writeStream(fs, content.data(), content.size());
   return path;
 }
 

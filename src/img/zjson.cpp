@@ -1,9 +1,15 @@
 #include "zjson.h"
 
+#include "zexception.h"
 #include "zioutils.h"
+
+#include <QIODevice>
+#include <QSaveFile>
+
 #include <boost/charconv/to_chars.hpp>
 #include <boost/json/serializer.hpp>
 #include <boost/json/src.hpp>
+#include <fmt/format.h>
 #include <algorithm>
 #include <cmath>
 #include <ostream>
@@ -245,14 +251,33 @@ json::object loadJsonObject(const QString& file)
 
 void saveJsonObject(const json::object& jo, const QString& file)
 {
-  auto fs = openOFStream(file, std::ios_base::out | std::ios_base::binary);
+  auto fs = openOFStream(file);
   PrettyJsonPrinter printer(fs);
   printer.print(jo);
 }
 
+void saveJsonObjectAtomic(const json::object& jo, const QString& file)
+{
+  QSaveFile fs(file);
+  if (!fs.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+    throw ZException(
+      fmt::format("Could not open file {} for writing: {}", file.toStdString(), fs.errorString().toStdString()));
+  }
+
+  const std::string payload = jsonToFormattedString(jo);
+  const qint64 written = fs.write(payload.data(), static_cast<qint64>(payload.size()));
+  if (written != static_cast<qint64>(payload.size())) {
+    throw ZException(fmt::format("Could not write file {}: {}", file.toStdString(), fs.errorString().toStdString()));
+  }
+
+  if (!fs.commit()) {
+    throw ZException(fmt::format("Could not commit file {}: {}", file.toStdString(), fs.errorString().toStdString()));
+  }
+}
+
 void saveJsonArray(const json::array& ja, const QString& file)
 {
-  auto fs = openOFStream(file, std::ios_base::out | std::ios_base::binary);
+  auto fs = openOFStream(file);
   PrettyJsonPrinter printer(fs);
   printer.print(ja);
 }

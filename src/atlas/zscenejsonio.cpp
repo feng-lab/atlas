@@ -94,7 +94,7 @@ bool ZSceneJsonIO::saveToPath(ZDoc* doc, ZView* view, Z3DRenderingEngine* engine
     json::object saveObj;
     saveObj["Scene"] = sceneObj;
 
-    saveJsonObject(saveObj, trimmed);
+    saveJsonObjectAtomic(saveObj, trimmed);
     return true;
   }
   catch (const std::exception& e) {

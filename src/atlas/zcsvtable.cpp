@@ -60,7 +60,7 @@ ZCsvTable readCsvTable(const QString& filename, const ZCsvReadOptions& options)
 
 void writeCsvTable(const QString& filename, const ZCsvTable& rows)
 {
-  std::ofstream out = openOFStream(filename, std::ios::out | std::ios::binary | std::ios::trunc);
+  std::ofstream out = openOFStream(filename);
   auto writer = csv::make_csv_writer(out);
   writeRows(writer, rows);
 

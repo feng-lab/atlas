@@ -44,7 +44,7 @@ void writeSwcLegacyNeuTuOrThrow(ZSwc& tree, const QString& filePath, const std::
   resortId(tree);
 
   try {
-    std::ofstream fs = openOFStream(filePath, std::ios_base::out | std::ios_base::trunc);
+    std::ofstream fs = openOFStream(filePath);
     fs.exceptions(std::ios::badbit | std::ios::failbit);
 
     fs << commentHeader();

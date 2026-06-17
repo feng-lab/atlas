@@ -156,7 +156,7 @@ void ZSwc::load(const QString& filename)
 void ZSwc::save(const QString& filename) const
 {
   try {
-    auto of = openOFStream(filename, std::ios_base::out);
+    auto of = openOFStream(filename);
 
     of << "#id type x y z radius parentID\n";
     if (!of) {

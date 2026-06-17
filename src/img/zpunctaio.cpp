@@ -390,7 +390,7 @@ void ZPunctaIO::readV3DApoFile(const QString& filename, ZPuncta& puncta)
 
 void ZPunctaIO::writeV3DApoFile(const ZPuncta& puncta, const QString& file)
 {
-  auto of = openOFStream(file, std::ios_base::out);
+  auto of = openOFStream(file);
 
   of << "#id, , name, comment, z, x, y, maxIntensity, meanIntensity, sDevOfIntensity, volSize, mass, property1, "
         "property2, property3, red, green, blue\n";
@@ -495,7 +495,7 @@ void ZPunctaIO::readMatFile(const QString& file, ZPuncta& puncta)
 
 void ZPunctaIO::writeMatFile(const ZPuncta& puncta, const QString& file)
 {
-  auto of = openOFStream(file, std::ios_base::out);
+  auto of = openOFStream(file);
   of << "# x y z radius\n";
   if (!of) {
     throw ZException("Error while writing file header", ZException::Option::CheckErrno);

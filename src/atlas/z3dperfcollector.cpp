@@ -440,7 +440,7 @@ void Z3DPerfCollector::flush(uint64_t token)
     }
 
     try {
-      std::ofstream ofs = openOFStream(QString::fromStdString(*tracePath), std::ios::out | std::ios::trunc);
+      std::ofstream ofs = openOFStream(QString::fromStdString(*tracePath));
       ofs << "{\n\"traceEvents\":[\n";
       for (size_t i = 0; i < events.size(); ++i) {
         const auto& e = events[i];
@@ -527,7 +527,7 @@ void Z3DPerfCollector::flush(uint64_t token)
         existing = readFileIntoString(traceAppendFilename);
       }
 
-      std::ofstream ofs = openOFStream(traceAppendFilename, std::ios::out | std::ios::trunc);
+      std::ofstream ofs = openOFStream(traceAppendFilename);
       if (existing.empty()) {
         ofs << "{\n\"traceEvents\":[\n";
         for (size_t i = 0; i < events.size(); ++i) {
@@ -615,7 +615,7 @@ void Z3DPerfCollector::flush(uint64_t token)
       if (fmtKind == "csv") {
         // Append CSV with header if file new. Top5 labels for stable columns.
         const bool exists = QFileInfo::exists(outFilename);
-        std::ofstream ofs = openOFStream(outFilename, std::ios::out | std::ios::app);
+        std::ofstream ofs = openOFStream(outFilename, std::ios::binary | std::ios::app);
         if (!exists) {
           ofs
             << "frame,cpu_ms,gpu_ms,top1_label,top1_ms,top1_pct,top2_label,top2_ms,top2_pct,top3_label,top3_ms,top3_pct,top4_label,top4_ms,top4_pct,top5_label,top5_ms,top5_pct,upload_hi,static_staged,readback,all_ms,all_samples,dsets,pipes_created,pipes_bound,segs,clears,loads,dwr,rew\n";
@@ -701,7 +701,7 @@ void Z3DPerfCollector::flush(uint64_t token)
         st["bound_set_rewrites"] = agg.boundSetRewriteAttempts;
         jo["stats"] = std::move(st);
         // Append NDJSON: one JSON object per line
-        std::ofstream ofs = openOFStream(outFilename, std::ios::out | std::ios::app);
+        std::ofstream ofs = openOFStream(outFilename, std::ios::binary | std::ios::app);
         ofs << jsonToString(jo) << "\n";
         ofs.close();
       } else {

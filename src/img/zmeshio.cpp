@@ -430,7 +430,7 @@ void ZMeshIO::readPrecomputed(const QString& filename, std::vector<glm::vec3>& v
 
 void ZMeshIO::writePrecomputed(const ZMesh& mesh, const QString& filename)
 {
-  std::ofstream outFileStream = openOFStream(filename, std::ios::out | std::ios::binary);
+  std::ofstream outFileStream = openOFStream(filename);
 
   uint32_t numVertices = mesh.numVertices();
   writeStream(outFileStream, &numVertices, 4);

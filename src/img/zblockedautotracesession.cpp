@@ -138,24 +138,6 @@ template<typename T>
   return it->value().as_object();
 }
 
-void atomicWriteJsonObjectOrThrow(const QString& finalPath, const json::object& jo)
-{
-  QSaveFile file(finalPath);
-  if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
-    throw ZException(fmt::format("Blocked auto trace: failed to open temp JSON file: {}", finalPath));
-  }
-
-  const std::string payload = jsonToFormattedString(jo);
-  const qint64 written = file.write(payload.data(), static_cast<qint64>(payload.size()));
-  if (written != static_cast<qint64>(payload.size())) {
-    throw ZException(fmt::format("Blocked auto trace: failed to write JSON file: {}", finalPath));
-  }
-
-  if (!file.commit()) {
-    throw ZException(fmt::format("Blocked auto trace: failed to commit JSON file: {}", finalPath));
-  }
-}
-
 [[nodiscard]] LocalNeuroseg localNeurosegFromJsonOrThrow(const json::object& o)
 {
   LocalNeuroseg out;
@@ -518,7 +500,7 @@ ZBlockedAutoTraceManifest ZBlockedAutoTraceSession::loadManifestOrThrow() const
 void ZBlockedAutoTraceSession::writeManifestAtomicOrThrow(const ZBlockedAutoTraceManifest& manifest) const
 {
   const QString path = manifestPath();
-  atomicWriteJsonObjectOrThrow(path, toJson(manifest));
+  saveJsonObjectAtomic(toJson(manifest), path);
 }
 
 void ZBlockedAutoTraceSession::ensureCreatedOrThrow(const ZBlockedAutoTraceManifest& manifest)
@@ -687,7 +669,7 @@ void ZBlockedAutoTraceSession::writeSwcDeltaOrThrow(const QString& filePath,
                                                     const std::vector<ZBlockedAutoTraceSwcDeltaNode>& nodes)
 {
   try {
-    std::ofstream fs = openOFStream(filePath, std::ios_base::out | std::ios_base::trunc);
+    std::ofstream fs = openOFStream(filePath);
     fs.exceptions(std::ios::badbit | std::ios::failbit);
 
     for (const auto& n : nodes) {
@@ -741,7 +723,7 @@ void ZBlockedAutoTraceSession::writeSeedScannedBlocksOrThrow(const QString& file
     arr.push_back(toJson(block));
   }
   jo["blocks"] = std::move(arr);
-  atomicWriteJsonObjectOrThrow(filePath, jo);
+  saveJsonObjectAtomic(jo, filePath);
 }
 
 namespace {
@@ -945,15 +927,15 @@ void ZBlockedAutoTraceSession::writeCommitOrThrow(const ZBlockedAutoTraceCommitW
       tasks.push_back(toJson(t));
     }
     frontierObj["tasks"] = std::move(tasks);
-    atomicWriteJsonObjectOrThrow(QDir(stagingPath).absoluteFilePath(frontierJsonName()), frontierObj);
+    saveJsonObjectAtomic(frontierObj, QDir(stagingPath).absoluteFilePath(frontierJsonName()));
   }
   {
-    atomicWriteJsonObjectOrThrow(QDir(stagingPath).absoluteFilePath(schedulerJsonName()), toJson(commit.scheduler));
+    saveJsonObjectAtomic(toJson(commit.scheduler), QDir(stagingPath).absoluteFilePath(schedulerJsonName()));
   }
 
   // Write commit marker last.
   {
-    atomicWriteJsonObjectOrThrow(QDir(stagingPath).absoluteFilePath(commitJsonName()), toJson(commit.info));
+    saveJsonObjectAtomic(toJson(commit.info), QDir(stagingPath).absoluteFilePath(commitJsonName()));
   }
 
   // Atomically rename staging -> final.
