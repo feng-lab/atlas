@@ -5346,6 +5346,33 @@ target_link_libraries(itkvnl_algo PRIVATE ITK::ITKEigen3Module)
         ),
         FilePatcher(
             orig_file=os.path.join(
+                src_dir, "Modules", "ThirdParty", "PNG", "itk-module.cmake"
+            ),
+            from_texts=[
+                r'itk_module(ITKPNG DEPENDS ITKZLIB DESCRIPTION "${DOCUMENTATION}")'
+            ],
+            to_texts=[
+                r'itk_module(ITKPNG EXCLUDE_FROM_DEFAULT DEPENDS ITKZLIB DESCRIPTION "${DOCUMENTATION}")'
+            ],
+        ),
+        FilePatcher(
+            orig_file=os.path.join(src_dir, "Modules", "IO", "PNG", "itk-module.cmake"),
+            from_texts=[
+                """itk_module(
+  ITKIOPNG
+  ENABLE_SHARED
+"""
+            ],
+            to_texts=[
+                """itk_module(
+  ITKIOPNG
+  EXCLUDE_FROM_DEFAULT
+  ENABLE_SHARED
+"""
+            ],
+        ),
+        FilePatcher(
+            orig_file=os.path.join(
                 src_dir,
                 "Modules",
                 "ThirdParty",
@@ -5463,6 +5490,10 @@ target_link_libraries(itkvnl_algo PRIVATE ITK::ITKEigen3Module)
                 src_dir, "Modules", "Nonunit", "Review", "itk-module.cmake"
             ),
             from_texts=[
+                """    ITKIONRRD
+    ITKIOPNG
+    ITKIORAW
+""",
                 """    ITKIOTIFF
     ITKIOVTK
 """,
@@ -5471,6 +5502,9 @@ target_link_libraries(itkvnl_algo PRIVATE ITK::ITKEigen3Module)
 """,
             ],
             to_texts=[
+                """    ITKIONRRD
+    ITKIORAW
+""",
                 """    ITKIOVTK
 """,
                 """    ITKRegistrationCommon
@@ -5500,7 +5534,6 @@ target_link_libraries(itkvnl_algo PRIVATE ITK::ITKEigen3Module)
                 "-DITK_USE_SYSTEM_EIGEN:BOOL=ON",
                 "-DITK_USE_SYSTEM_HDF5:BOOL=ON",
                 "-DITK_USE_SYSTEM_JPEG:BOOL=ON",
-                "-DITK_USE_SYSTEM_PNG:BOOL=ON",
                 "-DITK_USE_SYSTEM_ZLIB:BOOL=ON",
                 # '-DGDCM_USE_SYSTEM_OPENJPEG:BOOL=ON',
                 "-DModule_MorphologicalContourInterpolation:BOOL=ON",
