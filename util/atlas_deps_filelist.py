@@ -25,11 +25,6 @@ files_to_download = [
         "filename": "libjxl-0.11.2.tar.gz",
     },
     {
-        "expected_size": 53121812,
-        "expected_sha256": "deae7c80cba99c4b4f940ecadb3c3338b13cb77418409238e57d7f31f2a3b736",
-        "filename": "openssl-3.5.6.tar.gz",
-    },
-    {
         "expected_size": 61687836,
         "expected_sha256": "487ad434d8b121ae3902d5ad9cb830cd8e1f75fefad6e2ba80f89d60e3db95d7",
         "filename": "OpenJDK25U-jre_x64_linux_hotspot_25.0.3_9.tar.gz",
@@ -68,11 +63,6 @@ files_to_download = [
         "expected_size": 447175,
         "expected_sha256": "be7ffbd057cadebe2aa144542fd90c6838c6a083b5e8a9048b8ee3b66b29d5fb",
         "filename": "giflib-5.2.2.tar.gz",
-    },
-    {
-        "expected_size": 55380851,
-        "expected_sha256": "e6140dc6ffca92becbb1cc0ade2addb34a4b66df78f71cb9bc93380c0120e7de",
-        "filename": "OpenImageIO-3.1.14.0.tar.gz",
     },
     {
         "expected_size": 64009719,
@@ -135,6 +125,11 @@ files_to_download = [
         "filename": "ffmpeg-n8.1-latest-linux64-gpl-8.1.tar.xz",
     },
     {
+        "expected_size": 53153930,
+        "expected_sha256": "a8c0d28a529ca480f9f36cf5792e2cd21984552a3c8e4aa11a24aa31aeac98e8",
+        "filename": "openssl-3.5.7.tar.gz",
+    },
+    {
         "expected_size": 52961068,
         "expected_sha256": "83d20c23f5c5f64b3b328785e35b23c532e33057a97ed6294acaca3781b78a01",
         "filename": "cmake-4.3.2-windows-x86_64.zip",
@@ -158,6 +153,11 @@ files_to_download = [
         "expected_size": 42429998,
         "expected_sha256": "594bf4e7d15b622157a54915de7e458c208e3363d61a5e488d8abfbda9aff3e5",
         "filename": "OpenJDK25U-jre_x64_mac_hotspot_25.0.3_9.tar.gz",
+    },
+    {
+        "expected_size": 55378445,
+        "expected_sha256": "747341fd98f10d82868ec7663f1f3763cf6fb9acf8a2ed81fc3f25256ef019be",
+        "filename": "OpenImageIO-3.1.14.1.tar.gz",
     },
     {
         "expected_size": 17845221,
