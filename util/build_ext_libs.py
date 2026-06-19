@@ -1430,6 +1430,16 @@ def build_zlib(src_dir: str, install_dir: str):
 
         cmakecmd.extend([src_dir])
         build_and_install_cmakecmd(cmakecmd, build_dir)
+        patch_file(
+            os.path.join(install_dir, "lib", "cmake", "zlib", "ZLIBConfig.cmake"),
+            from_texts=[
+                'set(_ZLIB_supported_components "shared" "static")',
+            ],
+            to_texts=[
+                'set(_ZLIB_supported_components "static")',
+            ],
+            keep_bak_file=False,
+        )
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
 
@@ -5230,6 +5240,114 @@ def build_itk(src_dir: str, install_dir: str):
             orig_file=os.path.join(
                 src_dir,
                 "Modules",
+                "Numerics",
+                "Optimizers",
+                "src",
+                "itkEigenLevenbergMarquardtEngine.cxx",
+            ),
+            from_texts=[
+                """#include "itk_eigen.h"
+#include "itkeigen/Eigen/Core"
+#include "itkeigen/unsupported/Eigen/NonLinearOptimization"
+#include "itkeigen/unsupported/Eigen/NumericalDiff"
+"""
+            ],
+            to_texts=[
+                """#include "itk_eigen.h"
+#include ITK_EIGEN(Core)
+#include ITK_EIGEN(../unsupported/Eigen/NonLinearOptimization)
+#include ITK_EIGEN(../unsupported/Eigen/NumericalDiff)
+"""
+            ],
+        ),
+        FilePatcher(
+            orig_file=os.path.join(
+                src_dir,
+                "Modules",
+                "ThirdParty",
+                "VNL",
+                "itk-module.cmake",
+            ),
+            from_texts=[r'itk_module(ITKVNL DESCRIPTION "${DOCUMENTATION}")'],
+            to_texts=[
+                r'itk_module(ITKVNL DEPENDS ITKEigen3 DESCRIPTION "${DOCUMENTATION}")'
+            ],
+        ),
+        FilePatcher(
+            orig_file=os.path.join(
+                src_dir,
+                "Modules",
+                "ThirdParty",
+                "VNL",
+                "src",
+                "vxl",
+                "core",
+                "vnl",
+                "algo",
+                "vnl_levenberg_marquardt.cxx",
+            ),
+            from_texts=[
+                """#include "itkeigen/unsupported/Eigen/NonLinearOptimization"
+#include "itkeigen/unsupported/Eigen/NumericalDiff"
+"""
+            ],
+            to_texts=[
+                """#include "itk_eigen.h"
+#include ITK_EIGEN(../unsupported/Eigen/NonLinearOptimization)
+#include ITK_EIGEN(../unsupported/Eigen/NumericalDiff)
+"""
+            ],
+        ),
+        FilePatcher(
+            orig_file=os.path.join(
+                src_dir,
+                "Modules",
+                "ThirdParty",
+                "VNL",
+                "src",
+                "vxl",
+                "core",
+                "vnl",
+                "algo",
+                "CMakeLists.txt",
+            ),
+            from_texts=[
+                """# Eigen-backed vnl_levenberg_marquardt needs the vendored Eigen headers (private, header-only).
+target_include_directories( itkvnl_algo
+  PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../../../../../Eigen3/src )
+"""
+            ],
+            to_texts=[
+                """# Eigen-backed vnl_levenberg_marquardt uses ITK's Eigen module interface.
+target_link_libraries(itkvnl_algo PRIVATE ITK::ITKEigen3Module)
+"""
+            ],
+        ),
+        FilePatcher(
+            orig_file=os.path.join(
+                src_dir,
+                "Modules",
+                "Core",
+                "Common",
+                "include",
+                "itkMatrixExponential.h",
+            ),
+            from_texts=[
+                """// Eigen's matrix exponential lives in the unsupported MatrixFunctions module.
+#include "itkeigen/unsupported/Eigen/MatrixFunctions"
+"""
+            ],
+            to_texts=[
+                """// Eigen's matrix exponential lives in the unsupported MatrixFunctions module.
+#include "itk_eigen.h"
+#include ITK_EIGEN(../unsupported/Eigen/MatrixFunctions)
+"""
+            ],
+        ),
+        FilePatcher(
+            orig_file=os.path.join(
+                src_dir,
+                "Modules",
                 "ThirdParty",
                 "MINC",
                 "src",
@@ -5275,12 +5393,14 @@ def build_itk(src_dir: str, install_dir: str):
                 src_dir, "Modules", "ThirdParty", "TIFF", "itk-module.cmake"
             ),
             from_texts=[
-                """itk_module(ITKTIFF
+                """itk_module(
+  ITKTIFF
   DEPENDS
 """
             ],
             to_texts=[
-                """itk_module(ITKTIFF
+                """itk_module(
+  ITKTIFF
   EXCLUDE_FROM_DEFAULT
   DEPENDS
 """
@@ -5343,33 +5463,18 @@ def build_itk(src_dir: str, install_dir: str):
                 src_dir, "Modules", "Nonunit", "Review", "itk-module.cmake"
             ),
             from_texts=[
-                """  ITKIOTIFF
-  ITKIOVTK
+                """    ITKIOTIFF
+    ITKIOVTK
 """,
-                """  ITKIOLSM
-  DESCRIPTION
+                """    ITKIOLSM
+    ITKRegistrationCommon
 """,
             ],
             to_texts=[
-                """  ITKIOVTK
+                """    ITKIOVTK
 """,
-                """  DESCRIPTION
+                """    ITKRegistrationCommon
 """,
-            ],
-        ),
-        FilePatcher(
-            orig_file=os.path.join(
-                src_dir, "Modules", "Nonunit", "Review", "src", "CMakeLists.txt"
-            ),
-            from_texts=[
-                """    ${ITKTestKernel_LIBRARIES}
-    ${ITKIOLSM_LIBRARIES}
-    itkopenjpeg
-"""
-            ],
-            to_texts=[
-                """    itkopenjpeg
-"""
             ],
         ),
     ]
@@ -5398,7 +5503,7 @@ def build_itk(src_dir: str, install_dir: str):
                 "-DITK_USE_SYSTEM_PNG:BOOL=ON",
                 "-DITK_USE_SYSTEM_ZLIB:BOOL=ON",
                 # '-DGDCM_USE_SYSTEM_OPENJPEG:BOOL=ON',
-                "-DModule_MorphologicalContourInterpolation=OFF",  # example how to turn on a remote module
+                "-DModule_MorphologicalContourInterpolation:BOOL=ON",
             ],
         )
 
@@ -6999,8 +7104,11 @@ def build_or_tools(src_dir: str, install_dir: str):
                 "-DBUILD_Cbc:BOOL=ON",
                 "-DBUILD_HIGHS:BOOL=ON",
                 "-DBUILD_SCIP:BOOL=ON",
+                "-DBUILD_soplex:BOOL=ON",
                 "-DBUILD_SHARED_LIBS:BOOL=OFF",
                 "-DBUILD_TESTING:BOOL=OFF",
+                "-DBUILD_SAMPLES:BOOL=OFF",
+                "-DBUILD_EXAMPLES:BOOL=OFF",
             ]
         )
 
@@ -7448,9 +7556,6 @@ def build_libs(libs: OrderedDict, use_asan: bool):
             src_dir = os.path.join(ext_dir(), "jxrlib")
             build_jxrlib(src_dir, ext_build_dir())
 
-        if lib_name == "geometrictools":
-            logger.info("geometrictools")
-
         if lib_name == "assimp":
             src_dir = os.path.join(ext_dir(), "assimp")
             build_assimp(src_dir, ext_build_dir())
@@ -7493,7 +7598,7 @@ def build_libs(libs: OrderedDict, use_asan: bool):
                 os.path.join(ext_build_dir(), "packages-" + suffix),
                 dirs_exist_ok=True,
             )
-            if is_internal_dev_environment():
+            if is_internal_dev_environment() and is_mac():
                 package_name = find_src_package_with_glob(
                     os.path.join(src_package_dir(), "neurolabi-internal-src*")
                 )
@@ -7515,7 +7620,7 @@ def build_libs(libs: OrderedDict, use_asan: bool):
             src_dir = os.path.join(ext_dir(), "llfio")
             build_llfio(src_dir, ext_build_dir())
 
-        if lib_name == "jansson" and is_internal_dev_environment():
+        if lib_name == "jansson" and is_internal_dev_environment() and is_mac():
             package_name = find_src_package_with_glob(
                 os.path.join(src_package_dir(), "jansson*")
             )
@@ -7642,7 +7747,6 @@ def parse_inputs(argv: list):
         "libtiff",
         "libraw",
         "jxrlib",
-        "geometrictools",
         "assimp",
         "hdf5",
         "itk",
@@ -7665,18 +7769,19 @@ def parse_inputs(argv: list):
     ]
     libs: OrderedDict[str, bool] = OrderedDict([(lib, False) for lib in lib_list])
 
-    # Historical builders retained for possible future reactivation, but these
-    # libraries are intentionally disabled for both `all` and explicit requests.
+    # Historical or local-only builders that should not run as part of `all`.
+    # Explicit user requests are still honored.
     lib_skip_list = [
         "ospray",
         "ants",
         "skia",
-        "geometrictools",
         "rocksdb",
         "llfio",
+        # pcre2 was only needed by the Windows neurolabi/parity-test path,
+        # which is no longer built by default.
+        "pcre",
         "or-tools",
     ]
-
     libs_reverse_depends = {
         "eigen": ["opencv", "ceres-solver", "itk", "vtk"],
         "libpng": ["openimageio", "opencv", "itk", "vtk"],
@@ -7770,15 +7875,18 @@ python build_ext_libs.py [all or libs...] [--exclude-libs] [libs...] [--start-fr
 
     # Track if user explicitly requested "all"; used to decide cleanup
     requested_all = any(lib.lower() == "all" for lib in args.libs)
+    explicitly_requested_libs = {lib for lib in args.libs if lib.lower() != "all"}
 
     for lib in args.libs:
         if lib.lower() == "all":
             for vlib in libs:
                 if vlib not in lib_skip_list:
                     libs[vlib] = True
-        elif lib in lib_skip_list:
-            logger.info(f"skipping disabled external library: {lib}")
         else:
+            if lib in lib_skip_list:
+                logger.info(
+                    f"including explicitly requested normally skipped external library: {lib}"
+                )
             libs[lib] = True
 
     excluded_libs = set(args.exclude_libs or [])
@@ -7791,7 +7899,12 @@ python build_ext_libs.py [all or libs...] [--exclude-libs] [libs...] [--start-fr
     while pending_libs:
         lib = pending_libs.popleft()
         for dependent_lib in libs_reverse_depends.get(lib, []):
-            if dependent_lib in lib_skip_list or dependent_lib in excluded_libs:
+            if dependent_lib in excluded_libs:
+                continue
+            if (
+                dependent_lib in lib_skip_list
+                and dependent_lib not in explicitly_requested_libs
+            ):
                 continue
             if libs[dependent_lib]:
                 continue
@@ -7817,9 +7930,6 @@ python build_ext_libs.py [all or libs...] [--exclude-libs] [libs...] [--start-fr
                 stopping = True
             if stopping:
                 libs[lib] = False
-
-    for lib in lib_skip_list:
-        libs[lib] = False
 
     build_all = True
     for lib in libs:

@@ -1,12 +1,8 @@
 #include "zcompleximg.h"
-#include "zcommandlineflags.h"
 
 #include "zlog.h"
 #include "zmkl.h"
-#include <algorithm>
-#include <functional>
-
-ABSL_DECLARE_FLAG(bool, zimg_use_mkl_for_fft_if_available);
+#include <utility>
 
 namespace nim {
 
@@ -51,14 +47,12 @@ std::string ZComplexImg::toString() const
 ZComplexImg& ZComplexImg::conj()
 {
 #if ZIMG_MKL_ENABLED
-  if (absl::GetFlag(FLAGS_zimg_use_mkl_for_fft_if_available)) {
-    vzConj(m_data.size(), m_data.data(), m_data.data());
-    return *this;
-  }
-#endif
+  vzConj(m_data.size(), m_data.data(), m_data.data());
+#else
   for (auto& v : m_data) {
     v = std::conj(v);
   }
+#endif
   return *this;
 }
 
@@ -83,12 +77,12 @@ ZComplexImg& ZComplexImg::operator+=(const ZComplexImg& rhs)
       fmt::format("complex img addition requires same size img as input: this <{}>, other <{}>", *this, rhs));
   }
 #if ZIMG_MKL_ENABLED
-  if (absl::GetFlag(FLAGS_zimg_use_mkl_for_fft_if_available)) {
-    vzAdd(m_data.size(), m_data.data(), rhs.m_data.data(), m_data.data());
-    return *this;
+  vzAdd(m_data.size(), m_data.data(), rhs.m_data.data(), m_data.data());
+#else
+  for (size_t i = 0; i < m_data.size(); ++i) {
+    m_data[i] += rhs.m_data[i];
   }
 #endif
-  std::ranges::transform(m_data, rhs.m_data, m_data.begin(), std::plus<>());
   return *this;
 }
 
@@ -121,12 +115,12 @@ ZComplexImg& ZComplexImg::operator-=(const ZComplexImg& rhs)
       fmt::format("complex img subtraction requires same size img as input: this <{}>, other <{}>", *this, rhs));
   }
 #if ZIMG_MKL_ENABLED
-  if (absl::GetFlag(FLAGS_zimg_use_mkl_for_fft_if_available)) {
-    vzSub(m_data.size(), m_data.data(), rhs.m_data.data(), m_data.data());
-    return *this;
+  vzSub(m_data.size(), m_data.data(), rhs.m_data.data(), m_data.data());
+#else
+  for (size_t i = 0; i < m_data.size(); ++i) {
+    m_data[i] -= rhs.m_data[i];
   }
 #endif
-  std::ranges::transform(m_data, rhs.m_data, m_data.begin(), std::minus<>());
   return *this;
 }
 
@@ -147,7 +141,9 @@ ZComplexImg ZComplexImg::operator-(const ZComplexImg& rhs) const
 ZComplexImg ZComplexImg::operator-() const
 {
   ZComplexImg res(*this);
-  std::ranges::transform(res.m_data, res.m_data.begin(), std::negate<>());
+  for (auto& v : res.m_data) {
+    v = -v;
+  }
   return res;
 }
 
@@ -166,12 +162,12 @@ ZComplexImg& ZComplexImg::operator*=(const ZComplexImg& rhs)
       fmt::format("complex img multiplies requires same size img as input: this <{}>, other <{}>", *this, rhs));
   }
 #if ZIMG_MKL_ENABLED
-  if (absl::GetFlag(FLAGS_zimg_use_mkl_for_fft_if_available)) {
-    vzMul(m_data.size(), m_data.data(), rhs.m_data.data(), m_data.data());
-    return *this;
+  vzMul(m_data.size(), m_data.data(), rhs.m_data.data(), m_data.data());
+#else
+  for (size_t i = 0; i < m_data.size(); ++i) {
+    m_data[i] *= rhs.m_data[i];
   }
 #endif
-  std::ranges::transform(m_data, rhs.m_data, m_data.begin(), std::multiplies<>());
   return *this;
 }
 
@@ -204,12 +200,12 @@ ZComplexImg& ZComplexImg::operator/=(const ZComplexImg& rhs)
       fmt::format("complex img divides requires same size img as input: this <{}>, other <{}>", *this, rhs));
   }
 #if ZIMG_MKL_ENABLED
-  if (absl::GetFlag(FLAGS_zimg_use_mkl_for_fft_if_available)) {
-    vzDiv(m_data.size(), m_data.data(), rhs.m_data.data(), m_data.data());
-    return *this;
+  vzDiv(m_data.size(), m_data.data(), rhs.m_data.data(), m_data.data());
+#else
+  for (size_t i = 0; i < m_data.size(); ++i) {
+    m_data[i] /= rhs.m_data[i];
   }
 #endif
-  std::ranges::transform(m_data, rhs.m_data, m_data.begin(), std::divides<>());
   return *this;
 }
 

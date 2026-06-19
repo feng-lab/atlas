@@ -218,17 +218,16 @@ unset(_ATLAS_OPENIMAGEIO_PREFIX)
 
 find_package(ITK REQUIRED
              COMPONENTS ITKIOMeta ITKIONIFTI ITKIONRRD ITKIOGDCM ITKBinaryMathematicalMorphology ITKSmoothing
+                        MorphologicalContourInterpolation
              PATHS ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build NO_DEFAULT_PATH)
 message(STATUS "ITK_DIR: ${ITK_DIR}")
-message(STATUS "ITK_USE_FILE: ${ITK_USE_FILE}")
-include(${ITK_USE_FILE})
-message(STATUS "ITK_INCLUDE_DIRS: ${ITK_INCLUDE_DIRS}")
-message(STATUS "ITK_LIBRARIES: ${ITK_LIBRARIES}")
-print_target_properties(ITKIOMeta)
-print_target_properties(ITKIONIFTI)
-print_target_properties(ITKIONRRD)
-print_target_properties(ITKIOGDCM)
-print_target_properties(ITKSmoothing)
+message(STATUS "ITK_INTERFACE_LIBRARIES: ${ITK_INTERFACE_LIBRARIES}")
+print_target_properties(ITK::ITKIOMetaModule)
+print_target_properties(ITK::ITKIONIFTIModule)
+print_target_properties(ITK::ITKIONRRDModule)
+print_target_properties(ITK::ITKIOGDCMModule)
+print_target_properties(ITK::ITKSmoothingModule)
+print_target_properties(ITK::MorphologicalContourInterpolationModule)
 
 find_package(gflags REQUIRED
              PATHS ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build NO_DEFAULT_PATH)

@@ -12,6 +12,7 @@
 #include "zimgregionalextrema.h"
 #include "zimgneighborhooditerator.h"
 #include <itkImage.h>
+#include <itkImageRegionConstIteratorWithIndex.h>
 #include <itkImageRegionIterator.h>
 #include <itkSliceBySliceImageFilter.h>
 #include <itkThresholdImageFilter.h>
@@ -1182,7 +1183,7 @@ void ZPunctaDetection::detectSomaMask(const ZImg& dendriteImg,
   registerSubOperationExternal(dilateFilter.GetPointer(), totalWeight * .3);
 
   dilateFilter->Update();
-  using ConstIteratorType = itk::ImageRegionConstIterator<BinaryImage3DType>;
+  using ConstIteratorType = itk::ImageRegionConstIteratorWithIndex<BinaryImage3DType>;
   std::vector<int> coords;
 
   ConstIteratorType maskIt(dilateFilter->GetOutput(), dilateFilter->GetOutput()->GetLargestPossibleRegion());

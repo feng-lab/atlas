@@ -9,21 +9,15 @@
 #include <array>
 #include <chrono>
 #include <cstdlib>
-#include <string>
 
 ABSL_DECLARE_FLAG(uint64_t, atlas_disk_cache_http_max_bytes);
 
 namespace nim {
 namespace {
 
-bool envFlagEnabled(const char* name)
+bool ciEnvironmentDetected()
 {
-  const char* v = std::getenv(name);
-  if (!v) {
-    return false;
-  }
-  const std::string s(v);
-  return s == "1" || s == "true" || s == "TRUE" || s == "yes" || s == "YES";
+  return std::getenv("CI") != nullptr || std::getenv("GITHUB_ACTIONS") != nullptr;
 }
 
 class ScopedQtCoreApplication
@@ -47,8 +41,8 @@ private:
 
 void runPublicDatasetSmokeTest(const char* backend)
 {
-  if (!envFlagEnabled("ATLAS_ENABLE_NETWORK_TESTS")) {
-    GTEST_SKIP() << "Set ATLAS_ENABLE_NETWORK_TESTS=1 to run network E2E tests.";
+  if (ciEnvironmentDetected()) {
+    GTEST_SKIP() << "Network E2E tests are disabled on CI.";
   }
 
   ScopedQtCoreApplication qtApp;

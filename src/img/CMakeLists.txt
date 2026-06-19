@@ -288,8 +288,6 @@ set_source_files_properties(zimgopenimageio.cpp PROPERTIES
         INCLUDE_DIRECTORIES "${ATLAS_OIIO_INCLUDE_DIRS}"
         COMPILE_DEFINITIONS "${ATLAS_OIIO_COMPILE_DEFINITIONS}")
 set_source_files_properties(zimgjpegxr.cpp PROPERTIES INCLUDE_DIRECTORIES "${JPEGXR_INCLUDE_DIRS}")
-set_source_files_properties(zimginterpolate.cpp PROPERTIES
-        INCLUDE_DIRECTORIES "${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/ITKMorphologicalContourInterpolation")
 set(BIOFORMATS_BRIDGE_SOURCE_FILES
         zbioformatsbridgeclient.cpp
         ${BIOFORMATS_PROTO_SRCS}
@@ -422,7 +420,7 @@ set(ATLAS_IMG_FORMAT_LINK_LIBRARIES
         WebP::webp
         OpenImageIO::OpenImageIO)
 
-target_link_libraries(${LIBRARY_NAME} PUBLIC ${ITK_LIBRARIES} cpuinfo::cpuinfo hwy::hwy
+target_link_libraries(${LIBRARY_NAME} PUBLIC ${ITK_INTERFACE_LIBRARIES} cpuinfo::cpuinfo hwy::hwy
         hdf5_cpp-static hdf5-static Ceres::ceres Folly::folly Eigen3::Eigen
         Boost::headers Boost::charconv
         absl::bits absl::int128

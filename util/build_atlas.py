@@ -166,7 +166,6 @@ def build_atlas(
     skip_test: bool | None = None,
     debug_version: bool = False,
     release_pdb: bool = False,
-    enable_network_tests: bool = False,
 ):
     logger.info(f"srcDIR: {common_dirs.atlas_repository_dir()}")
     logger.info(f"buildDIR: {common_dirs.atlas_build_dir()}")
@@ -252,9 +251,6 @@ def build_atlas(
         if not skip_test:
             download_atlas_test_data()
             env["CTEST_PARALLEL_LEVEL"] = str(os.cpu_count())
-            # Network tests are opt-in. Force them off by default so CI/self-hosted
-            # runners don't fail when outbound access is restricted.
-            env["ATLAS_ENABLE_NETWORK_TESTS"] = "1" if enable_network_tests else "0"
             ctest_cmd = _ctest_command()
             logger.info("ctest command: %s", " ".join(ctest_cmd))
             subprocess.run(
@@ -301,9 +297,6 @@ def build_atlas(
         if not skip_test:
             download_atlas_test_data()
             env["CTEST_PARALLEL_LEVEL"] = str(os.cpu_count())
-            # Network tests are opt-in. Force them off by default so CI/self-hosted
-            # runners don't fail when outbound access is restricted.
-            env["ATLAS_ENABLE_NETWORK_TESTS"] = "1" if enable_network_tests else "0"
             ctest_cmd = _ctest_command()
             logger.info("ctest command: %s", " ".join(ctest_cmd))
             subprocess.run(
@@ -347,11 +340,6 @@ python build_atlas.py [--use-asan] [--skip-test|--run-test] [--debug-version] [-
         action="store_true",
         help="emit PDBs for optimized Release builds on Windows without disabling Release IPO/LTO",
     )
-    parser.add_argument(
-        "--enable-network-tests",
-        action="store_true",
-        help="enable network-dependent tests (disabled by default for CI/firewalled environments)",
-    )
     args = parser.parse_args()
 
     build_atlas(
@@ -359,5 +347,4 @@ python build_atlas.py [--use-asan] [--skip-test|--run-test] [--debug-version] [-
         skip_test=args.skip_test,
         debug_version=args.debug_version,
         release_pdb=args.release_pdb,
-        enable_network_tests=args.enable_network_tests,
     )

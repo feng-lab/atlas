@@ -37,11 +37,6 @@ python build_and_deploy_atlas.py [--use-asan] [--skip-test|--run-test] [--debug-
         action="store_true",
         help="emit PDBs for optimized Release builds on Windows without disabling Release IPO/LTO",
     )
-    parser.add_argument(
-        "--enable-network-tests",
-        action="store_true",
-        help="enable network-dependent tests (disabled by default for CI/firewalled environments)",
-    )
     args = parser.parse_args()
 
     build_atlas.build_atlas(
@@ -49,7 +44,6 @@ python build_and_deploy_atlas.py [--use-asan] [--skip-test|--run-test] [--debug-
         skip_test=args.skip_test,
         debug_version=args.debug_version,
         release_pdb=args.release_pdb,
-        enable_network_tests=args.enable_network_tests,
     )
     deploy_atlas.deploy_atlas(
         is_debug_version=args.use_asan or args.debug_version,
