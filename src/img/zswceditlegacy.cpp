@@ -1,5 +1,6 @@
 #include "zswceditlegacy.h"
 
+#include "zlinearassignment.h"
 #include "zswctreenodegeomlegacy.h"
 #include "zlog.h"
 
@@ -687,36 +688,9 @@ bool joinIsolatedBranchLegacyLike(ZSwc& swc, const ZSwc::SwcTreeNode& branchPoin
 
 namespace {
 
-constexpr double kHungarianCompareEpsLegacyLike = 1e-5;
 constexpr double kHungarianLargeWeightLegacyLike = 10000.0;
 
-[[nodiscard]] int compareFloatLegacyLike(double x, double y, double eps)
-{
-  int k1 = 0;
-  int k2 = 0;
-  std::frexp(x, &k1);
-  std::frexp(y, &k2);
-  const int k = std::max(k1, k2);
-  if (k > 0) {
-    eps *= static_cast<double>(2 << (k - 1));
-  }
-  if (std::fabs(x - y) < eps) {
-    return 0;
-  }
-  return (x < y) ? -1 : 1;
-}
-
-[[nodiscard]] bool hungarianIsEqualLegacyLike(double x, double y)
-{
-  return compareFloatLegacyLike(x, y, kHungarianCompareEpsLegacyLike) == 0;
-}
-
-[[nodiscard]] int hungarianCompareLegacyLike(double x, double y)
-{
-  return compareFloatLegacyLike(x, y, kHungarianCompareEpsLegacyLike);
-}
-
-[[nodiscard]] std::vector<int> hungarianAssignmentLegacyLike(std::vector<std::vector<double>> weight)
+[[nodiscard]] std::vector<int> linearAssignmentLegacyLike(const std::vector<std::vector<double>>& weight)
 {
   const int m = static_cast<int>(weight.size());
   if (m == 0) {
@@ -727,177 +701,21 @@ constexpr double kHungarianLargeWeightLegacyLike = 10000.0;
     CHECK(static_cast<int>(weight[i].size()) == n);
   }
 
-  const double inf = std::numeric_limits<double>::infinity();
-
-  std::vector<int> colMate(m, 0);
-  std::vector<int> rowMate(n, 0);
-  std::vector<int> parentRow(n, 0);
-  std::vector<int> unchosenRow(m, 0);
-  std::vector<double> rowDec(m, 0.0);
-  std::vector<double> colInc(n, 0.0);
-  std::vector<double> slack(n, 0.0);
-  std::vector<int> slackRow(n, 0);
-
-  // Begin subtract column minima in order to start with lots of zeroes (legacy heuristic).
-  for (int l = 0; l < n; ++l) {
-    double s = weight[0][l];
-    for (int k = 1; k < m; ++k) {
-      if (weight[k][l] < s) {
-        s = weight[k][l];
-      }
-    }
-    if (s != 0.0) {
-      for (int k = 0; k < m; ++k) {
-        weight[k][l] -= s;
-      }
-    }
+  std::vector<double> rowMajor;
+  rowMajor.reserve(static_cast<size_t>(m) * static_cast<size_t>(n));
+  for (const std::vector<double>& row : weight) {
+    rowMajor.insert(rowMajor.end(), row.begin(), row.end());
   }
 
-  // Begin initial state.
-  int t = 0;
-  for (int l = 0; l < n; ++l) {
-    rowMate[l] = -1;
-    parentRow[l] = -1;
-    colInc[l] = 0.0;
-    slack[l] = inf;
+  const ZLinearAssignmentResult assignment =
+    solveLinearAssignment(rowMajor, static_cast<size_t>(m), static_cast<size_t>(n));
+  CHECK(static_cast<int>(assignment.rowToCol.size()) == m);
+
+  std::vector<int> colMate;
+  colMate.reserve(assignment.rowToCol.size());
+  for (const int32_t col : assignment.rowToCol) {
+    colMate.push_back(static_cast<int>(col));
   }
-
-  for (int k = 0; k < m; ++k) {
-    double s = weight[k][0];
-    for (int l = 1; l < n; ++l) {
-      if (weight[k][l] < s) {
-        s = weight[k][l];
-      }
-    }
-    rowDec[k] = s;
-
-    bool rowDone = false;
-    for (int l = 0; l < n; ++l) {
-      if ((s == weight[k][l]) && rowMate[l] < 0) {
-        colMate[k] = l;
-        rowMate[l] = k;
-        rowDone = true;
-        break;
-      }
-    }
-
-    if (!rowDone) {
-      colMate[k] = -1;
-      unchosenRow[t++] = k;
-    }
-  }
-
-  // Begin Hungarian algorithm.
-  if (t == 0) {
-    return colMate;
-  }
-
-  int unmatched = t;
-  int q = 0;
-  int k = 0;
-  int l = 0;
-  int j = 0;
-  double s = 0.0;
-
-  while (true) {
-    q = 0;
-    while (true) {
-      while (q < t) {
-        // Begin explore node q of the forest.
-        k = unchosenRow[q];
-        s = rowDec[k];
-        for (l = 0; l < n; ++l) {
-          if (!hungarianIsEqualLegacyLike(slack[l], 0.0)) {
-            const double del = weight[k][l] - s + colInc[l];
-            if (hungarianCompareLegacyLike(del, slack[l]) < 0) {
-              if (hungarianIsEqualLegacyLike(del, 0.0)) {
-                if (rowMate[l] < 0) {
-                  goto breakthru;
-                }
-                slack[l] = 0.0;
-                parentRow[l] = k;
-                unchosenRow[t++] = rowMate[l];
-              } else {
-                slack[l] = del;
-                slackRow[l] = k;
-              }
-            }
-          }
-        }
-        // End explore node q of the forest.
-        q++;
-      }
-
-      // Begin introduce a new zero into the matrix.
-      s = inf;
-      for (l = 0; l < n; ++l) {
-        if (!hungarianIsEqualLegacyLike(slack[l], 0.0) && slack[l] < s) {
-          s = slack[l];
-        }
-      }
-
-      for (q = 0; q < t; ++q) {
-        rowDec[unchosenRow[q]] += s;
-      }
-
-      for (l = 0; l < n; ++l) {
-        if (!hungarianIsEqualLegacyLike(slack[l], 0.0)) {
-          slack[l] -= s;
-          if (hungarianIsEqualLegacyLike(slack[l], 0.0)) {
-            // Begin look at a new zero.
-            k = slackRow[l];
-            if (rowMate[l] < 0) {
-              for (j = l + 1; j < n; ++j) {
-                if (hungarianIsEqualLegacyLike(slack[j], 0.0)) {
-                  colInc[j] += s;
-                }
-              }
-              goto breakthru;
-            } else {
-              parentRow[l] = k;
-              unchosenRow[t++] = rowMate[l];
-            }
-            // End look at a new zero.
-          }
-        } else {
-          colInc[l] += s;
-        }
-      }
-      // End introduce a new zero into the matrix.
-    }
-
-breakthru:
-    // Begin update the matching.
-    while (true) {
-      j = colMate[k];
-      colMate[k] = l;
-      rowMate[l] = k;
-      if (j < 0) {
-        break;
-      }
-      k = parentRow[j];
-      l = j;
-    }
-    // End update the matching.
-
-    if (--unmatched == 0) {
-      break;
-    }
-
-    // Begin get ready for another stage.
-    t = 0;
-    for (l = 0; l < n; ++l) {
-      parentRow[l] = -1;
-      slack[l] = inf;
-    }
-    for (k = 0; k < m; ++k) {
-      if (colMate[k] < 0) {
-        unchosenRow[t++] = k;
-      }
-    }
-    // End get ready for another stage.
-  }
-
   return colMate;
 }
 
@@ -1003,7 +821,7 @@ minWeightSumMatchConnLegacyLike(const std::vector<std::vector<double>>& weight)
     }
   }
 
-  const std::vector<int> colMate = hungarianAssignmentLegacyLike(wm);
+  const std::vector<int> colMate = linearAssignmentLegacyLike(wm);
   CHECK(static_cast<int>(colMate.size()) == nvertex);
 
   std::vector<std::vector<bool>> conn(static_cast<size_t>(nvertex),

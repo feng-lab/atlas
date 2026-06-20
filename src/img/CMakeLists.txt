@@ -157,6 +157,7 @@ set(IMG_SOURCES
         zmeshutils.h
         zimginterpolate.h zimginterpolate.cpp
         zimgblockprovider.cpp
+        zlinearassignment.h zlinearassignment.cpp
         zmemorymappedfile.cpp zmemorymappedfile.h
         zmemorymappedfilecache.cpp zmemorymappedfilecache.h
         zh5zjpegxr.cpp zh5zjpegxr.h

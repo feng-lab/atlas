@@ -50,6 +50,23 @@ Tracing (Seeded + Auto)
   - “Automatic Tracing and Background Tasks”: section 5.8
 - Core tracing algorithms are implemented in `src/img/` and integrated into the app UI in `src/atlas/`.
 
+Linear Assignment Solver
+
+- Implementation: `src/img/zlinearassignment.*`.
+- Dense C++ API: `solveLinearAssignment(...)` accepts row-major spans or pointer/stride input and supports rectangular
+  matrices. `double` input is the zero-copy fast path; arithmetic vector/span overloads copy to `double` for convenience.
+  Use `ZLinearAssignmentOptions` for minimization/maximization and optional minimization `costLimit`.
+- Sparse C++ API: `solveLinearAssignmentCsr(...)` accepts square CSR through `ZLinearAssignmentCsrView`. The core view uses
+  `int32_t` indices and `double` costs; overloads accept other integral index arrays and arithmetic cost arrays by checked
+  conversion. CSR costs must be finite; omit forbidden edges instead of storing infinities. Assignment result vectors use
+  `int32_t`; dimensions or converted CSR indices larger than that range fail fast.
+- Python API: `linear_assignment`, `linear_assignment_csr`, and `LinearAssignmentResult`. The binding accepts read-only CPU
+  `nb::ndarray` inputs from supported array frameworks, converts real numeric cost dtypes to `float64`, converts numeric CSR
+  index dtypes to `int32` with finite/integer/range checks for floating-point index arrays, returns `int32` index arrays, and
+  avoids conversion copies only for directly usable contiguous `float64` cost data and `int32` CSR indices. It releases the
+  GIL while solving.
+- Tests: `test/zlinearassignmenttest.cpp`. Benchmark entry: `zbenchmark --benchmark_filter=linearAssignment`.
+
 Entry Points
 
 - CLI:
@@ -308,8 +325,7 @@ Testing (Linking Atlas Code)
   Classic MSVC uses a split-library workaround internally to keep Windows COFF archives under the 4GB LTCG limit, but
   tests should still consume the `atlas_lib` umbrella unless a narrower target is intentionally exposed for that
   platform-specific split.
-- Atlas test binaries use the custom `atlas_test_main` target from `test/test.cmake`, not `GTest::gtest_main`.
-  `atlas_test_main` compiles `test/ztestmain.cpp` once and shares that object across test executables. The shared main
+- Atlas test binaries use the custom `atlas_test_main` target from `test/test.cmake`. The shared main
   parses Atlas/Abseil flags and installs the `ZImgInit` test environment, which keeps Bio-Formats/JRE-backed tests and
   image-runtime shutdown behavior consistent with the application.
 - Test data and third-party runtime paths are provided through the shared `atlas_test_paths` target. Use the helpers in

@@ -21,6 +21,18 @@ Atlas includes shader source derived from NVIDIA samples for order-independent t
   - Source: `src/atlas/Resources/shader/wblended_init.frag`, `src/atlas/Resources/shader/wblended_final.frag`
   - License: `src/3rdparty/NVIDIA_WeightedBlendedOIT/LICENSE.txt`
 
+## Linear assignment provenance
+
+Atlas' linear assignment solver (`src/img/zlinearassignment.*`) implements the Jonker-Volgenant shortest augmenting path
+family. The following permissively licensed sources are relevant to the implementation and regression coverage:
+
+- **SciPy `linear_sum_assignment` rectangular LSAP implementation**
+  - Project: https://github.com/scipy/scipy
+  - License: BSD 3-Clause
+- **gatagat/lap LAPJV/LAPMOD implementation and tests**
+  - Project: https://github.com/gatagat/lap
+  - License: BSD 2-Clause
+
 ## Runtime binary sources
 
 - FFmpeg binaries are sourced from:

@@ -15,6 +15,7 @@
 #include "zchromaticshiftcorrection.h"
 #include "zroimaskrasterizer.h"
 #include "zimgautothreshold.h"
+#include "zlinearassignment.h"
 #include "zneutubeautotraceprocess.h"
 #include "zneutubeblockedautotraceprocess.h"
 #include "zneutubeskeletonizeprocess.h"
@@ -30,8 +31,14 @@
 #include <nanobind/eigen/dense.h>
 #include <nanobind/operators.h>
 #include <nanobind/trampoline.h>
+#include <cmath>
+#include <cstdint>
 #include <cstring>
+#include <limits>
+#include <optional>
+#include <span>
 #include <string_view>
+#include <type_traits>
 
 namespace nb = nanobind;
 
@@ -271,6 +278,550 @@ nb::ndarray<nanobind::numpy, const T> vectorToArray(const std::vector<T>& v)
 {
   return v.empty() ? nb::ndarray<nanobind::numpy, const T>()
                    : nb::ndarray<nanobind::numpy, const T>(v.data(), {v.size()});
+}
+
+[[nodiscard]] nb::ndarray<nb::numpy, const int32_t> vectorToOwnedInt32Array(std::vector<int32_t> values)
+{
+  auto* owner = new std::vector<int32_t>(std::move(values));
+  nb::capsule capsule(owner, [](void* ptr) noexcept {
+    delete static_cast<std::vector<int32_t>*>(ptr);
+  });
+  return nb::ndarray<nb::numpy, const int32_t>(owner->data(), {owner->size()}, capsule);
+}
+
+using ReadOnlyCpuArray = nb::ndarray<nb::ro, nb::device::cpu>;
+
+void requireArrayDType(const ReadOnlyCpuArray& array,
+                       nb::dlpack::dtype dtype,
+                       std::string_view name,
+                       std::string_view type)
+{
+  if (array.dtype() != dtype) {
+    throw makeTypeError(fmt::format("{} must have dtype {}", name, type));
+  }
+}
+
+[[nodiscard]] std::string dtypeDescription(nb::dlpack::dtype dtype)
+{
+  return fmt::format("code={}, bits={}, lanes={}", dtype.code, dtype.bits, dtype.lanes);
+}
+
+void requireScalarDType(const ReadOnlyCpuArray& array, std::string_view name)
+{
+  if (array.dtype().lanes != 1) {
+    throw makeTypeError(fmt::format("{} must have a scalar dtype, got {}", name, dtypeDescription(array.dtype())));
+  }
+}
+
+[[nodiscard]] int64_t checkedInt64Dimension(size_t value, std::string_view name)
+{
+  if (value > static_cast<size_t>(std::numeric_limits<int64_t>::max())) {
+    throw makeValueError(fmt::format("{} dimension is too large", name));
+  }
+  return static_cast<int64_t>(value);
+}
+
+[[nodiscard]] size_t checkedDenseElementCount(size_t rows, size_t cols)
+{
+  if (rows != 0 && cols > std::numeric_limits<size_t>::max() / rows) {
+    throw makeValueError("cost shape is too large");
+  }
+  return rows * cols;
+}
+
+[[nodiscard]] int64_t arrayStrideOrCompactC(const ReadOnlyCpuArray& array, size_t axis, std::string_view name)
+{
+  if (array.stride_ptr() != nullptr) {
+    return array.stride(axis);
+  }
+
+  int64_t stride = 1;
+  for (size_t i = array.ndim(); i > axis + 1; --i) {
+    const int64_t dim = checkedInt64Dimension(array.shape(i - 1), name);
+    if (dim != 0 && stride > std::numeric_limits<int64_t>::max() / dim) {
+      throw makeValueError(fmt::format("{} strides are too large", name));
+    }
+    stride *= dim;
+  }
+  return stride;
+}
+
+[[nodiscard]] double halfToDouble(uint16_t value)
+{
+  const uint32_t sign = (static_cast<uint32_t>(value & 0x8000u)) << 16;
+  const uint32_t exponent = (value >> 10u) & 0x1fu;
+  const uint32_t mantissa = value & 0x03ffu;
+
+  uint32_t bits = 0;
+  if (exponent == 0) {
+    if (mantissa == 0) {
+      bits = sign;
+    } else {
+      uint32_t normalizedMantissa = mantissa;
+      int32_t normalizedExponent = -14;
+      while ((normalizedMantissa & 0x0400u) == 0) {
+        normalizedMantissa <<= 1u;
+        --normalizedExponent;
+      }
+      normalizedMantissa &= 0x03ffu;
+      bits = sign | (static_cast<uint32_t>(normalizedExponent + 127) << 23u) | (normalizedMantissa << 13u);
+    }
+  } else if (exponent == 0x1fu) {
+    bits = sign | 0x7f800000u | (mantissa << 13u);
+  } else {
+    bits = sign | ((exponent + 112u) << 23u) | (mantissa << 13u);
+  }
+
+  float result = 0.0f;
+  std::memcpy(&result, &bits, sizeof(result));
+  return static_cast<double>(result);
+}
+
+[[nodiscard]] double bfloat16ToDouble(uint16_t value)
+{
+  const uint32_t bits = static_cast<uint32_t>(value) << 16u;
+  float result = 0.0f;
+  std::memcpy(&result, &bits, sizeof(result));
+  return static_cast<double>(result);
+}
+
+template<typename Src, typename Converter>
+void copyDenseCostsToRowMajorTyped(const ReadOnlyCpuArray& cost, std::vector<double>& rowMajor, Converter converter)
+{
+  const size_t rows = cost.shape(0);
+  const size_t cols = cost.shape(1);
+  rowMajor.resize(checkedDenseElementCount(rows, cols));
+  const auto* data = static_cast<const Src*>(cost.data());
+  const int64_t rowStride = arrayStrideOrCompactC(cost, 0, "cost");
+  const int64_t colStride = arrayStrideOrCompactC(cost, 1, "cost");
+  for (size_t row = 0; row < rows; ++row) {
+    for (size_t col = 0; col < cols; ++col) {
+      rowMajor[row * cols + col] =
+        converter(data[static_cast<int64_t>(row) * rowStride + static_cast<int64_t>(col) * colStride]);
+    }
+  }
+}
+
+void copyDenseCostsToRowMajorConverted(const ReadOnlyCpuArray& cost, std::vector<double>& rowMajor)
+{
+  requireScalarDType(cost, "cost");
+  const auto dtype = cost.dtype();
+  const auto code = static_cast<nb::dlpack::dtype_code>(dtype.code);
+  switch (code) {
+    case nb::dlpack::dtype_code::Bool:
+      copyDenseCostsToRowMajorTyped<uint8_t>(cost, rowMajor, [](uint8_t value) {
+        return value != 0 ? 1.0 : 0.0;
+      });
+      return;
+    case nb::dlpack::dtype_code::Int:
+      if (dtype.bits == 8) {
+        copyDenseCostsToRowMajorTyped<int8_t>(cost, rowMajor, [](int8_t value) {
+          return static_cast<double>(value);
+        });
+      } else if (dtype.bits == 16) {
+        copyDenseCostsToRowMajorTyped<int16_t>(cost, rowMajor, [](int16_t value) {
+          return static_cast<double>(value);
+        });
+      } else if (dtype.bits == 32) {
+        copyDenseCostsToRowMajorTyped<int32_t>(cost, rowMajor, [](int32_t value) {
+          return static_cast<double>(value);
+        });
+      } else if (dtype.bits == 64) {
+        copyDenseCostsToRowMajorTyped<int64_t>(cost, rowMajor, [](int64_t value) {
+          return static_cast<double>(value);
+        });
+      } else {
+        throw makeTypeError(fmt::format("cost has unsupported integer dtype {}", dtypeDescription(dtype)));
+      }
+      return;
+    case nb::dlpack::dtype_code::UInt:
+      if (dtype.bits == 8) {
+        copyDenseCostsToRowMajorTyped<uint8_t>(cost, rowMajor, [](uint8_t value) {
+          return static_cast<double>(value);
+        });
+      } else if (dtype.bits == 16) {
+        copyDenseCostsToRowMajorTyped<uint16_t>(cost, rowMajor, [](uint16_t value) {
+          return static_cast<double>(value);
+        });
+      } else if (dtype.bits == 32) {
+        copyDenseCostsToRowMajorTyped<uint32_t>(cost, rowMajor, [](uint32_t value) {
+          return static_cast<double>(value);
+        });
+      } else if (dtype.bits == 64) {
+        copyDenseCostsToRowMajorTyped<uint64_t>(cost, rowMajor, [](uint64_t value) {
+          return static_cast<double>(value);
+        });
+      } else {
+        throw makeTypeError(fmt::format("cost has unsupported unsigned integer dtype {}", dtypeDescription(dtype)));
+      }
+      return;
+    case nb::dlpack::dtype_code::Float:
+      if (dtype.bits == 16) {
+        copyDenseCostsToRowMajorTyped<uint16_t>(cost, rowMajor, [](uint16_t value) {
+          return halfToDouble(value);
+        });
+      } else if (dtype.bits == 32) {
+        copyDenseCostsToRowMajorTyped<float>(cost, rowMajor, [](float value) {
+          return static_cast<double>(value);
+        });
+      } else if (dtype.bits == 64) {
+        copyDenseCostsToRowMajorTyped<double>(cost, rowMajor, [](double value) {
+          return value;
+        });
+      } else {
+        throw makeTypeError(fmt::format("cost has unsupported floating dtype {}", dtypeDescription(dtype)));
+      }
+      return;
+    case nb::dlpack::dtype_code::Bfloat:
+      if (dtype.bits == 16) {
+        copyDenseCostsToRowMajorTyped<uint16_t>(cost, rowMajor, [](uint16_t value) {
+          return bfloat16ToDouble(value);
+        });
+        return;
+      }
+      break;
+    default:
+      break;
+  }
+  throw makeTypeError(fmt::format("cost must have a real numeric dtype, got {}", dtypeDescription(dtype)));
+}
+
+[[nodiscard]] bool canUseDenseCostsDirectly(const ReadOnlyCpuArray& cost)
+{
+  if (cost.dtype() != nb::dtype<double>()) {
+    return false;
+  }
+  const int64_t rowStride = arrayStrideOrCompactC(cost, 0, "cost");
+  const int64_t colStride = arrayStrideOrCompactC(cost, 1, "cost");
+  if (colStride != 1 || rowStride < 0) {
+    return false;
+  }
+  if (static_cast<uint64_t>(rowStride) > static_cast<uint64_t>(std::numeric_limits<ptrdiff_t>::max())) {
+    return false;
+  }
+  return static_cast<size_t>(rowStride) >= cost.shape(1);
+}
+
+template<typename T>
+[[nodiscard]] std::span<const T>
+directContiguousVectorView(const ReadOnlyCpuArray& array, std::string_view name, std::string_view type)
+{
+  requireArrayDType(array, nb::dtype<T>(), name, type);
+  if (array.ndim() != 1) {
+    throw makeValueError(fmt::format("{} must be a 1-dimensional array", name));
+  }
+
+  const size_t size = array.shape(0);
+  const auto* data = static_cast<const T*>(array.data());
+  if (arrayStrideOrCompactC(array, 0, name) == 1) {
+    return std::span<const T>(data, size);
+  }
+  return {};
+}
+
+template<typename Src, typename Dest, typename Converter>
+[[nodiscard]] std::span<const Dest> convertedVectorViewTyped(const ReadOnlyCpuArray& array,
+                                                             std::vector<Dest>& storage,
+                                                             std::string_view name,
+                                                             Converter converter)
+{
+  if (array.ndim() != 1) {
+    throw makeValueError(fmt::format("{} must be a 1-dimensional array", name));
+  }
+  const size_t size = array.shape(0);
+  storage.resize(size);
+  const auto* data = static_cast<const Src*>(array.data());
+  const int64_t stride = arrayStrideOrCompactC(array, 0, name);
+  for (size_t i = 0; i < size; ++i) {
+    storage[i] = converter(data[static_cast<int64_t>(i) * stride]);
+  }
+  return std::span<const Dest>(storage.data(), storage.size());
+}
+
+template<typename T>
+[[nodiscard]] int32_t checkedIntegralIndex(T value, std::string_view name)
+{
+  if constexpr (std::is_signed_v<T>) {
+    const int64_t widened = static_cast<int64_t>(value);
+    if (widened < static_cast<int64_t>(std::numeric_limits<int32_t>::min()) ||
+        widened > static_cast<int64_t>(std::numeric_limits<int32_t>::max())) {
+      throw makeValueError(fmt::format("{} contains a value outside int32 range", name));
+    }
+  } else {
+    const uint64_t widened = static_cast<uint64_t>(value);
+    if (widened > static_cast<uint64_t>(std::numeric_limits<int32_t>::max())) {
+      throw makeValueError(fmt::format("{} contains a value outside int32 range", name));
+    }
+  }
+  return static_cast<int32_t>(value);
+}
+
+template<typename T>
+[[nodiscard]] int32_t checkedFloatingIndex(T value, std::string_view name)
+{
+  if (!std::isfinite(static_cast<double>(value)) ||
+      std::trunc(static_cast<double>(value)) != static_cast<double>(value)) {
+    throw makeValueError(fmt::format("{} must contain finite integer values", name));
+  }
+  if (static_cast<double>(value) < static_cast<double>(std::numeric_limits<int32_t>::min()) ||
+      static_cast<double>(value) > static_cast<double>(std::numeric_limits<int32_t>::max())) {
+    throw makeValueError(fmt::format("{} contains a value outside int32 range", name));
+  }
+  return static_cast<int32_t>(value);
+}
+
+[[nodiscard]] std::span<const double>
+contiguousDoubleVectorView(const ReadOnlyCpuArray& array, std::vector<double>& storage, std::string_view name)
+{
+  if (array.dtype() == nb::dtype<double>()) {
+    std::span<const double> direct = directContiguousVectorView<double>(array, name, "float64");
+    if (!direct.empty() || array.shape(0) == 0) {
+      return direct;
+    }
+  }
+
+  requireScalarDType(array, name);
+  const auto dtype = array.dtype();
+  const auto code = static_cast<nb::dlpack::dtype_code>(dtype.code);
+  switch (code) {
+    case nb::dlpack::dtype_code::Bool:
+      return convertedVectorViewTyped<uint8_t, double>(array, storage, name, [](uint8_t value) {
+        return value != 0 ? 1.0 : 0.0;
+      });
+    case nb::dlpack::dtype_code::Int:
+      if (dtype.bits == 8) {
+        return convertedVectorViewTyped<int8_t, double>(array, storage, name, [](int8_t value) {
+          return static_cast<double>(value);
+        });
+      }
+      if (dtype.bits == 16) {
+        return convertedVectorViewTyped<int16_t, double>(array, storage, name, [](int16_t value) {
+          return static_cast<double>(value);
+        });
+      }
+      if (dtype.bits == 32) {
+        return convertedVectorViewTyped<int32_t, double>(array, storage, name, [](int32_t value) {
+          return static_cast<double>(value);
+        });
+      }
+      if (dtype.bits == 64) {
+        return convertedVectorViewTyped<int64_t, double>(array, storage, name, [](int64_t value) {
+          return static_cast<double>(value);
+        });
+      }
+      break;
+    case nb::dlpack::dtype_code::UInt:
+      if (dtype.bits == 8) {
+        return convertedVectorViewTyped<uint8_t, double>(array, storage, name, [](uint8_t value) {
+          return static_cast<double>(value);
+        });
+      }
+      if (dtype.bits == 16) {
+        return convertedVectorViewTyped<uint16_t, double>(array, storage, name, [](uint16_t value) {
+          return static_cast<double>(value);
+        });
+      }
+      if (dtype.bits == 32) {
+        return convertedVectorViewTyped<uint32_t, double>(array, storage, name, [](uint32_t value) {
+          return static_cast<double>(value);
+        });
+      }
+      if (dtype.bits == 64) {
+        return convertedVectorViewTyped<uint64_t, double>(array, storage, name, [](uint64_t value) {
+          return static_cast<double>(value);
+        });
+      }
+      break;
+    case nb::dlpack::dtype_code::Float:
+      if (dtype.bits == 16) {
+        return convertedVectorViewTyped<uint16_t, double>(array, storage, name, [](uint16_t value) {
+          return halfToDouble(value);
+        });
+      }
+      if (dtype.bits == 32) {
+        return convertedVectorViewTyped<float, double>(array, storage, name, [](float value) {
+          return static_cast<double>(value);
+        });
+      }
+      if (dtype.bits == 64) {
+        return convertedVectorViewTyped<double, double>(array, storage, name, [](double value) {
+          return value;
+        });
+      }
+      break;
+    case nb::dlpack::dtype_code::Bfloat:
+      if (dtype.bits == 16) {
+        return convertedVectorViewTyped<uint16_t, double>(array, storage, name, [](uint16_t value) {
+          return bfloat16ToDouble(value);
+        });
+      }
+      break;
+    default:
+      break;
+  }
+  throw makeTypeError(fmt::format("{} must have a real numeric dtype, got {}", name, dtypeDescription(dtype)));
+}
+
+[[nodiscard]] std::span<const int32_t>
+contiguousInt32VectorView(const ReadOnlyCpuArray& array, std::vector<int32_t>& storage, std::string_view name)
+{
+  if (array.dtype() == nb::dtype<int32_t>()) {
+    std::span<const int32_t> direct = directContiguousVectorView<int32_t>(array, name, "int32");
+    if (!direct.empty() || array.shape(0) == 0) {
+      return direct;
+    }
+  }
+
+  requireScalarDType(array, name);
+  const auto dtype = array.dtype();
+  const auto code = static_cast<nb::dlpack::dtype_code>(dtype.code);
+  switch (code) {
+    case nb::dlpack::dtype_code::Bool:
+      return convertedVectorViewTyped<uint8_t, int32_t>(array, storage, name, [](uint8_t value) {
+        return value != 0 ? 1 : 0;
+      });
+    case nb::dlpack::dtype_code::Int:
+      if (dtype.bits == 8) {
+        return convertedVectorViewTyped<int8_t, int32_t>(array, storage, name, [name](int8_t value) {
+          return checkedIntegralIndex(value, name);
+        });
+      }
+      if (dtype.bits == 16) {
+        return convertedVectorViewTyped<int16_t, int32_t>(array, storage, name, [name](int16_t value) {
+          return checkedIntegralIndex(value, name);
+        });
+      }
+      if (dtype.bits == 32) {
+        return convertedVectorViewTyped<int32_t, int32_t>(array, storage, name, [](int32_t value) {
+          return value;
+        });
+      }
+      if (dtype.bits == 64) {
+        return convertedVectorViewTyped<int64_t, int32_t>(array, storage, name, [name](int64_t value) {
+          return checkedIntegralIndex(value, name);
+        });
+      }
+      break;
+    case nb::dlpack::dtype_code::UInt:
+      if (dtype.bits == 8) {
+        return convertedVectorViewTyped<uint8_t, int32_t>(array, storage, name, [name](uint8_t value) {
+          return checkedIntegralIndex(value, name);
+        });
+      }
+      if (dtype.bits == 16) {
+        return convertedVectorViewTyped<uint16_t, int32_t>(array, storage, name, [name](uint16_t value) {
+          return checkedIntegralIndex(value, name);
+        });
+      }
+      if (dtype.bits == 32) {
+        return convertedVectorViewTyped<uint32_t, int32_t>(array, storage, name, [name](uint32_t value) {
+          return checkedIntegralIndex(value, name);
+        });
+      }
+      if (dtype.bits == 64) {
+        return convertedVectorViewTyped<uint64_t, int32_t>(array, storage, name, [name](uint64_t value) {
+          return checkedIntegralIndex(value, name);
+        });
+      }
+      break;
+    case nb::dlpack::dtype_code::Float:
+      if (dtype.bits == 16) {
+        return convertedVectorViewTyped<uint16_t, int32_t>(array, storage, name, [name](uint16_t value) {
+          return checkedFloatingIndex(halfToDouble(value), name);
+        });
+      }
+      if (dtype.bits == 32) {
+        return convertedVectorViewTyped<float, int32_t>(array, storage, name, [name](float value) {
+          return checkedFloatingIndex(value, name);
+        });
+      }
+      if (dtype.bits == 64) {
+        return convertedVectorViewTyped<double, int32_t>(array, storage, name, [name](double value) {
+          return checkedFloatingIndex(value, name);
+        });
+      }
+      break;
+    case nb::dlpack::dtype_code::Bfloat:
+      if (dtype.bits == 16) {
+        return convertedVectorViewTyped<uint16_t, int32_t>(array, storage, name, [name](uint16_t value) {
+          return checkedFloatingIndex(bfloat16ToDouble(value), name);
+        });
+      }
+      break;
+    default:
+      break;
+  }
+  throw makeTypeError(
+    fmt::format("{} must have a numeric dtype convertible to int32, got {}", name, dtypeDescription(dtype)));
+}
+
+[[nodiscard]] ZLinearAssignmentOptions makeLinearAssignmentOptions(bool maximize,
+                                                                   std::optional<double> costLimit = std::nullopt)
+{
+  ZLinearAssignmentOptions options;
+  options.objective = maximize ? ZLinearAssignmentObjective::Maximize : ZLinearAssignmentObjective::Minimize;
+  options.costLimit = costLimit;
+  return options;
+}
+
+[[nodiscard]] ZLinearAssignmentResult
+solveLinearAssignmentPy(const ReadOnlyCpuArray& cost, bool maximize, std::optional<double> costLimit)
+{
+  requireScalarDType(cost, "cost");
+  if (cost.ndim() != 2) {
+    throw makeValueError("cost must be a 2-dimensional array");
+  }
+
+  const size_t rows = cost.shape(0);
+  const size_t cols = cost.shape(1);
+  const bool useDirectView = canUseDenseCostsDirectly(cost);
+  std::vector<double> rowMajor;
+  if (!useDirectView) {
+    copyDenseCostsToRowMajorConverted(cost, rowMajor);
+  }
+
+  try {
+    nb::gil_scoped_release release;
+    return solveLinearAssignment(useDirectView ? static_cast<const double*>(cost.data()) : rowMajor.data(),
+                                 rows,
+                                 cols,
+                                 useDirectView ? static_cast<ptrdiff_t>(arrayStrideOrCompactC(cost, 0, "cost"))
+                                               : static_cast<ptrdiff_t>(cols),
+                                 makeLinearAssignmentOptions(maximize, costLimit));
+  }
+  catch (const ZException& e) {
+    throw makeValueError(e.what());
+  }
+}
+
+[[nodiscard]] ZLinearAssignmentResult solveLinearAssignmentCsrPy(size_t rows,
+                                                                 size_t cols,
+                                                                 const ReadOnlyCpuArray& indptr,
+                                                                 const ReadOnlyCpuArray& indices,
+                                                                 const ReadOnlyCpuArray& costs,
+                                                                 bool maximize)
+{
+  std::vector<int32_t> indptrStorage;
+  std::vector<int32_t> indicesStorage;
+  std::vector<double> costsStorage;
+  const std::span<const int32_t> indptrSpan = contiguousInt32VectorView(indptr, indptrStorage, "indptr");
+  const std::span<const int32_t> indicesSpan = contiguousInt32VectorView(indices, indicesStorage, "indices");
+  const std::span<const double> costsSpan = contiguousDoubleVectorView(costs, costsStorage, "data");
+
+  ZLinearAssignmentCsrView view;
+  view.rows = rows;
+  view.cols = cols;
+  view.indptr = indptrSpan;
+  view.indices = indicesSpan;
+  view.costs = costsSpan;
+
+  try {
+    nb::gil_scoped_release release;
+    return solveLinearAssignmentCsr(view, makeLinearAssignmentOptions(maximize));
+  }
+  catch (const ZException& e) {
+    throw makeValueError(e.what());
+  }
 }
 
 std::vector<glm::dvec2> roiPointsFromArray(const nb::ndarray<nb::numpy, const double>& points, std::string_view name)
@@ -591,6 +1142,73 @@ NB_MODULE(_imgpy, m)
     .def_rw("zstdCompressionLevel",
             &ZImgWriteParameters::zstdCompressionLevel,
             "Specifies the compression level for Zstd. Negative values favor speed over density, default to 1.");
+
+  nb::class_<ZLinearAssignmentResult>(m, "LinearAssignmentResult")
+    .def_prop_ro("cost",
+                 [](const ZLinearAssignmentResult& result) {
+                   return result.cost;
+                 })
+    .def_prop_ro(
+      "row_to_col",
+      [](const ZLinearAssignmentResult& result) {
+        return vectorToOwnedInt32Array(result.rowToCol);
+      },
+      nb::rv_policy::move)
+    .def_prop_ro(
+      "col_to_row",
+      [](const ZLinearAssignmentResult& result) {
+        return vectorToOwnedInt32Array(result.colToRow);
+      },
+      nb::rv_policy::move)
+    .def_prop_ro(
+      "row_ind",
+      [](const ZLinearAssignmentResult& result) {
+        return vectorToOwnedInt32Array(result.matchedRows());
+      },
+      nb::rv_policy::move)
+    .def_prop_ro(
+      "col_ind",
+      [](const ZLinearAssignmentResult& result) {
+        return vectorToOwnedInt32Array(result.matchedCols());
+      },
+      nb::rv_policy::move)
+    .def("__repr__", [](const ZLinearAssignmentResult& result) {
+      return fmt::format("<_imgpy.LinearAssignmentResult cost={} matched={}>",
+                         result.cost,
+                         result.matchedRows().size());
+    });
+
+  m.def(
+    "linear_assignment",
+    [](const ReadOnlyCpuArray& cost, bool maximize, nb::object costLimit) {
+      std::optional<double> parsedCostLimit;
+      if (!costLimit.is_none()) {
+        parsedCostLimit = nb::cast<double>(costLimit);
+      }
+      return solveLinearAssignmentPy(cost, maximize, parsedCostLimit);
+    },
+    "cost"_a,
+    "maximize"_a = false,
+    "cost_limit"_a = nb::none(),
+    R"doc(Solve a dense linear assignment problem and return row/column assignment vectors.)doc");
+
+  m.def(
+    "linear_assignment_csr",
+    [](size_t rows,
+       size_t cols,
+       const ReadOnlyCpuArray& indptr,
+       const ReadOnlyCpuArray& indices,
+       const ReadOnlyCpuArray& costs,
+       bool maximize) {
+      return solveLinearAssignmentCsrPy(rows, cols, indptr, indices, costs, maximize);
+    },
+    "rows"_a,
+    "cols"_a,
+    "indptr"_a,
+    "indices"_a,
+    "data"_a,
+    "maximize"_a = false,
+    R"doc(Solve a square sparse linear assignment problem from CSR arrays.)doc");
 
   nb::class_<ZImgInfo>(m, "ZImgInfo", "This class holds the metadata for a multidimensional image.")
     .def(nb::init<>(), "Default constructor that initializes the image information with default values.")

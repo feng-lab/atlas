@@ -2,6 +2,8 @@
 
 #include "zswceditlegacy.h"
 
+#include <cstdint>
+
 namespace nim {
 namespace {
 
@@ -14,6 +16,20 @@ namespace {
     }
   }
   return roots;
+}
+
+[[nodiscard]] SwcNode makeNode(int64_t id, double x, double y, double z = 0.0, double radius = 1.0)
+{
+  SwcNode node;
+  node.id = id;
+  node.type = 0;
+  node.x = x;
+  node.y = y;
+  node.z = z;
+  node.radius = radius;
+  node.parentID = -1;
+  node.label = 0;
+  return node;
 }
 
 TEST(ZSwcEditLegacyLikeTest, DeleteChildrenBecomeRoots)
@@ -170,6 +186,25 @@ TEST(ZSwcEditLegacyLikeTest, MergeSelectedNodesPreservesExternalParent)
   EXPECT_DOUBLE_EQ(core->y, 0.0);
   EXPECT_DOUBLE_EQ(core->z, 0.0);
   EXPECT_DOUBLE_EQ(core->radius, 2.0);
+}
+
+TEST(ZSwcEditLegacyLikeTest, ResolveCrossoverPairsOppositeOrthogonalBranches)
+{
+  ZSwc swc;
+
+  const auto center = swc.appendRoot(makeNode(1, 0.0, 0.0));
+  const auto east = swc.appendChild(center, makeNode(2, 1.0, 0.0));
+  const auto west = swc.appendChild(center, makeNode(3, -1.0, 0.0));
+  const auto north = swc.appendChild(center, makeNode(4, 0.0, 1.0));
+  const auto south = swc.appendChild(center, makeNode(5, 0.0, -1.0));
+
+  EXPECT_TRUE(resolveCrossoverLegacyLike(swc, center));
+
+  EXPECT_EQ(swc.size(), 4u);
+  EXPECT_EQ(countRoots(swc), 2u);
+  EXPECT_TRUE((ZSwc::parent(east) == west && ZSwc::isRoot(west)) || (ZSwc::parent(west) == east && ZSwc::isRoot(east)));
+  EXPECT_TRUE((ZSwc::parent(north) == south && ZSwc::isRoot(south)) ||
+              (ZSwc::parent(south) == north && ZSwc::isRoot(north)));
 }
 
 } // namespace

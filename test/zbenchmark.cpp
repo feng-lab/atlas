@@ -10,6 +10,7 @@
 #include "zimageresizehwy.h"
 #include "zimginit.h"
 #include "zimgregion.h"
+#include "zlinearassignment.h"
 #include "zlog.h"
 #include "zexception.h"
 #include "zrandom.h"
@@ -91,6 +92,39 @@ static void addRoundBench()
   BENCHMARK_TEMPLATE(BM_PositiveRound, float)->Range(8, 8 << 10);
   BENCHMARK_TEMPLATE(BM_stdRound, double)->Range(8, 8 << 10);
   BENCHMARK_TEMPLATE(BM_PositiveRound, double)->Range(8, 8 << 10);
+}
+
+static void BM_linearAssignmentDenseSquare(benchmark::State& state)
+{
+  const size_t n = static_cast<size_t>(state.range(0));
+  std::vector<double> costs(n * n);
+  for (size_t row = 0; row < n; ++row) {
+    for (size_t col = 0; col < n; ++col) {
+      const size_t mixed = (row * 1315423911u) ^ (col * 2654435761u) ^ ((row + col) * 2246822519u);
+      costs[row * n + col] = static_cast<double>(mixed % 1000003u) / 1000.0;
+    }
+  }
+
+  while (state.KeepRunning()) {
+    const auto result = solveLinearAssignment(costs, n, n);
+    double resultCost = result.cost;
+    benchmark::DoNotOptimize(resultCost);
+    benchmark::DoNotOptimize(result.rowToCol.data());
+  }
+  state.SetItemsProcessed(state.iterations() * static_cast<int64_t>(n));
+}
+
+static void addLinearAssignmentBench()
+{
+  BENCHMARK(BM_linearAssignmentDenseSquare)
+    ->Arg(64)
+    ->Arg(128)
+    ->Arg(256)
+    ->Arg(512)
+    ->Arg(1024)
+    ->Arg(2048)
+    ->Arg(4096)
+    ->Arg(12000);
 }
 
 inline int64_t saturate_mul_boost(int64_t x, int64_t y)
@@ -2246,6 +2280,7 @@ int main(int argc, char* argv[])
   using namespace nim;
 
   addRoundBench();
+  addLinearAssignmentBench();
   addSaturateMulBench();
   addSaturateAddSubBench();
   addImageConvolutionBench();

@@ -44,6 +44,96 @@ print(arr0.dtype)
 img.save("out.tif")
 ```
 
+## Linear assignment
+
+`zimg.linear_assignment(...)` solves dense linear assignment problems using
+zimg's Jonker-Volgenant implementation. It accepts CPU-resident 2D array
+objects supported by nanobind, including NumPy arrays and CPU tensors from
+frameworks that expose DLPack/array interop. Dense costs can use any real
+numeric scalar dtype supported by the binding and are converted to `float64`
+internally. C-contiguous `float64` inputs are solved without copying; other
+supported dtypes or strided layouts are copied to row-major storage at the
+Python/C++ boundary. The function returns a `LinearAssignmentResult`.
+
+The result contains:
+
+- `cost`: total cost of the selected assignment.
+- `row_to_col`: length-`n_rows` array; `row_to_col[i]` is the selected column
+  for row `i`, or `-1` when the row is unmatched. The dtype is `int32`.
+- `col_to_row`: length-`n_cols` array; `col_to_row[j]` is the selected row for
+  column `j`, or `-1` when the column is unmatched. The dtype is `int32`.
+- `row_ind` / `col_ind`: compact matched row/column index arrays for users who
+  prefer pair-list style results. The dtype is `int32`.
+
+```python
+import numpy as np
+import zimg
+
+cost = np.array(
+    [
+        [4.0, 1.0, 3.0],
+        [2.0, 0.0, 5.0],
+        [3.0, 2.0, 2.0],
+    ]
+)
+
+result = zimg.linear_assignment(cost)
+print(result.cost)        # 5.0
+print(result.row_to_col)  # [1 0 2]
+print(result.col_to_row)  # [1 0 2]
+```
+
+Rectangular matrices are supported directly. The solver assigns the smaller
+side completely and marks extra rows or columns as unmatched with `-1`.
+
+```python
+cost = np.array(
+    [
+        [8.0, 2.0, 5.0, 7.0],
+        [6.0, 4.0, 9.0, 1.0],
+    ]
+)
+
+result = zimg.linear_assignment(cost)
+print(result.row_to_col)  # length 2
+print(result.col_to_row)  # length 4; unmatched columns are -1
+```
+
+Use `maximize=True` for profit/score matrices. Use `cost_limit=` when an
+individual minimization assignment above that limit should be treated as
+unmatched.
+
+```python
+scores = np.array([[0.2, 0.9], [0.8, 0.1]])
+best = zimg.linear_assignment(scores, maximize=True)
+
+limited = zimg.linear_assignment(cost, cost_limit=4.99)
+```
+
+Sparse assignment is exposed through `zimg.linear_assignment_csr(...)`. It
+accepts square CSR arrays: `indptr`, `indices`, and `data`. `indptr` and
+`indices` can use numeric scalar dtypes convertible to `int32`; non-integral
+floating-point index values and out-of-range values are rejected. `data` can
+use any real numeric scalar dtype supported by the binding and is converted to
+`float64` internally. Contiguous `int32` indices and contiguous `float64` data
+avoid conversion copies. Sparse costs must be finite; omit forbidden edges
+instead of storing `inf`.
+
+```python
+indptr = np.array([0, 2, 4, 7], dtype=np.int32)
+indices = np.array([0, 1, 0, 2, 1, 2, 0], dtype=np.int32)
+data = np.array([3.0, 7.0, 4.0, 1.0, 2.0, 6.0, 5.0], dtype=np.float64)
+
+result = zimg.linear_assignment_csr(
+    rows=3,
+    cols=3,
+    indptr=indptr,
+    indices=indices,
+    data=data,
+)
+print(result.cost)
+```
+
 ## neuTube processing
 
 The package exposes neuTube processing workers directly. They can be configured
