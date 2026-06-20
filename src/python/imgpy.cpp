@@ -1208,7 +1208,7 @@ NB_MODULE(_imgpy, m)
     "indices"_a,
     "data"_a,
     "maximize"_a = false,
-    R"doc(Solve a square sparse linear assignment problem from CSR arrays.)doc");
+    R"doc(Solve a sparse linear assignment problem from square or rectangular CSR arrays.)doc");
 
   nb::class_<ZImgInfo>(m, "ZImgInfo", "This class holds the metadata for a multidimensional image.")
     .def(nb::init<>(), "Default constructor that initializes the image information with default values.")

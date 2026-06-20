@@ -10,7 +10,6 @@
 
 #include <algorithm>
 #include <cmath>
-#include <functional>
 #include <limits>
 #include <numeric>
 #include <stdexcept>
@@ -681,122 +680,201 @@ solveWithCostLimit(const double* costs, size_t rows, size_t cols, ptrdiff_t rowS
 struct CanonicalCsr
 {
   size_t n = 0;
-  std::vector<size_t> indptr;
-  std::vector<size_t> indices;
-  std::vector<double> costs;
-  std::vector<double> originalCosts;
+  size_t originalRows = 0;
+  size_t originalCols = 0;
+  std::span<const int32_t> indptr;
+  std::span<const int32_t> indices;
+  std::span<const double> costs;
+  std::span<const double> originalCosts;
+  std::vector<int32_t> ownedIndptr;
+  std::vector<int32_t> ownedIndices;
+  std::vector<double> ownedCosts;
+  std::vector<double> ownedOriginalCosts;
 };
 
-[[nodiscard]] CanonicalCsr canonicalizeCsr(const ZLinearAssignmentCsrView& view, bool maximize)
+void appendCanonicalCsrEdge(CanonicalCsr& csr, size_t col, double cost, bool maximize)
 {
-  if (view.rows != view.cols) {
-    throw ZException("sparse linear assignment currently requires a square CSR matrix");
-  }
+  CHECK_LE(col, static_cast<size_t>(std::numeric_limits<int32_t>::max()));
+  csr.ownedIndices.push_back(static_cast<int32_t>(col));
+  csr.ownedOriginalCosts.push_back(cost);
+  csr.ownedCosts.push_back(maximize ? -cost : cost);
+}
+
+void bindOwnedCsrStorage(CanonicalCsr& csr)
+{
+  csr.indptr = std::span<const int32_t>(csr.ownedIndptr.data(), csr.ownedIndptr.size());
+  csr.indices = std::span<const int32_t>(csr.ownedIndices.data(), csr.ownedIndices.size());
+  csr.costs = std::span<const double>(csr.ownedCosts.data(), csr.ownedCosts.size());
+  csr.originalCosts = std::span<const double>(csr.ownedOriginalCosts.data(), csr.ownedOriginalCosts.size());
+}
+
+[[nodiscard]] bool validateCsrInput(const ZLinearAssignmentCsrView& view)
+{
   if (view.indptr.size() != view.rows + 1) {
     throw ZException("sparse linear assignment indptr length must be rows + 1");
   }
   if (view.indices.size() != view.costs.size()) {
     throw ZException("sparse linear assignment indices and costs lengths differ");
   }
-  if (view.rows == 0) {
-    return {};
-  }
   if (view.indptr[0] != 0) {
     throw ZException("sparse linear assignment indptr must start at 0");
   }
 
-  CanonicalCsr csr;
-  csr.n = view.rows;
-  csr.indptr.assign(csr.n + 1, 0);
-
-  std::vector<std::pair<int32_t, double>> rowEntries;
-  for (size_t row = 0; row < csr.n; ++row) {
-    const int32_t begin = view.indptr[row];
-    const int32_t end = view.indptr[row + 1];
+  bool sortedUnique = true;
+  const int32_t* const indptr = view.indptr.data();
+  const int32_t* const indices = view.indices.data();
+  const double* const costs = view.costs.data();
+  for (size_t row = 0; row < view.rows; ++row) {
+    const int32_t begin = indptr[row];
+    const int32_t end = indptr[row + 1];
     if (begin < 0 || end < begin || static_cast<size_t>(end) > view.indices.size()) {
       throw ZException("sparse linear assignment indptr is not monotonic or is out of range");
     }
-    rowEntries.clear();
-    rowEntries.reserve(static_cast<size_t>(end - begin));
+    int32_t previousCol = -1;
     for (int32_t k = begin; k < end; ++k) {
-      const int32_t col = view.indices[static_cast<size_t>(k)];
+      const int32_t col = indices[static_cast<size_t>(k)];
       if (col < 0 || static_cast<size_t>(col) >= view.cols) {
         throw ZException("sparse linear assignment column index is out of range");
       }
-      const double cost = view.costs[static_cast<size_t>(k)];
-      if (!std::isfinite(cost)) {
+      const double cost = costs[static_cast<size_t>(k)];
+      if (std::isnan(cost) || cost == kInf || cost == -kInf) {
         throw ZException("sparse linear assignment CSR costs must be finite; omit forbidden edges");
       }
-      rowEntries.emplace_back(col, cost);
+      if (col <= previousCol) {
+        sortedUnique = false;
+      }
+      previousCol = col;
     }
-    std::sort(rowEntries.begin(), rowEntries.end(), [](const auto& a, const auto& b) {
-      return a.first < b.first;
-    });
-    for (size_t k = 1; k < rowEntries.size(); ++k) {
-      if (rowEntries[k - 1].first == rowEntries[k].first) {
-        throw ZException("sparse linear assignment CSR rows must not contain duplicate columns");
+  }
+  if (view.indptr[view.rows] < 0 || static_cast<size_t>(view.indptr[view.rows]) != view.indices.size()) {
+    throw ZException("sparse linear assignment indptr end must equal the number of CSR entries");
+  }
+  return sortedUnique;
+}
+
+[[nodiscard]] CanonicalCsr canonicalizeCsr(const ZLinearAssignmentCsrView& view, bool maximize)
+{
+  const bool inputSortedUnique = validateCsrInput(view);
+
+  CanonicalCsr csr;
+  csr.originalRows = view.rows;
+  csr.originalCols = view.cols;
+  csr.n = std::max(view.rows, view.cols);
+  if (view.rows == 0 || view.cols == 0) {
+    return csr;
+  }
+
+  if (view.rows == view.cols && inputSortedUnique) {
+    csr.indptr = view.indptr;
+    csr.indices = view.indices;
+    csr.originalCosts = view.costs;
+    if (maximize) {
+      csr.ownedCosts.reserve(view.costs.size());
+      for (const double cost : view.costs) {
+        csr.ownedCosts.push_back(-cost);
+      }
+      csr.costs = std::span<const double>(csr.ownedCosts.data(), csr.ownedCosts.size());
+    } else {
+      csr.costs = view.costs;
+    }
+    return csr;
+  }
+
+  csr.ownedIndptr.assign(csr.n + 1, 0);
+  const size_t extraEdges =
+    view.rows > view.cols ? view.rows * (view.rows - view.cols) : (view.cols - view.rows) * view.cols;
+  csr.ownedIndices.reserve(view.indices.size() + extraEdges);
+  csr.ownedCosts.reserve(view.costs.size() + extraEdges);
+  csr.ownedOriginalCosts.reserve(view.costs.size() + extraEdges);
+
+  std::vector<std::pair<int32_t, double>> rowEntries;
+  for (size_t row = 0; row < view.rows; ++row) {
+    const int32_t begin = view.indptr[row];
+    const int32_t end = view.indptr[row + 1];
+
+    csr.ownedIndptr[row] = static_cast<int32_t>(csr.ownedIndices.size());
+    if (inputSortedUnique) {
+      for (int32_t k = begin; k < end; ++k) {
+        appendCanonicalCsrEdge(csr,
+                               static_cast<size_t>(view.indices[static_cast<size_t>(k)]),
+                               view.costs[static_cast<size_t>(k)],
+                               maximize);
+      }
+    } else {
+      rowEntries.clear();
+      rowEntries.reserve(static_cast<size_t>(end - begin));
+      for (int32_t k = begin; k < end; ++k) {
+        rowEntries.emplace_back(view.indices[static_cast<size_t>(k)], view.costs[static_cast<size_t>(k)]);
+      }
+      std::sort(rowEntries.begin(), rowEntries.end(), [](const auto& a, const auto& b) {
+        return a.first < b.first;
+      });
+      for (size_t k = 1; k < rowEntries.size(); ++k) {
+        if (rowEntries[k - 1].first == rowEntries[k].first) {
+          throw ZException("sparse linear assignment CSR rows must not contain duplicate columns");
+        }
+      }
+      for (const auto& [col, cost] : rowEntries) {
+        appendCanonicalCsrEdge(csr, static_cast<size_t>(col), cost, maximize);
       }
     }
 
-    csr.indptr[row] = csr.indices.size();
-    for (const auto& [col, cost] : rowEntries) {
-      csr.indices.push_back(static_cast<size_t>(col));
-      csr.originalCosts.push_back(cost);
-      csr.costs.push_back(maximize ? -cost : cost);
+    if (view.rows > view.cols) {
+      for (size_t col = view.cols; col < csr.n; ++col) {
+        appendCanonicalCsrEdge(csr, col, 0.0, false);
+      }
     }
   }
-  csr.indptr[csr.n] = csr.indices.size();
+
+  for (size_t row = view.rows; row < csr.n; ++row) {
+    csr.ownedIndptr[row] = static_cast<int32_t>(csr.ownedIndices.size());
+    for (size_t col = 0; col < csr.n; ++col) {
+      appendCanonicalCsrEdge(csr, col, 0.0, false);
+    }
+  }
+  csr.ownedIndptr[csr.n] = static_cast<int32_t>(csr.ownedIndices.size());
+  bindOwnedCsrStorage(csr);
   return csr;
 }
 
-[[nodiscard]] bool csrHasPerfectMatching(const CanonicalCsr& csr)
+[[nodiscard]] size_t csrRowBegin(const CanonicalCsr& csr, size_t row)
 {
-  std::vector<int32_t> rowForCol(csr.n, -1);
-  std::vector<char> seen(csr.n, char{0});
-
-  std::function<bool(size_t)> visit = [&](size_t row) {
-    for (size_t k = csr.indptr[row]; k < csr.indptr[row + 1]; ++k) {
-      const size_t col = csr.indices[k];
-      if (seen[col]) {
-        continue;
-      }
-      seen[col] = char{1};
-      if (rowForCol[col] < 0 || visit(static_cast<size_t>(rowForCol[col]))) {
-        rowForCol[col] = static_cast<int32_t>(row);
-        return true;
-      }
-    }
-    return false;
-  };
-
-  for (size_t row = 0; row < csr.n; ++row) {
-    std::fill(seen.begin(), seen.end(), char{0});
-    if (!visit(row)) {
-      return false;
-    }
-  }
-  return true;
+  return static_cast<size_t>(csr.indptr[row]);
 }
 
-[[nodiscard]] size_t sparseColumnReductionAndTransfer(const CanonicalCsr& csr,
-                                                      std::vector<int32_t>& freeRows,
-                                                      std::vector<int32_t>& colForRow,
-                                                      std::vector<int32_t>& rowForCol,
-                                                      std::vector<double>& colReduction)
+[[nodiscard]] size_t csrRowEnd(const CanonicalCsr& csr, size_t row)
+{
+  return static_cast<size_t>(csr.indptr[row + 1]);
+}
+
+[[nodiscard]] size_t csrColumn(const CanonicalCsr& csr, size_t entry)
+{
+  return static_cast<size_t>(csr.indices[entry]);
+}
+
+[[nodiscard]] size_t findCsrEntry(const CanonicalCsr& csr, size_t row, int32_t col)
+{
+  const size_t begin = csrRowBegin(csr, row);
+  const size_t end = csrRowEnd(csr, row);
+  const auto first = csr.indices.begin() + static_cast<ptrdiff_t>(begin);
+  const auto last = csr.indices.begin() + static_cast<ptrdiff_t>(end);
+  const auto it = std::lower_bound(first, last, col);
+  if (it == last || *it != col) {
+    return std::numeric_limits<size_t>::max();
+  }
+  return static_cast<size_t>(std::distance(csr.indices.begin(), it));
+}
+
+[[nodiscard]] size_t sparseReductionTransfer(const CanonicalCsr& csr,
+                                             std::vector<int32_t>& freeRows,
+                                             std::vector<int32_t>& colForRow,
+                                             std::vector<int32_t>& rowForCol,
+                                             std::vector<double>& colReduction)
 {
   const size_t n = csr.n;
-  std::fill(colForRow.begin(), colForRow.end(), -1);
-  std::fill(rowForCol.begin(), rowForCol.end(), 0);
-  std::fill(colReduction.begin(), colReduction.end(), kInf);
-
-  for (size_t row = 0; row < n; ++row) {
-    for (size_t k = csr.indptr[row]; k < csr.indptr[row + 1]; ++k) {
-      const size_t col = csr.indices[k];
-      const double cost = csr.costs[k];
-      if (cost < colReduction[col]) {
-        colReduction[col] = cost;
-        rowForCol[col] = static_cast<int32_t>(row);
-      }
+  for (size_t col = 0; col < n; ++col) {
+    if (!std::isfinite(colReduction[col])) {
+      throw ZException("sparse linear assignment cost matrix is infeasible");
     }
   }
 
@@ -816,11 +894,11 @@ struct CanonicalCsr
   for (size_t row = 0; row < n; ++row) {
     if (colForRow[row] < 0) {
       freeRows[numFreeRows++] = static_cast<int32_t>(row);
-    } else if (unique[row] && csr.indptr[row + 1] - csr.indptr[row] > 1) {
+    } else if (unique[row] && csrRowEnd(csr, row) - csrRowBegin(csr, row) > 1) {
       const int32_t assignedCol = colForRow[row];
       double minReduced = kInf;
-      for (size_t k = csr.indptr[row]; k < csr.indptr[row + 1]; ++k) {
-        const size_t col = csr.indices[k];
+      for (size_t k = csrRowBegin(csr, row); k < csrRowEnd(csr, row); ++k) {
+        const size_t col = csrColumn(csr, k);
         if (col == static_cast<size_t>(assignedCol)) {
           continue;
         }
@@ -834,6 +912,110 @@ struct CanonicalCsr
   return numFreeRows;
 }
 
+[[nodiscard]] size_t sparseColumnReductionAndTransfer(const CanonicalCsr& csr,
+                                                      std::vector<int32_t>& freeRows,
+                                                      std::vector<int32_t>& colForRow,
+                                                      std::vector<int32_t>& rowForCol,
+                                                      std::vector<double>& colReduction)
+{
+  const size_t n = csr.n;
+  std::fill(colForRow.begin(), colForRow.end(), -1);
+  std::fill(rowForCol.begin(), rowForCol.end(), 0);
+  std::fill(colReduction.begin(), colReduction.end(), kInf);
+
+  for (size_t row = 0; row < n; ++row) {
+    const size_t rowBegin = csrRowBegin(csr, row);
+    const size_t rowEnd = csrRowEnd(csr, row);
+    if (rowBegin == rowEnd) {
+      throw ZException("sparse linear assignment cost matrix is infeasible");
+    }
+    for (size_t k = rowBegin; k < rowEnd; ++k) {
+      const size_t col = csrColumn(csr, k);
+      const double cost = csr.costs[k];
+      if (cost < colReduction[col]) {
+        colReduction[col] = cost;
+        rowForCol[col] = static_cast<int32_t>(row);
+      }
+    }
+  }
+  return sparseReductionTransfer(csr, freeRows, colForRow, rowForCol, colReduction);
+}
+
+[[nodiscard]] bool sparseSquareColumnReductionAndTransferFromInput(const ZLinearAssignmentCsrView& view,
+                                                                   std::vector<int32_t>& freeRows,
+                                                                   std::vector<int32_t>& colForRow,
+                                                                   std::vector<int32_t>& rowForCol,
+                                                                   std::vector<double>& colReduction,
+                                                                   size_t& numFreeRows)
+{
+  CHECK(view.rows == view.cols);
+  if (view.indptr.size() != view.rows + 1) {
+    throw ZException("sparse linear assignment indptr length must be rows + 1");
+  }
+  if (view.indices.size() != view.costs.size()) {
+    throw ZException("sparse linear assignment indices and costs lengths differ");
+  }
+  if (view.indptr[0] != 0) {
+    throw ZException("sparse linear assignment indptr must start at 0");
+  }
+
+  const size_t n = view.rows;
+  std::fill(colForRow.begin(), colForRow.end(), -1);
+  std::fill(rowForCol.begin(), rowForCol.end(), 0);
+  std::fill(colReduction.begin(), colReduction.end(), kInf);
+
+  const int32_t* const indptr = view.indptr.data();
+  const int32_t* const indices = view.indices.data();
+  const double* const costs = view.costs.data();
+  bool sortedUnique = true;
+  for (size_t row = 0; row < n; ++row) {
+    const int32_t begin = indptr[row];
+    const int32_t end = indptr[row + 1];
+    if (begin < 0 || end < begin || static_cast<size_t>(end) > view.indices.size()) {
+      throw ZException("sparse linear assignment indptr is not monotonic or is out of range");
+    }
+    if (begin == end) {
+      throw ZException("sparse linear assignment cost matrix is infeasible");
+    }
+    int32_t previousCol = -1;
+    for (int32_t k = begin; k < end; ++k) {
+      const int32_t col = indices[static_cast<size_t>(k)];
+      if (col < 0 || static_cast<size_t>(col) >= view.cols) {
+        throw ZException("sparse linear assignment column index is out of range");
+      }
+      const double cost = costs[static_cast<size_t>(k)];
+      if (!std::isfinite(cost)) {
+        throw ZException("sparse linear assignment CSR costs must be finite; omit forbidden edges");
+      }
+      if (col <= previousCol) {
+        sortedUnique = false;
+      }
+      previousCol = col;
+      if (cost < colReduction[static_cast<size_t>(col)]) {
+        colReduction[static_cast<size_t>(col)] = cost;
+        rowForCol[static_cast<size_t>(col)] = static_cast<int32_t>(row);
+      }
+    }
+  }
+  if (view.indptr[view.rows] < 0 || static_cast<size_t>(view.indptr[view.rows]) != view.indices.size()) {
+    throw ZException("sparse linear assignment indptr end must equal the number of CSR entries");
+  }
+  if (!sortedUnique) {
+    return false;
+  }
+
+  CanonicalCsr csr;
+  csr.n = n;
+  csr.originalRows = view.rows;
+  csr.originalCols = view.cols;
+  csr.indptr = view.indptr;
+  csr.indices = view.indices;
+  csr.costs = view.costs;
+  csr.originalCosts = view.costs;
+  numFreeRows = sparseReductionTransfer(csr, freeRows, colForRow, rowForCol, colReduction);
+  return true;
+}
+
 [[nodiscard]] size_t sparseAugmentingRowReduction(const CanonicalCsr& csr,
                                                   size_t numFreeRows,
                                                   std::vector<int32_t>& freeRows,
@@ -841,25 +1023,32 @@ struct CanonicalCsr
                                                   std::vector<int32_t>& rowForCol,
                                                   std::vector<double>& colReduction)
 {
-  const size_t n = csr.n;
-  size_t current = 0;
-  size_t newFreeRows = 0;
-  size_t reductionCount = 0;
+  const int32_t n = static_cast<int32_t>(csr.n);
+  const int32_t* const indptr = csr.indptr.data();
+  const int32_t* const indices = csr.indices.data();
+  const double* const costs = csr.costs.data();
+  int32_t* const freeRowsData = freeRows.data();
+  int32_t* const colForRowData = colForRow.data();
+  int32_t* const rowForColData = rowForCol.data();
+  double* const colReductionData = colReduction.data();
+  int32_t current = 0;
+  int32_t newFreeRows = 0;
+  int32_t reductionCount = 0;
+  const int32_t totalFreeRows = static_cast<int32_t>(numFreeRows);
 
-  while (current < numFreeRows) {
+  while (current < totalFreeRows) {
     ++reductionCount;
-    const int32_t freeRow = freeRows[current++];
-    const size_t rowBegin = csr.indptr[static_cast<size_t>(freeRow)];
-    const size_t rowEnd = csr.indptr[static_cast<size_t>(freeRow) + 1];
-    CHECK(rowBegin < rowEnd);
+    const int32_t freeRow = freeRowsData[current++];
+    const int32_t rowBegin = indptr[freeRow];
+    const int32_t rowEnd = indptr[freeRow + 1];
 
-    size_t bestCol = csr.indices[rowBegin];
-    double bestValue = csr.costs[rowBegin] - colReduction[bestCol];
-    size_t secondBestCol = bestCol;
+    int32_t bestCol = indices[rowBegin];
+    double bestValue = costs[rowBegin] - colReductionData[bestCol];
+    int32_t secondBestCol = -1;
     double secondBestValue = kInf;
-    for (size_t k = rowBegin + 1; k < rowEnd; ++k) {
-      const size_t col = csr.indices[k];
-      const double value = csr.costs[k] - colReduction[col];
+    for (int32_t k = rowBegin + 1; k < rowEnd; ++k) {
+      const int32_t col = indices[k];
+      const double value = costs[k] - colReductionData[col];
       if (value < secondBestValue) {
         if (value >= bestValue) {
           secondBestValue = value;
@@ -873,163 +1062,41 @@ struct CanonicalCsr
       }
     }
 
-    int32_t displacedRow = rowForCol[bestCol];
-    const bool hasSecond = std::isfinite(secondBestValue) && secondBestCol != bestCol;
-    const double newReduction =
-      hasSecond ? colReduction[bestCol] - (secondBestValue - bestValue) : colReduction[bestCol];
-    const bool lowersReduction = hasSecond && newReduction < colReduction[bestCol];
+    int32_t displacedRow = rowForColData[bestCol];
+    if (secondBestCol < 0) {
+      if (displacedRow >= 0) {
+        freeRowsData[newFreeRows++] = displacedRow;
+      }
+      colForRowData[freeRow] = bestCol;
+      rowForColData[bestCol] = freeRow;
+      continue;
+    }
+
+    const double newReduction = colReductionData[bestCol] - (secondBestValue - bestValue);
+    const bool lowersReduction = newReduction < colReductionData[bestCol];
 
     if (reductionCount < current * n) {
       if (lowersReduction) {
-        colReduction[bestCol] = newReduction;
-      } else if (displacedRow >= 0 && hasSecond) {
+        colReductionData[bestCol] = newReduction;
+      } else if (displacedRow >= 0) {
         bestCol = secondBestCol;
-        displacedRow = rowForCol[bestCol];
+        displacedRow = rowForColData[bestCol];
       }
       if (displacedRow >= 0) {
         if (lowersReduction) {
-          freeRows[--current] = displacedRow;
+          freeRowsData[--current] = displacedRow;
         } else {
-          freeRows[newFreeRows++] = displacedRow;
+          freeRowsData[newFreeRows++] = displacedRow;
         }
       }
     } else if (displacedRow >= 0) {
-      freeRows[newFreeRows++] = displacedRow;
+      freeRowsData[newFreeRows++] = displacedRow;
     }
 
-    colForRow[static_cast<size_t>(freeRow)] = static_cast<int32_t>(bestCol);
-    rowForCol[bestCol] = freeRow;
+    colForRowData[freeRow] = bestCol;
+    rowForColData[bestCol] = freeRow;
   }
-  return newFreeRows;
-}
-
-[[nodiscard]] size_t
-sparseFindColumnsWithMinimum(size_t n, size_t lo, const std::vector<double>& distances, std::vector<int32_t>& cols)
-{
-  size_t hi = lo + 1;
-  double minDistance = distances[static_cast<size_t>(cols[lo])];
-  for (size_t k = hi; k < n; ++k) {
-    const int32_t col = cols[k];
-    const double distance = distances[static_cast<size_t>(col)];
-    if (distance <= minDistance) {
-      if (distance < minDistance) {
-        hi = lo;
-        minDistance = distance;
-      }
-      cols[k] = cols[hi];
-      cols[hi++] = col;
-    }
-  }
-  return hi;
-}
-
-[[nodiscard]] int32_t sparseScanAllColumns(const CanonicalCsr& csr,
-                                           size_t& lo,
-                                           size_t& hi,
-                                           std::vector<double>& distances,
-                                           std::vector<int32_t>& cols,
-                                           std::vector<int32_t>& pred,
-                                           const std::vector<int32_t>& rowForCol,
-                                           const std::vector<double>& colReduction)
-{
-  std::vector<int32_t> reverseCol(csr.n, -1);
-  while (lo != hi) {
-    int32_t col = cols[lo++];
-    const int32_t row = rowForCol[static_cast<size_t>(col)];
-    CHECK(row >= 0);
-    const double minDistance = distances[static_cast<size_t>(col)];
-
-    for (size_t k = csr.indptr[static_cast<size_t>(row)]; k < csr.indptr[static_cast<size_t>(row) + 1]; ++k) {
-      reverseCol[csr.indices[k]] = static_cast<int32_t>(k);
-    }
-
-    const int32_t assignedEdge = reverseCol[static_cast<size_t>(col)];
-    if (assignedEdge >= 0) {
-      const double h =
-        csr.costs[static_cast<size_t>(assignedEdge)] - colReduction[static_cast<size_t>(col)] - minDistance;
-      for (size_t k = hi; k < csr.n; ++k) {
-        col = cols[k];
-        const int32_t edge = reverseCol[static_cast<size_t>(col)];
-        if (edge < 0) {
-          continue;
-        }
-        const double reduced = csr.costs[static_cast<size_t>(edge)] - colReduction[static_cast<size_t>(col)] - h;
-        if (reduced < distances[static_cast<size_t>(col)]) {
-          distances[static_cast<size_t>(col)] = reduced;
-          pred[static_cast<size_t>(col)] = row;
-          if (reduced == minDistance) {
-            if (rowForCol[static_cast<size_t>(col)] < 0) {
-              for (size_t rk = csr.indptr[static_cast<size_t>(row)]; rk < csr.indptr[static_cast<size_t>(row) + 1];
-                   ++rk) {
-                reverseCol[csr.indices[rk]] = -1;
-              }
-              return col;
-            }
-            cols[k] = cols[hi];
-            cols[hi++] = col;
-          }
-        }
-      }
-    }
-
-    for (size_t k = csr.indptr[static_cast<size_t>(row)]; k < csr.indptr[static_cast<size_t>(row) + 1]; ++k) {
-      reverseCol[csr.indices[k]] = -1;
-    }
-  }
-  return -1;
-}
-
-[[nodiscard]] int32_t sparseFindPathAllColumns(const CanonicalCsr& csr,
-                                               int32_t startRow,
-                                               const std::vector<int32_t>& rowForCol,
-                                               std::vector<double>& colReduction,
-                                               std::vector<int32_t>& pred)
-{
-  const size_t n = csr.n;
-  size_t lo = 0;
-  size_t hi = 0;
-  size_t readyCount = 0;
-  int32_t finalCol = -1;
-  std::vector<int32_t> cols(n, -1);
-  std::vector<double> distances(n, kInf);
-
-  for (size_t col = 0; col < n; ++col) {
-    cols[col] = static_cast<int32_t>(col);
-    pred[col] = startRow;
-  }
-  for (size_t k = csr.indptr[static_cast<size_t>(startRow)]; k < csr.indptr[static_cast<size_t>(startRow) + 1]; ++k) {
-    const size_t col = csr.indices[k];
-    distances[col] = csr.costs[k] - colReduction[col];
-  }
-
-  while (finalCol == -1) {
-    if (lo == hi) {
-      readyCount = lo;
-      if (lo >= n) {
-        throw ZException("sparse linear assignment internal search failed");
-      }
-      hi = sparseFindColumnsWithMinimum(n, lo, distances, cols);
-      if (distances[static_cast<size_t>(cols[lo])] == kInf) {
-        throw ZException("sparse linear assignment cost matrix is infeasible");
-      }
-      for (size_t k = lo; k < hi; ++k) {
-        const int32_t col = cols[k];
-        if (rowForCol[static_cast<size_t>(col)] < 0) {
-          finalCol = col;
-        }
-      }
-    }
-    if (finalCol == -1) {
-      finalCol = sparseScanAllColumns(csr, lo, hi, distances, cols, pred, rowForCol, colReduction);
-    }
-  }
-
-  const double minDistance = distances[static_cast<size_t>(cols[lo])];
-  for (size_t k = 0; k < readyCount; ++k) {
-    const int32_t col = cols[k];
-    colReduction[static_cast<size_t>(col)] += distances[static_cast<size_t>(col)] - minDistance;
-  }
-  return finalCol;
+  return static_cast<size_t>(newFreeRows);
 }
 
 [[nodiscard]] int32_t sparseFindColumnsWithMinimumTodo(const std::vector<double>& distances,
@@ -1057,6 +1124,152 @@ sparseFindColumnsWithMinimum(size_t n, size_t lo, const std::vector<double>& dis
   return hi;
 }
 
+[[nodiscard]] int32_t
+sparseFindColumnsWithMinimumAll(int32_t n, int32_t lo, const std::vector<double>& distances, std::vector<int32_t>& cols)
+{
+  const double* const distancesData = distances.data();
+  int32_t* const colsData = cols.data();
+  int32_t hi = lo + 1;
+  double minDistance = distancesData[colsData[lo]];
+  for (int32_t k = hi; k < n; ++k) {
+    const int32_t col = colsData[k];
+    const double distance = distancesData[col];
+    if (distance <= minDistance) {
+      if (distance < minDistance) {
+        hi = lo;
+        minDistance = distance;
+      }
+      colsData[k] = colsData[hi];
+      colsData[hi++] = col;
+    }
+  }
+  return hi;
+}
+
+[[nodiscard]] int32_t sparseScanAllColumns(const CanonicalCsr& csr,
+                                           int32_t& lo,
+                                           int32_t& hi,
+                                           std::vector<double>& distances,
+                                           std::vector<int32_t>& cols,
+                                           std::vector<int32_t>& pred,
+                                           std::vector<int32_t>& rowEntryByCol,
+                                           const std::vector<int32_t>& rowForCol,
+                                           const std::vector<double>& colReduction)
+{
+  const int32_t* const indptr = csr.indptr.data();
+  const int32_t* const indices = csr.indices.data();
+  const double* const costs = csr.costs.data();
+  double* const distancesData = distances.data();
+  int32_t* const colsData = cols.data();
+  int32_t* const predData = pred.data();
+  int32_t* const rowEntryByColData = rowEntryByCol.data();
+  const int32_t* const rowForColData = rowForCol.data();
+  const double* const colReductionData = colReduction.data();
+  int32_t scanLo = lo;
+  int32_t scanHi = hi;
+  const int32_t n = static_cast<int32_t>(csr.n);
+  while (scanLo != scanHi) {
+    int32_t col = colsData[scanLo++];
+    const int32_t row = rowForColData[col];
+    CHECK(row >= 0);
+    const double minDistance = distancesData[col];
+
+    std::fill(rowEntryByColData, rowEntryByColData + n, -1);
+    const int32_t rowBegin = indptr[row];
+    const int32_t rowEnd = indptr[row + 1];
+    for (int32_t k = rowBegin; k < rowEnd; ++k) {
+      rowEntryByColData[indices[k]] = k;
+    }
+
+    const int32_t assignedEntry = rowEntryByColData[col];
+    CHECK(assignedEntry >= 0);
+    const double h = costs[assignedEntry] - colReductionData[col] - minDistance;
+
+    for (int32_t k = scanHi; k < n; ++k) {
+      col = colsData[k];
+      const int32_t entry = rowEntryByColData[col];
+      if (entry < 0) {
+        continue;
+      }
+      const double reduced = costs[entry] - colReductionData[col] - h;
+      if (reduced < distancesData[col]) {
+        distancesData[col] = reduced;
+        predData[col] = row;
+        if (reduced == minDistance) {
+          if (rowForColData[col] < 0) {
+            return col;
+          }
+          colsData[k] = colsData[scanHi];
+          colsData[scanHi++] = col;
+        }
+      }
+    }
+  }
+  lo = scanLo;
+  hi = scanHi;
+  return -1;
+}
+
+[[nodiscard]] int32_t sparseFindPathAllColumns(const CanonicalCsr& csr,
+                                               int32_t startRow,
+                                               const std::vector<int32_t>& rowForCol,
+                                               std::vector<double>& colReduction,
+                                               std::vector<int32_t>& pred)
+{
+  const int32_t n = static_cast<int32_t>(csr.n);
+  int32_t lo = 0;
+  int32_t hi = 0;
+  int32_t readyCount = 0;
+  int32_t finalCol = -1;
+  std::vector<int32_t> cols(csr.n, -1);
+  std::vector<int32_t> rowEntryByCol(csr.n, -1);
+  std::vector<double> distances(csr.n, kInf);
+  int32_t* const colsData = cols.data();
+  int32_t* const predData = pred.data();
+  double* const distancesData = distances.data();
+  const int32_t* const rowForColData = rowForCol.data();
+  const double* const colReductionData = colReduction.data();
+  const int32_t* const indptr = csr.indptr.data();
+  const int32_t* const indices = csr.indices.data();
+  const double* const costs = csr.costs.data();
+
+  for (int32_t col = 0; col < n; ++col) {
+    colsData[col] = col;
+    predData[col] = startRow;
+  }
+
+  for (int32_t k = indptr[startRow]; k < indptr[startRow + 1]; ++k) {
+    const int32_t col = indices[k];
+    distancesData[col] = costs[k] - colReductionData[col];
+  }
+
+  while (finalCol == -1) {
+    if (lo == hi) {
+      readyCount = lo;
+      hi = sparseFindColumnsWithMinimumAll(n, lo, distances, cols);
+      if (!std::isfinite(distancesData[colsData[lo]])) {
+        throw ZException("sparse linear assignment cost matrix is infeasible");
+      }
+      for (int32_t k = lo; k < hi; ++k) {
+        const int32_t col = colsData[k];
+        if (rowForColData[col] < 0) {
+          finalCol = col;
+        }
+      }
+    }
+    if (finalCol == -1) {
+      finalCol = sparseScanAllColumns(csr, lo, hi, distances, cols, pred, rowEntryByCol, rowForCol, colReduction);
+    }
+  }
+
+  const double minDistance = distancesData[colsData[lo]];
+  for (int32_t k = 0; k < readyCount; ++k) {
+    const int32_t col = colsData[k];
+    colReduction[static_cast<size_t>(col)] += distancesData[col] - minDistance;
+  }
+  return finalCol;
+}
+
 [[nodiscard]] int32_t sparseScanTodoColumns(const CanonicalCsr& csr,
                                             size_t& lo,
                                             size_t& hi,
@@ -1072,25 +1285,23 @@ sparseFindColumnsWithMinimum(size_t n, size_t lo, const std::vector<double>& dis
                                             const std::vector<int32_t>& rowForCol,
                                             const std::vector<double>& colReduction)
 {
-  std::vector<int32_t> reverseCol(csr.n, -1);
-  while (lo != hi) {
-    int32_t col = scan[lo++];
+  size_t scanLo = lo;
+  size_t scanHi = hi;
+  size_t nextReadyCount = readyCount;
+  size_t nextTodoCount = todoCount;
+  while (scanLo != scanHi) {
+    int32_t col = scan[scanLo++];
     const int32_t row = rowForCol[static_cast<size_t>(col)];
     CHECK(row >= 0);
-    ready[readyCount++] = col;
+    ready[nextReadyCount++] = col;
     const double minDistance = distances[static_cast<size_t>(col)];
 
-    for (size_t k = csr.indptr[static_cast<size_t>(row)]; k < csr.indptr[static_cast<size_t>(row) + 1]; ++k) {
-      reverseCol[csr.indices[k]] = static_cast<int32_t>(k);
-    }
+    const size_t assignedEdge = findCsrEntry(csr, static_cast<size_t>(row), col);
+    CHECK(assignedEdge != std::numeric_limits<size_t>::max());
+    const double h = csr.costs[assignedEdge] - colReduction[static_cast<size_t>(col)] - minDistance;
 
-    const int32_t assignedEdge = reverseCol[static_cast<size_t>(col)];
-    CHECK(assignedEdge >= 0);
-    const double h =
-      csr.costs[static_cast<size_t>(assignedEdge)] - colReduction[static_cast<size_t>(col)] - minDistance;
-
-    for (size_t k = csr.indptr[static_cast<size_t>(row)]; k < csr.indptr[static_cast<size_t>(row) + 1]; ++k) {
-      col = static_cast<int32_t>(csr.indices[k]);
+    for (size_t k = csrRowBegin(csr, static_cast<size_t>(row)); k < csrRowEnd(csr, static_cast<size_t>(row)); ++k) {
+      col = static_cast<int32_t>(csrColumn(csr, k));
       if (done[static_cast<size_t>(col)]) {
         continue;
       }
@@ -1100,25 +1311,21 @@ sparseFindColumnsWithMinimum(size_t n, size_t lo, const std::vector<double>& dis
         pred[static_cast<size_t>(col)] = row;
         if (reduced <= minDistance) {
           if (rowForCol[static_cast<size_t>(col)] < 0) {
-            for (size_t rk = csr.indptr[static_cast<size_t>(row)]; rk < csr.indptr[static_cast<size_t>(row) + 1];
-                 ++rk) {
-              reverseCol[csr.indices[rk]] = -1;
-            }
             return col;
           }
-          scan[hi++] = col;
+          scan[scanHi++] = col;
           done[static_cast<size_t>(col)] = char{1};
         } else if (!added[static_cast<size_t>(col)]) {
-          todo[todoCount++] = col;
+          todo[nextTodoCount++] = col;
           added[static_cast<size_t>(col)] = char{1};
         }
       }
     }
-
-    for (size_t k = csr.indptr[static_cast<size_t>(row)]; k < csr.indptr[static_cast<size_t>(row) + 1]; ++k) {
-      reverseCol[csr.indices[k]] = -1;
-    }
   }
+  lo = scanLo;
+  hi = scanHi;
+  readyCount = nextReadyCount;
+  todoCount = nextTodoCount;
   return -1;
 }
 
@@ -1133,7 +1340,7 @@ sparseFindColumnsWithMinimum(size_t n, size_t lo, const std::vector<double>& dis
   size_t hi = 0;
   int32_t finalCol = -1;
   size_t readyCount = 0;
-  size_t todoCount = csr.indptr[static_cast<size_t>(startRow) + 1] - csr.indptr[static_cast<size_t>(startRow)];
+  size_t todoCount = csrRowEnd(csr, static_cast<size_t>(startRow)) - csrRowBegin(csr, static_cast<size_t>(startRow));
 
   std::vector<char> done(n, char{0});
   std::vector<char> added(n, char{0});
@@ -1145,10 +1352,11 @@ sparseFindColumnsWithMinimum(size_t n, size_t lo, const std::vector<double>& dis
   for (size_t col = 0; col < n; ++col) {
     pred[col] = startRow;
   }
-  for (size_t k = csr.indptr[static_cast<size_t>(startRow)]; k < csr.indptr[static_cast<size_t>(startRow) + 1]; ++k) {
-    const size_t col = csr.indices[k];
+  const size_t startRowBegin = csrRowBegin(csr, static_cast<size_t>(startRow));
+  for (size_t k = startRowBegin; k < csrRowEnd(csr, static_cast<size_t>(startRow)); ++k) {
+    const size_t col = csrColumn(csr, k);
     distances[col] = csr.costs[k] - colReduction[col];
-    todo[k - csr.indptr[static_cast<size_t>(startRow)]] = static_cast<int32_t>(col);
+    todo[k - startRowBegin] = static_cast<int32_t>(col);
     added[col] = char{1};
   }
 
@@ -1195,19 +1403,6 @@ sparseFindColumnsWithMinimum(size_t n, size_t lo, const std::vector<double>& dis
   return finalCol;
 }
 
-[[nodiscard]] int32_t sparseFindPathDynamic(const CanonicalCsr& csr,
-                                            int32_t startRow,
-                                            const std::vector<int32_t>& rowForCol,
-                                            std::vector<double>& colReduction,
-                                            std::vector<int32_t>& pred)
-{
-  const double sparsity = static_cast<double>(csr.costs.size()) / static_cast<double>(csr.n * csr.n);
-  if (sparsity > 0.25) {
-    return sparseFindPathAllColumns(csr, startRow, rowForCol, colReduction, pred);
-  }
-  return sparseFindPathTodoColumns(csr, startRow, rowForCol, colReduction, pred);
-}
-
 void sparseAugment(const CanonicalCsr& csr,
                    size_t numFreeRows,
                    std::vector<int32_t>& freeRows,
@@ -1215,11 +1410,13 @@ void sparseAugment(const CanonicalCsr& csr,
                    std::vector<int32_t>& rowForCol,
                    std::vector<double>& colReduction)
 {
+  const bool useAllColumns = csr.costs.size() * 4 > csr.n * csr.n;
   std::vector<int32_t> pred(csr.n, -1);
   for (size_t freeRowIndex = 0; freeRowIndex < numFreeRows; ++freeRowIndex) {
     const int32_t freeRow = freeRows[freeRowIndex];
     int32_t row = -1;
-    int32_t col = sparseFindPathDynamic(csr, freeRow, rowForCol, colReduction, pred);
+    int32_t col = useAllColumns ? sparseFindPathAllColumns(csr, freeRow, rowForCol, colReduction, pred)
+                                : sparseFindPathTodoColumns(csr, freeRow, rowForCol, colReduction, pred);
     CHECK(col >= 0);
     size_t guard = 0;
     while (row != freeRow) {
@@ -1235,18 +1432,15 @@ void sparseAugment(const CanonicalCsr& csr,
 [[nodiscard]] double sparseAssignmentCost(const CanonicalCsr& csr, const std::vector<int32_t>& colForRow)
 {
   double total = 0.0;
-  for (size_t row = 0; row < csr.n; ++row) {
+  CHECK(colForRow.size() == csr.originalRows);
+  for (size_t row = 0; row < csr.originalRows; ++row) {
     const int32_t col = colForRow[row];
-    CHECK(col >= 0);
-    bool found = false;
-    for (size_t k = csr.indptr[row]; k < csr.indptr[row + 1]; ++k) {
-      if (csr.indices[k] == static_cast<size_t>(col)) {
-        total += csr.originalCosts[k];
-        found = true;
-        break;
-      }
+    if (col < 0) {
+      continue;
     }
-    CHECK(found);
+    const size_t entry = findCsrEntry(csr, row, col);
+    CHECK(entry != std::numeric_limits<size_t>::max());
+    total += csr.originalCosts[entry];
   }
   return total;
 }
@@ -1338,20 +1532,46 @@ ZLinearAssignmentResult solveLinearAssignmentCsr(const ZLinearAssignmentCsrView&
     throw ZException("sparse linear assignment does not support cost_limit");
   }
 
-  CanonicalCsr csr = canonicalizeCsr(view, isMaximize(options));
-  if (csr.n == 0) {
-    return {};
-  }
-  if (!csrHasPerfectMatching(csr)) {
-    throw ZException("sparse linear assignment cost matrix is infeasible");
+  const bool maximize = isMaximize(options);
+  if (view.rows == 0 || view.cols == 0) {
+    return emptyResult(view.rows, view.cols);
   }
 
-  std::vector<int32_t> colForRow(csr.n, -1);
-  std::vector<int32_t> rowForCol(csr.n, -1);
-  std::vector<int32_t> freeRows(csr.n, -1);
-  std::vector<double> colReduction(csr.n, 0.0);
-
-  size_t numFreeRows = sparseColumnReductionAndTransfer(csr, freeRows, colForRow, rowForCol, colReduction);
+  CanonicalCsr csr;
+  std::vector<int32_t> colForRow;
+  std::vector<int32_t> rowForCol;
+  std::vector<int32_t> freeRows;
+  std::vector<double> colReduction;
+  size_t numFreeRows = 0;
+  bool initializedReduction = false;
+  if (!maximize && view.rows == view.cols) {
+    colForRow.assign(view.rows, -1);
+    rowForCol.assign(view.rows, -1);
+    freeRows.assign(view.rows, -1);
+    colReduction.assign(view.rows, 0.0);
+    initializedReduction =
+      sparseSquareColumnReductionAndTransferFromInput(view, freeRows, colForRow, rowForCol, colReduction, numFreeRows);
+    if (initializedReduction) {
+      csr.n = view.rows;
+      csr.originalRows = view.rows;
+      csr.originalCols = view.cols;
+      csr.indptr = view.indptr;
+      csr.indices = view.indices;
+      csr.costs = view.costs;
+      csr.originalCosts = view.costs;
+    }
+  }
+  if (!initializedReduction) {
+    csr = canonicalizeCsr(view, maximize);
+    if (csr.n == 0) {
+      return emptyResult(view.rows, view.cols);
+    }
+    colForRow.assign(csr.n, -1);
+    rowForCol.assign(csr.n, -1);
+    freeRows.assign(csr.n, -1);
+    colReduction.assign(csr.n, 0.0);
+    numFreeRows = sparseColumnReductionAndTransfer(csr, freeRows, colForRow, rowForCol, colReduction);
+  }
   for (int pass = 0; numFreeRows > 0 && pass < 2; ++pass) {
     numFreeRows = sparseAugmentingRowReduction(csr, numFreeRows, freeRows, colForRow, rowForCol, colReduction);
   }
@@ -1360,8 +1580,15 @@ ZLinearAssignmentResult solveLinearAssignmentCsr(const ZLinearAssignmentCsrView&
   }
 
   ZLinearAssignmentResult result;
-  result.rowToCol = std::move(colForRow);
-  result.colToRow = std::move(rowForCol);
+  result.rowToCol.assign(csr.originalRows, -1);
+  result.colToRow.assign(csr.originalCols, -1);
+  for (size_t row = 0; row < csr.originalRows; ++row) {
+    const int32_t col = colForRow[row];
+    if (col >= 0 && static_cast<size_t>(col) < csr.originalCols) {
+      result.rowToCol[row] = col;
+      result.colToRow[static_cast<size_t>(col)] = static_cast<int32_t>(row);
+    }
+  }
   result.cost = sparseAssignmentCost(csr, result.rowToCol);
   return result;
 }

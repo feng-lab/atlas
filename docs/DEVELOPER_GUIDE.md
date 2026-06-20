@@ -56,7 +56,9 @@ Linear Assignment Solver
 - Dense C++ API: `solveLinearAssignment(...)` accepts row-major spans or pointer/stride input and supports rectangular
   matrices. `double` input is the zero-copy fast path; arithmetic vector/span overloads copy to `double` for convenience.
   Use `ZLinearAssignmentOptions` for minimization/maximization and optional minimization `costLimit`.
-- Sparse C++ API: `solveLinearAssignmentCsr(...)` accepts square CSR through `ZLinearAssignmentCsrView`. The core view uses
+- Sparse C++ API: `solveLinearAssignmentCsr(...)` accepts square or rectangular CSR through
+  `ZLinearAssignmentCsrView`. Rectangular sparse input follows the dense API convention: it matches
+  `min(rows, cols)` pairs when feasible and leaves extra rows or columns as `-1` in the result vectors. The core view uses
   `int32_t` indices and `double` costs; overloads accept other integral index arrays and arithmetic cost arrays by checked
   conversion. CSR costs must be finite; omit forbidden edges instead of storing infinities. Assignment result vectors use
   `int32_t`; dimensions or converted CSR indices larger than that range fail fast.
@@ -65,7 +67,8 @@ Linear Assignment Solver
   index dtypes to `int32` with finite/integer/range checks for floating-point index arrays, returns `int32` index arrays, and
   avoids conversion copies only for directly usable contiguous `float64` cost data and `int32` CSR indices. It releases the
   GIL while solving.
-- Tests: `test/zlinearassignmenttest.cpp`. Benchmark entry: `zbenchmark --benchmark_filter=linearAssignment`.
+- Tests: `test/zlinearassignmenttest.cpp`. Benchmark entry: `zbenchmark --benchmark_filter=linearAssignment`; pass
+  `--atlas_linear_assignment_large_benchmark=true` to include the guarded 12000-row and dense-ish sparse CSR cases.
 
 Entry Points
 

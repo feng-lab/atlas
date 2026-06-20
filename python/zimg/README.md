@@ -111,7 +111,10 @@ limited = zimg.linear_assignment(cost, cost_limit=4.99)
 ```
 
 Sparse assignment is exposed through `zimg.linear_assignment_csr(...)`. It
-accepts square CSR arrays: `indptr`, `indices`, and `data`. `indptr` and
+accepts square or rectangular CSR arrays: `indptr`, `indices`, and `data`.
+Rectangular sparse input follows the dense API convention: the solver matches
+`min(rows, cols)` pairs when feasible and leaves extra rows or columns as `-1`
+in the result vectors. `indptr` and
 `indices` can use numeric scalar dtypes convertible to `int32`; non-integral
 floating-point index values and out-of-range values are rejected. `data` can
 use any real numeric scalar dtype supported by the binding and is converted to

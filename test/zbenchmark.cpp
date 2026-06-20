@@ -33,6 +33,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <future>
+#include <fstream>
 #include "zcommandlineflags.h"
 #include <limits>
 #include <mutex>
@@ -51,6 +52,14 @@ ABSL_FLAG(bool,
           atlas_resize_3d_exact_benchmark,
           false,
           "Enable exact-size 3D cubic-AA resize benchmarks, which allocate multi-GB working sets.");
+ABSL_FLAG(bool,
+          atlas_linear_assignment_large_benchmark,
+          false,
+          "Enable large linear-assignment benchmarks that can take multiple seconds per iteration.");
+ABSL_FLAG(std::string,
+          atlas_linear_assignment_csr_fixture,
+          "",
+          "Path to a binary CSR fixture for BM_linearAssignmentSparseCsrFixture.");
 
 namespace nim {
 
@@ -114,6 +123,203 @@ static void BM_linearAssignmentDenseSquare(benchmark::State& state)
   state.SetItemsProcessed(state.iterations() * static_cast<int64_t>(n));
 }
 
+struct LinearAssignmentCsrBenchInput
+{
+  size_t rows = 0;
+  size_t cols = 0;
+  std::vector<int32_t> indptr;
+  std::vector<int32_t> indices;
+  std::vector<double> costs;
+};
+
+void readLinearAssignmentFixtureBytes(std::ifstream& stream, char* data, size_t bytes, std::string_view field)
+{
+  stream.read(data, static_cast<std::streamsize>(bytes));
+  if (!stream) {
+    throw ZException(QStringLiteral("failed to read linear assignment CSR fixture field: %1").arg(field.data()));
+  }
+}
+
+template<typename T>
+[[nodiscard]] T readLinearAssignmentFixtureValue(std::ifstream& stream, std::string_view field)
+{
+  T value{};
+  readLinearAssignmentFixtureBytes(stream, reinterpret_cast<char*>(&value), sizeof(T), field);
+  return value;
+}
+
+[[nodiscard]] LinearAssignmentCsrBenchInput readLinearAssignmentCsrFixture(const std::string& path)
+{
+  std::ifstream stream(path, std::ios::binary);
+  if (!stream) {
+    throw ZException(QStringLiteral("failed to open linear assignment CSR fixture: %1").arg(path.c_str()));
+  }
+
+  std::array<char, 8> magic{};
+  readLinearAssignmentFixtureBytes(stream, magic.data(), magic.size(), "magic");
+  constexpr std::array<char, 8> kExpectedMagic{'Z', 'L', 'A', 'P', 'C', 'S', 'R', '1'};
+  if (magic != kExpectedMagic) {
+    throw ZException("linear assignment CSR fixture has an invalid magic header");
+  }
+
+  const uint64_t rows = readLinearAssignmentFixtureValue<uint64_t>(stream, "rows");
+  const uint64_t cols = readLinearAssignmentFixtureValue<uint64_t>(stream, "cols");
+  const uint64_t nnz = readLinearAssignmentFixtureValue<uint64_t>(stream, "nnz");
+  constexpr uint64_t maxInt32 = static_cast<uint64_t>(std::numeric_limits<int32_t>::max());
+  if (rows > maxInt32 || cols > maxInt32 || nnz > maxInt32) {
+    throw ZException("linear assignment CSR fixture exceeds int32 benchmark limits");
+  }
+
+  LinearAssignmentCsrBenchInput input;
+  input.rows = static_cast<size_t>(rows);
+  input.cols = static_cast<size_t>(cols);
+  input.indptr.resize(input.rows + 1);
+  input.indices.resize(static_cast<size_t>(nnz));
+  input.costs.resize(static_cast<size_t>(nnz));
+  readLinearAssignmentFixtureBytes(stream,
+                                   reinterpret_cast<char*>(input.indptr.data()),
+                                   input.indptr.size() * sizeof(int32_t),
+                                   "indptr");
+  readLinearAssignmentFixtureBytes(stream,
+                                   reinterpret_cast<char*>(input.indices.data()),
+                                   input.indices.size() * sizeof(int32_t),
+                                   "indices");
+  readLinearAssignmentFixtureBytes(stream,
+                                   reinterpret_cast<char*>(input.costs.data()),
+                                   input.costs.size() * sizeof(double),
+                                   "costs");
+  return input;
+}
+
+[[nodiscard]] uint64_t linearAssignmentBenchHash(uint64_t value)
+{
+  value += 0x9e3779b97f4a7c15ull;
+  value = (value ^ (value >> 30)) * 0xbf58476d1ce4e5b9ull;
+  value = (value ^ (value >> 27)) * 0x94d049bb133111ebull;
+  return value ^ (value >> 31);
+}
+
+[[nodiscard]] LinearAssignmentCsrBenchInput makeLinearAssignmentSparseCsrBenchInput(size_t n, size_t nnzPerRow)
+{
+  CHECK_GT(n, 0);
+  CHECK_GT(nnzPerRow, 0);
+  CHECK_LE(nnzPerRow, n);
+  CHECK_LE(n, static_cast<size_t>(std::numeric_limits<int32_t>::max()));
+  CHECK_LE(n * nnzPerRow, static_cast<size_t>(std::numeric_limits<int32_t>::max()));
+
+  LinearAssignmentCsrBenchInput input;
+  input.rows = n;
+  input.cols = n;
+  input.indptr.resize(n + 1);
+  input.indices.reserve(n * nnzPerRow);
+  input.costs.reserve(n * nnzPerRow);
+
+  std::vector<int32_t> rowCols;
+  rowCols.reserve(nnzPerRow);
+  std::vector<int32_t> excludedCols;
+  for (size_t row = 0; row < n; ++row) {
+    input.indptr[row] = static_cast<int32_t>(input.indices.size());
+    rowCols.clear();
+    uint64_t state = linearAssignmentBenchHash(row ^ (n << 21) ^ (nnzPerRow << 47));
+    if (nnzPerRow <= n / 2) {
+      rowCols.push_back(static_cast<int32_t>(row));
+      while (rowCols.size() < nnzPerRow) {
+        state = linearAssignmentBenchHash(state);
+        const int32_t col = static_cast<int32_t>(state % n);
+        if (std::find(rowCols.begin(), rowCols.end(), col) == rowCols.end()) {
+          rowCols.push_back(col);
+        }
+      }
+      std::sort(rowCols.begin(), rowCols.end());
+    } else {
+      const size_t missingCount = n - nnzPerRow;
+      excludedCols.clear();
+      excludedCols.reserve(missingCount);
+      while (excludedCols.size() < missingCount) {
+        state = linearAssignmentBenchHash(state);
+        const int32_t col = static_cast<int32_t>(state % n);
+        if (col != static_cast<int32_t>(row) &&
+            std::find(excludedCols.begin(), excludedCols.end(), col) == excludedCols.end()) {
+          excludedCols.push_back(col);
+        }
+      }
+      std::sort(excludedCols.begin(), excludedCols.end());
+      for (size_t col = 0; col < n; ++col) {
+        if (!std::binary_search(excludedCols.begin(), excludedCols.end(), static_cast<int32_t>(col))) {
+          rowCols.push_back(static_cast<int32_t>(col));
+        }
+      }
+    }
+    for (const int32_t col : rowCols) {
+      input.indices.push_back(col);
+      const uint64_t costHash =
+        linearAssignmentBenchHash((row + 1) * 0x517cc1b727220a95ull ^ (static_cast<uint64_t>(col) + 1));
+      input.costs.push_back(static_cast<double>(costHash % 100u) + 1.0);
+    }
+  }
+  input.indptr[n] = static_cast<int32_t>(input.indices.size());
+  return input;
+}
+
+static void BM_linearAssignmentSparseCsr(benchmark::State& state)
+{
+  const size_t n = static_cast<size_t>(state.range(0));
+  const size_t nnzPerRow = static_cast<size_t>(state.range(1));
+  if ((n > 4096 || n * nnzPerRow > 1'000'000) && !absl::GetFlag(FLAGS_atlas_linear_assignment_large_benchmark)) {
+    state.SkipWithError("pass --atlas_linear_assignment_large_benchmark=true to enable large sparse CSR cases");
+    return;
+  }
+
+  const LinearAssignmentCsrBenchInput input = makeLinearAssignmentSparseCsrBenchInput(n, nnzPerRow);
+  while (state.KeepRunning()) {
+    const auto result = solveLinearAssignmentCsr(n, n, input.indptr, input.indices, input.costs);
+    double resultCost = result.cost;
+    benchmark::DoNotOptimize(resultCost);
+    benchmark::DoNotOptimize(result.rowToCol.data());
+  }
+  state.SetItemsProcessed(state.iterations() * static_cast<int64_t>(input.costs.size()));
+  state.counters["density"] = static_cast<double>(input.costs.size()) / static_cast<double>(n * n);
+  state.counters["edges"] = static_cast<double>(input.costs.size());
+  state.counters["nnz_per_row"] = static_cast<double>(nnzPerRow);
+}
+
+static void BM_linearAssignmentSparseCsrFixture(benchmark::State& state)
+{
+  const std::string path = absl::GetFlag(FLAGS_atlas_linear_assignment_csr_fixture);
+  if (path.empty()) {
+    state.SkipWithError("pass --atlas_linear_assignment_csr_fixture=/path/to/fixture.bin");
+    return;
+  }
+
+  LinearAssignmentCsrBenchInput input;
+  try {
+    input = readLinearAssignmentCsrFixture(path);
+  }
+  catch (const std::exception& e) {
+    state.SkipWithError(e.what());
+    return;
+  }
+
+  if ((input.rows > 4096 || input.costs.size() > 1'000'000) &&
+      !absl::GetFlag(FLAGS_atlas_linear_assignment_large_benchmark)) {
+    state.SkipWithError("pass --atlas_linear_assignment_large_benchmark=true to enable large CSR fixture cases");
+    return;
+  }
+
+  while (state.KeepRunning()) {
+    const auto result = solveLinearAssignmentCsr(input.rows, input.cols, input.indptr, input.indices, input.costs);
+    double resultCost = result.cost;
+    benchmark::DoNotOptimize(resultCost);
+    benchmark::DoNotOptimize(result.rowToCol.data());
+  }
+  state.SetItemsProcessed(state.iterations() * static_cast<int64_t>(input.costs.size()));
+  state.counters["cols"] = static_cast<double>(input.cols);
+  state.counters["density"] =
+    static_cast<double>(input.costs.size()) / (static_cast<double>(input.rows) * static_cast<double>(input.cols));
+  state.counters["edges"] = static_cast<double>(input.costs.size());
+  state.counters["rows"] = static_cast<double>(input.rows);
+}
+
 static void addLinearAssignmentBench()
 {
   BENCHMARK(BM_linearAssignmentDenseSquare)
@@ -125,6 +331,15 @@ static void addLinearAssignmentBench()
     ->Arg(2048)
     ->Arg(4096)
     ->Arg(12000);
+  BENCHMARK(BM_linearAssignmentSparseCsr)
+    ->Args({512, 8})
+    ->Args({1024, 10})
+    ->Args({2048, 16})
+    ->Args({4096, 16})
+    ->Args({12000, 16})
+    ->Args({1000, 990})
+    ->Args({4000, 3984});
+  BENCHMARK(BM_linearAssignmentSparseCsrFixture);
 }
 
 inline int64_t saturate_mul_boost(int64_t x, int64_t y)

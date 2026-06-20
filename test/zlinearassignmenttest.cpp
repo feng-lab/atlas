@@ -25,6 +25,51 @@ constexpr double kCostEpsExpectedCost = 224.8899507294651;
 constexpr size_t kSyntheticScanRegressionSize = 1024;
 constexpr double kSyntheticScanRegressionExpectedCost = 1684.2179999999998;
 
+struct SquareAssignmentCase
+{
+  std::vector<double> costs;
+  size_t n = 0;
+  double expectedCost = 0.0;
+  std::vector<int32_t> rowToCol;
+  std::vector<int32_t> colToRow;
+};
+
+struct CsrFixture
+{
+  std::vector<int32_t> indptr;
+  std::vector<int32_t> indices;
+  std::vector<double> data;
+};
+
+struct CooEntry
+{
+  int32_t row = 0;
+  int32_t col = 0;
+  double cost = 0.0;
+};
+
+[[nodiscard]] std::vector<SquareAssignmentCase> lapReferenceSquareCases()
+{
+  return {
+    {{1000, 2,    11, 10, 8,  7,    6,  5,  6, 1000, 1,    8,  8,  4,  6,    7,  5,  12, 1000, 11,  8, 12,
+      3,    11,   11, 9,  10, 1000, 1,  9,  8, 10,   11,   11, 9,  4,  1000, 2,  10, 9,  12,   8,   5, 2,
+      11,   1000, 11, 9,  10, 11,   12, 10, 9, 12,   1000, 3,  10, 10, 10,   10, 6,  3,  1,    1000},
+     8,                                                                                                       17.0,
+     {1, 2, 0, 4, 5, 3, 7, 6},
+     {2, 0, 1, 5, 3, 4, 7, 6}                                                                                                                   },
+    {{1000, 4, 1, 1, 1000, 3, 5, 1, 1000},                                                                 3, 3.0,    {2, 0, 1},    {1, 2, 0}   },
+    {{5, 1000, 3, 1000, 2, 2, 1, 5, 1000},                                                                 3, 6.0,    {2, 1, 0},    {2, 1, 0}   },
+    {{1000, 1001, 1000, 1000, 1000, 1001, 1, 2, 3},                                                        3, 2001.0, {2, 1, 0},    {2, 1, 0}   },
+    {{10, 10, 13, 4, 8, 8, 8, 5, 8},                                                                       3, 22.0,   {2, 0, 1},    {1, 2, 0}   },
+    {{11, 10, 6, 10, 11, 11, 11, 12, 15},                                                                  3, 28.0,   {2, 0, 1},    {1, 2, 0}   },
+    {{12, 4, 9, 16, 15, 14, 19, 13, 17},                                                                   3, 37.0,   {1, 0, 2},    {1, 0, 2}   },
+    {{2, 5, 7, 7, 10, 12, 1, 5, 9},                                                                        3, 18.0,   {2, 1, 0},    {2, 1, 0}   },
+    {{10, 6, 14, 1, 17, 18, 17, 15, 14, 17, 15, 8, 11, 13, 11, 4},                                         4, 41.0,   {1, 2, 0, 3}, {2, 0, 1, 3}},
+    {{10, 10, 13, 4, 8, 8, 8, 5, 8},                                                                       3, 22.0,   {2, 0, 1},    {1, 2, 0}   },
+    {{2, 5, 7, 7, 10, 12, 1, 5, 9},                                                                        3, 18.0,   {2, 1, 0},    {2, 1, 0}   },
+  };
+}
+
 [[nodiscard]] std::vector<unsigned char> readFixtureBytes(const QString& relativePath)
 {
   const QString path = nim::getTestDataDir().filePath(relativePath);
@@ -157,6 +202,92 @@ void expectValidAssignment(const nim::ZLinearAssignmentResult& result, size_t ro
   EXPECT_EQ(matchedRows, std::min(rows, cols));
 }
 
+void expectAssignment(const nim::ZLinearAssignmentResult& result,
+                      const std::vector<double>& costs,
+                      size_t rows,
+                      size_t cols,
+                      double expectedCost,
+                      std::span<const int32_t> expectedRowToCol,
+                      std::span<const int32_t> expectedColToRow)
+{
+  expectValidAssignment(result, rows, cols);
+  EXPECT_NEAR(result.cost, expectedCost, 1e-10);
+  EXPECT_NEAR(result.cost, assignedCost(costs, rows, cols, result.rowToCol), 1e-10);
+  if (!expectedRowToCol.empty()) {
+    EXPECT_EQ(result.rowToCol, (std::vector<int32_t>{expectedRowToCol.begin(), expectedRowToCol.end()}));
+  }
+  if (!expectedColToRow.empty()) {
+    EXPECT_EQ(result.colToRow, (std::vector<int32_t>{expectedColToRow.begin(), expectedColToRow.end()}));
+  }
+}
+
+[[nodiscard]] CsrFixture makeFullCsr(size_t rows, size_t cols, const std::vector<double>& costs)
+{
+  CHECK_EQ(costs.size(), rows * cols);
+  CHECK_LE(cols, static_cast<size_t>(std::numeric_limits<int32_t>::max()));
+  CHECK_LE(rows * cols, static_cast<size_t>(std::numeric_limits<int32_t>::max()));
+
+  CsrFixture csr;
+  csr.indptr.assign(rows + 1, 0);
+  csr.indices.reserve(rows * cols);
+  csr.data.reserve(rows * cols);
+  for (size_t row = 0; row < rows; ++row) {
+    csr.indptr[row] = static_cast<int32_t>(csr.indices.size());
+    for (size_t col = 0; col < cols; ++col) {
+      csr.indices.push_back(static_cast<int32_t>(col));
+      csr.data.push_back(costAt(costs, rows, cols, row, col));
+    }
+  }
+  csr.indptr[rows] = static_cast<int32_t>(csr.indices.size());
+  return csr;
+}
+
+[[nodiscard]] CsrFixture makeFiniteCsr(size_t rows, size_t cols, const std::vector<double>& costs)
+{
+  CHECK_EQ(costs.size(), rows * cols);
+  CHECK_LE(cols, static_cast<size_t>(std::numeric_limits<int32_t>::max()));
+
+  CsrFixture csr;
+  csr.indptr.assign(rows + 1, 0);
+  for (size_t row = 0; row < rows; ++row) {
+    csr.indptr[row] = static_cast<int32_t>(csr.indices.size());
+    for (size_t col = 0; col < cols; ++col) {
+      const double cost = costAt(costs, rows, cols, row, col);
+      if (std::isfinite(cost)) {
+        csr.indices.push_back(static_cast<int32_t>(col));
+        csr.data.push_back(cost);
+      }
+    }
+  }
+  csr.indptr[rows] = static_cast<int32_t>(csr.indices.size());
+  return csr;
+}
+
+[[nodiscard]] CsrFixture makeCsrFromSortedEntries(size_t rows, std::vector<CooEntry> entries)
+{
+  std::sort(entries.begin(), entries.end(), [](const CooEntry& lhs, const CooEntry& rhs) {
+    if (lhs.row != rhs.row) {
+      return lhs.row < rhs.row;
+    }
+    return lhs.col < rhs.col;
+  });
+
+  CsrFixture csr;
+  csr.indptr.assign(rows + 1, 0);
+  size_t entryIndex = 0;
+  for (size_t row = 0; row < rows; ++row) {
+    csr.indptr[row] = static_cast<int32_t>(csr.indices.size());
+    while (entryIndex < entries.size() && entries[entryIndex].row == static_cast<int32_t>(row)) {
+      csr.indices.push_back(entries[entryIndex].col);
+      csr.data.push_back(entries[entryIndex].cost);
+      ++entryIndex;
+    }
+  }
+  CHECK_EQ(entryIndex, entries.size());
+  csr.indptr[rows] = static_cast<int32_t>(csr.indices.size());
+  return csr;
+}
+
 [[nodiscard]] double bruteForceMinCostRowsLeCols(const std::vector<double>& costs, size_t rows, size_t cols)
 {
   std::vector<int32_t> columns(cols);
@@ -201,20 +332,33 @@ TEST(ZLinearAssignment, DenseSquareFastMatchesLapReferenceCases)
 {
   using namespace nim;
 
-  const std::vector<std::pair<std::vector<double>, double>> cases = {
-    {{1000, 4, 1, 1, 1000, 3, 5, 1, 1000},                         3.0 },
-    {{5, 1000, 3, 1000, 2, 2, 1, 5, 1000},                         6.0 },
-    {{10, 10, 13, 4, 8, 8, 8, 5, 8},                               22.0},
-    {{11, 10, 6, 10, 11, 11, 11, 12, 15},                          28.0},
-    {{10, 6, 14, 1, 17, 18, 17, 15, 14, 17, 15, 8, 11, 13, 11, 4}, 41.0},
-  };
+  for (const SquareAssignmentCase& testCase : lapReferenceSquareCases()) {
+    const ZLinearAssignmentResult result = solveLinearAssignment(testCase.costs, testCase.n, testCase.n);
+    expectAssignment(result,
+                     testCase.costs,
+                     testCase.n,
+                     testCase.n,
+                     testCase.expectedCost,
+                     testCase.rowToCol,
+                     testCase.colToRow);
+  }
+}
 
-  for (const auto& [costs, expectedCost] : cases) {
-    const size_t n = static_cast<size_t>(std::sqrt(static_cast<double>(costs.size())));
-    const ZLinearAssignmentResult result = solveLinearAssignment(costs, n, n);
-    expectValidAssignment(result, n, n);
-    EXPECT_DOUBLE_EQ(result.cost, expectedCost);
-    EXPECT_DOUBLE_EQ(result.cost, assignedCost(costs, n, n, result.rowToCol));
+TEST(ZLinearAssignment, SparseCsrFullMatrixMatchesLapReferenceCases)
+{
+  using namespace nim;
+
+  for (const SquareAssignmentCase& testCase : lapReferenceSquareCases()) {
+    const CsrFixture csr = makeFullCsr(testCase.n, testCase.n, testCase.costs);
+    const ZLinearAssignmentResult result =
+      solveLinearAssignmentCsr(testCase.n, testCase.n, csr.indptr, csr.indices, csr.data);
+    expectAssignment(result,
+                     testCase.costs,
+                     testCase.n,
+                     testCase.n,
+                     testCase.expectedCost,
+                     testCase.rowToCol,
+                     testCase.colToRow);
   }
 }
 
@@ -297,6 +441,35 @@ TEST(ZLinearAssignment, DenseTallRectangularLeavesExtraRowsUnmatched)
   EXPECT_EQ(result.matchedRows().size(), 2);
 }
 
+TEST(ZLinearAssignment, DenseRectangularMatchesLapArrLoopRegression)
+{
+  using namespace nim;
+
+  const std::vector<double> values = {0.2593883482138951146,
+                                      0.3080381437461217620,
+                                      0.1976243020727339317,
+                                      0.2462740976049606068,
+                                      0.4203993396282833528,
+                                      0.4286184525458427985,
+                                      0.1706431415909629434,
+                                      0.2192929371231896185,
+                                      0.2117769622802734286,
+                                      0.2604267578125001315};
+  const std::vector<int32_t> rows = {0, 0, 1, 1, 2, 2, 5, 5, 6, 6};
+  const std::vector<int32_t> cols = {0, 1, 0, 1, 1, 2, 0, 1, 0, 1};
+
+  std::vector<double> costs(7 * 3, 1000.0);
+  for (size_t i = 0; i < values.size(); ++i) {
+    costs[static_cast<size_t>(rows[i]) * 3 + static_cast<size_t>(cols[i])] = values[i];
+  }
+
+  const ZLinearAssignmentResult result = solveLinearAssignment(costs, 7, 3);
+  expectValidAssignment(result, 7, 3);
+  EXPECT_NEAR(result.cost, 0.8455356917416, 1e-10);
+  EXPECT_NEAR(result.cost, assignedCost(costs, 7, 3, result.rowToCol), 1e-10);
+  EXPECT_TRUE(result.colToRow == (std::vector<int32_t>{5, 1, 2}) || result.colToRow == (std::vector<int32_t>{1, 5, 2}));
+}
+
 TEST(ZLinearAssignment, MaximizeMatchesBruteForceAfterNegation)
 {
   using namespace nim;
@@ -367,6 +540,25 @@ TEST(ZLinearAssignment, DenseInfCostMatrixUsesRectangularPathAndRejectsInfeasibl
   EXPECT_THROW((void)solveLinearAssignment(infeasible, 5, 5), ZException);
 }
 
+TEST(ZLinearAssignment, DenseInfeasibleInfCasesRaise)
+{
+  using namespace nim;
+
+  const std::vector<std::vector<double>> infeasibleCases = {
+    {0,  0,    0,  kInf, kInf, kInf, kInf, kInf, 0, 0,  kInf, kInf, kInf, 0,    0,    kInf, kInf, kInf, 0,  0,  0,  0,    0,  kInf, kInf},
+    {19, 22,   16, kInf, kInf, kInf, kInf, kInf, 4, 13, kInf, kInf, kInf,
+     3,                                                                         14,   kInf, kInf, kInf, 10, 12, 11, 14,   13, kInf, kInf},
+    {0,  kInf, 0,  0,    kInf, kInf, kInf, 0,    0, 0,  kInf, kInf, kInf,
+     0,                                                                         kInf, kInf, kInf, kInf, 0,  0,  0,  kInf, 0,  kInf, kInf},
+    {0,  0,    0,  0,    kInf, kInf, kInf, 0,    0, 0,  kInf, kInf, kInf, kInf, kInf, kInf, kInf, kInf, 0,  0,  0,  0,    0,  kInf, kInf},
+    std::vector<double>(25, kInf),
+  };
+
+  for (const std::vector<double>& costs : infeasibleCases) {
+    EXPECT_THROW((void)solveLinearAssignment(costs, 5, 5), ZException);
+  }
+}
+
 TEST(ZLinearAssignment, DenseValidationRejectsInvalidNumbers)
 {
   using namespace nim;
@@ -430,6 +622,184 @@ TEST(ZLinearAssignment, SparseCsrMatchesDenseReference)
   EXPECT_DOUBLE_EQ(result.cost, 71.0);
 }
 
+TEST(ZLinearAssignment, SparseCsrWideRectangularMatchesDense)
+{
+  using namespace nim;
+
+  const std::vector<double> costs = {
+    8,
+    2,
+    kInf,
+    7,
+    3,
+    6,
+    kInf,
+    1,
+    8,
+    5,
+    kInf,
+    6,
+    2,
+    4,
+    9,
+  };
+  const CsrFixture csr = makeFiniteCsr(3, 5, costs);
+
+  const ZLinearAssignmentResult sparse = solveLinearAssignmentCsr(3, 5, csr.indptr, csr.indices, csr.data);
+  const ZLinearAssignmentResult dense = solveLinearAssignment(costs, 3, 5);
+  expectValidAssignment(sparse, 3, 5);
+  expectValidAssignment(dense, 3, 5);
+  EXPECT_EQ(sparse.rowToCol, dense.rowToCol);
+  EXPECT_EQ(sparse.colToRow, dense.colToRow);
+  EXPECT_DOUBLE_EQ(sparse.cost, dense.cost);
+  EXPECT_DOUBLE_EQ(sparse.cost, bruteForceMinCost(costs, 3, 5));
+}
+
+TEST(ZLinearAssignment, SparseCsrTallRectangularMatchesDense)
+{
+  using namespace nim;
+
+  const std::vector<double> costs = {
+    4,
+    7,
+    2,
+    kInf,
+    6,
+    1,
+    3,
+    5,
+  };
+  const CsrFixture csr = makeFiniteCsr(4, 2, costs);
+
+  const ZLinearAssignmentResult sparse = solveLinearAssignmentCsr(4, 2, csr.indptr, csr.indices, csr.data);
+  const ZLinearAssignmentResult dense = solveLinearAssignment(costs, 4, 2);
+  expectValidAssignment(sparse, 4, 2);
+  expectValidAssignment(dense, 4, 2);
+  EXPECT_EQ(sparse.rowToCol, dense.rowToCol);
+  EXPECT_EQ(sparse.colToRow, dense.colToRow);
+  EXPECT_DOUBLE_EQ(sparse.cost, dense.cost);
+  EXPECT_DOUBLE_EQ(sparse.cost, bruteForceMinCost(costs, 4, 2));
+  EXPECT_EQ(sparse.matchedRows().size(), 2);
+}
+
+TEST(ZLinearAssignment, SparseCsrMaskedCasesMatchDenseAndBruteForce)
+{
+  using namespace nim;
+
+  auto runCase = [](std::vector<double> costs, size_t n) {
+    std::vector<int32_t> indptr(n + 1, 0);
+    std::vector<int32_t> indices;
+    std::vector<double> data;
+    for (size_t row = 0; row < n; ++row) {
+      indptr[row] = static_cast<int32_t>(indices.size());
+      for (size_t col = 0; col < n; ++col) {
+        const double cost = costs[row * n + col];
+        if (std::isfinite(cost)) {
+          indices.push_back(static_cast<int32_t>(col));
+          data.push_back(cost);
+        }
+      }
+    }
+    indptr[n] = static_cast<int32_t>(indices.size());
+
+    const ZLinearAssignmentResult sparse = solveLinearAssignmentCsr(n, n, indptr, indices, data);
+    const ZLinearAssignmentResult dense = solveLinearAssignment(costs, n, n);
+    expectValidAssignment(sparse, n, n);
+    expectValidAssignment(dense, n, n);
+    EXPECT_NEAR(sparse.cost, dense.cost, 1e-10);
+    EXPECT_NEAR(sparse.cost, bruteForceMinCost(costs, n, n), 1e-10);
+  };
+
+  runCase({11, 20, kInf, kInf, kInf, 12, kInf, 12, kInf, kInf, kInf, 11, 10,
+           15, 9,  15,   kInf, kInf, 22, kInf, 13, kInf, kInf, kInf, 15},
+          5);
+
+  std::vector<double> cyclic(8 * 8, kInf);
+  for (size_t row = 0; row < 8; ++row) {
+    cyclic[row * 8 + row] = 100.0 + static_cast<double>(row);
+    cyclic[row * 8 + ((row + 1) % 8)] = 1.0 + static_cast<double>(row);
+  }
+  runCase(std::move(cyclic), 8);
+
+  std::vector<double> nearDense = {kInf, 1, 7, 7, 7, 1,    kInf, 1, 7, 7, 7, 1,   kInf,
+                                   1,    7, 7, 7, 1, kInf, 1,    1, 7, 7, 7, kInf};
+  runCase(std::move(nearDense), 5);
+}
+
+TEST(ZLinearAssignment, SparseCsrMatchesLapArrLoopRegression)
+{
+  using namespace nim;
+
+  const std::vector<double> values = {0.2593883482138951146,
+                                      0.3080381437461217620,
+                                      0.1976243020727339317,
+                                      0.2462740976049606068,
+                                      0.4203993396282833528,
+                                      0.4286184525458427985,
+                                      0.1706431415909629434,
+                                      0.2192929371231896185,
+                                      0.2117769622802734286,
+                                      0.2604267578125001315};
+  const std::vector<int32_t> originalRows = {0, 0, 1, 1, 2, 2, 5, 5, 6, 6};
+  const std::vector<int32_t> originalCols = {0, 1, 0, 1, 1, 2, 0, 1, 0, 1};
+
+  std::vector<CooEntry> entries;
+  std::vector<double> extendedCosts(10 * 10, kInf);
+  auto addEntry = [&](int32_t row, int32_t col, double cost) {
+    entries.push_back(CooEntry{row, col, cost});
+    extendedCosts[static_cast<size_t>(row) * 10 + static_cast<size_t>(col)] = cost;
+  };
+
+  for (size_t i = 0; i < values.size(); ++i) {
+    addEntry(originalRows[i], originalCols[i], values[i]);
+  }
+  for (int32_t row = 0; row < 7; ++row) {
+    addEntry(row, 3 + row, 1000.0);
+  }
+  for (int32_t col = 0; col < 3; ++col) {
+    addEntry(7 + col, col, 1000.0);
+  }
+  for (size_t i = 0; i < values.size(); ++i) {
+    addEntry(7 + originalCols[i], 3 + originalRows[i], 0.0);
+  }
+
+  const CsrFixture csr = makeCsrFromSortedEntries(10, std::move(entries));
+  const ZLinearAssignmentResult result = solveLinearAssignmentCsr(10, 10, csr.indptr, csr.indices, csr.data);
+  expectValidAssignment(result, 10, 10);
+  EXPECT_NEAR(result.cost, 4000.8455356917416, 1e-10);
+  EXPECT_NEAR(result.cost, assignedCost(extendedCosts, 10, 10, result.rowToCol), 1e-10);
+
+  const std::vector<int32_t> croppedColToRow(result.colToRow.begin(), result.colToRow.begin() + 3);
+  EXPECT_TRUE(croppedColToRow == (std::vector<int32_t>{5, 1, 2}) || croppedColToRow == (std::vector<int32_t>{1, 5, 2}));
+}
+
+TEST(ZLinearAssignment, SparseCsrDenseLikeFixtureMatchesDenseReference)
+{
+  using namespace nim;
+
+  const std::vector<double> costs = loadCostEpsMatrix();
+  std::vector<int32_t> indptr(kCostEpsRows + 1, 0);
+  std::vector<int32_t> indices(kCostEpsRows * kCostEpsCols, 0);
+  for (size_t row = 0; row < kCostEpsRows; ++row) {
+    indptr[row] = static_cast<int32_t>(row * kCostEpsCols);
+    for (size_t col = 0; col < kCostEpsCols; ++col) {
+      indices[row * kCostEpsCols + col] = static_cast<int32_t>(col);
+    }
+  }
+  indptr[kCostEpsRows] = static_cast<int32_t>(indices.size());
+
+  ZLinearAssignmentCsrView view;
+  view.rows = kCostEpsRows;
+  view.cols = kCostEpsCols;
+  view.indptr = indptr;
+  view.indices = indices;
+  view.costs = costs;
+
+  const ZLinearAssignmentResult result = solveLinearAssignmentCsr(view);
+  expectValidAssignment(result, kCostEpsRows, kCostEpsCols);
+  EXPECT_NEAR(result.cost, kCostEpsExpectedCost, 1e-10);
+}
+
 TEST(ZLinearAssignment, SparseCsrOverloadsConvertIndexAndCostTypes)
 {
   using namespace nim;
@@ -471,4 +841,14 @@ TEST(ZLinearAssignment, SparseCsrRejectsMalformedInput)
   duplicate.indices = duplicateIndices;
   duplicate.costs = data;
   EXPECT_THROW((void)solveLinearAssignmentCsr(duplicate), ZException);
+
+  const CsrFixture infeasible = makeFiniteCsr(5, 5, {0, 0, 0,    kInf, kInf, kInf, kInf, kInf, 0, 0, kInf, kInf, kInf,
+                                                     0, 0, kInf, kInf, kInf, 0,    0,    0,    0, 0, kInf, kInf});
+  EXPECT_THROW((void)solveLinearAssignmentCsr(5, 5, infeasible.indptr, infeasible.indices, infeasible.data),
+               ZException);
+
+  const std::vector<int32_t> finiteIndptr = {0, 2, 4};
+  const std::vector<int32_t> finiteIndices = {0, 1, 0, 1};
+  const std::vector<double> nonFiniteData = {1, kInf, 2, 3};
+  EXPECT_THROW((void)solveLinearAssignmentCsr(2, 2, finiteIndptr, finiteIndices, nonFiniteData), ZException);
 }
