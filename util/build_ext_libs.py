@@ -2226,6 +2226,159 @@ def build_brotli(src_dir: str, install_dir: str):
         shutil.rmtree(build_dir, ignore_errors=False)
 
 
+def build_nghttp2(src_dir: str, install_dir: str):
+    build_dir = create_build_dir(src_dir)
+
+    try:
+        cmakecmd = get_cmake_cmd_common_part(install_dir, enable_cxx=False)
+        cmakecmd.extend(
+            [
+                "-DENABLE_LIB_ONLY:BOOL=ON",
+                "-DBUILD_SHARED_LIBS:BOOL=OFF",
+                "-DBUILD_STATIC_LIBS:BOOL=ON",
+                "-DBUILD_TESTING:BOOL=OFF",
+                "-DENABLE_APP:BOOL=OFF",
+                "-DENABLE_EXAMPLES:BOOL=OFF",
+                "-DENABLE_HPACK_TOOLS:BOOL=OFF",
+                "-DENABLE_FAILMALLOC:BOOL=OFF",
+                "-DENABLE_HTTP3:BOOL=OFF",
+                "-DENABLE_DOC:BOOL=OFF",
+                src_dir,
+            ]
+        )
+        build_and_install_cmakecmd(cmakecmd, build_dir)
+    finally:
+        shutil.rmtree(build_dir, ignore_errors=False)
+
+
+def build_nghttp3(src_dir: str, install_dir: str):
+    build_dir = create_build_dir(src_dir)
+
+    try:
+        cmakecmd = get_cmake_cmd_common_part(install_dir, enable_cxx=False)
+        cmakecmd.extend(
+            [
+                "-DENABLE_LIB_ONLY:BOOL=ON",
+                "-DENABLE_STATIC_LIB:BOOL=ON",
+                "-DENABLE_SHARED_LIB:BOOL=OFF",
+                "-DBUILD_TESTING:BOOL=OFF",
+                src_dir,
+            ]
+        )
+        build_and_install_cmakecmd(cmakecmd, build_dir)
+    finally:
+        shutil.rmtree(build_dir, ignore_errors=False)
+
+
+def build_ngtcp2(src_dir: str, install_dir: str):
+    build_dir = create_build_dir(src_dir)
+
+    try:
+        cmakecmd = get_cmake_cmd_common_part(install_dir, enable_cxx=False)
+        cmakecmd.extend(
+            [
+                "-DENABLE_LIB_ONLY:BOOL=ON",
+                "-DENABLE_STATIC_LIB:BOOL=ON",
+                "-DENABLE_SHARED_LIB:BOOL=OFF",
+                "-DBUILD_TESTING:BOOL=OFF",
+                "-DENABLE_OPENSSL:BOOL=ON",
+                "-DENABLE_GNUTLS:BOOL=OFF",
+                "-DENABLE_BORINGSSL:BOOL=OFF",
+                "-DENABLE_PICOTLS:BOOL=OFF",
+                "-DENABLE_WOLFSSL:BOOL=OFF",
+                "-DENABLE_JEMALLOC:BOOL=OFF",
+                f"-DOPENSSL_ROOT_DIR:PATH={install_dir}",
+                "-DOPENSSL_USE_STATIC_LIBS:BOOL=ON",
+                src_dir,
+            ]
+        )
+        build_and_install_cmakecmd(cmakecmd, build_dir)
+    finally:
+        shutil.rmtree(build_dir, ignore_errors=False)
+
+
+def build_curl(src_dir: str, install_dir: str):
+    if not is_linux():
+        return
+
+    build_dir = create_build_dir(src_dir)
+
+    try:
+        cmakecmd = get_cmake_cmd_common_part(install_dir, enable_cxx=False)
+        cmakecmd.extend(
+            [
+                "-DBUILD_SHARED_LIBS:BOOL=OFF",
+                "-DBUILD_STATIC_LIBS:BOOL=ON",
+                "-DBUILD_CURL_EXE:BOOL=OFF",
+                "-DBUILD_TESTING:BOOL=OFF",
+                "-DBUILD_EXAMPLES:BOOL=OFF",
+                "-DBUILD_LIBCURL_DOCS:BOOL=OFF",
+                "-DBUILD_MISC_DOCS:BOOL=OFF",
+                "-DENABLE_CURL_MANUAL:BOOL=OFF",
+                "-DCURL_USE_PKGCONFIG:BOOL=OFF",
+                "-DCURL_USE_CMAKECONFIG:BOOL=ON",
+                "-DCURL_ENABLE_EXPORT_TARGET:BOOL=ON",
+                "-DCURL_ENABLE_SSL:BOOL=ON",
+                "-DCURL_USE_OPENSSL:BOOL=ON",
+                "-DCURL_USE_GNUTLS:BOOL=OFF",
+                "-DCURL_USE_MBEDTLS:BOOL=OFF",
+                "-DCURL_USE_RUSTLS:BOOL=OFF",
+                "-DCURL_USE_WOLFSSL:BOOL=OFF",
+                f"-DOPENSSL_ROOT_DIR:PATH={install_dir}",
+                "-DOPENSSL_USE_STATIC_LIBS:BOOL=ON",
+                "-DCURL_ZLIB:BOOL=ON",
+                "-DZLIB_USE_STATIC_LIBS:BOOL=ON",
+                "-DCURL_BROTLI:BOOL=ON",
+                "-DBROTLI_USE_STATIC_LIBS:BOOL=ON",
+                "-DCURL_ZSTD:BOOL=ON",
+                "-DZSTD_USE_STATIC_LIBS:BOOL=ON",
+                "-DUSE_NGHTTP2:BOOL=ON",
+                "-DNGHTTP2_USE_STATIC_LIBS:BOOL=ON",
+                "-DUSE_NGTCP2:BOOL=ON",
+                "-DNGHTTP3_USE_STATIC_LIBS:BOOL=ON",
+                "-DNGTCP2_USE_STATIC_LIBS:BOOL=ON",
+                "-DUSE_QUICHE:BOOL=OFF",
+                "-DUSE_PROXY_HTTP3:BOOL=OFF",
+                "-DUSE_HTTPSRR:BOOL=OFF",
+                "-DUSE_ECH:BOOL=OFF",
+                "-DUSE_LIBIDN2:BOOL=OFF",
+                "-DCURL_USE_LIBPSL:BOOL=OFF",
+                "-DCURL_USE_GSSAPI:BOOL=OFF",
+                "-DCURL_USE_GSASL:BOOL=OFF",
+                "-DCURL_USE_LIBSSH2:BOOL=OFF",
+                "-DCURL_USE_LIBSSH:BOOL=OFF",
+                "-DCURL_USE_LIBUV:BOOL=OFF",
+                "-DENABLE_ARES:BOOL=OFF",
+                "-DCURL_ENABLE_NTLM:BOOL=ON",
+                "-DCURL_DISABLE_KERBEROS_AUTH:BOOL=ON",
+                "-DCURL_DISABLE_NEGOTIATE_AUTH:BOOL=ON",
+                "-DCURL_DISABLE_ALTSVC:BOOL=OFF",
+                "-DCURL_DISABLE_HSTS:BOOL=OFF",
+                "-DCURL_DISABLE_COOKIES:BOOL=OFF",
+                "-DCURL_DISABLE_DICT:BOOL=ON",
+                "-DCURL_DISABLE_FILE:BOOL=ON",
+                "-DCURL_DISABLE_FTP:BOOL=ON",
+                "-DCURL_DISABLE_GOPHER:BOOL=ON",
+                "-DCURL_DISABLE_IMAP:BOOL=ON",
+                "-DCURL_DISABLE_IPFS:BOOL=ON",
+                "-DCURL_DISABLE_LDAP:BOOL=ON",
+                "-DCURL_DISABLE_LDAPS:BOOL=ON",
+                "-DCURL_DISABLE_MQTT:BOOL=ON",
+                "-DCURL_DISABLE_POP3:BOOL=ON",
+                "-DCURL_DISABLE_RTSP:BOOL=ON",
+                "-DCURL_ENABLE_SMB:BOOL=OFF",
+                "-DCURL_DISABLE_SMTP:BOOL=ON",
+                "-DCURL_DISABLE_TELNET:BOOL=ON",
+                "-DCURL_DISABLE_TFTP:BOOL=ON",
+                "-DCURL_DISABLE_WEBSOCKETS:BOOL=ON",
+                src_dir,
+            ]
+        )
+        build_and_install_cmakecmd(cmakecmd, build_dir)
+    finally:
+        shutil.rmtree(build_dir, ignore_errors=False)
+
+
 def build_giflib(src_dir: str, install_dir: str):
     version = Path(src_dir).name.removeprefix("giflib-")
     if version == Path(src_dir).name:
@@ -7178,10 +7331,6 @@ def build_libs(libs: OrderedDict, use_asan: bool):
         if lib_name == "ninja":
             install_ninja()
 
-        if lib_name == "curl":
-            if is_windows():
-                ensure_windows_curl_sdk()
-
         if lib_name == "gperf":
             if is_windows():
                 install_gperf()
@@ -7375,6 +7524,66 @@ def build_libs(libs: OrderedDict, use_asan: bool):
                 unpack_file_to_folder(package_name, ext_dir())
                 assert os.path.exists(src_dir)
             build_brotli(src_dir, ext_build_dir())
+
+        if lib_name == "nghttp2":
+            if is_linux():
+                package_name = find_src_package_with_glob(
+                    os.path.join(src_package_dir(), "nghttp2*")
+                )
+                src_dir = os.path.join(
+                    ext_dir(), get_package_top_level_folder(package_name)
+                )
+                if not os.path.exists(src_dir):
+                    remove_old_src_folder_with_glob(os.path.join(ext_dir(), "nghttp2*"))
+                    unpack_file_to_folder(package_name, ext_dir())
+                    assert os.path.exists(src_dir)
+                build_nghttp2(src_dir, ext_build_dir())
+
+        if lib_name == "nghttp3":
+            if is_linux():
+                package_name = find_src_package_with_glob(
+                    os.path.join(src_package_dir(), "nghttp3*")
+                )
+                src_dir = os.path.join(
+                    ext_dir(), get_package_top_level_folder(package_name)
+                )
+                if not os.path.exists(src_dir):
+                    remove_old_src_folder_with_glob(os.path.join(ext_dir(), "nghttp3*"))
+                    unpack_file_to_folder(package_name, ext_dir())
+                    assert os.path.exists(src_dir)
+                build_nghttp3(src_dir, ext_build_dir())
+
+        if lib_name == "ngtcp2":
+            if is_linux():
+                package_name = find_src_package_with_glob(
+                    os.path.join(src_package_dir(), "ngtcp2*")
+                )
+                src_dir = os.path.join(
+                    ext_dir(), get_package_top_level_folder(package_name)
+                )
+                if not os.path.exists(src_dir):
+                    remove_old_src_folder_with_glob(os.path.join(ext_dir(), "ngtcp2*"))
+                    unpack_file_to_folder(package_name, ext_dir())
+                    assert os.path.exists(src_dir)
+                build_ngtcp2(src_dir, ext_build_dir())
+
+        if lib_name == "curl":
+            if is_windows():
+                ensure_windows_curl_sdk()
+            elif is_linux():
+                package_name = find_src_package_with_glob(
+                    os.path.join(src_package_dir(), "curl-[0-9]*.tar.*")
+                )
+                src_dir = os.path.join(
+                    ext_dir(), get_package_top_level_folder(package_name)
+                )
+                if not os.path.exists(src_dir):
+                    remove_old_src_folder_with_glob(
+                        os.path.join(ext_dir(), "curl-[0-9]*")
+                    )
+                    unpack_file_to_folder(package_name, ext_dir())
+                    assert os.path.exists(src_dir)
+                build_curl(src_dir, ext_build_dir())
 
         if lib_name == "fmt":
             fmt_src_dir = os.path.join(ext_dir(), "fmt")
@@ -7737,7 +7946,6 @@ def parse_inputs(argv: list):
     lib_list = [
         "cmake",
         "ninja",
-        "curl",
         "gperf",
         "ffmpeg",
         "java",
@@ -7760,6 +7968,10 @@ def parse_inputs(argv: list):
         "xz",
         "zstd",
         "brotli",
+        "nghttp2",
+        "nghttp3",
+        "ngtcp2",
+        "curl",
         "giflib",
         "highway",
         "fmt",
@@ -7832,13 +8044,14 @@ def parse_inputs(argv: list):
             "grpc",
             "folly",
             "proxygen",
+            "curl",
         ],
         # Atlas still builds glog/gflags for Folly, but current Ceres uses
         # Abseil logging and this OpenCV configuration does not consume glog.
         "gflags": ["glog", "folly"],
         "glog": ["folly"],
         "benchmark": ["grpc"],
-        "openssl": ["grpc", "folly"],
+        "openssl": ["grpc", "folly", "ngtcp2", "curl"],
         "hdf5": ["itk", "vtk"],
         "suitesparse": ["ceres-solver"],
         "ceres-solver": ["opencv"],  # only if we need opencv sfm
@@ -7847,8 +8060,11 @@ def parse_inputs(argv: list):
         "double-conversion": ["folly", "itk", "vtk"],
         "lz4": ["vtk", "folly", "rocksdb"],
         "xz": ["libtiff", "vtk", "folly"],
-        "zstd": ["libtiff", "folly", "rocksdb"],
-        "brotli": ["libjxl", "folly"],
+        "zstd": ["libtiff", "folly", "rocksdb", "curl"],
+        "brotli": ["libjxl", "folly", "curl"],
+        "nghttp2": ["curl"],
+        "nghttp3": ["curl"],
+        "ngtcp2": ["curl"],
         "giflib": ["openimageio"],
         "highway": ["libjxl"],
         "fmt": ["openimageio", "folly"],

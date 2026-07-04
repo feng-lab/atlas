@@ -186,6 +186,26 @@ std::string curlProtocolSummary(const curl_version_info_data* info)
   return joinNonEmpty(protocols, ",");
 }
 
+std::string curlHttpVersionName(long version)
+{
+  switch (version) {
+    case CURL_HTTP_VERSION_1_0:
+      return "1.0";
+    case CURL_HTTP_VERSION_1_1:
+      return "1.1";
+    case CURL_HTTP_VERSION_2_0:
+      return "2";
+#ifdef CURL_HTTP_VERSION_3
+    case CURL_HTTP_VERSION_3:
+      return "3";
+#endif
+    case CURL_HTTP_VERSION_NONE:
+      return "unknown";
+    default:
+      return fmt::format("unknown({})", version);
+  }
+}
+
 std::string proxyKindName(ZHttpProxyKind kind)
 {
   switch (kind) {
@@ -417,7 +437,7 @@ ZHttpGetBytesResult performCurlRequestBlocking(const ZHttpGetRequest& request,
   curl_easy_setopt(handle.get(), CURLOPT_CONNECTTIMEOUT_MS, static_cast<long>(request.timeout.count()));
   curl_easy_setopt(handle.get(), CURLOPT_SSL_VERIFYPEER, 1L);
   curl_easy_setopt(handle.get(), CURLOPT_SSL_VERIFYHOST, 2L);
-  curl_easy_setopt(handle.get(), CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_2TLS);
+  curl_easy_setopt(handle.get(), CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_NONE);
   curl_easy_setopt(handle.get(), CURLOPT_ACCEPT_ENCODING, acceptEncoding.c_str());
   curl_easy_setopt(handle.get(), CURLOPT_WRITEFUNCTION, &writeBodyCallback);
   curl_easy_setopt(handle.get(), CURLOPT_WRITEDATA, &body);
@@ -460,6 +480,11 @@ ZHttpGetBytesResult performCurlRequestBlocking(const ZHttpGetRequest& request,
 
   curl_off_t encodedBytes = 0;
   curl_easy_getinfo(handle.get(), CURLINFO_SIZE_DOWNLOAD_T, &encodedBytes);
+
+  long httpVersion = CURL_HTTP_VERSION_NONE;
+  if (curl_easy_getinfo(handle.get(), CURLINFO_HTTP_VERSION, &httpVersion) == CURLE_OK) {
+    VLOG(2) << fmt::format("curl HTTP GET protocol: '{}' HTTP/{}", request.url, curlHttpVersionName(httpVersion));
+  }
 
   ZHttpGetBytesResult out{};
   out.status = static_cast<uint16_t>(statusCode);

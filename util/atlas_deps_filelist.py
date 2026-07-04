@@ -5,11 +5,6 @@ files_to_download = [
         "filename": "ffmpeg-n8.1-latest-win64-gpl-8.1.zip",
     },
     {
-        "expected_size": 2035354,
-        "expected_sha256": "15fbc5aba6beee0b17aecb04602ae39432393aba1ebd8e39b7cabf7db883299f",
-        "filename": "pcre2-10.46.tar.bz2",
-    },
-    {
         "expected_size": 728187,
         "expected_sha256": "391cdd24ba8839ca179ddebe860ae0950f72a2e8a38edfc5e8aadbc60b78f2be",
         "filename": "brotli-1.2.0.zip",
@@ -70,6 +65,11 @@ files_to_download = [
         "filename": "cmake-4.3.2-linux-x86_64.tar.gz",
     },
     {
+        "expected_size": 2667714,
+        "expected_sha256": "c866b7477cbb7512ab6863a685027adbb1bb8da8fc3bab7429ed43d3281d5aa9",
+        "filename": "nghttp2-1.69.0.tar.gz",
+    },
+    {
         "expected_size": 594502,
         "expected_sha256": "e0ba5157007abc7b1a65118a96657a961ddf55f7e3f632ee035366dfce039ca4",
         "filename": "nasm-3.01-win64.zip",
@@ -80,9 +80,9 @@ files_to_download = [
         "filename": "ninja-mac.zip",
     },
     {
-        "expected_size": 8514178,
-        "expected_sha256": "88913cc69a7791a350457238c12c5028ebd6b9a31707d5a4b0f5aa0aa626de2b",
-        "filename": "curl-8.20.0_1-win64-mingw.zip",
+        "expected_size": 410916,
+        "expected_sha256": "e8b798272b9282045cb83577dcf7bd7fcd22bb3a43aec0eb1a24f675b4cef0b8",
+        "filename": "nghttp3-1.17.0.tar.xz",
     },
     {
         "expected_size": 150157261,
@@ -130,6 +130,11 @@ files_to_download = [
         "filename": "openssl-3.5.7.tar.gz",
     },
     {
+        "expected_size": 2882336,
+        "expected_sha256": "aa1b66a70eace83dc624508745646c08ae561de512ab403adffb93ac87fc72e6",
+        "filename": "curl-8.21.0.tar.xz",
+    },
+    {
         "expected_size": 52961068,
         "expected_sha256": "83d20c23f5c5f64b3b328785e35b23c532e33057a97ed6294acaca3781b78a01",
         "filename": "cmake-4.3.2-windows-x86_64.zip",
@@ -170,6 +175,11 @@ files_to_download = [
         "filename": "oneapi-mkl-2023.2.0-macos-x64.tar.xz",
     },
     {
+        "expected_size": 702424,
+        "expected_sha256": "7fa5ec2be0f0cbed8bc4ec89c0787dfa9d8ce678f1ed9477c52f30eb1a591207",
+        "filename": "ngtcp2-1.24.0.tar.xz",
+    },
+    {
         "expected_size": 1653271,
         "expected_sha256": "51b93737bf62e8549b0e94dce0fba92169e31c8ecc160883460a9bdaa6d2c298",
         "filename": "libsodium-1.0.22.tar.bz2",
@@ -198,6 +208,11 @@ files_to_download = [
         "expected_size": 1682411,
         "expected_sha256": "a789dc4e2409e2901d93793a4e0b80c7b49d0d97cf6ad71c850eb7616acfd786",
         "filename": "LibRaw-0.22.1.tar.gz",
+    },
+    {
+        "expected_size": 8623093,
+        "expected_sha256": "2a3e951f522be7d9a3a964be57e74ee15d19dd970bcc7b7843445089901a3ed4",
+        "filename": "curl-8.21.0_2-win64-mingw.zip",
     },
     {
         "expected_size": 53843906,

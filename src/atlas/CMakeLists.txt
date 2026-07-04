@@ -137,18 +137,28 @@ if (WIN32)
                         INTERFACE_INCLUDE_DIRECTORIES "${_atlas_curl_include_dir}")
 else ()
   if (UNIX AND NOT APPLE)
-    # The top-level build globally prefers archive libraries so vendored dependencies resolve statically.
-    # libcurl is the Linux exception: Atlas intentionally uses the shared system libcurl so we do not drag
-    # optional static curl backends (for example libssh) into every link. Force FindCURL's module-mode
-    # discovery to search shared libraries first instead of rewriting CURL::libcurl after the fact.
-    set(_atlas_saved_find_library_suffixes "${CMAKE_FIND_LIBRARY_SUFFIXES}")
-    set(CMAKE_FIND_LIBRARY_SUFFIXES "${CMAKE_SHARED_LIBRARY_SUFFIX}")
-    find_package(CURL MODULE REQUIRED)
-    set(CMAKE_FIND_LIBRARY_SUFFIXES "${_atlas_saved_find_library_suffixes}")
+    set(OPENSSL_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build")
+    set(OPENSSL_USE_STATIC_LIBS TRUE)
+    set(ZLIB_USE_STATIC_LIBS TRUE)
+    set(NGHTTP2_USE_STATIC_LIBS TRUE)
+    set(NGHTTP3_USE_STATIC_LIBS TRUE)
+    set(NGTCP2_USE_STATIC_LIBS TRUE)
+    set(CURL_USE_PKGCONFIG OFF)
+    set(CURL_USE_CMAKECONFIG ON)
+    find_package(CURL CONFIG REQUIRED
+                 COMPONENTS HTTP HTTPS SSL HTTP2 HTTP3 brotli zstd
+                 PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build
+                 NO_DEFAULT_PATH)
+
+    set(_atlas_curl_target CURL::libcurl)
+    get_target_property(_atlas_curl_aliased_target CURL::libcurl ALIASED_TARGET)
+    if (_atlas_curl_aliased_target)
+      set(_atlas_curl_target "${_atlas_curl_aliased_target}")
+    endif ()
 
     set(_atlas_curl_imported_locations)
     foreach(_atlas_curl_prop IMPORTED_LOCATION IMPORTED_LOCATION_RELEASE IMPORTED_LOCATION_DEBUG)
-      get_target_property(_atlas_curl_imported_location CURL::libcurl "${_atlas_curl_prop}")
+      get_target_property(_atlas_curl_imported_location "${_atlas_curl_target}" "${_atlas_curl_prop}")
       if (_atlas_curl_imported_location)
         list(APPEND _atlas_curl_imported_locations "${_atlas_curl_imported_location}")
       endif ()
@@ -156,16 +166,21 @@ else ()
 
     if (NOT _atlas_curl_imported_locations)
       message(FATAL_ERROR
-              "FindCURL did not report an imported libcurl location. "
-              "Atlas on Linux requires the shared system libcurl.")
+              "CURL::libcurl did not report an imported libcurl location. "
+              "Atlas on Linux requires the bundled static libcurl from src/3rdparty/build. "
+              "Run `python util/build_ext_libs.py curl` first.")
     endif ()
 
     foreach(_atlas_curl_imported_location IN LISTS _atlas_curl_imported_locations)
-      if (NOT _atlas_curl_imported_location MATCHES "\\.so($|\\.)")
+      if (_atlas_curl_imported_location MATCHES "\\.so($|\\.)")
         message(FATAL_ERROR
-                "FindCURL resolved non-shared libcurl at '${_atlas_curl_imported_location}'. "
-                "Atlas on Linux requires the shared system libcurl to avoid dragging "
-                "optional static curl backends (for example libssh) into every link.")
+                "CURL::libcurl resolved shared libcurl at '${_atlas_curl_imported_location}'. "
+                "Atlas on Linux requires the bundled static libcurl from src/3rdparty/build.")
+      endif ()
+      if (NOT _atlas_curl_imported_location MATCHES "\\.a$")
+        message(FATAL_ERROR
+                "CURL::libcurl resolved non-static libcurl at '${_atlas_curl_imported_location}'. "
+                "Atlas on Linux requires the bundled static libcurl archive.")
       endif ()
     endforeach ()
   else ()
