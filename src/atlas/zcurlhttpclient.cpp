@@ -99,11 +99,6 @@ bool isIdentityContentEncoding(std::string_view contentEncoding)
   return true;
 }
 
-bool isMissingResourceHttpStatus(uint16_t status)
-{
-  return status == 403 || status == 404;
-}
-
 bool curlFeatureEnabled(const curl_version_info_data* info, long featureBit)
 {
   CHECK(info);
@@ -602,7 +597,7 @@ folly::coro::Task<std::optional<ZHttpGetBytesResult>> ZCurlHttpClient::getBytes(
 
     if (attemptResult.hasValue()) {
       ZHttpGetBytesResult value = std::move(attemptResult).value();
-      if (isMissingResourceHttpStatus(value.status)) {
+      if (isHttpMissingResourceStatus(request, value.status)) {
         co_return std::nullopt;
       }
       if (isRetryableHttpStatus(value.status)) {

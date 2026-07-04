@@ -164,6 +164,7 @@ add_executable(
   ${CMAKE_CURRENT_LIST_DIR}/zneuroglancerstatetest.cpp
   ${CMAKE_CURRENT_LIST_DIR}/zneuroglancerurltest.cpp
   ${CMAKE_CURRENT_LIST_DIR}/zremoteobjectreadertest.cpp
+  ${CMAKE_CURRENT_LIST_DIR}/zcloudobjectstoretest.cpp
   ${CMAKE_CURRENT_LIST_DIR}/zneuroglancershardedreadertest.cpp
   ${CMAKE_CURRENT_LIST_DIR}/zneuroglancerprecomputedmeshtest.cpp
   ${CMAKE_CURRENT_LIST_DIR}/zneuroglanceruint64shardingtest.cpp

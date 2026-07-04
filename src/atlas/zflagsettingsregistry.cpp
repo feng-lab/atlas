@@ -121,6 +121,21 @@ const std::vector<ZFlagSettingSpec>& atlasFlagSettingSpecs()
                                 "Proxy strategy",
                                 ZFlagSettingEditorKind::Choice,
                                 {"auto", "no_proxy", "proxy_if_available"}));
+    allSpecs.push_back(makeSpec("atlas_s3_auth",
+                                "Network & Remote Data",
+                                "S3 auth mode",
+                                ZFlagSettingEditorKind::Choice,
+                                {"auto", "anonymous", "required"}));
+    allSpecs.push_back(makeSpec("atlas_s3_profile", "Network & Remote Data", "S3 AWS profile"));
+    allSpecs.push_back(makeSpec("atlas_gcs_auth",
+                                "Network & Remote Data",
+                                "GCS auth mode",
+                                ZFlagSettingEditorKind::Choice,
+                                {"auto", "anonymous", "required"}));
+    allSpecs.push_back(makeSpec("atlas_gcs_bearer_token_file",
+                                "Network & Remote Data",
+                                "GCS bearer token file",
+                                ZFlagSettingEditorKind::FilePath));
     allSpecs.push_back(makeSpec("atlas_http_max_retries", "Network & Remote Data", "HTTP max retries"));
     allSpecs.push_back(
       makeSpec("atlas_http_retry_backoff_initial_ms", "Network & Remote Data", "HTTP retry initial backoff (ms)"));

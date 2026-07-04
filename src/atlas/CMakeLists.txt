@@ -761,6 +761,7 @@ set(SOURCES
     zhttpdiskcache.h zhttpdiskcache.cpp
     zhttpclient.h zhttpclient.cpp
     zremoteobjectstore.h zremoteobjectstore.cpp
+    zcloudobjectstore.h zcloudobjectstore.cpp
     zremoteobjectreader.h zremoteobjectreader.cpp
     zhttpsystemproxy.h zhttpsystemproxy.cpp
     zhttpretrypolicy.h zhttpretrypolicy.cpp

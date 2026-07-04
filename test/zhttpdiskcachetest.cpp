@@ -29,6 +29,9 @@ QByteArray cacheKeyHashFor(const ZHttpGetRequest& request)
 {
   QByteArray keyBytes;
   keyBytes.append("GET\n", 4);
+  keyBytes.append("partition=", 10);
+  keyBytes.append(QByteArray(request.cachePartition.data(), static_cast<int>(request.cachePartition.size())));
+  keyBytes.append('\n');
   keyBytes.append(QByteArray(request.url.data(), static_cast<int>(request.url.size())));
   keyBytes.append('\n');
   keyBytes.append("range=", 6);
@@ -235,6 +238,30 @@ TEST(ZHttpDiskCache, RangeDifferentiatesEntries)
   ASSERT_TRUE(hit.has_value());
 
   auto miss = cache.tryGet(missRequest);
+  EXPECT_FALSE(miss.has_value());
+}
+
+TEST(ZHttpDiskCache, CachePartitionDifferentiatesEntries)
+{
+  QTemporaryDir tmp;
+  ASSERT_TRUE(tmp.isValid());
+
+  ZHttpDiskCache cache(tmp.path(), /*maxBytes=*/1024 * 1024);
+  ASSERT_TRUE(cache.isEnabled());
+
+  const std::string url = "https://example.invalid/private.bin";
+  ZHttpGetRequest partitionA = makeRequest(url, ZHttpByteRange{.offset = 0, .length = 4});
+  partitionA.cachePartition = "s3:bucket:us-east-1:ACCESS_A";
+  ZHttpGetRequest partitionB = partitionA;
+  partitionB.cachePartition = "s3:bucket:us-east-1:ACCESS_B";
+
+  cache.put(partitionA, makeResult({1, 2, 3, 4}, /*status=*/206));
+  ASSERT_TRUE(cache.drainWrites(std::chrono::seconds(5)));
+
+  auto hit = cache.tryGet(partitionA);
+  ASSERT_TRUE(hit.has_value());
+
+  auto miss = cache.tryGet(partitionB);
   EXPECT_FALSE(miss.has_value());
 }
 

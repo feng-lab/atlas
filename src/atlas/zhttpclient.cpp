@@ -89,6 +89,19 @@ std::vector<std::pair<std::string, std::string>> httpRequestHeadersForTransport(
   return headers;
 }
 
+bool isHttpMissingResourceStatus(const ZHttpGetRequest& request, uint16_t status)
+{
+  switch (request.missingResourcePolicy) {
+    case ZHttpMissingResourcePolicy::Treat403And404AsMissing:
+      return status == 403 || status == 404;
+    case ZHttpMissingResourcePolicy::Treat404AsMissing:
+      return status == 404;
+  }
+
+  CHECK(false) << "Unhandled ZHttpMissingResourcePolicy";
+  return false;
+}
+
 ZHttpClient& ZHttpClient::instance()
 {
   static ZHttpClient client;

@@ -1,5 +1,6 @@
 #include "zneuroglancerurl.h"
 
+#include "zcloudobjectstore.h"
 #include "zlog.h"
 
 #include <QUrl>
@@ -54,39 +55,7 @@ QString normalizeNeuroglancerUrlDropFragment(QString url)
 
 QString mapCloudStorageUrlToHttps(QString url)
 {
-  QString s = url.trimmed();
-  if (s.startsWith("gs://", Qt::CaseInsensitive)) {
-    const QString rest = s.mid(QStringLiteral("gs://").size());
-    return QStringLiteral("https://storage.googleapis.com/") + rest;
-  }
-  if (s.startsWith("s3://", Qt::CaseInsensitive)) {
-    const QString rest = s.mid(QStringLiteral("s3://").size());
-    const int slash = rest.indexOf('/');
-    const QString bucket = (slash < 0) ? rest : rest.left(slash);
-    const QString key = (slash < 0) ? QString{} : rest.mid(slash + 1);
-    if (bucket.isEmpty()) {
-      return s;
-    }
-
-    // Prefer virtual-hosted-style URLs for compatibility with newer AWS regions, but fall back to
-    // path-style when the bucket name contains dots (TLS wildcard mismatch with e.g. "a.b.s3.amazonaws.com").
-    const bool bucketHasDot = bucket.contains('.');
-    if (bucketHasDot) {
-      QString out = QStringLiteral("https://s3.amazonaws.com/") + bucket;
-      if (!key.isEmpty()) {
-        out += '/';
-        out += key;
-      }
-      return out;
-    }
-    QString out = QStringLiteral("https://") + bucket + QStringLiteral(".s3.amazonaws.com");
-    if (!key.isEmpty()) {
-      out += '/';
-      out += key;
-    }
-    return out;
-  }
-  return s;
+  return cloudObjectUrlToHttps(std::move(url));
 }
 
 QString normalizeNeuroglancerPrecomputedRootUrl(QString url)
@@ -127,11 +96,15 @@ QString normalizeNeuroglancerPrecomputedRootUrl(QString url)
     qurl.setPath(path);
   }
 
-  QString normalized = qurl.toString(QUrl::StripTrailingSlash);
-  if (!normalized.endsWith('/')) {
-    normalized += '/';
+  path = qurl.path();
+  while (path.endsWith('/') && path.size() > 1) {
+    path.chop(1);
   }
-  return normalized;
+  if (!path.endsWith('/')) {
+    path += '/';
+  }
+  qurl.setPath(path);
+  return qurl.toString();
 }
 
 } // namespace nim

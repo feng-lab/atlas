@@ -33,12 +33,20 @@ TEST(ZNeuroglancerUrl, MapCloudStorageUrlToHttps)
             "https://bucket.s3.amazonaws.com/path/to/object");
   EXPECT_EQ(mapCloudStorageUrlToHttps("s3://bucket.with.dot/path/to/object").toStdString(),
             "https://s3.amazonaws.com/bucket.with.dot/path/to/object");
+  EXPECT_EQ(mapCloudStorageUrlToHttps("https://bucket.storage.googleapis.com/path/to/object?alt=media").toStdString(),
+            "https://bucket.storage.googleapis.com/path/to/object?alt=media");
+  EXPECT_EQ(
+    mapCloudStorageUrlToHttps("https://bucket.s3.us-west-2.amazonaws.com/path/to/object?versionId=abc").toStdString(),
+    "https://bucket.s3.us-west-2.amazonaws.com/path/to/object?versionId=abc");
 }
 
 TEST(ZNeuroglancerUrl, NormalizePrecomputedRootUrl)
 {
   EXPECT_EQ(normalizeNeuroglancerPrecomputedRootUrl(" precomputed://gs://bucket/volume ").toStdString(),
             "https://storage.googleapis.com/bucket/volume/");
+  EXPECT_EQ(normalizeNeuroglancerPrecomputedRootUrl("https://bucket.s3.us-west-2.amazonaws.com/dataset?versionId=abc")
+              .toStdString(),
+            "https://bucket.s3.us-west-2.amazonaws.com/dataset/?versionId=abc");
   EXPECT_EQ(normalizeNeuroglancerPrecomputedRootUrl("https://example.com/dataset/info").toStdString(),
             "https://example.com/dataset/");
   EXPECT_THROW((void)normalizeNeuroglancerPrecomputedRootUrl("https://example.com/state.json"), ZException);

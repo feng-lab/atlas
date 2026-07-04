@@ -3,6 +3,7 @@
 
 #include "zcancellation.h"
 #include "zcpuinfo.h"
+#include "zcloudobjectstore.h"
 #include "zneuroglancerprecomputedchunkdecoder.h"
 #include "zneuroglancerprecomputedmesh.h"
 #include "zneuroglancerprecomputedskeleton.h"
@@ -419,6 +420,47 @@ std::string toStdString(const QString& s)
   return std::string(u8.data(), static_cast<size_t>(u8.size()));
 }
 
+bool isNativeCloudObjectUrl(QString url)
+{
+  url = url.trimmed();
+  if (url.startsWith(QStringLiteral("precomputed://"), Qt::CaseInsensitive)) {
+    url = url.mid(QStringLiteral("precomputed://").size()).trimmed();
+  }
+  return url.startsWith(QStringLiteral("gs://"), Qt::CaseInsensitive) ||
+         url.startsWith(QStringLiteral("s3://"), Qt::CaseInsensitive);
+}
+
+QString cloudStoreRootUrl(QString inputUrl, const QString& normalizedRootUrl)
+{
+  if (!isNativeCloudObjectUrl(std::move(inputUrl))) {
+    return normalizedRootUrl;
+  }
+
+  const auto rootObject = parseCloudObjectUrl(normalizedRootUrl);
+  if (!rootObject) {
+    return normalizedRootUrl;
+  }
+
+  QString out;
+  switch (rootObject->provider) {
+    case ZCloudObjectProvider::Gcs:
+      out = QStringLiteral("gs://");
+      break;
+    case ZCloudObjectProvider::S3:
+      out = QStringLiteral("s3://");
+      break;
+    case ZCloudObjectProvider::None:
+      return normalizedRootUrl;
+  }
+
+  out += rootObject->bucket;
+  if (!rootObject->key.isEmpty()) {
+    out += '/';
+    out += rootObject->key;
+  }
+  return out;
+}
+
 void swapEndianInPlace(uint8_t* data, size_t bytesPerVoxel, size_t elementCount)
 {
   CHECK(bytesPerVoxel == 2 || bytesPerVoxel == 4 || bytesPerVoxel == 8);
@@ -514,10 +556,14 @@ ZNeuroglancerPrecomputedVolume::open(QString url,
                                      std::chrono::milliseconds timeout,
                                      std::shared_ptr<const ZRemoteObjectStore> objectStore)
 {
+  const QString inputUrl = url;
   auto vol = std::shared_ptr<ZNeuroglancerPrecomputedVolume>(new ZNeuroglancerPrecomputedVolume());
+  vol->m_rootUrl = normalizeRootUrl(std::move(url));
+  if (!objectStore) {
+    objectStore = makeCloudAwareRemoteObjectStoreForUrl(cloudStoreRootUrl(inputUrl, vol->m_rootUrl));
+  }
   vol->m_remoteContext = ZNeuroglancerRemoteContext::create(timeout, std::move(objectStore));
 
-  vol->m_rootUrl = normalizeRootUrl(std::move(url));
   vol->m_rootQUrl = QUrl(vol->m_rootUrl);
   if (!vol->m_rootQUrl.isValid()) {
     throw ZException(fmt::format("Invalid URL '{}'", toStdString(vol->m_rootUrl)));

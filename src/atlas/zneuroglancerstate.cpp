@@ -1,5 +1,6 @@
 #include "zneuroglancerstate.h"
 
+#include "zcloudobjectstore.h"
 #include "zneuroglancerremotecontext.h"
 #include "zneuroglancerurl.h"
 #include "zexception.h"
@@ -370,8 +371,6 @@ ZNeuroglancerState::parseInputText(const QString& text,
     return out;
   }
 
-  const auto remoteContext = ZNeuroglancerRemoteContext::create(timeout, std::move(objectStore));
-
   try {
     if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
       out.stateJson = boost::json::parse(trimmed.toStdString());
@@ -388,6 +387,11 @@ ZNeuroglancerState::parseInputText(const QString& text,
     if (trimmed.contains("://") || trimmed.startsWith("gs://", Qt::CaseInsensitive) ||
         trimmed.startsWith("s3://", Qt::CaseInsensitive)) {
       const QString url = mapCloudStorageUrlToHttps(trimmed);
+      std::shared_ptr<const ZRemoteObjectStore> stateObjectStore = objectStore;
+      if (!stateObjectStore) {
+        stateObjectStore = makeCloudAwareRemoteObjectStoreForUrl(trimmed);
+      }
+      const auto remoteContext = ZNeuroglancerRemoteContext::create(timeout, std::move(stateObjectStore));
       auto responseOpt = folly::coro::blockingWait(remoteContext->getResponseAsync(url.toStdString()));
       if (!responseOpt) {
         out.status = InputStatus::Error;

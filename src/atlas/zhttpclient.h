@@ -20,6 +20,12 @@ enum class ZHttpGetBytesSource : std::uint8_t
   DiskCache = 2,
 };
 
+enum class ZHttpMissingResourcePolicy : std::uint8_t
+{
+  Treat403And404AsMissing,
+  Treat404AsMissing,
+};
+
 struct ZHttpByteRange
 {
   uint64_t offset = 0;
@@ -38,6 +44,15 @@ struct ZHttpGetRequest
   // Transport backends synthesize the HTTP Range header from this field rather than
   // asking higher layers to encode range semantics in raw header text.
   std::optional<ZHttpByteRange> exactByteRange;
+
+  // Non-secret partition for persistent cache entries. This lets provider-aware
+  // object stores separate anonymous/public bytes from credential-scoped bytes
+  // while keeping Authorization headers and tokens out of cache keys.
+  std::string cachePartition;
+
+  // Public object stores sometimes report absent objects as either 403 or 404.
+  // Signed/private requests must usually preserve 403 as an access-denied error.
+  ZHttpMissingResourcePolicy missingResourcePolicy = ZHttpMissingResourcePolicy::Treat403And404AsMissing;
 };
 
 struct ZHttpGetBytesResult
@@ -61,6 +76,8 @@ struct ZHttpGetBytesResult
 
 [[nodiscard]] std::vector<std::pair<std::string, std::string>>
 httpRequestHeadersForTransport(const ZHttpGetRequest& request);
+
+[[nodiscard]] bool isHttpMissingResourceStatus(const ZHttpGetRequest& request, uint16_t status);
 
 class ZHttpClient
 {

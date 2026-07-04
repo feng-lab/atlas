@@ -33,6 +33,7 @@ public:
   {
     std::string url;
     std::optional<ZHttpByteRange> exactByteRange;
+    std::string cachePartition;
   };
 
   ZHttpDiskCache(QString rootDir, uint64_t maxBytes);

@@ -147,6 +147,7 @@ ZHttpDiskCache::KeyParts ZHttpDiskCache::keyPartsFrom(const ZHttpGetRequest& req
   KeyParts out;
   out.url = request.url;
   out.exactByteRange = request.exactByteRange;
+  out.cachePartition = request.cachePartition;
   return out;
 }
 
@@ -256,8 +257,11 @@ std::optional<ZHttpGetBytesResult> ZHttpDiskCache::tryGet(const ZHttpGetRequest&
   const std::string rangeKey = exactByteRangeKeyString(parts.exactByteRange);
 
   std::string keyBytes;
-  keyBytes.reserve(16 + parts.url.size() + rangeKey.size());
+  keyBytes.reserve(32 + parts.cachePartition.size() + parts.url.size() + rangeKey.size());
   keyBytes.append("GET\n");
+  keyBytes.append("partition=");
+  keyBytes.append(parts.cachePartition);
+  keyBytes.push_back('\n');
   keyBytes.append(parts.url);
   keyBytes.push_back('\n');
   keyBytes.append("range=");
@@ -322,8 +326,11 @@ void ZHttpDiskCache::put(const ZHttpGetRequest& request, const ZHttpGetBytesResu
   const KeyParts parts = keyPartsFrom(request);
   const std::string rangeKey = exactByteRangeKeyString(parts.exactByteRange);
   std::string keyBytes;
-  keyBytes.reserve(16 + parts.url.size() + rangeKey.size());
+  keyBytes.reserve(32 + parts.cachePartition.size() + parts.url.size() + rangeKey.size());
   keyBytes.append("GET\n");
+  keyBytes.append("partition=");
+  keyBytes.append(parts.cachePartition);
+  keyBytes.push_back('\n');
   keyBytes.append(parts.url);
   keyBytes.push_back('\n');
   keyBytes.append("range=");

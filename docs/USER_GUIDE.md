@@ -296,6 +296,8 @@ Steps to load and manage images:
 2. **Load Neuroglancer (Precomputed)**
    1. Choose **File → Load Neuroglancer (Precomputed)...**.
    2. Enter a dataset URL (root or `.../info`). Supported schemes: `precomputed://`, `gs://`, `s3://`, `http://`, `https://`. (Note: Neuroglancer viewer state `.json` URLs are not dataset roots; use **File → Load Neuroglancer (State JSON)...** for share links / state JSON.)
+      - Public `gs://` and `s3://` buckets work anonymously. For private S3 buckets, Atlas follows the standard AWS credential/config chain. `--atlas_s3_profile` selects the AWS profile; empty uses `AWS_PROFILE`, then `default`. Standard AWS environment variables such as `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`, and `AWS_ENDPOINT_URL_S3` take precedence over profile/config values. The selected AWS profile/config provides region, endpoint URL, service-specific S3 endpoint URL, and `s3.addressing_style`; `AWS_CONFIG_FILE` and `AWS_SHARED_CREDENTIALS_FILE` select the standard AWS config/credentials file locations. For private GCS buckets, set `--atlas_gcs_bearer_token_file=/path/to/token`.
+      - `--atlas_s3_auth=auto` and `--atlas_gcs_auth=auto` are the mixed public/private defaults. The policy is process-wide: Atlas uses credentials for provider roots when the AWS credential chain provides S3 credentials or the configured GCS token file provides a token, and reads anonymously when credentials are unavailable. Public buckets generally accept signed reads as well as anonymous reads. Use `required` when a private bucket should fail immediately if credentials are missing. Use `anonymous` for public-bucket debugging or sessions where all provider reads should stay anonymous. Scene files and Neuroglancer history store dataset URLs; credential material stays in AWS files/environment variables or the configured GCS token file.
    3. Use the **History** tab to re-open previously loaded datasets; optionally assign friendly names (editable in the dialog).
    4. Use the **Examples** tab for a small built-in list of public datasets.
    5. The history is stored in the user config folder as `neuroglancer_precomputed_history.json` (open **Edit → Settings...**, then use **Open Config Folder**).
@@ -354,6 +356,7 @@ Steps to load and manage images:
        - `--atlas_disk_cache_http_async_max_pending_bytes=<N>` (min 256 MiB; bounds queued background cache writes; when full, writes are dropped on a best-effort basis)
        - `--atlas_disk_cache_dir=<path>` (optional override; default is auto-chosen Atlas cache/config directory)
        - The cache is stored in a single database file at `<dir>/atlas_disk_cache_v1/http.sqlite`.
+       - Signed private S3/GCS reads use separate credential-scope cache partitions, so anonymous/public bytes and private-user bytes for the same object URL are not reused across identities.
        - Multiple Atlas instances can share the same disk cache; under heavy write contention, cache writes may be dropped (best-effort).
    13. Optional: enable the persistent image-region disk cache to persist computed full-resolution blocks for file-backed datasets:
        - `--atlas_disk_cache_imgregion_max_bytes=<N>` (default 20 GiB; set to 0 to disable; tune depending on disk space)
@@ -380,6 +383,7 @@ Steps to load and manage images:
       - a URL to a state `.json` file, or
       - raw state JSON text.
    3. Atlas opens only the supported layer types (**image** and **segmentation**) that reference a Neuroglancer precomputed volume source. This includes direct `precomputed://...` roots and datasource URLs such as `s3://...|neuroglancer-precomputed:`. Unsupported layer types are ignored (Atlas will show a warning list at the end if anything was skipped).
+      - The same S3/GCS credential behavior used by **Load Neuroglancer (Precomputed)** applies when state JSON references private cloud-backed datasets.
    4. If the state contains annotation layers linked to a segmentation layer, Atlas does not create annotation objects yet, but it will use that information to configure the segmentation dataset’s **Annotations Source Override** (so the existing right‑click import actions can work without additional URL prompting).
    5. Any datasets opened from the state are recorded into the same history list used by **Load Neuroglancer (Precomputed)**.
 4. **Import sequences** – use **File → Import Sequence Images...** to select an ordered set of images. Atlas stacks the frames into a volume.
@@ -1558,6 +1562,10 @@ Use **Help → Shortcuts** in either the 2D or 3D window to open this section di
 | `--atlas_http_backend` | Select remote-dataset HTTP transport: `proxygen` or `curl`. |
 | `--atlas_http_ca_bundle` | Override the PEM CA bundle used for HTTPS remote-dataset requests. |
 | `--atlas_http_windows_trust_source` | On Windows, choose the default HTTPS trust source shared by both HTTP backends: `auto`, `windows_store`, or `bundled_pem`. |
+| `--atlas_s3_auth` | S3 credential policy: `auto` signs requests when credentials are available and reads anonymously otherwise; `anonymous` reads anonymously; `required` signs requests and fails if credentials are unavailable. |
+| `--atlas_s3_profile` | AWS profile used for S3 remote datasets. Empty uses `AWS_PROFILE`, then `default`. Standard AWS environment variables take precedence over profile/config values. Region, endpoint URL, service-specific S3 endpoint URL, and `s3.addressing_style` come from AWS profile/config data. |
+| `--atlas_gcs_auth` | GCS credential policy: `auto` uses `--atlas_gcs_bearer_token_file` when configured and reads anonymously when no token file is configured; `anonymous` reads anonymously; `required` requires a readable token file. |
+| `--atlas_gcs_bearer_token_file` | Path to a file containing a GCS OAuth bearer token for private remote datasets. |
 | `--filename` | Input path for headless export (`.animation3d` for animation export, `.scene` for scene export). |
 | `--output_filename` | Output path (`.mp4`/video for animation export, image path for scene export). |
 | `--output_fps`, `--output_start_frame`, `--output_end_frame` | Output frame timing. |
