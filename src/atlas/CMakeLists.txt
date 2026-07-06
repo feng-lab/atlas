@@ -487,21 +487,6 @@ add_custom_target(vulkan_shaders ALL DEPENDS ${ATLAS_VK_SPV_OUTPUTS})
 #   message(STATUS "${_variableName}=${${_variableName}}")
 # endforeach()
 
-#libqxt srcs
-add_definitions(-DBUILD_QXT -DBUILD_QXT_OBJECT)
-set(LIBQXTDIR ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/libqxt)
-set(LIBQXT_HEADERS
-    ${LIBQXTDIR}/core/qxtglobal.h
-    ${LIBQXTDIR}/widgets/qxtspanslider.h
-    ${LIBQXTDIR}/widgets/qxtspanslider_p.h
-    ${LIBQXTDIR}/core/qxtnamespace.h
-)
-set(LIBQXT_SOURCES
-    ${LIBQXTDIR}/core/qxtglobal.cpp
-    ${LIBQXTDIR}/widgets/qxtspanslider.cpp
-)
-source_group(libqxt FILES ${LIBQXT_HEADERS} ${LIBQXT_SOURCES})
-
 # csv-parser sources. Keep Atlas in control of the source list instead of importing
 # upstream CMake, which also builds example/program targets and tweaks global flags.
 set(CSVPARSERDIR ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/csv-parser)
@@ -1027,13 +1012,11 @@ if (ATLAS_USE_MSVC_LIBRARY_SPLIT)
   add_library(atlas_core_private_includes INTERFACE)
   target_include_directories(atlas_core_private_includes
     SYSTEM INTERFACE
-      ${CSVPARSERDIR}/include
-      ${LIBQXTDIR}/core ${LIBQXTDIR}/widgets)
+      ${CSVPARSERDIR}/include)
 
   # Support code (generated RPC stubs + small bundled sources).
   add_library(atlas_core_support STATIC
               ${CSVPARSER_SOURCES}
-              ${LIBQXT_HEADERS} ${LIBQXT_SOURCES}
               ${PROTO_SRCS} ${GRPC_SRCS})
   target_link_libraries(atlas_core_support PRIVATE atlas_core_deps atlas_core_private_includes)
 
@@ -1093,7 +1076,6 @@ else ()
   # clang-cl, keep the original single-library Atlas layout.
   add_library(atlas_lib STATIC
               ${CSVPARSER_SOURCES}
-              ${LIBQXT_HEADERS} ${LIBQXT_SOURCES}
               ${ATLAS_SOURCES_NO_MAIN}
               ${PROTO_SRCS} ${GRPC_SRCS})
 
@@ -1104,8 +1086,7 @@ else ()
 
   target_include_directories(atlas_lib
     SYSTEM PRIVATE
-      ${CSVPARSERDIR}/include
-      ${LIBQXTDIR}/core ${LIBQXTDIR}/widgets)
+      ${CSVPARSERDIR}/include)
   # Vulkan headers are required transitively by some Atlas sources/headers (e.g. zvulkan*.h
   # included from renderer base). Ensure the SDK include path is visible to atlas_lib too.
   if (WIN32)

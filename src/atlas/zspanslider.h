@@ -1,22 +1,147 @@
 #pragma once
 
 #include "zspinbox.h"
-#include <qxtspanslider.h>
+#include <QSlider>
+
+class QKeyEvent;
+class QMouseEvent;
+class QPaintEvent;
+class QStyleOptionSlider;
+class QStylePainter;
+class QWheelEvent;
 
 namespace nim {
 
-class ZSpanSlider : public QxtSpanSlider
+class ZSpanSlider : public QSlider
 {
   Q_OBJECT
+  Q_PROPERTY(int lowerValue READ lowerValue WRITE setLowerValue)
+  Q_PROPERTY(int upperValue READ upperValue WRITE setUpperValue)
+  Q_PROPERTY(int lowerPosition READ lowerPosition WRITE setLowerPosition)
+  Q_PROPERTY(int upperPosition READ upperPosition WRITE setUpperPosition)
+  Q_PROPERTY(HandleMovementMode handleMovementMode READ handleMovementMode WRITE setHandleMovementMode)
 
 public:
-  using QxtSpanSlider::QxtSpanSlider;
+  explicit ZSpanSlider(QWidget* parent = nullptr);
+
+  explicit ZSpanSlider(Qt::Orientation orientation, QWidget* parent = nullptr);
+
+  enum HandleMovementMode
+  {
+    FreeMovement,
+    NoCrossing,
+    NoOverlapping
+  };
+  Q_ENUM(HandleMovementMode)
+
+  enum SpanHandle
+  {
+    NoHandle,
+    LowerHandle,
+    UpperHandle
+  };
+  Q_ENUM(SpanHandle)
+
+  [[nodiscard]] HandleMovementMode handleMovementMode() const;
+
+  void setHandleMovementMode(HandleMovementMode mode);
+
+  [[nodiscard]] int lowerValue() const;
+
+  [[nodiscard]] int upperValue() const;
+
+  [[nodiscard]] int lowerPosition() const;
+
+  [[nodiscard]] int upperPosition() const;
+
+public Q_SLOTS:
+  void setLowerValue(int lower);
+
+  void setUpperValue(int upper);
+
+  void setSpan(int lower, int upper);
+
+  void setLowerPosition(int lower);
+
+  void setUpperPosition(int upper);
 
   void setLowerValueBlockSignals(int lower);
 
   void setUpperValueBlockSignals(int upper);
 
   void setRangeBlockSignals(int min, int max);
+
+Q_SIGNALS:
+  void spanChanged(int lower, int upper);
+
+  void lowerValueChanged(int lower);
+
+  void upperValueChanged(int upper);
+
+  void lowerPositionChanged(int lower);
+
+  void upperPositionChanged(int upper);
+
+  void sliderPressed(SpanHandle handle);
+
+protected:
+  void keyPressEvent(QKeyEvent* event) override;
+
+  void mousePressEvent(QMouseEvent* event) override;
+
+  void mouseMoveEvent(QMouseEvent* event) override;
+
+  void mouseReleaseEvent(QMouseEvent* event) override;
+
+  void paintEvent(QPaintEvent* event) override;
+
+  void wheelEvent(QWheelEvent* event) override;
+
+private:
+  void initialize();
+
+  void updateRange(int min, int max);
+
+  void movePressedHandle();
+
+  void initStyleOptionForHandle(QStyleOptionSlider* option, SpanHandle handle) const;
+
+  [[nodiscard]] QRect handleRect(SpanHandle handle) const;
+
+  [[nodiscard]] int pick(const QPoint& point) const;
+
+  [[nodiscard]] int pixelPosToRangeValue(int position) const;
+
+  [[nodiscard]] SpanHandle hitHandle(const QPoint& position) const;
+
+  void movePressedHandleTo(int newPosition);
+
+  void applySliderAction(SliderAction action, SpanHandle handle);
+
+  [[nodiscard]] int constrainedLowerPosition(int position) const;
+
+  [[nodiscard]] int constrainedUpperPosition(int position) const;
+
+  void commitLowerPosition();
+
+  void commitUpperPosition();
+
+  void drawSpan(QStylePainter* painter, const QRect& rect) const;
+
+  void drawHandle(QStylePainter* painter, SpanHandle handle) const;
+
+private:
+  int m_lower = 0;
+  int m_upper = 0;
+  int m_lowerPosition = 0;
+  int m_upperPosition = 0;
+  int m_dragOffset = 0;
+  int m_dragStartPosition = 0;
+  SpanHandle m_lastPressed = NoHandle;
+  SpanHandle m_pressedHandle = NoHandle;
+  HandleMovementMode m_movement = FreeMovement;
+  bool m_firstMovement = false;
+  bool m_blockTracking = false;
 };
 
 class ZSpanSliderWithSpinBox : public QWidget
