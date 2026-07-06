@@ -1156,6 +1156,7 @@ Notes
     - Renders a “block-id” pass (`image3d_raycaster_blockID.frag`) to discover which cache blocks are needed along the rays for the current view.
     - Downloads per-pixel block IDs to CPU, compacts/deduplicates them, and asks `Z3DImg::updateAndUploadPageDirectoryCaches()` to read/upload those blocks.
     - Then renders per-channel into a layer-array RT; multi-channel results are merged via `image2d_array_compositor.frag`.
+  - A local cut whose lower and upper bounds are equal is a planar slice, not a volume raycast. OpenGL handles that case through `render2DSliceOf3DImage()`: fast preview first, then a slice-shaped block-ID pass and a paged transfer-function slice draw. Vulkan mirrors that behavior with explicit planar progressive stages; the volumetric progressive raycaster stages remain volume-only and should continue to `CHECK` if planar geometry reaches them.
   - `Z3DImg` owns:
     - Page directory and page table cache textures (3D integer textures) per channel.
     - The image block cache texture per channel (3D texture storing block bricks).

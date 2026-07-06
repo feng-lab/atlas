@@ -852,6 +852,9 @@ struct ImgRaycasterPayload
     ProgressiveCompaction,
     ProgressiveRaycast,
     ProgressiveCopyToLayers,
+    // Progressive planar stages for 3D volumes collapsed to explicit slice quads.
+    ProgressivePlanarBlockId,
+    ProgressivePlanarDrawLayer,
     ProgressiveMerge,
   };
 

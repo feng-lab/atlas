@@ -220,6 +220,21 @@ struct RaycasterSingleChannelBindlessUBOStd140
 
 static_assert(sizeof(RaycasterSingleChannelBindlessUBOStd140) == 32u,
               "Bindless indices UBO must match backend-shared imgIndices descriptor range (8 uints / 32B)");
+
+struct RaycasterPagedSliceBindlessUBOStd140
+{
+  uint32_t page_directory = 0u;
+  uint32_t page_table_cache = 0u;
+  uint32_t image_cache = 0u;
+  uint32_t volume = 0u;
+  uint32_t transfer_function = 0u;
+  uint32_t _pad0 = 0u;
+  uint32_t _pad1 = 0u;
+  uint32_t _pad2 = 0u;
+};
+
+static_assert(sizeof(RaycasterPagedSliceBindlessUBOStd140) == 32u,
+              "Paged slice bindless UBO must match GLSL std140 packing (5 uints + padding)");
 static_assert(kVulkanAnalyticRaySetupMaxClipPlanes == kZ3DAnalyticRaySetupMaxClipPlanes);
 
 ImgRaySetupUBOStd140 buildRaySetupUBO(const Z3DAnalyticRaySetup& setup)
@@ -710,6 +725,12 @@ void ZVulkanImgRaycasterPipelineContext::record(Z3DRendererBase& renderer,
     case ImgRaycasterPayload::Stage::ProgressiveCopyToLayers:
       recordStageProgressiveCopyToLayers(renderer, batch, payload, viewport, scissor, cmd);
       break;
+    case ImgRaycasterPayload::Stage::ProgressivePlanarBlockId:
+      recordStageProgressivePlanarBlockId(renderer, batch, payload, viewport, scissor, cmd);
+      break;
+    case ImgRaycasterPayload::Stage::ProgressivePlanarDrawLayer:
+      recordStageProgressivePlanarDrawLayer(renderer, batch, payload, viewport, scissor, cmd);
+      break;
     case ImgRaycasterPayload::Stage::ProgressiveMerge:
       recordStageProgressiveMerge(renderer, batch, payload, viewport, scissor, cmd);
       break;
@@ -919,6 +940,291 @@ ZVulkanImgRaycasterPipelineContext::ensurePreparedProgressiveRound(Z3DRendererBa
 
   m_progressivePrep = prep;
   return prep;
+}
+
+ZVulkanImgRaycasterPipelineContext::PlanarPagedInputs
+ZVulkanImgRaycasterPipelineContext::preparePlanarPagedInputs(Z3DRendererBase& renderer,
+                                                             const ImgRaycasterPayload& payload,
+                                                             size_t channelIndex,
+                                                             bool needsTransferFunction)
+{
+  CHECK(payload.planarGeometry) << "Planar paged inputs require planar geometry";
+  CHECK(payload.image != nullptr) << "Planar paged inputs missing image";
+  CHECK(payload.image->is3DData()) << "Planar paged inputs require 3D source data";
+  CHECK_LT(channelIndex, payload.image->numChannels()) << "Planar paged channel index out of range";
+
+  PlanarPagedInputs inputs;
+
+  ZVulkanImageBlockUploader& imageBlockUploader = m_backend.sharedImageBlockUploader();
+  imageBlockUploader.bindToImage(*payload.image);
+
+  ChannelResources& resources = ensureChannelResources(channelIndex);
+
+  inputs.pageDirectory = imageBlockUploader.pageDirectoryTexture(*payload.image, channelIndex);
+  inputs.pageTable = imageBlockUploader.pageTableTexture(*payload.image, channelIndex);
+  inputs.imageCache = imageBlockUploader.imageCacheTexture(*payload.image, channelIndex);
+  CHECK(inputs.pageDirectory && inputs.pageTable && inputs.imageCache)
+    << "Planar paged path missing paging textures for channel " << channelIndex;
+
+  if (needsTransferFunction) {
+    auto channelImage = payload.image->channelImageShared(channelIndex);
+    CHECK(channelImage != nullptr) << "Planar paged draw missing channel image";
+    const uint64_t volGen = payload.image->volumeGeneration(channelIndex);
+    inputs.volumeTexture = &ensureVolumeTexture(*payload.image, channelIndex, volGen, channelImage);
+
+    CHECK(payload.transferFunctions != nullptr) << "Planar paged draw missing transfer function vector";
+    const auto& transferList = *payload.transferFunctions;
+    CHECK(channelIndex < transferList.size() && transferList[channelIndex] != nullptr)
+      << "Planar paged draw missing transfer function for channel " << channelIndex;
+    inputs.transferTexture = &ensureTransferTexture(resources, *transferList[channelIndex]);
+  }
+
+  const glm::uvec2 outputSize = payload.outputSize;
+  CHECK(outputSize.x > 0u && outputSize.y > 0u) << "Planar paged path requires non-zero output size";
+
+  const auto& viewState = renderer.viewState();
+  const auto& sceneState = renderer.sceneState();
+  const auto& monoEyeState = viewState.eyes[static_cast<size_t>(Z3DEye::MonoEye)];
+  const float nearClip = std::abs(viewState.nearClip) < 1e-6f ? 1e-6f : viewState.nearClip;
+  const glm::vec2 pixelEyeSpaceSize =
+    monoEyeState.frustumNearPlaneSize / glm::vec2(std::max(1u, outputSize.x), std::max(1u, outputSize.y));
+  const float zeToScreenPixelVoxelSize =
+    -std::min(pixelEyeSpaceSize.x, pixelEyeSpaceSize.y) / nearClip * sceneState.devicePixelRatio;
+
+  const uint32_t devCap = deviceLevelCap(m_backend.device());
+  const uint32_t levelCount = static_cast<uint32_t>(std::min<size_t>(payload.image->numLevels(), devCap));
+  CHECK_GT(levelCount, 0u) << "Planar paged path has no paging levels";
+  inputs.levelCount = levelCount;
+  resources.levelCount = levelCount;
+
+  const std::vector<uint8_t> pageData =
+    buildPageDataBuffer(*payload.image, channelIndex, zeToScreenPixelVoxelSize, levelCount);
+  const auto pageSlice = m_backend.suballocateUniformFor(payload, pageData.size());
+  CHECK(pageSlice.mapped != nullptr) << "Planar paged page-data uniform slice mapping missing";
+  std::memcpy(pageSlice.mapped, pageData.data(), pageData.size());
+  CHECK(pageSlice.offset <= std::numeric_limits<uint32_t>::max())
+    << "Planar paged page-data dynamic offset exceeds uint32 range: " << pageSlice.offset;
+  inputs.pageDataDynOffset = static_cast<uint32_t>(pageSlice.offset);
+
+  RaycasterPagedSliceBindlessUBOStd140 bindless{};
+  bindless.page_directory =
+    m_backend.bindlessLookupSampledImageAutoOrCrash(*inputs.pageDirectory, "ray_planar_page_directory");
+  bindless.page_table_cache =
+    m_backend.bindlessLookupSampledImageAutoOrCrash(*inputs.pageTable, "ray_planar_page_table");
+  bindless.image_cache = m_backend.bindlessLookupSampledImageAutoOrCrash(*inputs.imageCache, "ray_planar_image_cache");
+  if (inputs.volumeTexture != nullptr) {
+    bindless.volume = m_backend.bindlessLookupSampledImageAutoOrCrash(*inputs.volumeTexture, "ray_planar_volume");
+  }
+  if (inputs.transferTexture != nullptr) {
+    bindless.transfer_function =
+      m_backend.bindlessLookupSampledImageAutoOrCrash(*inputs.transferTexture, "ray_planar_transfer");
+  }
+
+  const auto bindlessSlice = m_backend.suballocateUniformFor(payload, sizeof(bindless));
+  CHECK(bindlessSlice.mapped != nullptr) << "Planar paged bindless uniform slice mapping missing";
+  std::memcpy(bindlessSlice.mapped, &bindless, sizeof(bindless));
+  CHECK(bindlessSlice.offset <= std::numeric_limits<uint32_t>::max())
+    << "Planar paged bindless dynamic offset exceeds uint32 range: " << bindlessSlice.offset;
+  inputs.bindlessDynOffset = static_cast<uint32_t>(bindlessSlice.offset);
+
+  return inputs;
+}
+
+void ZVulkanImgRaycasterPipelineContext::recordStageProgressivePlanarBlockId(Z3DRendererBase& renderer,
+                                                                             const RenderBatch& batch,
+                                                                             const ImgRaycasterPayload& payload,
+                                                                             const vk::Viewport& viewport,
+                                                                             const vk::Rect2D& scissor,
+                                                                             vk::raii::CommandBuffer& cmd)
+{
+  const uint64_t streamKey = payload.streamKey;
+  if (stageSkippedThisFrame(streamKey, batch.eye)) {
+    return;
+  }
+
+  if (streamKey != 0u && m_pendingFinalization && m_pendingFinalization->streamKey == streamKey &&
+      m_pendingFinalization->eye == batch.eye) {
+    markStageSkippedThisFrame(streamKey, batch.eye);
+    return;
+  }
+
+  CHECK(payload.planarGeometry) << "ProgressivePlanarBlockId requires planar geometry";
+  CHECK(!payload.fastPathOnly) << "ProgressivePlanarBlockId requires full-resolution paging";
+  CHECK(payload.channelIndexRaw >= 0) << "ProgressivePlanarBlockId requires channelIndexRaw >= 0";
+  CHECK_EQ(payload.roundIndexRaw, 0) << "ProgressivePlanarBlockId expects one paging round per planar channel";
+  CHECK(static_cast<size_t>(payload.channelIndexRaw) < payload.visibleChannels.size())
+    << "ProgressivePlanarBlockId channelIndexRaw out of range";
+  CHECK(payload.blockIdLease && payload.blockIdLease->hasVulkanImage())
+    << "ProgressivePlanarBlockId missing block-ID lease";
+
+  const size_t channelIndex = payload.visibleChannels[static_cast<size_t>(payload.channelIndexRaw)];
+  const PlanarPagedInputs inputs =
+    preparePlanarPagedInputs(renderer, payload, channelIndex, /*needsTransferFunction=*/false);
+
+  ensureEntryGeometryUploadedThisFrame(payload);
+  CHECK(m_entryVertexBuffer != nullptr) << "ProgressivePlanarBlockId missing entry vertex buffer";
+  const uint32_t vertexCount = static_cast<uint32_t>(payload.entryPositions.size());
+  CHECK_GT(vertexCount, 0u) << "ProgressivePlanarBlockId missing planar vertex data";
+
+  const vulkan::AttachmentFormats formats = vulkan::extractAttachmentFormats(batch);
+  CHECK(!formats.colorFormats.empty()) << "ProgressivePlanarBlockId requires a color attachment";
+  const vk::Format blockFormat = formats.colorFormats.front();
+  PlanarBlockIdPipelineKey pipelineKey{inputs.levelCount, blockFormat};
+  PipelineInstance& pipeline = ensurePlanarBlockIdPipeline(pipelineKey, blockFormat);
+
+  const vk::DescriptorSet dsIndices = m_backend.sharedImgIndicesDescriptorSet();
+  const vk::DescriptorSet dsPageData = m_backend.sharedImgPageDataDescriptorSet();
+  CHECK(dsIndices && dsPageData) << "ProgressivePlanarBlockId missing shared descriptor sets";
+
+  struct SlicePushConstant
+  {
+    glm::mat4 projectionView;
+    glm::mat4 view;
+  } pc;
+  const auto& eyeState = renderer.viewState().eyes[static_cast<size_t>(batch.eye)];
+  pc.projectionView = eyeState.projectionMatrix * eyeState.viewMatrix;
+  pc.view = eyeState.viewMatrix;
+
+  ZVulkanPipelineCommandRecorder recorder(cmd);
+  ZVulkanGraphicsDrawSpec drawSpec{};
+  drawSpec.viewports = std::span<const vk::Viewport>(&viewport, 1);
+  drawSpec.scissors = std::span<const vk::Rect2D>(&scissor, 1);
+  drawSpec.pipelineHandle = pipeline.pipeline->pipelineHandle();
+  drawSpec.pipelineLayoutHandle = pipeline.pipeline->pipelineLayoutHandle();
+  const std::array<vk::DescriptorSet, 3> descriptorSets{m_backend.bindlessSampledImageDescriptorSet(),
+                                                        dsIndices,
+                                                        dsPageData};
+  const std::array<uint32_t, 2> dynamicOffsets{inputs.bindlessDynOffset, inputs.pageDataDynOffset};
+  drawSpec.descriptorSets = descriptorSets;
+  drawSpec.dynamicOffsets = dynamicOffsets;
+  drawSpec.descriptorSetFirst = 0;
+  drawSpec.expectedDescriptorSetCount = 3;
+  const std::array<vk::Buffer, 1> vertexBuffers{m_entryVertexBuffer->buffer()};
+  const std::array<vk::DeviceSize, 1> vertexOffsets{0};
+  drawSpec.vertexBuffers = vertexBuffers;
+  drawSpec.vertexOffsets = vertexOffsets;
+  drawSpec.pushConstantsData = &pc;
+  drawSpec.pushConstantsSize = sizeof(pc);
+  drawSpec.pushConstantsStages = vk::ShaderStageFlagBits::eVertex;
+  drawSpec.requirePushConstants = true;
+  drawSpec.instanceCount = 1;
+
+  if (payload.entryHasIndices && m_entryIndexBuffer && !payload.entryIndices.empty()) {
+    drawSpec.indexBuffer = m_entryIndexBuffer->buffer();
+    drawSpec.indexOffset = 0;
+    drawSpec.indexType = vk::IndexType::eUint32;
+    drawSpec.indexCount = static_cast<uint32_t>(payload.entryIndices.size());
+    drawSpec.firstIndex = 0;
+    drawSpec.vertexOffset = 0;
+    drawSpec.firstInstance = 0;
+  } else {
+    drawSpec.vertexCount = vertexCount;
+    drawSpec.firstVertex = 0;
+    drawSpec.firstInstance = 0;
+  }
+
+  recorder.recordGraphicsDraw(drawSpec);
+}
+
+void ZVulkanImgRaycasterPipelineContext::recordStageProgressivePlanarDrawLayer(Z3DRendererBase& renderer,
+                                                                               const RenderBatch& batch,
+                                                                               const ImgRaycasterPayload& payload,
+                                                                               const vk::Viewport& viewport,
+                                                                               const vk::Rect2D& scissor,
+                                                                               vk::raii::CommandBuffer& cmd)
+{
+  const uint64_t streamKey = payload.streamKey;
+  if (stageSkippedThisFrame(streamKey, batch.eye)) {
+    return;
+  }
+
+  if (streamKey != 0u && m_pendingFinalization && m_pendingFinalization->streamKey == streamKey &&
+      m_pendingFinalization->eye == batch.eye) {
+    markStageSkippedThisFrame(streamKey, batch.eye);
+    return;
+  }
+
+  CHECK(payload.planarGeometry) << "ProgressivePlanarDrawLayer requires planar geometry";
+  CHECK(!payload.fastPathOnly) << "ProgressivePlanarDrawLayer requires full-resolution paging";
+  CHECK(payload.channelLayerLease && payload.channelLayerLease->hasVulkanImage())
+    << "ProgressivePlanarDrawLayer missing layer lease";
+  CHECK(payload.channelIndexRaw >= 0) << "ProgressivePlanarDrawLayer requires channelIndexRaw >= 0";
+  CHECK(static_cast<size_t>(payload.channelIndexRaw) < payload.visibleChannels.size())
+    << "ProgressivePlanarDrawLayer channelIndexRaw out of range";
+  CHECK(!batch.pass.colorAttachments.empty()) << "ProgressivePlanarDrawLayer requires a color attachment";
+  CHECK_EQ(batch.pass.colorAttachments.front().handle.index, static_cast<uint32_t>(payload.channelIndexRaw))
+    << "ProgressivePlanarDrawLayer target layer must match channelIndexRaw";
+
+  const size_t channelIndex = payload.visibleChannels[static_cast<size_t>(payload.channelIndexRaw)];
+  const PlanarPagedInputs inputs =
+    preparePlanarPagedInputs(renderer, payload, channelIndex, /*needsTransferFunction=*/true);
+
+  ensureEntryGeometryUploadedThisFrame(payload);
+  CHECK(m_entryVertexBuffer != nullptr) << "ProgressivePlanarDrawLayer missing entry vertex buffer";
+  const uint32_t vertexCount = static_cast<uint32_t>(payload.entryPositions.size());
+  CHECK_GT(vertexCount, 0u) << "ProgressivePlanarDrawLayer missing planar vertex data";
+
+  const vulkan::AttachmentFormats formats = vulkan::extractAttachmentFormats(batch);
+  CHECK(!formats.colorFormats.empty()) << "ProgressivePlanarDrawLayer requires color attachment formats";
+  const CompositingConfig composite = evaluateCompositing(payload.compositingMode);
+  PlanarPagedPipelineKey pipelineKey{inputs.levelCount,
+                                     composite.resultOpaque,
+                                     formats.colorFormats,
+                                     formats.depthFormat};
+  PipelineInstance& pipeline = ensurePlanarPagedPipeline(pipelineKey, formats);
+
+  const vk::DescriptorSet dsIndices = m_backend.sharedImgIndicesDescriptorSet();
+  const vk::DescriptorSet dsPageData = m_backend.sharedImgPageDataDescriptorSet();
+  CHECK(dsIndices && dsPageData) << "ProgressivePlanarDrawLayer missing shared descriptor sets";
+
+  struct SlicePushConstant
+  {
+    glm::mat4 projectionView;
+    glm::mat4 view;
+  } pc;
+  const auto& eyeState = renderer.viewState().eyes[static_cast<size_t>(batch.eye)];
+  pc.projectionView = eyeState.projectionMatrix * eyeState.viewMatrix;
+  pc.view = eyeState.viewMatrix;
+
+  ZVulkanPipelineCommandRecorder recorder(cmd);
+  ZVulkanGraphicsDrawSpec drawSpec{};
+  drawSpec.viewports = std::span<const vk::Viewport>(&viewport, 1);
+  drawSpec.scissors = std::span<const vk::Rect2D>(&scissor, 1);
+  drawSpec.pipelineHandle = pipeline.pipeline->pipelineHandle();
+  drawSpec.pipelineLayoutHandle = pipeline.pipeline->pipelineLayoutHandle();
+  const std::array<vk::DescriptorSet, 3> descriptorSets{m_backend.bindlessSampledImageDescriptorSet(),
+                                                        dsIndices,
+                                                        dsPageData};
+  const std::array<uint32_t, 2> dynamicOffsets{inputs.bindlessDynOffset, inputs.pageDataDynOffset};
+  drawSpec.descriptorSets = descriptorSets;
+  drawSpec.dynamicOffsets = dynamicOffsets;
+  drawSpec.descriptorSetFirst = 0;
+  drawSpec.expectedDescriptorSetCount = 3;
+  const std::array<vk::Buffer, 1> vertexBuffers{m_entryVertexBuffer->buffer()};
+  const std::array<vk::DeviceSize, 1> vertexOffsets{0};
+  drawSpec.vertexBuffers = vertexBuffers;
+  drawSpec.vertexOffsets = vertexOffsets;
+  drawSpec.pushConstantsData = &pc;
+  drawSpec.pushConstantsSize = sizeof(pc);
+  drawSpec.pushConstantsStages = vk::ShaderStageFlagBits::eVertex;
+  drawSpec.requirePushConstants = true;
+  drawSpec.instanceCount = 1;
+
+  if (payload.entryHasIndices && m_entryIndexBuffer && !payload.entryIndices.empty()) {
+    drawSpec.indexBuffer = m_entryIndexBuffer->buffer();
+    drawSpec.indexOffset = 0;
+    drawSpec.indexType = vk::IndexType::eUint32;
+    drawSpec.indexCount = static_cast<uint32_t>(payload.entryIndices.size());
+    drawSpec.firstIndex = 0;
+    drawSpec.vertexOffset = 0;
+    drawSpec.firstInstance = 0;
+  } else {
+    drawSpec.vertexCount = vertexCount;
+    drawSpec.firstVertex = 0;
+    drawSpec.firstInstance = 0;
+  }
+
+  recorder.recordGraphicsDraw(drawSpec);
 }
 
 void ZVulkanImgRaycasterPipelineContext::recordStageEntryExit(Z3DRendererBase& renderer,
@@ -1544,7 +1850,11 @@ void ZVulkanImgRaycasterPipelineContext::recordStageProgressivePreviewLayers(Z3D
   ensureQuadVertexBuffer();
 
   const CompositingConfig composite = evaluateCompositing(payload.compositingMode);
-  recordFastVolumeLayersOnly(renderer, batch, payload, viewport, scissor, cmd, composite);
+  if (payload.planarGeometry) {
+    recordFastPlanarLayersOnly(renderer, batch, payload, viewport, scissor, cmd, composite);
+  } else {
+    recordFastVolumeLayersOnly(renderer, batch, payload, viewport, scissor, cmd, composite);
+  }
 }
 
 void ZVulkanImgRaycasterPipelineContext::recordStageProgressiveBlockId(Z3DRendererBase& renderer,
@@ -1936,6 +2246,14 @@ void ZVulkanImgRaycasterPipelineContext::recordStageProgressiveMerge(Z3DRenderer
       fin.streamKey = streamKey;
       fin.eye = batch.eye;
       fin.lastRound = false;
+      fin.channelCount = channelCount;
+    }
+  } else if (payload.planarGeometry) {
+    if (wantsFinalization && streamKey != 0u) {
+      setFinalization = true;
+      fin.streamKey = streamKey;
+      fin.eye = batch.eye;
+      fin.lastRound = true;
       fin.channelCount = channelCount;
     }
   } else {
@@ -3146,6 +3464,7 @@ void ZVulkanImgRaycasterPipelineContext::recordBlockIdCompaction(Z3DRendererBase
      eye = batch.eye,
      channelCount = static_cast<uint32_t>(payload.visibleChannels.size()),
      progressiveGeneration = payload.progressiveGeneration,
+     planarGeometry = payload.planarGeometry,
      attCount = effectiveAttachmentCount,
      channelIndex = resolvedChannelIndex,
      channelIndexRaw = static_cast<uint32_t>(payload.channelIndexRaw),
@@ -3370,6 +3689,15 @@ void ZVulkanImgRaycasterPipelineContext::recordBlockIdCompaction(Z3DRendererBase
         ZBenchTimer timer("vulkan_raycaster_blockid_compaction");
         imagePtr->updateAndUploadPageDirectoryCaches(missingBlocks, channelIndex, cancellationToken, timer, roundIndex);
         VLOG(1) << fmt::format("cache uploads dispatched: blocks={}", missingBlocks.size());
+      }
+
+      if (planarGeometry) {
+        if (m_deferredProgressive && m_deferredProgressive->streamKey == streamKey &&
+            m_deferredProgressive->eye == eye &&
+            m_deferredProgressive->progressiveGeneration == progressiveGeneration) {
+          m_deferredProgressive.reset();
+        }
+        co_return;
       }
 
       // Track attachments that rendered zero block IDs so we can mirror GL's
@@ -3706,6 +4034,167 @@ ZVulkanImgRaycasterPipelineContext::ensureProgressivePipeline(const ProgressiveP
   }
 
   auto [inserted, _] = m_progressivePipelines.emplace(key, std::move(instance));
+  return inserted->second;
+}
+
+ZVulkanImgRaycasterPipelineContext::PipelineInstance&
+ZVulkanImgRaycasterPipelineContext::ensurePlanarBlockIdPipeline(const PlanarBlockIdPipelineKey& key,
+                                                                vk::Format colorFormat)
+{
+  auto it = m_planarBlockIdPipelines.find(key);
+  if (it != m_planarBlockIdPipelines.end()) {
+    return it->second;
+  }
+
+  const vk::DescriptorSetLayout bindlessLayout = m_backend.bindlessSampledImageDescriptorSetLayout();
+  CHECK(bindlessLayout) << "Planar Block-ID pipeline requires backend bindless descriptor set layout";
+  const vk::DescriptorSetLayout indicesLayout = m_backend.imgIndicesDescriptorSetLayout();
+  CHECK(indicesLayout) << "Planar Block-ID pipeline requires backend indices descriptor set layout";
+  const vk::DescriptorSetLayout pageDataLayout = m_backend.imgPageDataDescriptorSetLayout();
+  CHECK(pageDataLayout) << "Planar Block-ID pipeline requires backend page-data descriptor set layout";
+
+  auto& device = m_backend.device();
+  PipelineInstance instance;
+  instance.shader = std::make_unique<ZVulkanShader>(
+    device,
+    ZVulkanShader::spirvResourcePath(QStringLiteral("transform_with_3dtexture_and_eye_coordinate.vert.spv")),
+    ZVulkanShader::spirvResourcePath(QStringLiteral("image3d_slice_with_transfun_blockID.frag.spv")),
+    std::nullopt);
+
+  vk::VertexInputBindingDescription binding{.binding = 0,
+                                            .stride = static_cast<uint32_t>(sizeof(EntryVertex)),
+                                            .inputRate = vk::VertexInputRate::eVertex};
+  std::array<vk::VertexInputAttributeDescription, 2> attrs{
+    vk::VertexInputAttributeDescription{.location = 0,
+                                        .binding = 0,
+                                        .format = vk::Format::eR32G32B32Sfloat,
+                                        .offset = static_cast<uint32_t>(offsetof(EntryVertex, position))},
+    vk::VertexInputAttributeDescription{.location = 1,
+                                        .binding = 0,
+                                        .format = vk::Format::eR32G32B32Sfloat,
+                                        .offset = static_cast<uint32_t>(offsetof(EntryVertex, texCoord))}
+  };
+  vk::PipelineVertexInputStateCreateInfo vertexInput{};
+  vertexInput.vertexBindingDescriptionCount = 1;
+  vertexInput.pVertexBindingDescriptions = &binding;
+  vertexInput.vertexAttributeDescriptionCount = static_cast<uint32_t>(attrs.size());
+  vertexInput.pVertexAttributeDescriptions = attrs.data();
+
+  instance.pipeline = device.createPipeline(*instance.shader, vertexInput, vk::PrimitiveTopology::eTriangleList);
+  instance.pipeline->setDescriptorSetLayouts({bindlessLayout, indicesLayout, pageDataLayout});
+  instance.pipeline->setAttachmentFormats({colorFormat}, std::nullopt);
+  instance.colorFormats = {colorFormat};
+  instance.depthFormat.reset();
+  instance.pipeline->setCullMode(vk::CullModeFlagBits::eNone);
+  instance.pipeline->setFrontFace(vk::FrontFace::eCounterClockwise);
+  instance.pipeline->setDepthTestEnable(false);
+  instance.pipeline->setDepthWriteEnable(false);
+  instance.pipeline->setColorBlendAttachment(vk::PipelineColorBlendAttachmentState{
+    .blendEnable = VK_FALSE,
+    .colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG | vk::ColorComponentFlagBits::eB |
+                      vk::ColorComponentFlagBits::eA});
+
+  vk::PushConstantRange vsRange{.stageFlags = vk::ShaderStageFlagBits::eVertex,
+                                .offset = 0,
+                                .size = static_cast<uint32_t>(sizeof(glm::mat4) * 2)};
+  instance.pipeline->setPushConstantRanges({vsRange});
+
+  std::array<vk::SpecializationMapEntry, 1> entries{
+    vk::SpecializationMapEntry{.constantID = 70, .offset = 0, .size = sizeof(uint32_t)}
+  };
+  const uint32_t levelCount = std::max(1u, key.levelCount);
+  std::vector<uint8_t> data(sizeof(uint32_t));
+  std::memcpy(data.data(), &levelCount, sizeof(uint32_t));
+  instance.shader->setSpecializationConstants(vk::ShaderStageFlagBits::eFragment,
+                                              std::vector(entries.begin(), entries.end()),
+                                              data);
+
+  instance.pipeline->create();
+
+  auto [inserted, _] = m_planarBlockIdPipelines.emplace(key, std::move(instance));
+  return inserted->second;
+}
+
+ZVulkanImgRaycasterPipelineContext::PipelineInstance&
+ZVulkanImgRaycasterPipelineContext::ensurePlanarPagedPipeline(const PlanarPagedPipelineKey& key,
+                                                              const vulkan::AttachmentFormats& formats)
+{
+  auto it = m_planarPagedPipelines.find(key);
+  if (it != m_planarPagedPipelines.end()) {
+    return it->second;
+  }
+
+  const vk::DescriptorSetLayout bindlessLayout = m_backend.bindlessSampledImageDescriptorSetLayout();
+  CHECK(bindlessLayout) << "Planar paged pipeline requires backend bindless descriptor set layout";
+  const vk::DescriptorSetLayout indicesLayout = m_backend.imgIndicesDescriptorSetLayout();
+  CHECK(indicesLayout) << "Planar paged pipeline requires backend indices descriptor set layout";
+  const vk::DescriptorSetLayout pageDataLayout = m_backend.imgPageDataDescriptorSetLayout();
+  CHECK(pageDataLayout) << "Planar paged pipeline requires backend page-data descriptor set layout";
+
+  auto& device = m_backend.device();
+  PipelineInstance instance;
+  instance.shader = std::make_unique<ZVulkanShader>(
+    device,
+    ZVulkanShader::spirvResourcePath(QStringLiteral("transform_with_3dtexture_and_eye_coordinate.vert.spv")),
+    ZVulkanShader::spirvResourcePath(QStringLiteral("image3d_slice_with_transfun.frag.spv")),
+    std::nullopt);
+
+  vk::VertexInputBindingDescription binding{.binding = 0,
+                                            .stride = static_cast<uint32_t>(sizeof(EntryVertex)),
+                                            .inputRate = vk::VertexInputRate::eVertex};
+  std::array<vk::VertexInputAttributeDescription, 2> attrs{
+    vk::VertexInputAttributeDescription{.location = 0,
+                                        .binding = 0,
+                                        .format = vk::Format::eR32G32B32Sfloat,
+                                        .offset = static_cast<uint32_t>(offsetof(EntryVertex, position))},
+    vk::VertexInputAttributeDescription{.location = 1,
+                                        .binding = 0,
+                                        .format = vk::Format::eR32G32B32Sfloat,
+                                        .offset = static_cast<uint32_t>(offsetof(EntryVertex, texCoord))}
+  };
+  vk::PipelineVertexInputStateCreateInfo vertexInput{};
+  vertexInput.vertexBindingDescriptionCount = 1;
+  vertexInput.pVertexBindingDescriptions = &binding;
+  vertexInput.vertexAttributeDescriptionCount = static_cast<uint32_t>(attrs.size());
+  vertexInput.pVertexAttributeDescriptions = attrs.data();
+
+  instance.pipeline = device.createPipeline(*instance.shader, vertexInput, vk::PrimitiveTopology::eTriangleList);
+  instance.pipeline->setDescriptorSetLayouts({bindlessLayout, indicesLayout, pageDataLayout});
+  instance.pipeline->setAttachmentFormats(formats.colorFormats, formats.depthFormat);
+  instance.colorFormats = formats.colorFormats;
+  instance.depthFormat = formats.depthFormat;
+  instance.pipeline->setCullMode(vk::CullModeFlagBits::eNone);
+  instance.pipeline->setFrontFace(vk::FrontFace::eCounterClockwise);
+  const bool hasDepth = formats.depthFormat.has_value();
+  instance.pipeline->setDepthTestEnable(hasDepth);
+  instance.pipeline->setDepthWriteEnable(hasDepth);
+  instance.pipeline->setDepthCompareOp(hasDepth ? vk::CompareOp::eLessOrEqual : vk::CompareOp::eAlways);
+
+  vk::PipelineColorBlendAttachmentState blend{};
+  blend.blendEnable = VK_FALSE;
+  blend.colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
+                         vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA;
+  instance.pipeline->setColorBlendAttachment(blend);
+
+  vk::PushConstantRange vsRange{.stageFlags = vk::ShaderStageFlagBits::eVertex,
+                                .offset = 0,
+                                .size = static_cast<uint32_t>(sizeof(glm::mat4) * 2)};
+  instance.pipeline->setPushConstantRanges({vsRange});
+
+  std::array<vk::SpecializationMapEntry, 2> entries{
+    vk::SpecializationMapEntry{.constantID = 70, .offset = 0 * sizeof(uint32_t), .size = sizeof(uint32_t)},
+    vk::SpecializationMapEntry{.constantID = 71, .offset = 1 * sizeof(uint32_t), .size = sizeof(uint32_t)}
+  };
+  std::array<uint32_t, 2> values{std::max(1u, key.levelCount), key.resultOpaque ? 1u : 0u};
+  std::vector<uint8_t> data(sizeof(values));
+  std::memcpy(data.data(), values.data(), sizeof(values));
+  instance.shader->setSpecializationConstants(vk::ShaderStageFlagBits::eFragment,
+                                              std::vector(entries.begin(), entries.end()),
+                                              data);
+
+  instance.pipeline->create();
+
+  auto [inserted, _] = m_planarPagedPipelines.emplace(key, std::move(instance));
   return inserted->second;
 }
 

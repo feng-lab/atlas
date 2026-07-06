@@ -243,6 +243,9 @@ size_t UniformArenaBudgetTraits<ImgRaycasterPayload>::estimateAdditionalBytes(co
     case ImgRaycasterPayload::Stage::ProgressiveBlockId:
     case ImgRaycasterPayload::Stage::ProgressiveRaycast:
       return szRaySetup + estimatePageDataBytes();
+    case ImgRaycasterPayload::Stage::ProgressivePlanarBlockId:
+    case ImgRaycasterPayload::Stage::ProgressivePlanarDrawLayer:
+      return szIndices + estimatePageDataBytes();
     case ImgRaycasterPayload::Stage::ProgressiveCopyToLayers:
     case ImgRaycasterPayload::Stage::ProgressiveMerge:
       return 0u;

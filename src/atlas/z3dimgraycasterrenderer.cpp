@@ -266,6 +266,14 @@ std::vector<ImgRaycasterPayload> Z3DImgRaycasterRenderer::buildVulkanStagePayloa
 
   CHECK(m_outputSize.x > 0u && m_outputSize.y > 0u) << "Vulkan img raycaster output size is zero.";
 
+  const bool planarGeometry = !m_quads.empty();
+  const bool pagedPlanarGeometry =
+    planarGeometry && m_img->is3DData() && !m_fastRendering && m_img->isVolumeDownsampled();
+  if (planarGeometry && !pagedPlanarGeometry && m_channelIdx[eye] >= 0) {
+    // A fast planar draw is not part of a progressive paging cycle.
+    resetProgress(eye);
+  }
+
   ImgRaycasterPayload common;
   common.streamKey = static_cast<uint64_t>(reinterpret_cast<uintptr_t>(this));
   common.image = m_img;
@@ -274,7 +282,7 @@ std::vector<ImgRaycasterPayload> Z3DImgRaycasterRenderer::buildVulkanStagePayloa
   common.isoValue = m_isoValue;
   common.localMIPThreshold = m_localMIPThreshold;
   common.compositingMode = m_compositingModeValue;
-  common.fastPathOnly = m_fastRendering || !m_img->isVolumeDownsampled();
+  common.fastPathOnly = m_fastRendering || !m_img->isVolumeDownsampled() || (planarGeometry && !pagedPlanarGeometry);
   common.visibleChannels = visibleChannels;
   common.transferFunctions = &m_transferFunctions;
   const uint32_t maxRounds = absl::GetFlag(FLAGS_atlas_volume_rendering_maximum_round);
@@ -282,7 +290,7 @@ std::vector<ImgRaycasterPayload> Z3DImgRaycasterRenderer::buildVulkanStagePayloa
   common.channelIndexRaw = m_channelIdx[eye];
   common.roundIndexRaw = m_round[eye];
   common.interactiveProgressivePaging = interactiveProgressivePaging;
-  common.planarGeometry = !m_quads.empty();
+  common.planarGeometry = planarGeometry;
   common.analyticRaySetup = m_analyticRaySetup;
 
   // Progressive init parity with GL: if starting progressive (channelIdx < 0), bump
@@ -423,7 +431,6 @@ std::vector<ImgRaycasterPayload> Z3DImgRaycasterRenderer::buildVulkanStagePayloa
     CHECK(!entryPositions.empty()) << "Vulkan img raycaster is missing entry geometry for the current draw.";
   }
 
-  const bool planarGeometry = common.planarGeometry;
   const bool needsEntryExit = !planarGeometry && !common.analyticRaySetup.enabled;
   // GL parity for progressive: render entry/exit exactly once per progressive cycle.
   // For fast-only rendering, render every frame.
@@ -468,12 +475,14 @@ std::vector<ImgRaycasterPayload> Z3DImgRaycasterRenderer::buildVulkanStagePayloa
   }
 
   if (!common.fastPathOnly) {
-    ensureRaycastAccumulators(eye);
+    if (!planarGeometry) {
+      ensureRaycastAccumulators(eye);
 
-    CHECK(m_lastRaycastAccum[eye]) << "Vulkan progressive raycaster missing last accum lease.";
-    CHECK(m_currentRaycastAccum[eye]) << "Vulkan progressive raycaster missing current accum lease.";
-    common.lastAccumLease = shareLease(m_lastRaycastAccum[eye]);
-    common.currentAccumLease = shareLease(m_currentRaycastAccum[eye]);
+      CHECK(m_lastRaycastAccum[eye]) << "Vulkan progressive raycaster missing last accum lease.";
+      CHECK(m_currentRaycastAccum[eye]) << "Vulkan progressive raycaster missing current accum lease.";
+      common.lastAccumLease = shareLease(m_lastRaycastAccum[eye]);
+      common.currentAccumLease = shareLease(m_currentRaycastAccum[eye]);
+    }
 
     // Persistent per-eye layer array used for preview + progressive merges.
     // This mirrors the GL path's m_progressiveLayerLease behavior but is scoped
@@ -538,12 +547,13 @@ std::vector<ImgRaycasterPayload> Z3DImgRaycasterRenderer::buildVulkanStagePayloa
     return stages;
   }
 
-  // Progressive (paging) path is volumetric-only.
-  CHECK(!planarGeometry) << "Vulkan progressive raycaster stages are volumetric-only.";
-
   if (common.channelIndexRaw < 0) {
     ImgRaycasterPayload preview = common;
     preview.stage = ImgRaycasterPayload::Stage::ProgressivePreviewLayers;
+    if (planarGeometry) {
+      preview.entryPositions = std::move(entryPositions);
+      preview.entryTexCoords = std::move(entryTexCoords);
+    }
     stages.push_back(std::move(preview));
 
     ImgRaycasterPayload merge = common;
@@ -555,6 +565,51 @@ std::vector<ImgRaycasterPayload> Z3DImgRaycasterRenderer::buildVulkanStagePayloa
     m_vulkanProgressivePhase[eye] = VulkanProgressivePhase::BlockIdDiscovery;
     return stages;
   }
+
+  if (planarGeometry) {
+    CHECK(pagedPlanarGeometry) << "Vulkan planar progressive stages require paged 3D data.";
+    const VulkanProgressivePhase phase = m_vulkanProgressivePhase[eye];
+    switch (phase) {
+      case VulkanProgressivePhase::BlockIdDiscovery: {
+        auto blockLease =
+          pool.acquireBlockIdRenderTarget(m_outputSize, 1, -1.0, std::optional<RenderBackend>(RenderBackend::Vulkan));
+        common.blockIdAttachmentCount = blockLease.attachments;
+        common.blockIdEffectiveAttachmentCount = 1u;
+        common.blockIdLease = std::make_shared<Z3DScratchResourcePool::RenderTargetLease>(std::move(blockLease));
+
+        ImgRaycasterPayload blockId = common;
+        blockId.stage = ImgRaycasterPayload::Stage::ProgressivePlanarBlockId;
+        blockId.entryPositions = std::move(entryPositions);
+        blockId.entryTexCoords = std::move(entryTexCoords);
+        stages.push_back(std::move(blockId));
+
+        ImgRaycasterPayload compact = common;
+        compact.stage = ImgRaycasterPayload::Stage::ProgressiveCompaction;
+        stages.push_back(std::move(compact));
+
+        m_vulkanProgressivePhase[eye] = VulkanProgressivePhase::Raycast;
+        return stages;
+      }
+      case VulkanProgressivePhase::Raycast: {
+        ImgRaycasterPayload draw = common;
+        draw.stage = ImgRaycasterPayload::Stage::ProgressivePlanarDrawLayer;
+        draw.entryPositions = std::move(entryPositions);
+        draw.entryTexCoords = std::move(entryTexCoords);
+        stages.push_back(std::move(draw));
+
+        ImgRaycasterPayload merge = common;
+        merge.stage = ImgRaycasterPayload::Stage::ProgressiveMerge;
+        merge.requestFinalization = true;
+        stages.push_back(std::move(merge));
+        return stages;
+      }
+    }
+
+    CHECK(false) << "Unhandled VulkanProgressivePhase for planar img raycaster";
+  }
+
+  // Progressive volume paging remains volumetric-only.
+  CHECK(!planarGeometry) << "Vulkan progressive raycaster stages are volumetric-only.";
 
   // Split progressive paging into fine-grained per-frame stages (GL parity):
   // - BlockIdDiscovery frame: BlockId + Compaction (schedule readback + cache upload), then return.
@@ -648,8 +703,15 @@ Z3DImgRaycasterRenderer::recordVulkanStagesToScript(ZVulkanLinearScript& script,
         return "ray_progressive_raycast";
       case Stage::ProgressiveCopyToLayers:
         return "ray_copy_to_layers";
+      case Stage::ProgressivePlanarBlockId:
+        return "ray_planar_block_id";
+      case Stage::ProgressivePlanarDrawLayer:
+        return "ray_planar_draw_layer";
       case Stage::ProgressiveMerge:
-        return (payload.channelIndexRaw < 0) ? "ray_preview_merge" : "ray_progressive_merge";
+        if (payload.channelIndexRaw < 0) {
+          return "ray_preview_merge";
+        }
+        return payload.planarGeometry ? "ray_planar_merge" : "ray_progressive_merge";
     }
     CHECK(false) << "Unhandled ImgRaycasterPayload stage";
     return "ray_unknown";
@@ -672,6 +734,8 @@ Z3DImgRaycasterRenderer::recordVulkanStagesToScript(ZVulkanLinearScript& script,
       case Stage::ProgressiveCompaction:
       case Stage::ProgressiveRaycast:
       case Stage::ProgressiveCopyToLayers:
+      case Stage::ProgressivePlanarBlockId:
+      case Stage::ProgressivePlanarDrawLayer:
         return false;
     }
     return false;
@@ -915,6 +979,41 @@ Z3DImgRaycasterRenderer::recordVulkanStagesToScript(ZVulkanLinearScript& script,
           auto lastAccumSamples = accumSurfaceHandles(stagePayload.lastAccumLease);
           colorSamples.insert(colorSamples.end(), lastAccumSamples.begin(), lastAccumSamples.end());
           appendRasterBatchWithExternalSamples(std::move(stagePayload), colorSamples, {});
+          return;
+        }
+
+        case ImgRaycasterPayload::Stage::ProgressivePlanarBlockId: {
+          CHECK(stagePayload.blockIdLease && stagePayload.blockIdLease->hasVulkanImage())
+            << "Raycaster planar Block-ID stage missing Vulkan block-ID lease";
+          m_rendererBase.frameState().updateViewportData(stagePayload.blockIdLease->descriptor.size);
+          RendererFrameState::ActiveSurface blockSurface = m_rendererBase.describeSurface(*stagePayload.blockIdLease);
+          CHECK_EQ(blockSurface.colorAttachments.size(), 1u)
+            << "Raycaster planar Block-ID pass expects exactly one color attachment";
+          m_rendererBase.setActiveSurfaceWithLoadStore(blockSurface,
+                                                       LoadOp::Clear,
+                                                       StoreOp::Store,
+                                                       LoadOp::DontCare,
+                                                       StoreOp::DontCare);
+          markActiveSurfaceSampled();
+          appendRasterBatchWithExternalSamples(std::move(stagePayload), {}, {});
+          return;
+        }
+
+        case ImgRaycasterPayload::Stage::ProgressivePlanarDrawLayer: {
+          CHECK(stagePayload.channelLayerLease && stagePayload.channelLayerLease->hasVulkanImage())
+            << "Raycaster ProgressivePlanarDrawLayer stage missing Vulkan layer lease";
+          CHECK(stagePayload.channelIndexRaw >= 0)
+            << "Raycaster ProgressivePlanarDrawLayer stage requires non-negative channelIndexRaw";
+          m_rendererBase.frameState().updateViewportData(stagePayload.channelLayerLease->descriptor.size);
+          const uint32_t layerIndex = static_cast<uint32_t>(stagePayload.channelIndexRaw);
+          const auto surface = surfaceFromLeaseWithLayerIndex(*stagePayload.channelLayerLease, layerIndex);
+          m_rendererBase.setActiveSurfaceWithLoadStore(surface,
+                                                       LoadOp::Clear,
+                                                       StoreOp::Store,
+                                                       LoadOp::Clear,
+                                                       StoreOp::Store);
+          markActiveSurfaceSampled();
+          appendRasterBatchWithExternalSamples(std::move(stagePayload), {}, {});
           return;
         }
 

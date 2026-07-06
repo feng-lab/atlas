@@ -186,6 +186,40 @@ private:
     }
   };
 
+  struct PlanarBlockIdPipelineKey
+  {
+    uint32_t levelCount = 1u;
+    vk::Format colorFormat = vk::Format::eR32G32B32A32Uint;
+
+    auto tie() const
+    {
+      return std::tuple(levelCount, colorFormat);
+    }
+
+    bool operator<(const PlanarBlockIdPipelineKey& rhs) const
+    {
+      return tie() < rhs.tie();
+    }
+  };
+
+  struct PlanarPagedPipelineKey
+  {
+    uint32_t levelCount = 1u;
+    bool resultOpaque = false;
+    std::vector<vk::Format> colorFormats;
+    std::optional<vk::Format> depthFormat;
+
+    auto tie() const
+    {
+      return std::tuple(levelCount, resultOpaque, colorFormats, depthFormat);
+    }
+
+    bool operator<(const PlanarPagedPipelineKey& rhs) const
+    {
+      return tie() < rhs.tie();
+    }
+  };
+
   struct CopyPipelineKey
   {
     std::vector<vk::Format> colorFormats;
@@ -259,6 +293,8 @@ private:
   std::map<FastPipelineKey, PipelineInstance> m_fastPipelines;
   std::map<BlockIdPipelineKey, PipelineInstance> m_blockIdPipelines;
   std::map<ProgressivePipelineKey, PipelineInstance> m_progressivePipelines;
+  std::map<PlanarBlockIdPipelineKey, PipelineInstance> m_planarBlockIdPipelines;
+  std::map<PlanarPagedPipelineKey, PipelineInstance> m_planarPagedPipelines;
   std::map<CopyPipelineKey, PipelineInstance> m_copyPipelines;
   std::map<MergePipelineKey, PipelineInstance> m_mergePipelines;
 
@@ -399,6 +435,9 @@ private:
   PipelineInstance& ensureBlockIdPipeline(const BlockIdPipelineKey& key, vk::Format colorFormat);
   PipelineInstance& ensureProgressivePipeline(const ProgressivePipelineKey& key,
                                               const vulkan::AttachmentFormats& formats);
+  PipelineInstance& ensurePlanarBlockIdPipeline(const PlanarBlockIdPipelineKey& key, vk::Format colorFormat);
+  PipelineInstance& ensurePlanarPagedPipeline(const PlanarPagedPipelineKey& key,
+                                              const vulkan::AttachmentFormats& formats);
   PipelineInstance& ensureCopyPipeline(const CopyPipelineKey& key, const vulkan::AttachmentFormats& formats);
   PipelineInstance& ensureMergePipeline(const MergePipelineKey& key, const vulkan::AttachmentFormats& formats);
   void uploadEntryGeometry(const ImgRaycasterPayload& payload);
@@ -494,6 +533,37 @@ private:
                                                                                    const vk::Rect2D& scissor,
                                                                                    vk::raii::CommandBuffer& cmd,
                                                                                    const CompositingConfig& composite);
+
+  struct PlanarPagedInputs
+  {
+    uint32_t levelCount = 1u;
+    uint32_t bindlessDynOffset = 0u;
+    uint32_t pageDataDynOffset = 0u;
+    ZVulkanTexture* pageDirectory = nullptr;
+    ZVulkanTexture* pageTable = nullptr;
+    ZVulkanTexture* imageCache = nullptr;
+    ZVulkanTexture* volumeTexture = nullptr;
+    ZVulkanTexture* transferTexture = nullptr;
+  };
+
+  [[nodiscard]] PlanarPagedInputs preparePlanarPagedInputs(Z3DRendererBase& renderer,
+                                                           const ImgRaycasterPayload& payload,
+                                                           size_t channelIndex,
+                                                           bool needsTransferFunction);
+
+  void recordStageProgressivePlanarBlockId(Z3DRendererBase& renderer,
+                                           const RenderBatch& batch,
+                                           const ImgRaycasterPayload& payload,
+                                           const vk::Viewport& viewport,
+                                           const vk::Rect2D& scissor,
+                                           vk::raii::CommandBuffer& cmd);
+
+  void recordStageProgressivePlanarDrawLayer(Z3DRendererBase& renderer,
+                                             const RenderBatch& batch,
+                                             const ImgRaycasterPayload& payload,
+                                             const vk::Viewport& viewport,
+                                             const vk::Rect2D& scissor,
+                                             vk::raii::CommandBuffer& cmd);
 
   void recordFastPlanarLayersOnly(Z3DRendererBase& renderer,
                                   const RenderBatch& batch,

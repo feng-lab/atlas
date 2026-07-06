@@ -1212,6 +1212,30 @@ void ZVulkanLinearScript::flushNodes(std::string_view reason, /*nullable*/ const
                     channels.push_back(*resolved);
                     break;
                   }
+                  case ImgRaycasterPayload::Stage::ProgressivePlanarBlockId: {
+                    const auto resolved = resolveProgressiveChannel();
+                    if (!resolved.has_value()) {
+                      return;
+                    }
+                    needsWarmup = true;
+                    wants2D = false;
+                    wantsVolume3D = false;
+                    wantsPaging = true;
+                    channels.push_back(*resolved);
+                    break;
+                  }
+                  case ImgRaycasterPayload::Stage::ProgressivePlanarDrawLayer: {
+                    const auto resolved = resolveProgressiveChannel();
+                    if (!resolved.has_value()) {
+                      return;
+                    }
+                    needsWarmup = true;
+                    wants2D = false;
+                    wantsVolume3D = true;
+                    wantsPaging = true;
+                    channels.push_back(*resolved);
+                    break;
+                  }
                   default:
                     break;
                 }
@@ -1415,6 +1439,30 @@ void ZVulkanLinearScript::flushNodes(std::string_view reason, /*nullable*/ const
                   }
                   case ImgRaycasterPayload::Stage::ProgressiveBlockId:
                   case ImgRaycasterPayload::Stage::ProgressiveRaycast: {
+                    const auto resolved = resolveProgressiveChannel();
+                    if (!resolved.has_value()) {
+                      return;
+                    }
+                    needsWarmup = true;
+                    wants2D = false;
+                    wantsVolume3D = true;
+                    wantsPaging = true;
+                    channels.push_back(*resolved);
+                    break;
+                  }
+                  case ImgRaycasterPayload::Stage::ProgressivePlanarBlockId: {
+                    const auto resolved = resolveProgressiveChannel();
+                    if (!resolved.has_value()) {
+                      return;
+                    }
+                    needsWarmup = true;
+                    wants2D = false;
+                    wantsVolume3D = false;
+                    wantsPaging = true;
+                    channels.push_back(*resolved);
+                    break;
+                  }
+                  case ImgRaycasterPayload::Stage::ProgressivePlanarDrawLayer: {
                     const auto resolved = resolveProgressiveChannel();
                     if (!resolved.has_value()) {
                       return;
