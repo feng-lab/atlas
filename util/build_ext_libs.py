@@ -5880,8 +5880,7 @@ void vtkBoundingBox::ComputeBounds(
 
         # Keep these cache args aligned with the current vendored VTK tree.
         # VTK_DATA_EXCLUDE_FROM_ALL only matters when VTK_BUILD_TESTING is ON,
-        # VTK_LEGACY_REMOVE is now inert, and the old doubleconversion toggle
-        # no longer exists in this VTK checkout.
+        # VTK_LEGACY_REMOVE is now inert
         cmakecmd.extend(
             [
                 "-DVTK_BUILD_EXAMPLES:BOOL=OFF",
@@ -6524,23 +6523,6 @@ def build_jansson(src_dir: str, install_dir: str):
                 "-DJANSSON_STATIC_CRT:BOOL=OFF",
                 "-DJANSSON_EXAMPLES:BOOL=OFF",
                 "-DCMAKE_POLICY_VERSION_MINIMUM=3.5",
-            ]
-        )
-
-        cmakecmd.extend([src_dir])
-        build_and_install_cmakecmd(cmakecmd, build_dir)
-    finally:
-        shutil.rmtree(build_dir, ignore_errors=False)
-
-
-def build_pcre(src_dir: str, install_dir: str):
-    build_dir = create_build_dir(src_dir)
-
-    try:
-        cmakecmd = get_cmake_cmd_common_part(install_dir, universal=True)
-        cmakecmd.extend(
-            [
-                "-DBUILD_STATIC_LIBS:BOOL=ON",
             ]
         )
 
@@ -7875,20 +7857,6 @@ def build_libs(libs: OrderedDict, use_asan: bool):
                 assert os.path.exists(src_dir)
             build_jansson(src_dir, ext_build_dir())
 
-        if lib_name == "pcre" and is_internal_dev_environment():
-            if is_windows():
-                package_name = find_src_package_with_glob(
-                    os.path.join(src_package_dir(), "pcre2*")
-                )
-                src_dir = os.path.join(
-                    ext_dir(), get_package_top_level_folder(package_name)
-                )
-                if not os.path.exists(src_dir):
-                    remove_old_src_folder_with_glob(os.path.join(ext_dir(), "pcre2*"))
-                    unpack_file_to_folder(package_name, ext_dir())
-                    assert os.path.exists(src_dir)
-                build_pcre(src_dir, ext_build_dir())
-
         if lib_name == "fizz":
             src_dir = os.path.join(ext_dir(), "fizz", "fizz")
             build_fizz(src_dir, ext_build_dir())
@@ -8002,7 +7970,6 @@ def parse_inputs(argv: list):
         "rocksdb",
         "llfio",
         "jansson",
-        "pcre",
         "fizz",
         "mvfst",
         "wangle",
@@ -8022,9 +7989,6 @@ def parse_inputs(argv: list):
         "skia",
         "rocksdb",
         "llfio",
-        # pcre2 was only needed by the Windows neurolabi/parity-test path,
-        # which is no longer built by default.
-        "pcre",
         "or-tools",
     ]
     libs_reverse_depends = {
