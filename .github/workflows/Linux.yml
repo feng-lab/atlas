@@ -415,99 +415,13 @@ jobs:
           cd "$GITHUB_WORKSPACE"
           python util/publish_r2.py publish-ifw --os Linux
 
-      - name: Setup SSH key
+      - name: Deploy artifacts (SSH)
         shell: bash -l {0}
         run: |
+          eval "$(conda shell.bash hook)"
+          conda activate atlas-ci
           set -euo pipefail
-          if [ -z "${SSH_PRIVATE_KEY_BASE64:-}" ] || [ -z "${SSH_KNOWN_HOSTS_BASE64:-}" ]; then
-            echo "Error: SSH_PRIVATE_KEY_BASE64 / SSH_KNOWN_HOSTS_BASE64 are not set. Provide them via the ATLAS_ENV_LOCAL dotenv secret." >&2
-            exit 1
-          fi
-
-          sshDir="${RUNNER_TEMP:-/tmp}/atlas-ssh"
-          mkdir -p "${sshDir}"
-          sshKeyPath="${sshDir}/deploy.key"
-          knownHostsPath="${sshDir}/known_hosts"
-
-          sshPrivateKeyB64="${SSH_PRIVATE_KEY_BASE64//$'\r'/}"
-          sshPrivateKeyB64="${sshPrivateKeyB64//$'\n'/}"
-          if [[ "${sshPrivateKeyB64}" == *% ]]; then
-            sshPrivateKeyB64="${sshPrivateKeyB64%?}"
-          fi
-          printf '%s' "$sshPrivateKeyB64" | base64 --decode > "${sshKeyPath}"
-          chmod 600 "${sshKeyPath}"
-
-          # Use a temp known_hosts file; do not mutate ~/.ssh on self-hosted runners.
-          sshKnownHostsB64="${SSH_KNOWN_HOSTS_BASE64//$'\r'/}"
-          sshKnownHostsB64="${sshKnownHostsB64//$'\n'/}"
-          if [[ "${sshKnownHostsB64}" == *% ]]; then
-            sshKnownHostsB64="${sshKnownHostsB64%?}"
-          fi
-          printf '%s' "$sshKnownHostsB64" | base64 --decode > "${knownHostsPath}"
-          printf '\n' >> "${knownHostsPath}"
-
-          {
-            echo "ATLAS__SSH_DIR=${sshDir}"
-            echo "ATLAS__SSH_KEY_PATH=${sshKeyPath}"
-            echo "ATLAS__SSH_KNOWN_HOSTS_PATH=${knownHostsPath}"
-          } >> "$GITHUB_ENV"
-
-      - name: Deploy artifacts
-        shell: bash -l {0}
-        run: |
-          set -euo pipefail
-
-          retry() {
-            local attempts="${1:?attempts missing}"
-            local base_delay="${2:?base_delay missing}"
-            local max_delay="${3:?max_delay missing}"
-            shift 3
-            local attempt=1
-            while true; do
-              if "$@"; then
-                return 0
-              fi
-              local rc=$?
-              if [ "$attempt" -ge "$attempts" ]; then
-                echo "Command failed after ${attempts} attempts (exit ${rc}): ${1:-<unknown>}" >&2
-                return "$rc"
-              fi
-              local sleep_for=$(( base_delay * (2 ** (attempt - 1)) ))
-              if [ "$sleep_for" -gt "$max_delay" ]; then
-                sleep_for="$max_delay"
-              fi
-              echo "Command failed (exit ${rc}); retrying in ${sleep_for}s (${attempt}/${attempts}): ${1:-<unknown>}" >&2
-              sleep "$sleep_for"
-              attempt=$(( attempt + 1 ))
-            done
-          }
-
-          : "${SSH_SERVER:?Error: SSH_SERVER is not set (ATLAS_ENV_LOCAL)}"
-          : "${SSH_PORT:?Error: SSH_PORT is not set (ATLAS_ENV_LOCAL)}"
-          : "${SSH_USERNAME:?Error: SSH_USERNAME is not set (ATLAS_ENV_LOCAL)}"
-          : "${SSH_DEPLOY_PATH:?Error: SSH_DEPLOY_PATH is not set (ATLAS_ENV_LOCAL)}"
-          : "${ATLAS__SSH_KEY_PATH:?Error: ATLAS__SSH_KEY_PATH is not set}"
-          : "${ATLAS__SSH_KNOWN_HOSTS_PATH:?Error: ATLAS__SSH_KNOWN_HOSTS_PATH is not set}"
-
-          sshCmd="ssh -p $SSH_PORT -i $ATLAS__SSH_KEY_PATH -o UserKnownHostsFile=$ATLAS__SSH_KNOWN_HOSTS_PATH -o StrictHostKeyChecking=yes -o LogLevel=ERROR"
-          cd "$GITHUB_WORKSPACE/deploy"
-          retry 5 5 60 rsync -av --delete -e "${sshCmd}" ${{ runner.os }} $SSH_USERNAME@$SSH_SERVER:$SSH_DEPLOY_PATH/packages/
-          retry 5 5 60 rsync -tv -e "${sshCmd}" AtlasInstaller*.zip $SSH_USERNAME@$SSH_SERVER:$SSH_DEPLOY_PATH/installers/
-          schemaDir="$GITHUB_WORKSPACE/src/atlas/Resources/json/atlas"
-          retry 5 5 60 rsync -tv -e "${sshCmd}" \
-            "$schemaDir/animation3d.schema.json" \
-            "$schemaDir/capabilities.json" \
-            "$schemaDir/supported_file_formats.json" \
-            $SSH_USERNAME@$SSH_SERVER:$SSH_DEPLOY_PATH/installers/
-
-      - name: Cleanup SSH assets
-        if: ${{ always() }}
-        shell: bash -l {0}
-        run: |
-          set -euo pipefail
-          if [ -n "${ATLAS__SSH_DIR:-}" ] && [ -d "${ATLAS__SSH_DIR}" ]; then
-            rm -rf "${ATLAS__SSH_DIR}" || true
-          fi
+          python util/deploy_artifacts_ssh.py --os ${{ runner.os }} --include-schema
 
       - name: Publish atlas-agent to PyPI
         if: github.event_name == 'create' && github.ref_type == 'tag' && startsWith(github.event.ref, 'v')
