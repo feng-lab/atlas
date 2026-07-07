@@ -384,6 +384,178 @@ jobs:
           python util/build_and_deploy_atlas.py
           if ($LASTEXITCODE -ne 0) { Write-Error "build_and_deploy_atlas failed with exit code $LASTEXITCODE"; exit $LASTEXITCODE }
 
+      - name: Collect Windows failure diagnostics
+        if: ${{ failure() }}
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Continue'
+          $diag = Join-Path $env:GITHUB_WORKSPACE 'ci-diagnostics'
+          New-Item -ItemType Directory -Force -Path $diag | Out-Null
+
+          function Write-Capture {
+            param(
+              [Parameter(Mandatory=$true)][string]$Name,
+              [Parameter(Mandatory=$true)][scriptblock]$Command
+            )
+            $path = Join-Path $diag $Name
+            "===== $Name =====" | Out-File -FilePath $path -Encoding utf8
+            try {
+              & $Command 2>&1 | Out-String -Width 240 | Out-File -FilePath $path -Encoding utf8 -Append
+            } catch {
+              "FAILED: $($_.Exception.GetType().FullName): $($_.Exception.Message)" | Out-File -FilePath $path -Encoding utf8 -Append
+            }
+          }
+
+          $env:VK_DRIVER_FILES = 'C:\SwiftShader\vk_swiftshader_icd.json'
+          $env:Path = "C:\SwiftShader;$env:Path"
+          $since = (Get-Date).AddHours(-8)
+
+          Write-Capture 'environment.txt' {
+            Write-Output "CollectedAtUtc=$((Get-Date).ToUniversalTime().ToString('o'))"
+            Write-Output "Workspace=$env:GITHUB_WORKSPACE"
+            foreach ($name in @(
+              'CI',
+              'GITHUB_ACTIONS',
+              'GITHUB_WORKSPACE',
+              'RUNNER_OS',
+              'RUNNER_TEMP',
+              'RUNNER_TOOL_CACHE',
+              'CONDA_DEFAULT_ENV',
+              'VK_DRIVER_FILES',
+              'VK_ICD_FILENAMES',
+              'VK_LAYER_PATH',
+              'VK_ADD_LAYER_PATH',
+              'VK_LOADER_DRIVERS_SELECT',
+              'VULKAN_SDK',
+              'QT_PLUGIN_PATH',
+              'QT_QPA_PLATFORM',
+              'QT_QPA_PLATFORM_PLUGIN_PATH',
+              'QT_DEBUG_PLUGINS',
+              'LOCALAPPDATA',
+              'APPDATA',
+              'USERPROFILE',
+              'TEMP',
+              'TMP',
+              'PATH'
+            )) {
+              $value = [Environment]::GetEnvironmentVariable($name)
+              if ([string]::IsNullOrEmpty($value)) { $value = '<unset>' }
+              Write-Output "$name=$value"
+            }
+          }
+
+          Write-Capture 'processes.txt' {
+            Get-CimInstance Win32_Process |
+              Where-Object { $_.Name -match 'Atlas|java|python|vulkaninfo|WerFault|conhost' } |
+              Select-Object ProcessId,ParentProcessId,Name,CreationDate,ExecutablePath,CommandLine |
+              Sort-Object CreationDate |
+              Format-List
+          }
+
+          Write-Capture 'deploy-atlas-directory.txt' {
+            Get-ChildItem -Force -LiteralPath (Join-Path $env:GITHUB_WORKSPACE 'deploy\Atlas') |
+              Select-Object Name,Length,LastWriteTime,FullName |
+              Sort-Object Name |
+              Format-Table -AutoSize
+          }
+
+          Write-Capture 'qt-platform-plugins.txt' {
+            Get-ChildItem -Force -LiteralPath (Join-Path $env:GITHUB_WORKSPACE 'deploy\Atlas\platforms') |
+              Select-Object Name,Length,LastWriteTime,FullName |
+              Sort-Object Name |
+              Format-Table -AutoSize
+          }
+
+          Write-Capture 'atlas-vulkan-resources.txt' {
+            foreach ($path in @(
+              (Join-Path $env:GITHUB_WORKSPACE 'deploy\Atlas\vulkan'),
+              (Join-Path $env:GITHUB_WORKSPACE 'deploy\Atlas\Resources\vulkan')
+            )) {
+              Write-Output "===== $path ====="
+              if (Test-Path $path) {
+                Get-ChildItem -Force -LiteralPath $path |
+                  Select-Object Name,Length,LastWriteTime,FullName |
+                  Sort-Object Name |
+                  Format-Table -AutoSize
+              } else {
+                Write-Output 'missing'
+              }
+            }
+          }
+
+          Write-Capture 'schema-output-directory.txt' {
+            Get-ChildItem -Force -LiteralPath (Join-Path $env:GITHUB_WORKSPACE 'src\atlas\Resources\json\atlas') |
+              Select-Object Name,Length,LastWriteTime,FullName |
+              Sort-Object Name |
+              Format-Table -AutoSize
+          }
+
+          Write-Capture 'swiftshader.txt' {
+            Get-ChildItem -Force -LiteralPath 'C:\SwiftShader' |
+              Select-Object Name,Length,LastWriteTime,FullName |
+              Sort-Object Name |
+              Format-Table -AutoSize
+            Write-Output ''
+            Write-Output '--- vk_swiftshader_icd.json ---'
+            Get-Content -LiteralPath 'C:\SwiftShader\vk_swiftshader_icd.json'
+          }
+
+          Write-Capture 'vulkaninfo-summary.txt' {
+            where.exe vulkaninfo
+            vulkaninfo --summary
+          }
+
+          Write-Capture 'application-events.txt' {
+            Get-WinEvent -FilterHashtable @{LogName='Application'; StartTime=$since} -ErrorAction SilentlyContinue |
+              Where-Object {
+                $_.ProviderName -match 'Application Error|Windows Error Reporting' -or
+                $_.Message -match 'Atlas\.exe|Qt6|qoffscreen|qwindows|platform plugin|Vulkan|SwiftShader'
+              } |
+              Sort-Object TimeCreated |
+              Select-Object TimeCreated,ProviderName,Id,LevelDisplayName,Message |
+              Format-List
+          }
+
+          $logs = Join-Path $env:LOCALAPPDATA 'fenglab\Atlas\Logs'
+          if (Test-Path $logs) {
+            Copy-Item -LiteralPath $logs -Destination (Join-Path $diag 'AtlasLogs') -Recurse -Force -ErrorAction Continue
+          }
+
+          $schemaDir = Join-Path $env:GITHUB_WORKSPACE 'src\atlas\Resources\json\atlas'
+          if (Test-Path $schemaDir) {
+            Copy-Item -LiteralPath $schemaDir -Destination (Join-Path $diag 'SchemaOutput') -Recurse -Force -ErrorAction Continue
+          }
+
+          $dumpDir = Join-Path $diag 'Dumps'
+          New-Item -ItemType Directory -Force -Path $dumpDir | Out-Null
+          Get-ChildItem -LiteralPath $HOME -File -ErrorAction SilentlyContinue |
+            Where-Object { $_.Name -match '^Atlas.*\.(dmp|mdmp|dump|core)$' -and $_.LastWriteTime -ge $since } |
+            Copy-Item -Destination $dumpDir -Force -ErrorAction Continue
+
+          $werOut = Join-Path $diag 'WER'
+          New-Item -ItemType Directory -Force -Path $werOut | Out-Null
+          foreach ($werRoot in @(
+            'C:\ProgramData\Microsoft\Windows\WER\ReportArchive',
+            'C:\ProgramData\Microsoft\Windows\WER\ReportQueue'
+          )) {
+            if (Test-Path $werRoot) {
+              Get-ChildItem -LiteralPath $werRoot -Directory -ErrorAction SilentlyContinue |
+                Where-Object { $_.Name -like '*Atlas.exe*' -and $_.LastWriteTime -ge $since } |
+                ForEach-Object {
+                  Copy-Item -LiteralPath $_.FullName -Destination (Join-Path $werOut $_.Name) -Recurse -Force -ErrorAction Continue
+                }
+            }
+          }
+
+      - name: Upload Windows failure diagnostics
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-failure-diagnostics
+          path: ci-diagnostics
+          if-no-files-found: ignore
+          retention-days: 7
+
       - name: Publish artifacts to R2
         shell: bash -l {0}
         run: |
