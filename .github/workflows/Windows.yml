@@ -502,7 +502,8 @@ jobs:
           eval "$(conda shell.bash hook)"
           conda activate atlas-ci
           set -euo pipefail
-          python util/deploy_artifacts_ssh.py --os ${{ runner.os }} --method scp
+          cd "$GITHUB_WORKSPACE"
+          python util/deploy_artifacts_ssh.py --os Windows --method scp
 
       - name: Publish zimg (PyPI + conda)
         shell: pwsh

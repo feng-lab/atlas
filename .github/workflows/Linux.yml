@@ -421,7 +421,8 @@ jobs:
           eval "$(conda shell.bash hook)"
           conda activate atlas-ci
           set -euo pipefail
-          python util/deploy_artifacts_ssh.py --os ${{ runner.os }} --include-schema
+          cd "$GITHUB_WORKSPACE"
+          python util/deploy_artifacts_ssh.py --os Linux --include-schema
 
       - name: Publish atlas-agent to PyPI
         if: github.event_name == 'create' && github.ref_type == 'tag' && startsWith(github.event.ref, 'v')

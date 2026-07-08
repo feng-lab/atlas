@@ -111,110 +111,6 @@ runs:
         fi
         ls -la "$HOME/Qt" || true
 
-    - name: Configure macOS signing + notarization
-      shell: bash -l {0}
-      run: |
-        set -euo pipefail
-
-        if [ -z "${MACOS_CODESIGN_IDENTITY:-}" ]; then
-          echo "Error: MACOS_CODESIGN_IDENTITY is not set." >&2
-          exit 1
-        fi
-        if [ -z "${MACOS_CODESIGN_P12_BASE64:-}" ] || [ -z "${MACOS_CODESIGN_P12_PASSWORD:-}" ]; then
-          echo "Error: MACOS_CODESIGN_P12_BASE64 / MACOS_CODESIGN_P12_PASSWORD are required." >&2
-          exit 1
-        fi
-        if [ -z "${MACOS_NOTARYTOOL_API_KEY_ID:-}" ] || [ -z "${MACOS_NOTARYTOOL_API_ISSUER_ID:-}" ] || [ -z "${MACOS_NOTARYTOOL_API_KEY_P8_BASE64:-}" ]; then
-          echo "Error: notarytool API key env vars are required (MACOS_NOTARYTOOL_API_KEY_ID, MACOS_NOTARYTOOL_API_ISSUER_ID, MACOS_NOTARYTOOL_API_KEY_P8_BASE64)." >&2
-          exit 1
-        fi
-
-        KEYCHAIN_PATH="${RUNNER_TEMP}/atlas-codesign.keychain-db"
-        CERT_P12_PATH="${RUNNER_TEMP}/atlas-codesign-cert.p12"
-        NOTARY_P8_PATH="${RUNNER_TEMP}/atlas-notary-key.p8"
-
-        eval "$(conda shell.bash hook)"
-        conda activate atlas-ci
-
-        export CERT_P12_PATH NOTARY_P8_PATH
-        python - << 'PY'
-        import base64
-        import os
-        from pathlib import Path
-
-        def write_b64(env: str, path: str) -> None:
-            data = os.environ.get(env)
-            if not data:
-                raise SystemExit(f"Missing env var: {env}")
-            data = data.strip()
-            while data.endswith("%"):
-                data = data[:-1]
-            Path(path).write_bytes(base64.b64decode(data))
-
-        write_b64("MACOS_CODESIGN_P12_BASE64", os.environ["CERT_P12_PATH"])
-        write_b64("MACOS_NOTARYTOOL_API_KEY_P8_BASE64", os.environ["NOTARY_P8_PATH"])
-        PY
-
-        KEYCHAIN_PASSWORD="$(python -c 'import secrets; print(secrets.token_hex(16))')"
-        security_quiet() {
-          local subcmd="${1:-<unknown>}"
-          # Treat CI logs as public: suppress all output from `security` on both stdout/stderr
-          # (some subcommands print keychain/cert metadata even on success).
-          if ! security "$@" >/dev/null 2>&1; then
-            echo "Error: security ${subcmd} failed (output suppressed for CI log safety)." >&2
-            return 1
-          fi
-          return 0
-        }
-
-        # On some self-hosted runners, the user may not have a default keychain configured.
-        # Treat missing defaults/search-lists as soft state and proceed with a temp keychain.
-        ORIG_DEFAULT_KEYCHAIN="$(security default-keychain 2>/dev/null | sed -E 's/^"//; s/"$//' || true)"
-        ORIG_KEYCHAIN_LIST="$(
-          security list-keychains -d user 2>/dev/null \
-            | sed -E 's/^[[:space:]]*\"//; s/\"$//' \
-            | grep -F -v -- "${KEYCHAIN_PATH}" \
-            || true
-        )"
-        if [ "${ORIG_DEFAULT_KEYCHAIN}" = "${KEYCHAIN_PATH}" ]; then
-          ORIG_DEFAULT_KEYCHAIN=""
-        fi
-
-        security_quiet create-keychain -p "${KEYCHAIN_PASSWORD}" "${KEYCHAIN_PATH}"
-        security_quiet set-keychain-settings -lut 21600 "${KEYCHAIN_PATH}"
-        security_quiet unlock-keychain -p "${KEYCHAIN_PASSWORD}" "${KEYCHAIN_PATH}"
-        security_quiet import "${CERT_P12_PATH}" -k "${KEYCHAIN_PATH}" -P "${MACOS_CODESIGN_P12_PASSWORD}" -T /usr/bin/codesign -T /usr/bin/security
-        security_quiet set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "${KEYCHAIN_PASSWORD}" "${KEYCHAIN_PATH}"
-
-        # Ensure both login and the temp keychain are searchable (do not drop existing entries).
-        # shellcheck disable=SC2086
-        security_quiet list-keychains -d user -s "${KEYCHAIN_PATH}" ${ORIG_KEYCHAIN_LIST}
-        security_quiet default-keychain -s "${KEYCHAIN_PATH}"
-        # Public CI logs: do not print certificate subjects / Team IDs. Sanity-check that
-        # the configured identity exists without echoing identities into logs.
-        identities=""
-        if ! identities="$(security find-identity -v -p codesigning "${KEYCHAIN_PATH}" 2>/dev/null)"; then
-          echo "Error: failed to query codesigning identities in the temporary keychain." >&2
-          exit 1
-        fi
-        if ! printf '%s\n' "${identities}" | grep -F -q -- "${MACOS_CODESIGN_IDENTITY}"; then
-          echo "Error: MACOS_CODESIGN_IDENTITY does not match any valid codesigning identity in the temporary keychain. Check MACOS_CODESIGN_IDENTITY and the P12 import step." >&2
-          exit 1
-        fi
-        echo "Codesigning identity available in temp keychain."
-
-        {
-          echo "MACOS_NOTARYTOOL_API_KEY_PATH=${NOTARY_P8_PATH}"
-          echo "ATLAS__CODESIGN_ORIG_DEFAULT_KEYCHAIN=${ORIG_DEFAULT_KEYCHAIN}"
-        } >> "$GITHUB_ENV"
-        if [ -n "${ORIG_KEYCHAIN_LIST}" ]; then
-          {
-            echo "ATLAS__CODESIGN_ORIG_KEYCHAIN_LIST<<EOF"
-            echo "${ORIG_KEYCHAIN_LIST}"
-            echo "EOF"
-          } >> "$GITHUB_ENV"
-        fi
-
     - name: Cache atlas test data
       if: ${{ inputs.cache-test-data == 'true' }}
       uses: actions/cache@v5
@@ -229,10 +125,15 @@ runs:
     - name: Build and deploy Atlas
       shell: bash -l {0}
       run: |
+        set -euo pipefail
         eval "$(conda shell.bash hook)"
         conda activate atlas-ci
         cd "$GITHUB_WORKSPACE"
-        python util/build_and_deploy_atlas.py
+        signingDir="${TMPDIR:-/tmp}/atlas-macos-signing-${GITHUB_RUN_ID:-local}-${GITHUB_RUN_ATTEMPT:-0}-${GITHUB_JOB:-job}"
+        python util/macos_ci_signing.py run \
+          --work-dir "${signingDir}" \
+          -- \
+          python util/build_and_deploy_atlas.py
 
     - name: Create or update release and upload assets (gh CLI)
       if: github.event_name == 'create' && github.ref_type == 'tag' && startsWith(github.event.ref, 'v')
@@ -312,7 +213,8 @@ runs:
         eval "$(conda shell.bash hook)"
         conda activate atlas-ci
         set -euo pipefail
-        python util/deploy_artifacts_ssh.py --os ${{ runner.os }}
+        cd "$GITHUB_WORKSPACE"
+        python util/deploy_artifacts_ssh.py --os macOS
 
     - name: Publish zimg (PyPI + conda)
       shell: bash -l {0}
@@ -320,13 +222,18 @@ runs:
         eval "$(conda shell.bash hook)"
         conda activate atlas-ci
         set -euo pipefail
+        cd "$GITHUB_WORKSPACE"
         python -m pip install --upgrade pip
         # Ensure build backend is available (redundant if conda tooling already installed)
         python -m pip install --no-cache-dir build twine
         if [ -n "${ANACONDA_API_TOKEN:-}" ]; then
           conda config --set anaconda_upload yes
         fi
-        python util/publish_zimg.py
+        signingDir="${TMPDIR:-/tmp}/atlas-macos-signing-${GITHUB_RUN_ID:-local}-${GITHUB_RUN_ATTEMPT:-0}-${GITHUB_JOB:-job}"
+        python util/macos_ci_signing.py run \
+          --work-dir "${signingDir}" \
+          -- \
+          python util/publish_zimg.py
         ls -R python/zimg/dist
 
     - name: Cleanup macOS signing assets
@@ -334,45 +241,8 @@ runs:
       shell: bash -l {0}
       run: |
         set -euo pipefail
-        security_quiet() {
-          local subcmd="${1:-<unknown>}"
-          if ! security "$@" >/dev/null 2>&1; then
-            echo "Warning: security ${subcmd} failed during cleanup (output suppressed for CI log safety)." >&2
-            return 1
-          fi
-          return 0
-        }
-        KEYCHAIN_PATH="${RUNNER_TEMP}/atlas-codesign.keychain-db"
-        CERT_P12_PATH="${RUNNER_TEMP}/atlas-codesign-cert.p12"
-        NOTARY_P8_PATH="${RUNNER_TEMP}/atlas-notary-key.p8"
-
-        restoreDefault=""
-        if [ -n "${ATLAS__CODESIGN_ORIG_DEFAULT_KEYCHAIN:-}" ] && [ "${ATLAS__CODESIGN_ORIG_DEFAULT_KEYCHAIN}" != "${KEYCHAIN_PATH}" ] && [ -f "${ATLAS__CODESIGN_ORIG_DEFAULT_KEYCHAIN}" ]; then
-          restoreDefault="${ATLAS__CODESIGN_ORIG_DEFAULT_KEYCHAIN}"
-        else
-          for candidate in "${HOME}/Library/Keychains/login.keychain-db" "${HOME}/Library/Keychains/login.keychain"; do
-            if [ "${candidate}" != "${KEYCHAIN_PATH}" ] && [ -f "${candidate}" ]; then
-              restoreDefault="${candidate}"
-              break
-            fi
-          done
-          if [ -z "${restoreDefault}" ] && [ -f "/Library/Keychains/System.keychain" ]; then
-            restoreDefault="/Library/Keychains/System.keychain"
-          fi
-        fi
-
-        if [ -n "${restoreDefault}" ]; then
-          security_quiet default-keychain -s "${restoreDefault}" || true
-        fi
-
-        if [ -n "${ATLAS__CODESIGN_ORIG_KEYCHAIN_LIST:-}" ]; then
-          # shellcheck disable=SC2086
-          security_quiet list-keychains -d user -s ${ATLAS__CODESIGN_ORIG_KEYCHAIN_LIST} || true
-        elif [ -n "${restoreDefault}" ]; then
-          security_quiet list-keychains -d user -s "${restoreDefault}" || true
-        fi
-
-        if [ -f "${KEYCHAIN_PATH}" ]; then
-          security_quiet delete-keychain "${KEYCHAIN_PATH}" || true
-        fi
-        rm -f "${NOTARY_P8_PATH}" "${CERT_P12_PATH}" || true
+        eval "$(conda shell.bash hook)"
+        conda activate atlas-ci
+        cd "$GITHUB_WORKSPACE"
+        signingDir="${TMPDIR:-/tmp}/atlas-macos-signing-${GITHUB_RUN_ID:-local}-${GITHUB_RUN_ATTEMPT:-0}-${GITHUB_JOB:-job}"
+        python util/macos_ci_signing.py cleanup --work-dir "${signingDir}"

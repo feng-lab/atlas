@@ -44,7 +44,7 @@ class SshConfig:
 
 @dataclass(frozen=True)
 class DeployInputs:
-    workspace: Path
+    repo_root: Path
     deploy_dir: Path
     os_name: str
     include_schema: bool
@@ -274,21 +274,13 @@ def _remove_remote_package_dir(
 
 
 def _collect_inputs(args: argparse.Namespace) -> DeployInputs:
-    workspace = Path(args.workspace).resolve()
-    deploy_dir = (
-        Path(args.deploy_dir).resolve() if args.deploy_dir else workspace / "deploy"
-    )
-    schema_dir = (
-        Path(args.schema_dir).resolve()
-        if args.schema_dir
-        else workspace / "src" / "atlas" / "Resources" / "json" / "atlas"
-    )
+    repo_root = _repo_root()
     return DeployInputs(
-        workspace=workspace,
-        deploy_dir=deploy_dir,
+        repo_root=repo_root,
+        deploy_dir=repo_root / "deploy",
         os_name=args.os,
         include_schema=args.include_schema,
-        schema_dir=schema_dir,
+        schema_dir=repo_root / "src" / "atlas" / "Resources" / "json" / "atlas",
     )
 
 
@@ -370,11 +362,11 @@ def _deploy_with_rsync(
             "--delete",
             "-e",
             rsync_ssh,
-            _local_arg(package_dir, cwd=inputs.workspace),
+            _local_arg(package_dir, cwd=inputs.repo_root),
             packages_target,
         ],
         label=f"upload {inputs.os_name} package directory with rsync",
-        cwd=inputs.workspace,
+        cwd=inputs.repo_root,
         dry_run=dry_run,
         policy=policy,
     )
@@ -384,11 +376,11 @@ def _deploy_with_rsync(
             "-t",
             "-e",
             rsync_ssh,
-            *[_local_arg(path, cwd=inputs.workspace) for path in installers],
+            *[_local_arg(path, cwd=inputs.repo_root) for path in installers],
             installers_target,
         ],
         label=f"upload {inputs.os_name} installer artifact with rsync",
-        cwd=inputs.workspace,
+        cwd=inputs.repo_root,
         dry_run=dry_run,
         policy=policy,
     )
@@ -399,11 +391,11 @@ def _deploy_with_rsync(
                 "-t",
                 "-e",
                 rsync_ssh,
-                *[_local_arg(path, cwd=inputs.workspace) for path in schema_files],
+                *[_local_arg(path, cwd=inputs.repo_root) for path in schema_files],
                 installers_target,
             ],
             label=f"upload {inputs.os_name} schema artifacts with rsync",
-            cwd=inputs.workspace,
+            cwd=inputs.repo_root,
             dry_run=dry_run,
             policy=policy,
         )
@@ -429,7 +421,7 @@ def _deploy_with_scp(
     _remove_remote_package_dir(
         config,
         os_name=inputs.os_name,
-        cwd=inputs.workspace,
+        cwd=inputs.repo_root,
         dry_run=dry_run,
         policy=policy,
     )
@@ -437,22 +429,22 @@ def _deploy_with_scp(
         [
             *_scp_command(config),
             "-r",
-            _local_arg(package_dir, cwd=inputs.workspace),
+            _local_arg(package_dir, cwd=inputs.repo_root),
             packages_target,
         ],
         label=f"upload {inputs.os_name} package directory with scp",
-        cwd=inputs.workspace,
+        cwd=inputs.repo_root,
         dry_run=dry_run,
         policy=policy,
     )
     _run_with_retry(
         [
             *_scp_command(config),
-            *[_local_arg(path, cwd=inputs.workspace) for path in installers],
+            *[_local_arg(path, cwd=inputs.repo_root) for path in installers],
             installers_target,
         ],
         label=f"upload {inputs.os_name} installer artifact with scp",
-        cwd=inputs.workspace,
+        cwd=inputs.repo_root,
         dry_run=dry_run,
         policy=policy,
     )
@@ -460,11 +452,11 @@ def _deploy_with_scp(
         _run_with_retry(
             [
                 *_scp_command(config),
-                *[_local_arg(path, cwd=inputs.workspace) for path in schema_files],
+                *[_local_arg(path, cwd=inputs.repo_root) for path in schema_files],
                 installers_target,
             ],
             label=f"upload {inputs.os_name} schema artifacts with scp",
-            cwd=inputs.workspace,
+            cwd=inputs.repo_root,
             dry_run=dry_run,
             policy=policy,
         )
@@ -508,11 +500,7 @@ def deploy(args: argparse.Namespace) -> None:
     package_dir, installers, schema_files = _validate_inputs(inputs)
     policy = _collect_command_policy(args)
 
-    temp_parent = Path(os.environ.get("RUNNER_TEMP", tempfile.gettempdir()))
-    if not temp_parent.is_dir():
-        temp_parent = Path(tempfile.gettempdir())
-
-    with tempfile.TemporaryDirectory(prefix="atlas-ssh-", dir=temp_parent) as temp_dir:
+    with tempfile.TemporaryDirectory(prefix="atlas-ssh-") as temp_dir:
         key_path, known_hosts_path = _write_ssh_material(Path(temp_dir))
         config = _load_config(key_path, known_hosts_path)
         method = _resolve_method(args.method)
@@ -524,7 +512,7 @@ def deploy(args: argparse.Namespace) -> None:
         )
         _ensure_remote_dirs(
             config,
-            cwd=inputs.workspace,
+            cwd=inputs.repo_root,
             dry_run=args.dry_run,
             policy=policy,
         )
@@ -558,33 +546,13 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
         "--os",
         required=True,
         choices=("Linux", "macOS", "Windows"),
-        help="GitHub runner OS name and deploy/<os> package directory to publish.",
-    )
-    parser.add_argument(
-        "--workspace",
-        default=os.environ.get("GITHUB_WORKSPACE", str(_repo_root())),
-        help=(
-            "Repository workspace root. Defaults to GITHUB_WORKSPACE or the repo root."
-        ),
-    )
-    parser.add_argument(
-        "--deploy-dir",
-        default=None,
-        help="Deploy output directory. Defaults to <workspace>/deploy.",
+        help="Artifact platform name and deploy/<os> package directory to publish.",
     )
     parser.add_argument(
         "--include-schema",
         action="store_true",
         help=(
             "Also upload generated Atlas JSON schema/capabilities files to installers/."
-        ),
-    )
-    parser.add_argument(
-        "--schema-dir",
-        default=None,
-        help=(
-            "Directory containing generated JSON schema files. Defaults to "
-            "src/atlas/Resources/json/atlas."
         ),
     )
     parser.add_argument(
