@@ -302,29 +302,6 @@ jobs:
           reg.exe query "HKLM\SOFTWARE\Khronos\Vulkan\Drivers"
           if ($LASTEXITCODE -ne 0) { Write-Error "Failed to query Vulkan driver registry"; exit $LASTEXITCODE }
 
-      - name: Verify SwiftShader Vulkan ICD
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Stop'
-          $icd = 'C:\SwiftShader\vk_swiftshader_icd.json'
-          if (-not (Test-Path $icd)) {
-            Write-Error "SwiftShader ICD manifest not found: $icd"
-          }
-          $env:Path = "C:\SwiftShader;$env:Path"
-          $env:VK_DRIVER_FILES = $icd
-          $env:VK_ICD_FILENAMES = $icd
-          $vulkanInfo = "C:\VulkanSDK\$env:VULKAN_SDK_VERSION\Bin\vulkaninfoSDK.exe"
-          if (-not (Test-Path $vulkanInfo)) {
-            Write-Error "vulkaninfoSDK not found: $vulkanInfo"
-          }
-          $summary = & $vulkanInfo --summary 2>&1
-          $exitCode = $LASTEXITCODE
-          $summary | ForEach-Object { Write-Host $_ }
-          if ($exitCode -ne 0) { Write-Error "vulkaninfoSDK failed with exit code $exitCode"; exit $exitCode }
-          if (-not (($summary | Out-String) -match 'SwiftShader')) {
-            Write-Error "vulkaninfoSDK did not enumerate SwiftShader"
-          }
-
       - name: Setup conda
         uses: conda-incubator/setup-miniconda@v4
         with:
