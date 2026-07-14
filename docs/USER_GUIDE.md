@@ -64,7 +64,7 @@ Atlas User Guide
   - [9.4 Generate High-Resolution Stereo Captures](#94-generate-high-resolution-stereo-captures)
   - [9.5 Batch Export Animations via CLI](#95-batch-export-animations-via-cli)
 - [10. Configuration, Logs, and Maintenance](#10-configuration-logs-and-maintenance)
-  - [10.1 Configuration Files and Flags](#101-configuration-files-and-flags)
+  - [10.1 Configure via Flag File](#101-configure-via-flag-file)
   - [10.2 Log Files and Diagnostics](#102-log-files-and-diagnostics)
   - [10.3 Updating and Multiple Instances](#103-updating-and-multiple-instances)
 - [11. Troubleshooting and FAQ](#11-troubleshooting-and-faq)
@@ -425,11 +425,61 @@ Steps to load and manage images:
 
 ### 4.5 Puncta Sets
 
-1. **Load** – **File → Load Puncta...**; supports Atlas `.nimp`, Vaa3D `.apo`/`.marker`, and simple `.txt`/`.xyz` point files.
-2. **Detect** – choose **Detect Puncta...** to launch automatic detection (when available) and feed results into the document.
-3. **Analysis export** – **Generate Analysis Text Files...** outputs CSV summaries of the puncta set.
-4. **Edit** – double-click to open the puncta editor; add/remove points, adjust thresholds. Undo/Redo tied to the puncta pack.
-5. **Save** – Save writes in the native format when possible; Save As provides new formats.
+Atlas stores a puncta set as a collection of detected or annotated points with positions, radii, intensities, and other
+measurements. Use **File → Load Puncta...** to open Atlas `.nimp`, Vaa3D `.apo`/`.marker`, or simple `.txt`/`.xyz`
+point files. Atlas can save `.nimp`, `.apo`, and `.txt`; use `.nimp` when you need to preserve the complete Atlas
+punctum data.
+
+#### Detect puncta from a 3D image
+
+1. Choose **Puncta → Detect Puncta...**. Detection accepts a 3D image with one time point; a time-sequence image is
+   rejected.
+2. Select **Input Image**. Atlas proposes result and log filenames beside the image; change them before starting if
+   necessary.
+3. Confirm **Voxel Size (um)**. Atlas fills these values when the image contains usable spacing metadata. If it does
+   not, enter the X/Y/Z spacing in micrometers. **Detect From File** can read spacing from a selected LSM file.
+4. Select the **Puncta Channel**. Leave **Puncta Threshold** at `-1` for automatic thresholding, or enter a value from
+   `0` to `255` to override it.
+5. Optional: select a **Tube Channel** containing the neuronal structure when you want soma-aware detection. The tube
+   channel must differ from the puncta channel. This enables **Tube Threshold**, uses **Soma Puncta Threshold** for
+   the soma region (`-1` means automatic), and requires valid voxel spacing.
+6. Optional: add one or more **Input Swcs** to assign nearby detections to reconstructed neurons. Assignment runs only
+   when both SWCs and a Tube Channel are supplied. Atlas then also writes per-SWC puncta files beside the SWCs; an
+   additional ambiguous-puncta file is written when a detection cannot be assigned uniquely.
+7. Check the output fields, then click **Detect**:
+   - **Output All Puncta File** is the required main `.nimp` result.
+   - **Output All Soma Puncta File** is used when a Tube Channel is selected.
+   - **Output Log File** is required and records the detection run.
+   - Atlas also writes companion `*_filtered_puncta.nimp` files (and a filtered soma file when applicable) beside the
+     selected results.
+8. Detection writes files; it does not automatically add the result to the current document. After it finishes, use
+   **File → Load Puncta...** to load the main result, then open the 3D window if you want to inspect it with the source
+   image.
+
+#### Review and edit puncta
+
+1. Double-click the puncta object in **Objects Manager** to open its table in the **Edit and Output** dock. The table
+   shows score, XYZ position, radius, volume, mass, and intensity measurements and can be sorted by column.
+2. In 3D, click a punctum to select it; `Ctrl`-click toggles additional puncta. The corresponding table rows are
+   selected and scrolled into view. Selecting table rows updates the 3D selection in the same way.
+3. Double-click a table row to recenter the 2D and 3D views on that punctum.
+4. Right-click a selected punctum or selected table row to choose an edit:
+   - **Delete Selected Puncta** removes one or more selected puncta. `Delete` and `Backspace` are shortcuts.
+   - **Transfer Selected Puncta to Another File...** moves the selection to another loaded puncta object; this action
+     is available only when a second puncta object is loaded.
+   - **Merge Selected Puncta** combines two or more selected puncta.
+   - **Split Punctum...** splits exactly one selected punctum into 2–10 parts using Gaussian-mixture fitting.
+5. Edits use the puncta object's undo stack. Use **Undo/Redo**, then **Save** (`Ctrl/Cmd+S`) or **Save As...** to
+   persist the result. Unlock the object in **Objects Manager** first if selection or edit actions are disabled.
+
+![A selected punctum, its table row, and the puncta editing context menu](images/puncta-editing-context-menu.png)
+
+*A selected punctum is highlighted in both the 3D view and its table row. Right-click either selection to open the
+editing menu; actions are enabled according to the number of selected puncta and loaded puncta sets.*
+
+**Puncta → Generate Analysis Text Files...** is a batch worklist tool, not an export of only the puncta object that is
+currently selected. Open or create its CSV worklist, supply the image/SWC/puncta inputs and output folder for each
+row, save the worklist, and click **Generate**.
 
 ### 4.6 SWC Trees
 
@@ -1079,6 +1129,57 @@ Atlas uses a classical **trackball/orbit** camera controller centered on the cam
 5. Use the Global/Per-object tabs to manage render passes.
 6. Changes immediately affect the 3D canvas; for heavy operations (full-resolution volume streaming) watch the progress toolbar.
 
+#### Image channels and transfer functions
+
+For an image object, **Show Channel N** toggles a channel without modifying its data, and **Channel N Display Range**
+sets the intensity interval used for display. Click the preview beside **Transfer Function N** to open the transfer
+function editor.
+
+A transfer function is a piecewise-linear mapping from image intensity (horizontal axis) to color and opacity
+(vertical axis). Its keys are the circular handles on the plot; the histogram behind them shows where the image
+intensities are concentrated.
+
+- Click an empty part of the plot to add a key at that intensity and opacity.
+- Drag a key horizontally to change its intensity and vertically to change its opacity. The two endpoint keys keep
+  their endpoint intensities but can still move vertically.
+- Double-click a key to change its color.
+- Right-click a key for exact **Change Color**, **Change Opacity**, and **Change Intensity** controls, or to
+  **Delete Key**. You can also select an interior key and press `Delete` or `Backspace`.
+- To suppress background, place a low-intensity key at opacity `0`, then place another key near the weakest signal you
+  want to retain and raise its opacity. Add more keys when different intensity bands need different colors or
+  visibility.
+
+The **Compositing** choice controls how the channel results become a volume: **Direct Volume Rendering** integrates
+the transfer-function colors and opacity, while MIP-family modes emphasize high intensities. **Apply EM Preset** is a
+shortcut for the common dark-background EM mapping described above.
+
+#### Slices, cuts, and bounding boxes
+
+- Enable **Show X Slice**, **Show Y Slice**, or **Show Z Slice**, then change the matching **Slice Position** to inspect
+  an orthogonal plane at a specific voxel index. Advanced settings also provide second and oblique slice planes.
+- **Slice Channel N Colormap** controls the color mapping used by explicit slice planes independently of the volume
+  transfer function. Click its preview to open an editor where you can add, move, recolor, or delete mapping keys.
+- **X Cut**, **Y Cut**, and **Z Cut** restrict the displayed subvolume along each axis. These are per-object cuts;
+  section 6.4 describes scene-wide global cuts.
+- **Bound Box** can show the transformed object bounds. Choose the bound-box mode, then adjust its line width and
+  color when you need a spatial reference or want to verify cuts and transforms.
+
+![A multimodal 3D scene combining an image volume and several surface meshes](images/multimodal-3d-scene.png)
+
+*An image volume, colored surface meshes, and a wireframe reference mesh can share one scene while retaining
+independent view settings. Slice planes, object bounds, axes, and the transform manipulator provide spatial context.*
+
+#### Transform scale and voxel aspect
+
+The per-object transform changes how an object is displayed without rewriting its source data. Edit translation,
+rotation, and scale numerically, or use the on-canvas manipulator when it is available for the selected object. After
+a large transform, use **View → Reset Camera** (or the toolbar button) to fit all visible objects again.
+
+For images with valid voxel-spacing metadata, Atlas initializes the display scale automatically. In particular, its
+Z scale is `voxelSizeZ / max(voxelSizeX, voxelSizeY)`: an image with `0.2 µm` XY spacing and `1.0 µm` Z spacing starts
+with a Z scale of `5`. Do not apply that factor a second time. If the source has missing or incorrect spacing, adjust
+the transform scale deliberately and verify the result against a known physical dimension.
+
 **Quick transform shortcut (selected objects)**
 
 - When a transform-enabled object is selected in 3D, you can rotate it in small increments:
@@ -1370,18 +1471,28 @@ For reproducible still-image capture from saved workspaces:
    - Press **Save Key Frame** again to capture the full scene state at that time.
    - Repeat for all beats in your timeline.
 
-6. **Preview + refine**
+6. **For a complete 360° orbit, add quarter-turn keys**
+   - Select the animation object and keep **Object View Setting → Animation3D → Camera Interpolation Method** set to
+     **Center**.
+   - Save the starting camera at the orbit's start time.
+   - At 25%, 50%, 75%, and 100% of the orbit duration, click **Global View Setting → Camera Control → Azimuth
+     Camera** with `90°` (use `-90°` for the other direction), then press **Save Key Frame** after each turn.
+   - Use the same sign for all four quarter turns. The first and last camera orientations of a full revolution are
+     identical, so start/end keys alone contain no complete-turn direction; the intermediate keys make the intended
+     path unambiguous.
+
+7. **Preview + refine**
    - Use **Play/Pause** and **Reverse Play/Pause** in the editor to preview motion.
    - If motion feels too abrupt:
      - Edit key **Type (easing)** by double-clicking a key (try `InOutQuad` for smooth transitions).
      - Add more keys between beats (right-click a track row → **Add Key Here**).
      - Drag keys to fine-tune timing (snap-free; uses continuous seconds).
 
-7. **Keep the timeline readable**
+8. **Keep the timeline readable**
    - Expand an object to see its tracks; use **Show All ...** only when you need to keyframe rarely-used parameters.
    - Use **Remove Redundant Keys** after you are happy with the look to remove “no-op” keys and reduce clutter.
 
-8. **Export**
+9. **Export**
    - In the timeline toolbar, click the **camcorder icon** to open the export panel (section 8.3).
    - Export a video (e.g., 1920×1080 @ 30 fps), then review it outside Atlas.
 
@@ -1476,7 +1587,13 @@ Tips
 
 ### 10.3 Updating and Multiple Instances
 
-- **Updates**: **Help → Check for Updates** opens the installed update tool if that feature is available on your platform.
+- **Updates**: save your work, then choose **Help → Check for Updates...**. Installer-based distributions launch the
+  bundled **MaintenanceTool** directly in updater mode. Continue through the available component updates and close
+  Atlas if the updater asks you to release installed files. If MaintenanceTool updates or restarts itself before it
+  updates Atlas, run **Check for Updates...** again and continue until no Atlas update remains.
+- **Updater not found**: source builds and some manually copied distributions do not include MaintenanceTool. If Atlas
+  reports **Could not find updater**, update using the same package, installer, or source-build process you originally
+  used instead.
 - **Multiple instances (macOS)**: from the dock icon, choose **Open Additional Instance of Atlas**.
 - **Scene RPC port**: Atlas reserves `127.0.0.1:50051` for the live Scene RPC server. To intentionally expose Scene RPC on all
   interfaces, launch Atlas with `--atlas_scene_rpc_bind_all_interfaces=true`. If another Atlas instance or process is already

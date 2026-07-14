@@ -645,7 +645,11 @@ solveWithCostLimit(const double* costs, size_t rows, size_t cols, ptrdiff_t rowS
   }
 
   const size_t n = rows + cols;
-  std::vector<double> extended(n * n, costLimit / 2.0);
+  // A real edge whose cost equals costLimit is still eligible. Make the pair
+  // of synthetic unmatched edges strictly more expensive so the solver does
+  // not discard an equal-cost real edge when breaking a tie.
+  const double unmatchedHalfCost = std::nextafter(costLimit / 2.0, kInf);
+  std::vector<double> extended(n * n, unmatchedHalfCost);
   for (size_t i = rows; i < n; ++i) {
     for (size_t j = cols; j < n; ++j) {
       extended[i * n + j] = 0.0;
@@ -653,7 +657,12 @@ solveWithCostLimit(const double* costs, size_t rows, size_t cols, ptrdiff_t rowS
   }
   for (size_t i = 0; i < rows; ++i) {
     for (size_t j = 0; j < cols; ++j) {
-      extended[i * n + j] = denseCostAt(costs, i, j, rowStride);
+      const double cost = denseCostAt(costs, i, j, rowStride);
+      // Exclude ineligible edges before optimization. With the inclusive tie
+      // bias above, the next representable cost above costLimit can otherwise
+      // tie the unmatched route and displace eligible edges before being
+      // discarded from the final result.
+      extended[i * n + j] = cost <= costLimit ? cost : kInf;
     }
   }
 
@@ -667,10 +676,10 @@ solveWithCostLimit(const double* costs, size_t rows, size_t cols, ptrdiff_t rowS
     const int32_t col = extendedResult.rowToCol[row];
     if (col >= 0 && static_cast<size_t>(col) < cols) {
       const double c = denseCostAt(costs, row, static_cast<size_t>(col), rowStride);
-      if (std::isfinite(c) && c <= costLimit) {
-        result.rowToCol[row] = col;
-        result.colToRow[static_cast<size_t>(col)] = static_cast<int32_t>(row);
-      }
+      CHECK(std::isfinite(c));
+      CHECK_LE(c, costLimit);
+      result.rowToCol[row] = col;
+      result.colToRow[static_cast<size_t>(col)] = static_cast<int32_t>(row);
     }
   }
   result.cost = assignmentCost(costs, rows, rowStride, result.rowToCol);

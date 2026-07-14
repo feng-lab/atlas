@@ -521,6 +521,86 @@ TEST(ZLinearAssignment, CostLimitAllowsUnmatchedRowsAndColumns)
   EXPECT_DOUBLE_EQ(result.cost, 3.0);
 }
 
+TEST(ZLinearAssignment, CostLimitIncludesEqualCostAssignments)
+{
+  using namespace nim;
+
+  ZLinearAssignmentOptions options;
+  options.costLimit = 1.0;
+
+  const ZLinearAssignmentResult result = solveLinearAssignment(std::vector<double>{1.0}, 1, 1, options);
+  EXPECT_EQ(result.rowToCol, (std::vector<int32_t>{0}));
+  EXPECT_EQ(result.colToRow, (std::vector<int32_t>{0}));
+  EXPECT_DOUBLE_EQ(result.cost, 1.0);
+}
+
+TEST(ZLinearAssignment, CostLimitRejectsImmediatelyLargerCost)
+{
+  using namespace nim;
+
+  constexpr double costLimit = 1.0;
+  ZLinearAssignmentOptions options;
+  options.costLimit = costLimit;
+  const double overLimit = std::nextafter(costLimit, kInf);
+
+  const ZLinearAssignmentResult result = solveLinearAssignment(std::vector<double>{overLimit}, 1, 1, options);
+  EXPECT_EQ(result.rowToCol, (std::vector<int32_t>{-1}));
+  EXPECT_EQ(result.colToRow, (std::vector<int32_t>{-1}));
+  EXPECT_DOUBLE_EQ(result.cost, 0.0);
+}
+
+TEST(ZLinearAssignment, CostLimitOverLimitEdgeCannotDisplaceEligibleMatches)
+{
+  using namespace nim;
+
+  constexpr double costLimit = 1.0;
+  ZLinearAssignmentOptions options;
+  options.costLimit = costLimit;
+  const double overLimit = std::nextafter(costLimit, kInf);
+  const std::vector<double> costs = {
+    1.0,
+    overLimit,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+  };
+
+  const ZLinearAssignmentResult result = solveLinearAssignment(costs, 2, 3, options);
+  expectValidAssignment(result, 2, 3);
+  for (size_t row = 0; row < result.rowToCol.size(); ++row) {
+    ASSERT_GE(result.rowToCol[row], 0);
+    EXPECT_LE(costAt(costs, 2, 3, row, static_cast<size_t>(result.rowToCol[row])), costLimit);
+  }
+  EXPECT_DOUBLE_EQ(result.cost, 2.0);
+}
+
+TEST(ZLinearAssignment, CostLimitInclusiveTiePreservesAvailableMatch)
+{
+  using namespace nim;
+
+  constexpr double costLimit = 1.0;
+  ZLinearAssignmentOptions options;
+  options.costLimit = costLimit;
+  const double belowLimit = std::nextafter(costLimit, -kInf);
+  const double overLimit = std::nextafter(costLimit, kInf);
+  const std::vector<double> costs = {
+    belowLimit,
+    belowLimit,
+    belowLimit,
+    costLimit,
+    overLimit,
+    overLimit,
+  };
+
+  const ZLinearAssignmentResult result = solveLinearAssignment(costs, 2, 3, options);
+  expectValidAssignment(result, 2, 3);
+  EXPECT_TRUE(result.rowToCol[0] == 1 || result.rowToCol[0] == 2);
+  EXPECT_EQ(result.rowToCol[1], 0);
+  EXPECT_EQ(result.colToRow[0], 1);
+  EXPECT_DOUBLE_EQ(result.cost, belowLimit + costLimit);
+}
+
 TEST(ZLinearAssignment, DenseInfCostMatrixUsesRectangularPathAndRejectsInfeasible)
 {
   using namespace nim;

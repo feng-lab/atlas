@@ -100,8 +100,8 @@ print(result.col_to_row)  # length 4; unmatched columns are -1
 ```
 
 Use `maximize=True` for profit/score matrices. Use `cost_limit=` when an
-individual minimization assignment above that limit should be treated as
-unmatched.
+individual minimization assignment above that inclusive limit should be
+treated as unmatched.
 
 ```python
 scores = np.array([[0.2, 0.9], [0.8, 0.1]])

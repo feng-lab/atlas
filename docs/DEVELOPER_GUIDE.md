@@ -55,7 +55,8 @@ Linear Assignment Solver
 - Implementation: `src/img/zlinearassignment.*`.
 - Dense C++ API: `solveLinearAssignment(...)` accepts row-major spans or pointer/stride input and supports rectangular
   matrices. `double` input is the zero-copy fast path; arithmetic vector/span overloads copy to `double` for convenience.
-  Use `ZLinearAssignmentOptions` for minimization/maximization and optional minimization `costLimit`.
+  Use `ZLinearAssignmentOptions` for minimization/maximization and optional minimization `costLimit`; the limit is inclusive,
+  so assignments whose individual cost equals it remain eligible.
 - Sparse C++ API: `solveLinearAssignmentCsr(...)` accepts square or rectangular CSR through
   `ZLinearAssignmentCsrView`. Rectangular sparse input follows the dense API convention: it matches
   `min(rows, cols)` pairs when feasible and leaves extra rows or columns as `-1` in the result vectors. The core view uses
