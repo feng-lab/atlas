@@ -361,8 +361,8 @@ private:
   Z3DLocalColorBuffer* m_rightCurrentLocalBuffer = nullptr;
 
   // Vulkan async readback can complete later than newer frames; keep presentation
-  // monotonic by dropping stale publishes (older perf-frame tokens) per eye.
-  std::array<uint64_t, 3> m_lastPublishedPerfFrameToken{};
+  // monotonic by dropping stale publishes (older render-frame tokens) per eye.
+  std::array<uint64_t, 3> m_lastPublishedRenderFrameToken{};
 
   struct VulkanBatchesCacheKey
   {

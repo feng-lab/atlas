@@ -3,6 +3,7 @@
 #include "z3drendercommands.h"
 #include "z3dscratchresourcepool.h"
 #include "zvulkan.h"
+#include "zvulkansubmissionrequirements.h"
 
 #include <cstdint>
 #include <functional>
@@ -129,6 +130,11 @@ public:
   // create an explicit fence-wait boundary when control-flow depends on GPU data.
   void flush(std::string_view reason = {});
 
+  // Submit pending nodes and wait until their completion safe point. Use this
+  // only when later GPU work must reuse mutable submission resources; ordinary
+  // independent work should use flush() and remain asynchronous.
+  void flushAndWaitForCompletion(std::string_view reason);
+
   // Decide whether pending script nodes should be submitted before recording
   // independent follow-up work that may grow the Vulkan residency working set.
   // This preserves explicit strict-budget behavior while avoiding extra
@@ -222,14 +228,18 @@ public:
   // whose resource effects are fully accounted for by adjacent nodes (for
   // example frame-local buffer barriers/counters); generic commands() remains a
   // safe-point because opaque texture effects cannot be pre-scanned.
-  SegmentHandle commandsInSubmission(std::string_view label,
-                                     std::span<const SegmentHandle> deps,
-                                     const std::function<void(Z3DRendererVulkanBackend&)>& record);
-  SegmentHandle commandsInSubmission(std::string_view label,
-                                     std::initializer_list<SegmentHandle> deps,
-                                     const std::function<void(Z3DRendererVulkanBackend&)>& record)
+  SegmentHandle commandsInSubmission(
+    std::string_view label,
+    std::span<const SegmentHandle> deps,
+    const std::function<void(Z3DRendererVulkanBackend&)>& record,
+    ZVulkanSubmissionRequirements requirements = vulkanSubmissionRequirementMask(ZVulkanSubmissionRequirement::None));
+  SegmentHandle commandsInSubmission(
+    std::string_view label,
+    std::initializer_list<SegmentHandle> deps,
+    const std::function<void(Z3DRendererVulkanBackend&)>& record,
+    ZVulkanSubmissionRequirements requirements = vulkanSubmissionRequirementMask(ZVulkanSubmissionRequirement::None))
   {
-    return commandsInSubmission(label, std::span<const SegmentHandle>(deps.begin(), deps.size()), record);
+    return commandsInSubmission(label, std::span<const SegmentHandle>(deps.begin(), deps.size()), record, requirements);
   }
   // Variant for opaque command nodes that directly read/write scratch textures.
   // The declared uses are consumed by residency pre-scanning so a full overwrite
@@ -238,17 +248,20 @@ public:
     std::string_view label,
     std::span<const SegmentHandle> deps,
     std::span<const Z3DScratchResourcePool::VulkanScratchTextureUse> scratchTextureUses,
-    const std::function<void(Z3DRendererVulkanBackend&)>& record);
+    const std::function<void(Z3DRendererVulkanBackend&)>& record,
+    ZVulkanSubmissionRequirements requirements = vulkanSubmissionRequirementMask(ZVulkanSubmissionRequirement::None));
   SegmentHandle commandsInSubmissionWithScratchUses(
     std::string_view label,
     std::initializer_list<SegmentHandle> deps,
     std::span<const Z3DScratchResourcePool::VulkanScratchTextureUse> scratchTextureUses,
-    const std::function<void(Z3DRendererVulkanBackend&)>& record)
+    const std::function<void(Z3DRendererVulkanBackend&)>& record,
+    ZVulkanSubmissionRequirements requirements = vulkanSubmissionRequirementMask(ZVulkanSubmissionRequirement::None))
   {
     return commandsInSubmissionWithScratchUses(label,
                                                std::span<const SegmentHandle>(deps.begin(), deps.size()),
                                                scratchTextureUses,
-                                               record);
+                                               record,
+                                               requirements);
   }
 
   // Request an end-of-submission buffer readback and block until the value is
@@ -341,6 +354,7 @@ private:
     std::string label;
     std::function<void(Z3DRendererVulkanBackend&)> record;
     std::vector<Z3DScratchResourcePool::VulkanScratchTextureUse> scratchTextureUses;
+    ZVulkanSubmissionRequirements requirements = vulkanSubmissionRequirementMask(ZVulkanSubmissionRequirement::None);
   };
 
   using Node = std::variant<RasterNode, ReplayNode, CommandsNode>;
@@ -358,7 +372,9 @@ private:
   void setReadbackSource(ReadbackBufferSpec& spec, ZVulkanBuffer& src);
   void setReadbackSource(ReadbackBufferSpec& spec, const Slot<ZVulkanBuffer*>& srcSlot);
 
-  void flushNodes(std::string_view reason, /*nullable*/ const ReadbackBufferSpec* readback);
+  void flushNodes(std::string_view reason,
+                  /*nullable*/ const ReadbackBufferSpec* readback,
+                  bool waitForCompletion = false);
   void drainNodesIntoExecutionOrder(std::vector<Node>& out);
   void executeNodes(std::span<Node> nodes);
   [[nodiscard]] std::vector<Z3DScratchResourcePool::VulkanScratchTextureUse>

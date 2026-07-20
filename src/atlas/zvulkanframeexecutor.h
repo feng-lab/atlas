@@ -1,7 +1,6 @@
 #pragma once
 
 #include "zvulkan.h"
-#include <algorithm>
 #include <functional>
 #include <string_view>
 #include <vector>
@@ -29,12 +28,9 @@ public:
     ActiveFrame& operator=(const ActiveFrame&) = delete;
     ActiveFrame(ActiveFrame&& other) noexcept;
     ActiveFrame& operator=(ActiveFrame&& other) noexcept;
-    ~ActiveFrame() = default;
+    ~ActiveFrame();
 
-    [[nodiscard]] bool valid() const
-    {
-      return m_frame != nullptr;
-    }
+    [[nodiscard]] bool valid() const;
 
     explicit operator bool() const
     {
@@ -46,28 +42,42 @@ public:
     [[nodiscard]] vk::raii::Semaphore& acquireSemaphore() const;
     [[nodiscard]] vk::raii::Semaphore& releaseSemaphore() const;
     [[nodiscard]] void* key() const;
+    [[nodiscard]] uint32_t slotIndex() const;
+    [[nodiscard]] uint64_t acquisitionSerial() const;
+    [[nodiscard]] bool waitedForReuse() const;
 
   private:
     friend class ZVulkanFrameExecutor;
     ActiveFrame(Frame* frame, ZVulkanFrameExecutor* executor);
+    void release() noexcept;
 
     Frame* m_frame = nullptr;
     ZVulkanFrameExecutor* m_executor = nullptr;
+    uint64_t m_acquisitionSerial = 0u;
   };
 
-  explicit ZVulkanFrameExecutor(ZVulkanDevice& device, uint32_t maxFramesInFlight = 2);
+  explicit ZVulkanFrameExecutor(ZVulkanDevice& device, uint32_t maxFramesInFlight);
   ~ZVulkanFrameExecutor();
 
   ZVulkanFrameExecutor(const ZVulkanFrameExecutor&) = delete;
   ZVulkanFrameExecutor& operator=(const ZVulkanFrameExecutor&) = delete;
 
-  void setMaxFramesInFlight(uint32_t frames);
   [[nodiscard]] uint32_t maxFramesInFlight() const
   {
     return m_maxFramesInFlight;
   }
 
   ActiveFrame beginFrame();
+  [[nodiscard]] bool owns(const ActiveFrame& frame) const;
+  // Descriptor writes are safe only for the current slot acquisition and
+  // before its command buffer is first exposed for recording. This excludes
+  // submitted frames, completed-but-not-reacquired frames, and stale handles
+  // whose slot has since been reused.
+  [[nodiscard]] bool isPreRecordSafePoint(const ActiveFrame& frame) const;
+  // True when no current acquisition has exposed a command buffer that could
+  // still be submitted. Call after waitForAllInFlight() before mutating shared
+  // descriptor state across every frame slot.
+  [[nodiscard]] bool allFrameSlotsDescriptorMutationSafe() const;
   void markSubmitted(ActiveFrame& frame);
   // Schedule a callback to run once the frame's submission fence signals.
   // Callbacks are executed on the caller thread when the executor observes
@@ -93,29 +103,42 @@ public:
   // their completion callbacks).
   void pollCompletions(std::vector<void*>* completedKeys = nullptr);
 
-  void trim();
-
 private:
   struct Frame
   {
+    enum class Phase : uint8_t
+    {
+      FenceSafe,
+      Acquired,
+      Recording,
+      Submitted,
+    };
+
     vk::raii::CommandBuffer commandBuffer{nullptr};
     vk::raii::Fence fence{nullptr};
     vk::raii::Semaphore acquireSemaphore{nullptr};
     vk::raii::Semaphore releaseSemaphore{nullptr};
+    uint32_t slotIndex = 0u;
+    uint64_t acquisitionSerial = 0u;
     bool inFlight = false;
+    bool waitedForReuse = false;
+    Phase phase = Phase::FenceSafe;
     std::vector<std::function<void()>> completionCallbacks;
   };
 
   Frame& acquireFrame();
+  void releaseFrameLease(ActiveFrame& frame) noexcept;
   void runCompletionCallbacks(Frame& frame);
   void ensureFrames();
-  void rebuildFrames();
+  void createFrames();
+  void checkOwnerThread(std::string_view operation) const;
 
   ZVulkanDevice& m_device;
-  uint32_t m_maxFramesInFlight = 2;
+  const uint32_t m_maxFramesInFlight;
   std::vector<Frame> m_frames;
   size_t m_cursor = 0;
-  bool m_framesDirty = true;
+  uint64_t m_nextAcquisitionSerial = 1u;
+  uint32_t m_activeLeaseCount = 0u;
 };
 
 } // namespace nim

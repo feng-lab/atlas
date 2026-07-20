@@ -1,5 +1,6 @@
 #include "zoptionparameter.h"
 
+#include <QThread>
 #include <utility>
 
 #include "zlog.h"
@@ -17,6 +18,20 @@ template<class T, class T2>
 void ZOptionParameter<T, T2>::select(const T& value)
 {
   this->set(value);
+}
+
+template<class T, class T2>
+void ZOptionParameter<T, T2>::restoreSelectionWithoutValueChanged(const T& value)
+{
+  CHECK(QThread::currentThread() == this->thread()) << "Option recovery must run on the parameter owner thread";
+  CHECK_EQ(m_options.size(), m_associatedDatas.size());
+  const auto index = indexOf(m_options, value);
+  CHECK_GE(index, 0) << "Cannot restore an option that is not registered";
+
+  this->m_value = value;
+  m_associatedData = m_associatedDatas[static_cast<size_t>(index)];
+  m_dataIsValid = true;
+  Q_EMIT this->reservedIntSignal1(index);
 }
 
 template<class T, class T2>

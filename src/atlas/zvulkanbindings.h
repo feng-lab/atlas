@@ -17,6 +17,8 @@ inline constexpr uint32_t kSetBindlessSampledImages = 0;
 inline constexpr uint32_t kSetLighting = 1;
 inline constexpr uint32_t kSetTransforms = 2;
 inline constexpr uint32_t kSetOIT = 3;
+inline constexpr uint32_t kLightingUniformBufferDescriptorCount = 1;
+inline constexpr uint32_t kTransformsUniformBufferDescriptorCount = 3;
 
 // ---------------------------------------------------------------------------
 // Bindless sampled images (set 0)
@@ -45,5 +47,6 @@ inline constexpr uint32_t kBindingOITPPLLCounts = 2; // uint counts[pixel]
 inline constexpr uint32_t kBindingOITPPLLOffsets = 3; // uint offsets[pixel]
 inline constexpr uint32_t kBindingOITPPLLCursors = 4; // uint cursors[pixel]
 inline constexpr uint32_t kBindingOITPPLLFragments = 5; // Fragment fragments[total]
+inline constexpr uint32_t kOITStorageBufferBindingCount = kBindingOITPPLLFragments + 1u;
 
 } // namespace nim::vkbind

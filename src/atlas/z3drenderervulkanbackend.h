@@ -12,6 +12,7 @@
 // Attachment format helpers
 #include "zvulkanrenderconversions.h"
 #include "zvulkanresidencymanager.h"
+#include "zvulkansubmissionrequirements.h"
 #include "z3dtypes.h"
 #include "zvulkanuniforms.h"
 // Public API uses Folly coroutine/executor types; keep Folly behind the Atlas gateway.
@@ -78,10 +79,9 @@ inline constexpr size_t alignUp(size_t value, size_t alignment)
 }
 
 template<typename PayloadT>
-inline constexpr bool kHasUniformArenaBudgetTraits =
-  requires(const PayloadT& payload, size_t uniformAlignment) {
-    UniformArenaBudgetTraits<PayloadT>::estimateAdditionalBytes(payload, uniformAlignment);
-  };
+inline constexpr bool kHasUniformArenaBudgetTraits = requires(const PayloadT& payload, size_t uniformAlignment) {
+  UniformArenaBudgetTraits<PayloadT>::estimateAdditionalBytes(payload, uniformAlignment);
+};
 
 template<>
 struct UniformArenaBudgetTraits<LinePayload>
@@ -255,6 +255,19 @@ public:
   void setPendingBeginRenderPreRecordActions(std::vector<BeginRenderPreRecordAction> actions,
                                              std::string_view debugLabel = {});
 
+  // Resource families that must be ready before a submission starts recording.
+  // The linear script derives these from typed batch metadata, allowing normal
+  // submissions to skip feature-specific allocation and descriptor priming.
+  using SubmissionRequirement = ZVulkanSubmissionRequirement;
+  using SubmissionRequirements = ZVulkanSubmissionRequirements;
+
+  static constexpr SubmissionRequirements requirementMask(SubmissionRequirement requirement)
+  {
+    return vulkanSubmissionRequirementMask(requirement);
+  }
+
+  void setPendingBeginRenderRequirements(SubmissionRequirements requirements);
+
   // ---------------------------------------------------------------------------
   // Linear-script stats (pre_cpu attribution)
   // ---------------------------------------------------------------------------
@@ -357,7 +370,7 @@ public:
   // Mutations (descriptor writes) must happen before command-buffer recording
   // begins for the frame-slot; lookups are allowed during recording.
   [[nodiscard]] vk::DescriptorSet bindlessSampledImageDescriptorSet() const;
-  [[nodiscard]] uint64_t bindlessSampledImageDescriptorSetGeneration() const;
+  [[nodiscard]] uint64_t bindlessSampledImageCommandBufferCompatibilityGeneration() const;
   // Convenience wrappers that choose bindless table based on the texture's
   // view type + format (float vs unsigned integer). Sampler state is selected
   // in shaders via bindless.glslinc's immutable sampler bindings.
@@ -757,7 +770,7 @@ public:
   void notifyDrawSecondaryCacheSignatureMismatchMask(uint32_t mask);
   void notifyDrawSecondaryCacheHit();
   void notifyDrawSecondaryCacheBuild();
-  void notifyDrawSecondaryCacheExecute();
+  void notifyDrawSecondaryCacheExecute(vk::Pipeline pipeline);
   // Queue a static copy (upload slice -> device-local VB/IB) to be executed
   // outside dynamic rendering before command buffer end in this frame.
   void scheduleStaticCopy(vk::Buffer dst, vk::DeviceSize dstOffset, const UploadSlice& src, bool isIndexBuffer);
@@ -980,14 +993,18 @@ public:
   //   flushForTeardown()), so do not require render-thread TLS state here.
   void recordAllMsForCompletionSafePoint(double milliseconds);
 
-  // GPU timestamp scopes (public so pipeline contexts can instrument hot paths)
-  std::optional<size_t> beginGpuScope(std::string_view label);
+  // GPU timestamp scopes (public so pipeline contexts can instrument hot paths).
+  // Pass scopes are identified structurally by their caller; label equality is
+  // not sufficient because nested pipeline scopes can legitimately reuse a
+  // top-level pass label.
+  std::optional<size_t> beginGpuScope(std::string_view label, bool isPassScope = false);
   void endGpuScope(size_t token);
 
 private:
   friend class Z3DRendererBase;
   void ensureDevice();
   void resetFrameResources();
+  void releaseDeviceDescriptorSetRecording();
   void ensureDefaultPlaceholders();
   void ensureSharedDescriptorLayouts();
   struct FrameResources;
@@ -1008,8 +1025,13 @@ private:
   struct FrameResources
   {
     // Aggregation keys for per-submission ingestion
+    bool perfCollectionEnabled = false;
     uint64_t realFrameToken = 0;
     uint32_t submissionId = 0;
+    // Backend-local, monotonically increasing identity used by persistent UBO
+    // caches. Unlike submissionId, this never repeats at a render-frame
+    // boundary, so an old cache entry cannot look busy in a later submission.
+    uint64_t uniformCacheGeneration = 0;
     vk::raii::QueryPool queryPool{nullptr};
     std::vector<GpuScopeRecord> gpuScopes;
     std::vector<CpuScopeRecord> cpuScopes;
@@ -1021,7 +1043,7 @@ private:
 
     std::chrono::steady_clock::time_point cpuStart;
     std::chrono::steady_clock::time_point cpuEnd;
-    // Time between perf-frame start (Z3DRenderGlobalState::beginNewPerfFrameToken)
+    // Time between perf-frame start (Z3DRenderGlobalState::beginNewRenderFrameToken)
     // and the start of this submission's CPU encode window (cpuStart).
     //
     // This captures engine/filter overhead, Vulkan frame-slot acquisition, safe
@@ -1049,10 +1071,9 @@ private:
     // is intentionally not reset each submission so cached command buffers can
     // keep binding the same descriptor-set handles across frames.
     std::unique_ptr<ZVulkanDescriptorPool> persistentDescriptorPool;
-    // Per-frame-slot bindless sampled-image tables (descriptor indexing). These
-    // descriptor-set handles remain stable for the lifetime of the frame-slot
-    // and are updated only after the slot's previous submission completes.
-    std::unique_ptr<ZVulkanBindlessDescriptorSet> bindlessSampledImages;
+    // Non-owning view of the device-owned bindless table for this executor
+    // frame slot. Every backend using the device shares the same slot table.
+    ZVulkanBindlessDescriptorSet* bindlessSampledImages = nullptr;
     // Shared per-frame-slot descriptor sets used across pipeline contexts to
     // avoid per-submission descriptor-set churn. These are allocated from the
     // persistent descriptor pool and updated only at beginRender() (after the
@@ -1100,7 +1121,7 @@ private:
     uint32_t drawSecondaryCacheExecutes = 0;
 
     // Pipelines
-    uint32_t pipelinesCreated = 0; // graphics pipelines created this frame
+    uint32_t pipelinesCreated = 0; // graphics and compute pipelines created this frame
     std::unordered_set<uint64_t> pipelinesBound; // unique pipelines bound this frame
 
     // Residency pins for managed (evictable) textures referenced by this submission.
@@ -1160,6 +1181,7 @@ private:
     // enter the frame completion safe point before returning. This is used for
     // control-flow boundaries (paging compaction, script readback, etc.).
     bool forceFenceWaitForCompletionSafePoint = false;
+    uint32_t fenceWaits = 0; // synchronous waits performed for this submission
     size_t readbackBytesCopied = 0; // total bytes copied this frame
     uint32_t readbackSlotsInFlight = 0; // slots associated with this frame
     uint32_t allSamples = 0; // count of perf-frame-start → host-ready samples recorded
@@ -1398,7 +1420,7 @@ public:
   // Obtain a mapped pointer into the persistent uniform arena for a previously
   // allocated offset range (debug-checked).
   [[nodiscard]] void* persistentUniformMappedAt(vk::DeviceSize offset, size_t bytes);
-  [[nodiscard]] uint32_t activeSubmissionId() const;
+  [[nodiscard]] uint64_t activeUniformCacheGeneration() const;
   // Dynamic offset of the shared per-frame lighting UBO slice
   [[nodiscard]] vk::DeviceSize frameSharedLightingOffset() const
   {
@@ -1477,6 +1499,7 @@ public:
   std::unordered_map<void*, size_t> m_frameResourceMap;
   std::optional<ZVulkanFrameExecutor::ActiveFrame> m_activeFrameHandle;
   FrameResources* m_activeFrame = nullptr;
+  uint64_t m_nextUniformCacheGeneration = 0;
   // Key of the most recently submitted (or ended) frame-executor slot. Used to
   // defer scratch-pool releases that occur after endRender() has cleared the
   // active recording context, without forcing a device-wide drain.
@@ -1484,6 +1507,7 @@ public:
   Z3DRendererBase* m_activeRenderer = nullptr;
   std::atomic<FrameResources*> m_frameInCompletionSafePoint{nullptr};
   bool m_frameRecording = false;
+  bool m_deviceDescriptorSetRecording = false;
   bool m_submissionResourcePinningOpen = false;
   // Scratch storage for frame-executor polling: keys of frame slots whose
   // fences completed in the last pollCompletions() call.
@@ -1491,10 +1515,6 @@ public:
   uint32_t m_maxFramesInFlight = 2;
   float m_timestampPeriod = 1.0f;
   mutable size_t m_cachedUniformAlignment = 0;
-  // Deliver first Vulkan frame to UI immediately after backend switch by
-  // pumping the fence and executing deferred readback consumers once.
-  bool m_pumpFenceAfterFirstSubmit = true;
-
   std::unique_ptr<ZVulkanLinePipelineContext> m_lineContext;
   std::unique_ptr<ZVulkanMeshPipelineContext> m_meshContext;
   std::unique_ptr<ZVulkanEllipsoidPipelineContext> m_ellipsoidContext;
@@ -1514,20 +1534,12 @@ public:
   std::unique_ptr<ZVulkanImageBlockUploader> m_imageBlockUploader;
   ZVulkanDevice* m_imageBlockUploaderDevice = nullptr;
 
-  // Shared fallback resources
-  std::unique_ptr<ZVulkanTexture> m_defaultPlaceholder2D;
-  std::unique_ptr<ZVulkanTexture> m_defaultPlaceholder2DArray;
-  std::unique_ptr<ZVulkanTexture> m_defaultPlaceholder3D;
-  std::unique_ptr<ZVulkanTexture> m_defaultPlaceholderU2D;
-  std::unique_ptr<ZVulkanTexture> m_defaultPlaceholderU3D;
+  // Backend-local fallback resource. Sampled-image placeholders and immutable
+  // samplers belong to the device-owned bindless state.
   std::unique_ptr<ZVulkanBuffer> m_defaultPlaceholderStorageBuffer;
-  std::optional<vk::raii::Sampler> m_defaultSampler;
-  std::optional<vk::raii::Sampler> m_nearestClampSampler;
-  std::optional<vk::raii::Sampler> m_linearBorderZero3DSampler;
 
   struct SharedDescriptorLayouts
   {
-    std::optional<vk::raii::DescriptorSetLayout> bindlessSampledImages;
     std::optional<vk::raii::DescriptorSetLayout> lighting;
     std::optional<vk::raii::DescriptorSetLayout> transforms;
     std::optional<vk::raii::DescriptorSetLayout> oitParams;
@@ -1706,7 +1718,6 @@ public:
   void scheduleArenaReset(FrameResources& frame);
   void vlogFrameRecyclingStats(const FrameResources& frame) const;
 
-  void ensureSharedSamplers();
   void ensureFullscreenQuad();
   void ensureDummyVertexBuffer();
   vk::Buffer dummyVertexBuffer();
@@ -1727,6 +1738,7 @@ public:
 
   std::vector<BeginRenderPreRecordAction> m_pendingBeginRenderPreRecordActions;
   std::string m_pendingBeginRenderPreRecordLabel;
+  SubmissionRequirements m_pendingBeginRenderRequirements = requirementMask(SubmissionRequirement::None);
   std::optional<BeginRenderScriptStats> m_pendingBeginRenderScriptStats;
 
   // Device feature gates (cached on device change)

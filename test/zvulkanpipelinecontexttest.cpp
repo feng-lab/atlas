@@ -65,6 +65,29 @@ TEST_F(VulkanPipelineDebugTest, DescriptorCoverageEnforced)
   EXPECT_DEATH(tracker.assertGraphicsPreDraw(spec), "Descriptor set coverage incomplete");
 }
 
+TEST_F(VulkanPipelineDebugTest, DescriptorCoverageAllowsUnusedLeadingSet)
+{
+  nim::ZVulkanDebugStateTracker tracker;
+  nim::ZVulkanGraphicsDrawSpec spec{};
+  spec.pipeline = reinterpret_cast<const vk::raii::Pipeline*>(0x1);
+  spec.pipelineLayout = reinterpret_cast<const vk::raii::PipelineLayout*>(0x1);
+  spec.viewports.emplace_back(0.0f, 0.0f, 8.0f, 8.0f, 0.0f, 1.0f);
+  spec.scissors.emplace_back(vk::Rect2D{
+    {0,  0 },
+    {8u, 8u}
+  });
+  // expectedDescriptorSetCount is the exclusive upper set bound. Vulkan does
+  // not require set 0 to be bound when no shader in this pipeline uses it.
+  spec.expectedDescriptorSetCount = 3;
+
+  tracker.reset(spec);
+  tracker.markViewport();
+  tracker.markScissor();
+  tracker.markDescriptorSets(1, 2);
+
+  EXPECT_NO_FATAL_FAILURE(tracker.assertGraphicsPreDraw(spec));
+}
+
 TEST_F(VulkanPipelineDebugTest, ComputePushConstantsRequired)
 {
   nim::ZVulkanDebugStateTracker tracker;

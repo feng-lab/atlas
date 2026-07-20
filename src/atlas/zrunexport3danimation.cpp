@@ -13,6 +13,7 @@
 #include <folly/futures/Future.h>
 #include <folly/executors/CPUThreadPoolExecutor.h>
 #include <QCoreApplication>
+#include <limits>
 #include <string>
 #include <vector>
 
@@ -41,6 +42,8 @@ ABSL_FLAG(std::string, output_image_folder_name, "", "Folder for output images. 
 ABSL_FLAG(bool, skip_video_compression, false, "Skip video compression. If true, specify --output_image_folder_name");
 ABSL_DECLARE_FLAG(std::string, output_image_name_prefix);
 ABSL_DECLARE_FLAG(int32_t, output_image_name_field_width);
+ABSL_DECLARE_FLAG(nim::RenderBackend, atlas_default_render_backend);
+ABSL_DECLARE_FLAG(int32_t, atlas_vk_device_index);
 ABSL_FLAG(bool,
           only_compress_video,
           false,
@@ -60,7 +63,8 @@ ABSL_FLAG(int32_t, maximum_output_height, 8640, "Maximum possible output video h
 ABSL_FLAG(std::vector<std::string>,
           use_gpu_devices,
           std::vector<std::string>{},
-          "Comma-separated list of GPU device IDs to use (e.g., '0,1,2,3'). Linux only.");
+          "Comma-separated backend device indices to use (e.g., '0,1,2,3'). OpenGL values select EGL device IDs; "
+          "Vulkan values select preference-sorted Vulkan device indices. Linux only.");
 ABSL_DECLARE_FLAG(uint32_t, use_gpu_device);
 
 #if defined(__linux__)
@@ -125,11 +129,16 @@ int ZRunExport3DAnimation::run()
 
 #if defined(__linux__)
   if (std::vector<std::string> gpuDevices = absl::GetFlag(FLAGS_use_gpu_devices); !gpuDevices.empty()) {
+    const RenderBackend requestedBackend = absl::GetFlag(FLAGS_atlas_default_render_backend);
     std::vector<uint32_t> gpuList;
     for (const std::string& numStr : gpuDevices) {
       uint32_t v;
       if (!stringToValueNoThrow(numStr, v)) {
         LOG(ERROR) << fmt::format("invalid gpu device {}", numStr);
+        return 1;
+      }
+      if (requestedBackend == RenderBackend::Vulkan && v > static_cast<uint32_t>(std::numeric_limits<int32_t>::max())) {
+        LOG(ERROR) << fmt::format("Vulkan device index {} exceeds the supported command-line range", v);
         return 1;
       }
       gpuList.push_back(v);
@@ -155,7 +164,11 @@ int ZRunExport3DAnimation::run()
     }
 
     if (gpuList.size() == 1 || totalEndFrame <= absl::GetFlag(FLAGS_output_fps)) {
-      absl::SetFlag(&FLAGS_use_gpu_device, gpuList[0]);
+      if (requestedBackend == RenderBackend::Vulkan) {
+        absl::SetFlag(&FLAGS_atlas_vk_device_index, static_cast<int32_t>(gpuList[0]));
+      } else {
+        absl::SetFlag(&FLAGS_use_gpu_device, gpuList[0]);
+      }
     } else {
       int nFramesForOneGPU =
         (totalEndFrame - absl::GetFlag(FLAGS_output_start_frame)) / static_cast<int>(gpuList.size());
@@ -177,11 +190,12 @@ int ZRunExport3DAnimation::run()
         gpuFutures.push_back(folly::via(cpuExecutor, [=]() {
           QStringList arguments;
           arguments << "--run_export_3d_animation"
-                    << "--use_gpu_device" << QString::number(gpuList[idx]) << "--filename" << filename
-                    << "--output_filename" << outputFilename << "--output_fps"
-                    << QString::number(absl::GetFlag(FLAGS_output_fps)) << "--output_start_frame"
-                    << QString::number(startFrame) << "--output_end_frame" << QString::number(endFrame)
-                    << "--output_width" << QString::number(absl::GetFlag(FLAGS_output_width)) << "--output_height"
+                    << "--filename" << filename << "--atlas_default_render_backend"
+                    << (requestedBackend == RenderBackend::Vulkan ? "vulkan" : "opengl") << "--output_filename"
+                    << outputFilename << "--output_fps" << QString::number(absl::GetFlag(FLAGS_output_fps))
+                    << "--output_start_frame" << QString::number(startFrame) << "--output_end_frame"
+                    << QString::number(endFrame) << "--output_width"
+                    << QString::number(absl::GetFlag(FLAGS_output_width)) << "--output_height"
                     << QString::number(absl::GetFlag(FLAGS_output_height)) << "--output_image_folder_name"
                     << outputImageFolderName << "--skip_video_compression"
                     << "--limit_memory_usage_in_gb_to"
@@ -195,6 +209,11 @@ int ZRunExport3DAnimation::run()
                     << QString::number(absl::GetFlag(FLAGS_output_image_name_field_width)) << "--output_tile_size"
                     << QString::number(absl::GetFlag(FLAGS_output_tile_size)) << "--output_tile_border"
                     << QString::number(absl::GetFlag(FLAGS_output_tile_border));
+          if (requestedBackend == RenderBackend::Vulkan) {
+            arguments << "--atlas_vk_device_index" << QString::number(gpuList[idx]);
+          } else {
+            arguments << "--use_gpu_device" << QString::number(gpuList[idx]);
+          }
           if (absl::GetFlag(FLAGS_overwrite)) {
             arguments << "--overwrite";
           }

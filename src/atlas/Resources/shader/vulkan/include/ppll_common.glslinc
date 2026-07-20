@@ -43,6 +43,11 @@ struct PPLLFragment
 {
   vec4 color;
   float depth;
+  // std430 rounds this struct to a 32-byte stride because of color's 16-byte
+  // alignment. Reuse the existing padding as resolve-only sort workspace so
+  // record indices can be sorted without rewriting color/depth data or
+  // increasing PPLL memory consumption.
+  uint sortIndex;
 };
 
 layout(set = 3, binding = 5, std430) buffer PPLLFragments

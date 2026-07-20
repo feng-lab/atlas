@@ -4,23 +4,33 @@
 #include "zvulkantexture.h"
 #include "zvulkanshader.h"
 #include "zvulkanpipeline.h"
+#include "zvulkanbindlessdescriptorset.h"
+#include "zvulkanbindings.h"
 #include "zvulkandescriptorpool.h"
 #include "zvulkandescriptorset.h"
 #include "zvulkancontext.h"
 #include "zvulkanframeexecutor.h"
-#include "zcommandlineflags.h"
 #include "zexception.h"
 #include "zlog.h"
 
+#include <folly/ScopeGuard.h>
+
 #include <algorithm>
+#include <array>
 #include <exception>
 #include <limits>
 #include <string_view>
 #include <utility>
 
-ABSL_FLAG(int32_t, atlas_vk_frames_in_flight, 2, "Max Vulkan frames in flight (debug: set to 1 to serialize submits)");
-
 namespace nim {
+
+struct ZVulkanDevice::BindlessSlotState
+{
+  std::unique_ptr<ZVulkanBindlessDescriptorSet> descriptorSet;
+  std::vector<ZVulkanBindlessDescriptorSet::EntryHandle> pendingRetirements;
+  std::vector<std::shared_ptr<void>> pendingRetirementResources;
+  uint64_t registrationSerial = 0u;
+};
 
 namespace {
 
@@ -174,7 +184,7 @@ void brokerReclaimBeforeAllocation(ZVulkanDevice& device,
           retryPressure.reclaimBytes,
           inFlightBefore,
           reason.empty() ? "<unspecified>" : std::string(reason));
-        device.frameExecutor().waitForAllInFlight();
+        (void)device.waitForAllFramesAndDrainBindlessRetirements();
         waitedForCompletion = true;
         pressure = device.residencyManager().allocationPressureFor(strictAllocationBytes);
         force = false;
@@ -265,7 +275,7 @@ void enforceStrictBudgetAfterAllocation(ZVulkanDevice& device,
         pressure.reclaimBytes,
         inFlightBefore,
         reason.empty() ? "<unspecified>" : std::string(reason));
-      device.frameExecutor().waitForAllInFlight();
+      (void)device.waitForAllFramesAndDrainBindlessRetirements();
       waitedForCompletion = true;
       pressure = device.residencyManager().allocationPressureFor(0u);
       if (!pressure.needsReclaim()) {
@@ -303,10 +313,10 @@ void logAllocationFailureReport(ZVulkanDevice& device,
 
 ZVulkanDevice::ZVulkanDevice(ZVulkanContext& context)
   : m_context(context)
+  , m_ownerThreadId(std::this_thread::get_id())
+  , m_framesInFlight(context.frameSlotCount())
 {
-  // Capture once at startup. Atlas assumes this remains stable for the lifetime
-  // of the Vulkan device.
-  m_framesInFlight = static_cast<uint32_t>(std::max<int32_t>(1, absl::GetFlag(FLAGS_atlas_vk_frames_in_flight)));
+  CHECK_GT(m_framesInFlight, 0u) << "Vulkan context resolved an invalid frame-slot count";
 
   LOG(INFO) << "Vulkan device created";
   // Do not require VK_EXT_vertex_input_dynamic_state (MoltenVK lacks it).
@@ -324,11 +334,21 @@ ZVulkanDevice::ZVulkanDevice(ZVulkanContext& context)
   info.vulkanApiVersion = m_context.physicalDevice().getProperties().apiVersion;
   // Enable VK_EXT_memory_budget integration when available so we can make
   // best-effort cache residency decisions without hardcoding VRAM caps.
-  info.flags |= VMA_ALLOCATOR_CREATE_EXT_MEMORY_BUDGET_BIT;
+  if (m_context.supportsMemoryBudget()) {
+    info.flags |= VMA_ALLOCATOR_CREATE_EXT_MEMORY_BUDGET_BIT;
+  }
   const VkResult res = vmaCreateAllocator(&info, &m_allocator);
   if (static_cast<vk::Result>(res) != vk::Result::eSuccess) {
     throw ZException("Failed to create VMA allocator");
   }
+  auto allocatorCleanupGuard = folly::makeGuard([this]() noexcept {
+    // Raw VMA handles are not RAII members. Keep constructor failure
+    // transactional if a later pool, broker, query, or logging allocation
+    // throws before the wrapper is published to ZVulkanContext.
+    m_residencyManager.reset();
+    m_immediateUploadStagingBuffer.reset();
+    destroyVmaResources();
+  });
 
   // Create tuned VMA pools
   auto createPool = [&](VkMemoryPropertyFlags reqFlags, VkDeviceSize blockSize, std::string_view label) -> VmaPool {
@@ -437,16 +457,39 @@ ZVulkanDevice::ZVulkanDevice(ZVulkanContext& context)
     const float ts = (props.limits.timestampPeriod > 0.0f) ? props.limits.timestampPeriod : 1.0f;
     LOG(INFO) << "VK calibrated timestamps: extension not available; timestampPeriod=" << ts << " ns/tick";
   }
+  m_context.notifyDeviceWrapperCreated(this);
+  allocatorCleanupGuard.dismiss();
 }
 
 ZVulkanDevice::~ZVulkanDevice()
 {
-  if (m_frameExecutor != nullptr) {
-    // Drain all fence-gated completions while the residency manager and VMA
-    // allocator are still alive. This flushes deferred unpins and any teardown
-    // callbacks that would otherwise outlive the allocator.
-    m_frameExecutor->waitForAllInFlight();
+  checkOwnerThread("destroy Vulkan device wrapper");
+  CHECK(descriptorSetWritesAllowed()) << "Destroying Vulkan device while a backend is recording commands";
+  // Flush fence-gated callbacks, sanitize retired descriptors, and release
+  // their deferred GPU handles before tearing down the allocator.
+  CHECK(waitForAllFramesAndDrainBindlessRetirements())
+    << "Vulkan device teardown found an unsubmitted command buffer still recording";
+
+  // The bindless tables own raw descriptor-set handles allocated from their
+  // pools. Tear down in dependency order while the logical device, residency
+  // manager, and VMA allocator are all still alive.
+  m_bindlessSlots.clear();
+  m_bindlessDescriptorPool.reset();
+  if (m_bindlessPoolUpdateAfterBindReservation != 0u) {
+    releaseUpdateAfterBindDescriptors(m_bindlessPoolUpdateAfterBindReservation);
+    m_bindlessPoolUpdateAfterBindReservation = 0u;
   }
+  CHECK_EQ(updateAfterBindDescriptorsReserved(), 0u)
+    << "Update-after-bind descriptor reservation leaked during device teardown";
+  m_bindlessPlaceholderU3D.reset();
+  m_bindlessPlaceholderU2D.reset();
+  m_bindlessPlaceholder3D.reset();
+  m_bindlessPlaceholder2DArray.reset();
+  m_bindlessPlaceholder2D.reset();
+  m_bindlessDescriptorSetLayout.reset();
+  m_bindlessLinearBorderZero3DSampler.reset();
+  m_bindlessNearestClampSampler.reset();
+  m_bindlessLinearClampSampler.reset();
 
   // Managed textures owned by the residency manager destroy VkImages via VMA,
   // so they must be released before the allocator/pools are torn down.
@@ -455,6 +498,13 @@ ZVulkanDevice::~ZVulkanDevice()
   m_immediateUploadStagingBuffer.reset();
   m_immediateUploadStagingBufferSize = 0;
 
+  destroyVmaResources();
+  m_context.notifyDeviceWrapperDestroyed(this);
+  LOG(INFO) << "Destroying Vulkan device";
+}
+
+void ZVulkanDevice::destroyVmaResources() noexcept
+{
   if (m_uploadTransientPool != nullptr) {
     vmaDestroyPool(m_allocator, m_uploadTransientPool);
     m_uploadTransientPool = nullptr;
@@ -475,7 +525,6 @@ ZVulkanDevice::~ZVulkanDevice()
     vmaDestroyAllocator(m_allocator);
     m_allocator = nullptr;
   }
-  LOG(INFO) << "Destroying Vulkan device";
 }
 
 std::unique_ptr<ZVulkanBuffer>
@@ -570,17 +619,12 @@ ZVulkanDevice::createPipeline(ZVulkanShader& shader,
 
 ZVulkanFrameExecutor& ZVulkanDevice::frameExecutor()
 {
+  checkOwnerThread("access frame executor");
   if (!m_frameExecutor) {
     m_frameExecutor = std::make_unique<ZVulkanFrameExecutor>(*this, m_framesInFlight);
-  } else {
-    // Ensure nobody mutates the debug flag at runtime; changing frames-in-flight
-    // mid-run invalidates executor slot identities and can strand fence-gated
-    // callbacks (residency unpins, retained UBO lifetimes, etc.).
-    const uint32_t fif = static_cast<uint32_t>(std::max<int32_t>(1, absl::GetFlag(FLAGS_atlas_vk_frames_in_flight)));
-    CHECK(fif == m_framesInFlight) << "atlas_vk_frames_in_flight changed at runtime; this is unsupported";
-    CHECK(m_frameExecutor->maxFramesInFlight() == m_framesInFlight)
-      << "Vulkan frame executor frames-in-flight changed unexpectedly";
   }
+  CHECK(m_frameExecutor->maxFramesInFlight() == m_framesInFlight)
+    << "Vulkan frame executor frames-in-flight changed unexpectedly";
   return *m_frameExecutor;
 }
 
@@ -619,14 +663,559 @@ bool ZVulkanDevice::allocationRecoveryScopeActive() const
   return s_allocationRecoveryScopeDepth > 0u;
 }
 
-std::unique_ptr<ZVulkanDescriptorPool> ZVulkanDevice::createDescriptorPool()
+void ZVulkanDevice::checkOwnerThread(std::string_view operation) const
 {
-  return std::make_unique<ZVulkanDescriptorPool>(*this);
+  CHECK(std::this_thread::get_id() == m_ownerThreadId)
+    << "Vulkan device operation must run on its owning rendering thread: " << operation;
+}
+
+void ZVulkanDevice::reserveUpdateAfterBindDescriptors(uint64_t count, std::string_view label)
+{
+  checkOwnerThread("reserve update-after-bind descriptors");
+  CHECK_GT(count, 0u) << "Update-after-bind reservation must be non-zero";
+  const uint64_t limit = m_context.selectedDeviceSupport().maxUpdateAfterBindDescriptorsInAllPools;
+  CHECK_LE(m_updateAfterBindDescriptorsReserved, limit);
+  CHECK_LE(count, limit - m_updateAfterBindDescriptorsReserved)
+    << "Update-after-bind descriptor budget exceeded while reserving " << label << ": requested=" << count
+    << " already_reserved=" << m_updateAfterBindDescriptorsReserved << " device_limit=" << limit;
+  m_updateAfterBindDescriptorsReserved += count;
+  VLOG(1) << "VK update-after-bind reservation: label=" << label << " added=" << count
+          << " total=" << m_updateAfterBindDescriptorsReserved << "/" << limit;
+}
+
+void ZVulkanDevice::releaseUpdateAfterBindDescriptors(uint64_t count)
+{
+  checkOwnerThread("release update-after-bind descriptors");
+  CHECK_GT(count, 0u) << "Update-after-bind release must be non-zero";
+  CHECK_LE(count, m_updateAfterBindDescriptorsReserved)
+    << "Update-after-bind descriptor reservation underflow: released=" << count
+    << " reserved=" << m_updateAfterBindDescriptorsReserved;
+  m_updateAfterBindDescriptorsReserved -= count;
+}
+
+uint64_t ZVulkanDevice::updateAfterBindDescriptorsReserved() const
+{
+  checkOwnerThread("query update-after-bind descriptor reservation");
+  return m_updateAfterBindDescriptorsReserved;
+}
+
+void ZVulkanDevice::beginDescriptorSetRecording(const void* owner)
+{
+  checkOwnerThread("begin descriptor-set recording");
+  CHECK(owner != nullptr) << "Descriptor recording owner must be non-null";
+  CHECK(m_descriptorSetRecordingOwner == nullptr)
+    << "A second Vulkan backend attempted to record while another backend owns the device descriptor guard";
+  m_descriptorSetRecordingOwner = owner;
+}
+
+void ZVulkanDevice::endDescriptorSetRecording(const void* owner)
+{
+  checkOwnerThread("end descriptor-set recording");
+  CHECK(owner != nullptr) << "Descriptor recording owner must be non-null";
+  CHECK(m_descriptorSetRecordingOwner == owner)
+    << "Vulkan descriptor recording guard released by a backend that does not own it";
+  m_descriptorSetRecordingOwner = nullptr;
+}
+
+bool ZVulkanDevice::descriptorSetWritesAllowed() const
+{
+  checkOwnerThread("query descriptor-set write guard");
+  return m_descriptorSetRecordingOwner == nullptr;
+}
+
+uint64_t ZVulkanDevice::allocateTextureDescriptorIdentity()
+{
+  checkOwnerThread("allocate texture descriptor identity");
+  const uint64_t identity = m_nextTextureDescriptorIdentity++;
+  CHECK_NE(identity, 0u) << "Vulkan texture descriptor identity wrapped";
+  CHECK_NE(identity, std::numeric_limits<uint64_t>::max()) << "Vulkan texture descriptor identity exhausted";
+  return identity;
+}
+
+void ZVulkanDevice::ensureBindlessDescriptorSetLayout()
+{
+  checkOwnerThread("ensure bindless descriptor-set layout");
+  if (m_bindlessDescriptorSetLayout.has_value()) {
+    return;
+  }
+  CHECK(descriptorSetWritesAllowed()) << "Creating bindless descriptor layout while a backend is recording";
+
+  auto& vkDevice = m_context.device();
+  vk::SamplerCreateInfo linearClampInfo{.magFilter = vk::Filter::eLinear,
+                                        .minFilter = vk::Filter::eLinear,
+                                        .mipmapMode = vk::SamplerMipmapMode::eNearest,
+                                        .addressModeU = vk::SamplerAddressMode::eClampToEdge,
+                                        .addressModeV = vk::SamplerAddressMode::eClampToEdge,
+                                        .addressModeW = vk::SamplerAddressMode::eClampToEdge,
+                                        .borderColor = vk::BorderColor::eFloatOpaqueWhite};
+  m_bindlessLinearClampSampler.emplace(vkDevice, linearClampInfo);
+
+  vk::SamplerCreateInfo nearestClampInfo{.magFilter = vk::Filter::eNearest,
+                                         .minFilter = vk::Filter::eNearest,
+                                         .mipmapMode = vk::SamplerMipmapMode::eNearest,
+                                         .addressModeU = vk::SamplerAddressMode::eClampToEdge,
+                                         .addressModeV = vk::SamplerAddressMode::eClampToEdge,
+                                         .addressModeW = vk::SamplerAddressMode::eClampToEdge,
+                                         .borderColor = vk::BorderColor::eFloatOpaqueWhite};
+  m_bindlessNearestClampSampler.emplace(vkDevice, nearestClampInfo);
+
+  vk::SamplerCreateInfo linearBorderZeroInfo{.magFilter = vk::Filter::eLinear,
+                                             .minFilter = vk::Filter::eLinear,
+                                             .mipmapMode = vk::SamplerMipmapMode::eNearest,
+                                             .addressModeU = vk::SamplerAddressMode::eClampToBorder,
+                                             .addressModeV = vk::SamplerAddressMode::eClampToBorder,
+                                             .addressModeW = vk::SamplerAddressMode::eClampToBorder,
+                                             .borderColor = vk::BorderColor::eFloatTransparentBlack};
+  m_bindlessLinearBorderZero3DSampler.emplace(vkDevice, linearBorderZeroInfo);
+
+  const auto& caps = m_context.effectiveBindlessSampledImageCapacities();
+  const vk::ShaderStageFlags fragmentStage = vk::ShaderStageFlagBits::eFragment;
+  const vk::ShaderStageFlags computeStage = vk::ShaderStageFlagBits::eCompute;
+  const std::array<vk::Sampler, 1> linearSamplers{**m_bindlessLinearClampSampler};
+  const std::array<vk::Sampler, 1> nearestSamplers{**m_bindlessNearestClampSampler};
+  const std::array<vk::Sampler, 1> linearBorderZeroSamplers{**m_bindlessLinearBorderZero3DSampler};
+  const std::array<vk::DescriptorSetLayoutBinding, 8> bindings{
+    vk::DescriptorSetLayoutBinding{.binding = vkbind::kBindingBindlessTexture2D,
+                                   .descriptorType = vk::DescriptorType::eSampledImage,
+                                   .descriptorCount = caps.texture2D,
+                                   .stageFlags = fragmentStage},
+    vk::DescriptorSetLayoutBinding{.binding = vkbind::kBindingBindlessTexture2DArray,
+                                   .descriptorType = vk::DescriptorType::eSampledImage,
+                                   .descriptorCount = caps.texture2DArray,
+                                   .stageFlags = fragmentStage},
+    vk::DescriptorSetLayoutBinding{.binding = vkbind::kBindingBindlessTexture3D,
+                                   .descriptorType = vk::DescriptorType::eSampledImage,
+                                   .descriptorCount = caps.texture3D,
+                                   .stageFlags = fragmentStage},
+    vk::DescriptorSetLayoutBinding{.binding = vkbind::kBindingBindlessUTexture2D,
+                                   .descriptorType = vk::DescriptorType::eSampledImage,
+                                   .descriptorCount = caps.uTexture2D,
+                                   .stageFlags = computeStage},
+    vk::DescriptorSetLayoutBinding{.binding = vkbind::kBindingBindlessUTexture3D,
+                                   .descriptorType = vk::DescriptorType::eSampledImage,
+                                   .descriptorCount = caps.uTexture3D,
+                                   .stageFlags = fragmentStage},
+    vk::DescriptorSetLayoutBinding{.binding = vkbind::kBindingBindlessSamplerLinearClamp,
+                                   .descriptorType = vk::DescriptorType::eSampler,
+                                   .descriptorCount = 1u,
+                                   .stageFlags = fragmentStage,
+                                   .pImmutableSamplers = linearSamplers.data()},
+    vk::DescriptorSetLayoutBinding{.binding = vkbind::kBindingBindlessSamplerNearestClamp,
+                                   .descriptorType = vk::DescriptorType::eSampler,
+                                   .descriptorCount = 1u,
+                                   .stageFlags = fragmentStage | computeStage,
+                                   .pImmutableSamplers = nearestSamplers.data()},
+    vk::DescriptorSetLayoutBinding{.binding = vkbind::kBindingBindlessSamplerLinearBorderZero3D,
+                                   .descriptorType = vk::DescriptorType::eSampler,
+                                   .descriptorCount = 1u,
+                                   .stageFlags = fragmentStage,
+                                   .pImmutableSamplers = linearBorderZeroSamplers.data()},
+  };
+
+  const bool useUpdateAfterBind = m_context.supportsDescriptorIndexingSampledImageUpdateAfterBind();
+  std::array<vk::DescriptorBindingFlags, 8> bindingFlags{};
+  for (size_t i = 0; i < 5u; ++i) {
+    bindingFlags[i] = vk::DescriptorBindingFlagBits::ePartiallyBound;
+    if (useUpdateAfterBind) {
+      bindingFlags[i] |= vk::DescriptorBindingFlagBits::eUpdateAfterBind;
+    }
+  }
+  vk::DescriptorSetLayoutBindingFlagsCreateInfo flagsInfo{
+    .bindingCount = static_cast<uint32_t>(bindingFlags.size()),
+    .pBindingFlags = bindingFlags.data(),
+  };
+  vk::DescriptorSetLayoutCreateFlags layoutFlags{};
+  if (useUpdateAfterBind) {
+    layoutFlags |= vk::DescriptorSetLayoutCreateFlagBits::eUpdateAfterBindPool;
+  }
+  vk::DescriptorSetLayoutCreateInfo layoutInfo{
+    .pNext = &flagsInfo,
+    .flags = layoutFlags,
+    .bindingCount = static_cast<uint32_t>(bindings.size()),
+    .pBindings = bindings.data(),
+  };
+  m_bindlessDescriptorSetLayout.emplace(vkDevice, layoutInfo);
+}
+
+void ZVulkanDevice::ensureBindlessPlaceholderTextures()
+{
+  checkOwnerThread("ensure bindless placeholder textures");
+  if (m_bindlessPlaceholder2D != nullptr) {
+    CHECK(m_bindlessPlaceholder2DArray != nullptr);
+    CHECK(m_bindlessPlaceholder3D != nullptr);
+    CHECK(m_bindlessPlaceholderU2D != nullptr);
+    CHECK(m_bindlessPlaceholderU3D != nullptr);
+    return;
+  }
+  CHECK(descriptorSetWritesAllowed()) << "Creating bindless placeholders while a backend is recording";
+
+  constexpr vk::ImageUsageFlags usage = vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst;
+  constexpr vk::MemoryPropertyFlags memory = vk::MemoryPropertyFlagBits::eDeviceLocal;
+
+  auto info2D = ZVulkanTexture::CreateInfo::make2D(1u,
+                                                   1u,
+                                                   vk::Format::eR8G8B8A8Unorm,
+                                                   usage,
+                                                   memory,
+                                                   1u,
+                                                   false,
+                                                   vk::ImageLayout::eShaderReadOnlyOptimal);
+  auto placeholder2D = createTexture(info2D);
+  const uint32_t white = 0xffffffffu;
+  placeholder2D->uploadData(&white, sizeof(white), vk::ImageLayout::eShaderReadOnlyOptimal);
+
+  auto info2DArray = ZVulkanTexture::CreateInfo::make2DArray(1u,
+                                                             1u,
+                                                             1u,
+                                                             vk::Format::eR8G8B8A8Unorm,
+                                                             usage,
+                                                             memory,
+                                                             1u,
+                                                             false,
+                                                             vk::ImageLayout::eShaderReadOnlyOptimal);
+  auto placeholder2DArray = createTexture(info2DArray);
+  placeholder2DArray->uploadData(&white, sizeof(white), vk::ImageLayout::eShaderReadOnlyOptimal);
+
+  auto info3D = ZVulkanTexture::CreateInfo::make3D(1u,
+                                                   1u,
+                                                   1u,
+                                                   vk::Format::eR8Unorm,
+                                                   usage,
+                                                   memory,
+                                                   1u,
+                                                   false,
+                                                   vk::ImageLayout::eShaderReadOnlyOptimal);
+  auto placeholder3D = createTexture(info3D);
+  const uint8_t zeroByte = 0u;
+  placeholder3D->uploadData(&zeroByte, sizeof(zeroByte), vk::ImageLayout::eShaderReadOnlyOptimal);
+
+  auto infoU2D = ZVulkanTexture::CreateInfo::make2D(1u,
+                                                    1u,
+                                                    vk::Format::eR32G32B32A32Uint,
+                                                    usage,
+                                                    memory,
+                                                    1u,
+                                                    false,
+                                                    vk::ImageLayout::eShaderReadOnlyOptimal);
+  auto placeholderU2D = createTexture(infoU2D);
+  const std::array<uint32_t, 4> zeroUint{0u, 0u, 0u, 0u};
+  placeholderU2D->uploadData(zeroUint.data(), sizeof(zeroUint), vk::ImageLayout::eShaderReadOnlyOptimal);
+
+  auto infoU3D = ZVulkanTexture::CreateInfo::make3D(1u,
+                                                    1u,
+                                                    1u,
+                                                    vk::Format::eR32G32B32A32Uint,
+                                                    usage,
+                                                    memory,
+                                                    1u,
+                                                    false,
+                                                    vk::ImageLayout::eShaderReadOnlyOptimal);
+  auto placeholderU3D = createTexture(infoU3D);
+  placeholderU3D->uploadData(zeroUint.data(), sizeof(zeroUint), vk::ImageLayout::eShaderReadOnlyOptimal);
+
+  m_bindlessPlaceholder2D = std::move(placeholder2D);
+  m_bindlessPlaceholder2DArray = std::move(placeholder2DArray);
+  m_bindlessPlaceholder3D = std::move(placeholder3D);
+  m_bindlessPlaceholderU2D = std::move(placeholderU2D);
+  m_bindlessPlaceholderU3D = std::move(placeholderU3D);
+}
+
+void ZVulkanDevice::prepareBindlessDescriptorState()
+{
+  checkOwnerThread("prepare bindless descriptor state");
+  if (!m_bindlessSlots.empty()) {
+    CHECK_EQ(m_bindlessSlots.size(), static_cast<size_t>(m_framesInFlight));
+    return;
+  }
+  CHECK(descriptorSetWritesAllowed()) << "Preparing bindless descriptors while a backend is recording";
+  ensureBindlessDescriptorSetLayout();
+  ensureBindlessPlaceholderTextures();
+
+  const auto& caps = m_context.effectiveBindlessSampledImageCapacities();
+  const uint64_t sampledImagesPerSet = caps.totalSampledImages();
+  CHECK_GT(sampledImagesPerSet, 0u) << "Bindless capacities not computed before descriptor pool creation";
+  CHECK_LE(sampledImagesPerSet, std::numeric_limits<uint64_t>::max() / m_framesInFlight)
+    << "Bindless sampled-image pool sizing overflow";
+  const uint64_t sampledImages64 = sampledImagesPerSet * m_framesInFlight;
+  const uint64_t samplers64 =
+    static_cast<uint64_t>(ZVulkanDeviceSupport::DescriptorPoolPolicy::kBindlessSamplerDescriptors) * m_framesInFlight;
+  CHECK_LE(sampledImages64, std::numeric_limits<uint32_t>::max())
+    << "Device bindless sampled-image pool exceeds Vulkan's uint32 descriptor count";
+  CHECK_LE(samplers64, std::numeric_limits<uint32_t>::max())
+    << "Device bindless sampler pool exceeds Vulkan's uint32 descriptor count";
+  const std::array<vk::DescriptorPoolSize, 2> poolSizes{
+    vk::DescriptorPoolSize{.type = vk::DescriptorType::eSampledImage,
+                           .descriptorCount = static_cast<uint32_t>(sampledImages64)                                      },
+    vk::DescriptorPoolSize{.type = vk::DescriptorType::eSampler,      .descriptorCount = static_cast<uint32_t>(samplers64)},
+  };
+  vk::DescriptorPoolCreateFlags poolFlags{};
+  uint64_t updateAfterBindReservation = 0u;
+  if (m_context.supportsDescriptorIndexingSampledImageUpdateAfterBind()) {
+    poolFlags |= vk::DescriptorPoolCreateFlagBits::eUpdateAfterBind;
+    updateAfterBindReservation = sampledImages64 + samplers64;
+    reserveUpdateAfterBindDescriptors(updateAfterBindReservation, "device_bindless_pool");
+  }
+
+  std::optional<vk::raii::DescriptorPool> descriptorPool;
+  std::vector<std::unique_ptr<BindlessSlotState>> slots;
+  try {
+    vk::DescriptorPoolCreateInfo poolInfo{.flags = poolFlags,
+                                          .maxSets = m_framesInFlight,
+                                          .poolSizeCount = static_cast<uint32_t>(poolSizes.size()),
+                                          .pPoolSizes = poolSizes.data()};
+    descriptorPool.emplace(m_context.device(), poolInfo);
+
+    std::vector<vk::DescriptorSetLayout> layouts(m_framesInFlight, **m_bindlessDescriptorSetLayout);
+    vk::DescriptorSetAllocateInfo allocateInfo{.descriptorPool = **descriptorPool,
+                                               .descriptorSetCount = m_framesInFlight,
+                                               .pSetLayouts = layouts.data()};
+    std::vector<vk::DescriptorSet> rawSets;
+    rawSets.reserve(m_framesInFlight);
+    auto allocatedSets = m_context.device().allocateDescriptorSets(allocateInfo);
+    CHECK_EQ(allocatedSets.size(), static_cast<size_t>(m_framesInFlight));
+    for (auto& allocatedSet : allocatedSets) {
+      rawSets.push_back(allocatedSet.release());
+    }
+
+    slots.reserve(m_framesInFlight);
+    for (uint32_t slotIndex = 0u; slotIndex < m_framesInFlight; ++slotIndex) {
+      auto slot = std::make_unique<BindlessSlotState>();
+      CHECK_LE(sampledImagesPerSet, std::numeric_limits<size_t>::max());
+      slot->pendingRetirements.reserve(static_cast<size_t>(sampledImagesPerSet));
+      slot->pendingRetirementResources.reserve(static_cast<size_t>(sampledImagesPerSet));
+      const vk::DescriptorSet raw = rawSets[slotIndex];
+      CHECK(raw != vk::DescriptorSet{}) << "Failed to allocate device bindless descriptor set";
+      slot->descriptorSet = std::make_unique<ZVulkanBindlessDescriptorSet>(*this,
+                                                                           raw,
+                                                                           caps.texture2D,
+                                                                           caps.texture2DArray,
+                                                                           caps.texture3D,
+                                                                           caps.uTexture2D,
+                                                                           caps.uTexture3D);
+
+      const std::array<std::pair<ZVulkanBindlessDescriptorSet::Kind, ZVulkanTexture*>, 5> placeholders{
+        std::pair{ZVulkanBindlessDescriptorSet::Kind::Texture2D,      m_bindlessPlaceholder2D.get()     },
+        std::pair{ZVulkanBindlessDescriptorSet::Kind::Texture2DArray, m_bindlessPlaceholder2DArray.get()},
+        std::pair{ZVulkanBindlessDescriptorSet::Kind::Texture3D,      m_bindlessPlaceholder3D.get()     },
+        std::pair{ZVulkanBindlessDescriptorSet::Kind::UTexture2D,     m_bindlessPlaceholderU2D.get()    },
+        std::pair{ZVulkanBindlessDescriptorSet::Kind::UTexture3D,     m_bindlessPlaceholderU3D.get()    },
+      };
+      for (const auto& [kind, texture] : placeholders) {
+        ZVulkanBindlessDescriptorSet::RegisterRequest request{};
+        request.kind = kind;
+        request.texture = texture;
+        request.debugLabel = "device_bindless_placeholder";
+        const uint32_t index = slot->descriptorSet->registerTexture(request);
+        CHECK_EQ(index, 0u) << "Device bindless placeholder must reserve index zero for every table";
+      }
+      slots.emplace_back(std::move(slot));
+    }
+  }
+  catch (...) {
+    descriptorPool.reset();
+    if (updateAfterBindReservation != 0u) {
+      releaseUpdateAfterBindDescriptors(updateAfterBindReservation);
+    }
+    throw;
+  }
+  m_bindlessDescriptorPool = std::move(descriptorPool);
+  m_bindlessPoolUpdateAfterBindReservation = updateAfterBindReservation;
+  m_bindlessSlots = std::move(slots);
+
+  const auto& support = m_context.selectedDeviceSupport();
+  if (m_context.supportsDescriptorIndexingSampledImageUpdateAfterBind()) {
+    CHECK_EQ(updateAfterBindDescriptorsReserved(), support.requiredUpdateAfterBindDescriptors)
+      << "Device bindless pools did not reserve the evaluated update-after-bind descriptor count";
+  } else {
+    CHECK_EQ(updateAfterBindDescriptorsReserved(), 0u);
+  }
+}
+
+vk::DescriptorSetLayout ZVulkanDevice::bindlessSampledImageDescriptorSetLayout()
+{
+  checkOwnerThread("access bindless descriptor-set layout");
+  ensureBindlessDescriptorSetLayout();
+  CHECK(m_bindlessDescriptorSetLayout.has_value());
+  return **m_bindlessDescriptorSetLayout;
+}
+
+ZVulkanBindlessDescriptorSet& ZVulkanDevice::bindlessSampledImagesForFrameSlot(uint32_t frameSlot)
+{
+  checkOwnerThread("access bindless frame-slot table");
+  CHECK_EQ(m_bindlessSlots.size(), static_cast<size_t>(m_framesInFlight))
+    << "Bindless device state must be prepared before acquiring a frame slot";
+  CHECK_LT(frameSlot, m_framesInFlight) << "Bindless frame-slot index out of range";
+  CHECK(m_bindlessSlots[frameSlot] != nullptr);
+  CHECK(m_bindlessSlots[frameSlot]->descriptorSet != nullptr);
+  return *m_bindlessSlots[frameSlot]->descriptorSet;
+}
+
+ZVulkanBindlessDescriptorSet& ZVulkanDevice::bindlessSampledImagesForFrame(ZVulkanFrameExecutor::ActiveFrame& frame)
+{
+  checkOwnerThread("access mutable bindless frame table");
+  CHECK(frame.valid()) << "Bindless descriptor table requested with an invalid executor frame";
+  CHECK(frameExecutor().isPreRecordSafePoint(frame))
+    << "Mutable bindless descriptor table requested outside its pre-record safe point";
+  const uint32_t slot = frame.slotIndex();
+  CHECK_LT(slot, m_bindlessSlots.size());
+  CHECK(m_bindlessSlots[slot] != nullptr);
+  CHECK_EQ(m_bindlessSlots[slot]->registrationSerial, frame.acquisitionSerial())
+    << "Bindless descriptor table requested before beginning this frame-slot epoch";
+  return bindlessSampledImagesForFrameSlot(slot);
+}
+
+ZVulkanTexture& ZVulkanDevice::defaultBindlessPlaceholderTexture2D()
+{
+  checkOwnerThread("access default bindless placeholder");
+  ensureBindlessPlaceholderTextures();
+  CHECK(m_bindlessPlaceholder2D != nullptr);
+  return *m_bindlessPlaceholder2D;
+}
+
+bool ZVulkanDevice::retireBindlessTexture(const ZVulkanTexture& texture, const std::shared_ptr<void>& deferredResources)
+{
+  checkOwnerThread("retire bindless texture");
+  const uint64_t identity = texture.descriptorIdentity();
+  CHECK_NE(identity, 0u) << "Retiring a Vulkan texture without a descriptor identity";
+  CHECK(deferredResources != nullptr) << "Bindless texture retirement requires a GPU-resource holder";
+
+  constexpr std::array kinds{ZVulkanBindlessDescriptorSet::Kind::Texture2D,
+                             ZVulkanBindlessDescriptorSet::Kind::Texture2DArray,
+                             ZVulkanBindlessDescriptorSet::Kind::Texture3D,
+                             ZVulkanBindlessDescriptorSet::Kind::UTexture2D,
+                             ZVulkanBindlessDescriptorSet::Kind::UTexture3D};
+  bool queued = false;
+  for (auto& slot : m_bindlessSlots) {
+    CHECK(slot != nullptr);
+    CHECK(slot->descriptorSet != nullptr);
+    bool queuedForSlot = false;
+    for (const auto kind : kinds) {
+      const auto handle = slot->descriptorSet->retirementHandle(kind, &texture, identity);
+      if (!handle.has_value()) {
+        continue;
+      }
+      CHECK_LT(slot->pendingRetirements.size(), slot->pendingRetirements.capacity())
+        << "Bindless retirement queue exceeded the slot's descriptor-backed capacity";
+      slot->pendingRetirements.push_back(*handle);
+      queuedForSlot = true;
+      queued = true;
+    }
+    if (queuedForSlot) {
+      CHECK_LT(slot->pendingRetirementResources.size(), slot->pendingRetirementResources.capacity());
+      slot->pendingRetirementResources.push_back(deferredResources);
+    }
+  }
+  return queued;
+}
+
+void ZVulkanDevice::beginBindlessFrameSlot(ZVulkanFrameExecutor::ActiveFrame& frame)
+{
+  checkOwnerThread("begin bindless frame slot");
+  CHECK(frame.valid()) << "Beginning bindless frame-slot state with an invalid executor frame";
+  CHECK(frameExecutor().owns(frame)) << "Bindless frame slot belongs to another Vulkan device";
+  CHECK(frameExecutor().isPreRecordSafePoint(frame))
+    << "Beginning bindless frame-slot state outside its pre-record safe point";
+  const uint32_t slot = frame.slotIndex();
+  CHECK_LT(slot, m_bindlessSlots.size());
+  CHECK(m_bindlessSlots[slot] != nullptr);
+  CHECK_NE(m_bindlessSlots[slot]->registrationSerial, frame.acquisitionSerial())
+    << "Bindless frame-slot epoch begun twice for one frame acquisition";
+  applyBindlessRetirementsForFrameSlot(slot);
+  bindlessSampledImagesForFrameSlot(slot).beginRegistrationEpoch();
+  m_bindlessSlots[slot]->registrationSerial = frame.acquisitionSerial();
+}
+
+void ZVulkanDevice::drainBindlessRetirements(ZVulkanFrameExecutor::ActiveFrame& frame)
+{
+  checkOwnerThread("drain bindless frame-slot retirements");
+  CHECK(frame.valid()) << "Draining bindless retirements with an invalid executor frame";
+  CHECK(frameExecutor().owns(frame)) << "Bindless retirement frame belongs to another Vulkan device";
+  CHECK(frameExecutor().isPreRecordSafePoint(frame))
+    << "Draining bindless retirements outside the frame's pre-record safe point";
+  applyBindlessRetirementsForFrameSlot(frame.slotIndex());
+}
+
+bool ZVulkanDevice::waitForAllFramesAndDrainBindlessRetirements()
+{
+  checkOwnerThread("wait and drain all bindless retirements");
+  if (m_frameExecutor != nullptr) {
+    m_frameExecutor->waitForAllInFlight();
+  }
+  if (!descriptorSetWritesAllowed() ||
+      (m_frameExecutor != nullptr && !m_frameExecutor->allFrameSlotsDescriptorMutationSafe())) {
+    // A current, unsubmitted command buffer is outside waitForAllInFlight()'s
+    // fence domain and may already reference the slot's descriptor set. Keep
+    // the deferred holders alive; the normal post-record slot safe point will
+    // consume them. Strict-budget recovery will report pressure if this leaves
+    // the requested allocation unsatisfied.
+    VLOG(1) << "VK bindless retirement: all-slot drain deferred because a command buffer is recording";
+    return false;
+  }
+  // Every executor slot is now fence-safe. Release all deferred texture
+  // resources, including those whose allocations contributed to the memory
+  // pressure that triggered this strong-recovery path.
+  for (uint32_t slot = 0u; slot < m_bindlessSlots.size(); ++slot) {
+    applyBindlessRetirementsForFrameSlot(slot);
+  }
+  return true;
+}
+
+void ZVulkanDevice::applyBindlessRetirementsForFrameSlot(uint32_t frameSlot)
+{
+  checkOwnerThread("apply bindless frame-slot retirements");
+  CHECK(descriptorSetWritesAllowed()) << "Applying bindless retirements while a backend is recording";
+  CHECK_LT(frameSlot, m_bindlessSlots.size()) << "Bindless retirement frame-slot index out of range";
+  auto& slotState = m_bindlessSlots[frameSlot];
+  CHECK(slotState != nullptr);
+  CHECK(slotState->descriptorSet != nullptr);
+  if (slotState->pendingRetirements.empty()) {
+    CHECK(slotState->pendingRetirementResources.empty());
+    return;
+  }
+  CHECK(!slotState->pendingRetirementResources.empty());
+
+  CHECK(m_bindlessPlaceholder2D != nullptr);
+  CHECK(m_bindlessPlaceholder2DArray != nullptr);
+  CHECK(m_bindlessPlaceholder3D != nullptr);
+  CHECK(m_bindlessPlaceholderU2D != nullptr);
+  CHECK(m_bindlessPlaceholderU3D != nullptr);
+  ZVulkanBindlessDescriptorSet::PlaceholderDescriptorInfos placeholderInfos{
+    m_bindlessPlaceholder2D->descriptorInfo(),
+    m_bindlessPlaceholder2DArray->descriptorInfo(),
+    m_bindlessPlaceholder3D->descriptorInfo(),
+    m_bindlessPlaceholderU2D->descriptorInfo(),
+    m_bindlessPlaceholderU3D->descriptorInfo(),
+  };
+  for (auto& info : placeholderInfos) {
+    info.sampler = vk::Sampler{};
+    CHECK(info.imageView != vk::ImageView{});
+  }
+  for (const auto& holder : slotState->pendingRetirementResources) {
+    CHECK(holder != nullptr) << "Bindless retirement lost its deferred GPU-resource holder";
+  }
+  slotState->descriptorSet->retireEntries(slotState->pendingRetirements, placeholderInfos);
+  slotState->pendingRetirements.clear();
+  // Release GPU resources only after every descriptor has been sanitized and
+  // its table index is no longer reachable.
+  slotState->pendingRetirementResources.clear();
+}
+
+std::unique_ptr<ZVulkanDescriptorPool> ZVulkanDevice::createTransientDescriptorPool()
+{
+  checkOwnerThread("create transient descriptor pool");
+  return std::make_unique<ZVulkanDescriptorPool>(*this, ZVulkanDescriptorPoolKind::Transient);
+}
+
+std::unique_ptr<ZVulkanDescriptorPool> ZVulkanDevice::createPersistentDescriptorPool()
+{
+  checkOwnerThread("create persistent descriptor pool");
+  return std::make_unique<ZVulkanDescriptorPool>(*this, ZVulkanDescriptorPoolKind::Persistent);
 }
 
 std::unique_ptr<ZVulkanDescriptorSet> ZVulkanDevice::createDescriptorSet(ZVulkanDescriptorPool& pool,
                                                                          vk::DescriptorSetLayout layout)
 {
+  checkOwnerThread("create descriptor set");
   auto descriptorSet = pool.allocateDescriptorSet(layout);
   return std::make_unique<ZVulkanDescriptorSet>(*this, descriptorSet);
 }

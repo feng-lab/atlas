@@ -62,8 +62,14 @@ public:
 
   void requestMeshLodViewCancellation();
 
+  // Vulkan initialization is an external, recoverable failure. Restore the
+  // selector and Vulkan-only transparency options before reporting the error.
+  void restoreOpenGLAfterFailedVulkanInitialization();
+
 private:
   void updateLightsArray();
+
+  void updateTransparencyOptionsForBackend(RenderBackend backend);
 
   void markGlobalSceneStateDirty()
   {

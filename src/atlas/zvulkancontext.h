@@ -1,6 +1,8 @@
 #pragma once
 
 #include "zvulkan.h"
+#include "zvulkandevicesupport.h"
+#include "zlog.h"
 #include <cstdint>
 #include <memory>
 #include <optional>
@@ -16,29 +18,7 @@ class ZVulkanDevice;
 class ZVulkanContext
 {
 public:
-  struct BindlessSampledImageCapacities
-  {
-    uint32_t texture2D = 0;
-    uint32_t texture2DArray = 0;
-    uint32_t texture3D = 0;
-    uint32_t uTexture2D = 0;
-    uint32_t uTexture3D = 0;
-
-    [[nodiscard]] uint32_t totalSampledImages() const
-    {
-      return texture2D + texture2DArray + texture3D + uTexture2D + uTexture3D;
-    }
-
-    [[nodiscard]] uint32_t fragmentVisibleSampledImages() const
-    {
-      return texture2D + texture2DArray + texture3D + uTexture3D;
-    }
-
-    [[nodiscard]] uint32_t computeVisibleSampledImages() const
-    {
-      return uTexture2D;
-    }
-  };
+  using BindlessSampledImageCapacities = ZVulkanDeviceSupport::BindlessSampledImageCapacities;
 
   ZVulkanContext();
   ~ZVulkanContext();
@@ -75,6 +55,13 @@ public:
   size_t selectedDeviceIndex() const
   {
     return m_selectedDeviceIndex;
+  }
+
+  // Immutable topology captured before physical-device evaluation. Descriptor
+  // budgeting, bindless slots, and every wrapper use this one value.
+  [[nodiscard]] uint32_t frameSlotCount() const
+  {
+    return m_frameSlotCount;
   }
 
   // Returns the logical device
@@ -126,6 +113,17 @@ public:
     return m_supportsCalibratedTimestamps;
   }
 
+  [[nodiscard]] bool supportsMemoryBudget() const
+  {
+    return selectedDeviceSupport().memoryBudget;
+  }
+
+  [[nodiscard]] const ZVulkanDeviceSupport& selectedDeviceSupport() const
+  {
+    CHECK(m_selectedDeviceIndex < m_deviceSupports.size());
+    return m_deviceSupports[m_selectedDeviceIndex];
+  }
+
   // Bindless sampled-image table capacity policy:
   // - Requested capacities come from command-line flags (developer override).
   // - Effective capacities are clamped once per logical device creation to fit
@@ -165,17 +163,13 @@ public:
 
   // Create a ZVulkanDevice instance from this context
   std::unique_ptr<ZVulkanDevice> createDevice();
-
-  // Check if the device supports the required extensions
-  bool checkDeviceExtensionSupport(vk::raii::PhysicalDevice& physicalDevice) const;
+  // Internal lifetime callbacks used by ZVulkanDevice. A context owns one
+  // logical vk::Device and permits exactly one live wrapper/accounting domain,
+  // including for direct wrapper construction outside createDevice().
+  void notifyDeviceWrapperCreated(const ZVulkanDevice* device);
+  void notifyDeviceWrapperDestroyed(const ZVulkanDevice* device);
 
   void logGpuInfo() const;
-
-  // Runtime device switching: select a new physical device by sorted index and
-  // recreate the logical device, queues, and command pool. Returns true on
-  // success. Callers must ensure no in-flight work depends on the prior device
-  // (e.g., waitIdle and reset higher-level resources) before calling.
-  bool setSelectedDeviceIndex(size_t index);
 
 private:
   // Vulkan initialization steps
@@ -185,15 +179,18 @@ private:
   void createLogicalDevice();
   void createCommandPool();
   void computeBindlessSampledImageCapacities();
+  ZVulkanDeviceSupport evaluateDeviceSupport(vk::raii::PhysicalDevice& physicalDevice) const;
 
   // Find queue families that support required operations
   QueueFamilyIndices findQueueFamilies(vk::raii::PhysicalDevice& physicalDevice) const;
 
   // Vulkan RAII objects
+  const uint32_t m_frameSlotCount;
   std::optional<vk::raii::Context> m_context;
   std::optional<vk::raii::Instance> m_instance;
   std::optional<vk::raii::DebugUtilsMessengerEXT> m_debugMessenger;
   std::vector<vk::raii::PhysicalDevice> m_physicalDevices;
+  std::vector<ZVulkanDeviceSupport> m_deviceSupports;
   size_t m_selectedDeviceIndex = 0; // index into m_physicalDevices
   std::optional<vk::raii::Device> m_device;
   std::optional<vk::raii::Queue> m_graphicsQueue;
@@ -208,6 +205,7 @@ private:
   BindlessSampledImageCapacities m_requestedBindlessSampledImageCapacities{};
   BindlessSampledImageCapacities m_effectiveBindlessSampledImageCapacities{};
   bool m_bindlessSampledImageCapacitiesClamped = false;
+  const ZVulkanDevice* m_liveDeviceWrapper = nullptr;
 };
 
 } // namespace nim

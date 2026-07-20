@@ -34,6 +34,11 @@ public:
 
   void select(const T& value);
 
+  // Restore a selection from the parameter's owner thread while valueChanged()
+  // is still on the stack. This intentionally avoids a recursive valueChanged
+  // notification but keeps the value, associated data, and widgets consistent.
+  void restoreSelectionWithoutValueChanged(const T& value);
+
   void selectNext();
 
   [[nodiscard]] bool isSelected(const T& value) const;

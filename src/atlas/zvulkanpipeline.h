@@ -57,7 +57,9 @@ public:
 private:
   ZVulkanDevice& m_device;
   ZVulkanShader& m_shader;
-  vk::PipelineVertexInputStateCreateInfo m_vertexInputInfo;
+  vk::PipelineVertexInputStateCreateFlags m_vertexInputFlags{};
+  std::vector<vk::VertexInputBindingDescription> m_vertexBindings;
+  std::vector<vk::VertexInputAttributeDescription> m_vertexAttributes;
   vk::PrimitiveTopology m_topology;
 
   std::vector<vk::DescriptorSetLayout> m_descriptorSetLayouts;

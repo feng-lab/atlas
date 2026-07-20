@@ -2811,6 +2811,7 @@ void ZVulkanImgRaycasterPipelineContext::ensureBlockIdCompactionPipeline()
                                               .module = *compModule,
                                               .pName = "main"};
       pipeline.emplace(device, nullptr, vk::ComputePipelineCreateInfo{.stage = stage, .layout = layout});
+      m_backend.notifyPipelineCreated();
     };
 
   auto ensureStorageParallelFlush = [&]() {
@@ -3059,9 +3060,9 @@ ZVulkanImgRaycasterPipelineContext::ensureBlockIdCompactOutput(VulkanBlockIdComp
   void* key = m_backend.activeFrameKey();
   CHECK(key != nullptr) << "ensureBlockIdCompactOutput called with no active frame";
 
-  // The executor may rebuild its frame slots when maxFramesInFlight changes or
-  // when the shared Vulkan device is replaced. Frame keys become invalid across
-  // such rebuilds, so clear any per-slot buffers when those properties change.
+  // Shared-device replacement invalidates frame keys. Also retain the fixed
+  // slot count in this cache key so topology mismatches fail visibly if that
+  // device-lifetime invariant is ever changed.
   auto& dev = m_backend.device();
   const uint32_t maxFrames = dev.frameExecutor().maxFramesInFlight();
   if (m_blockIdCompactDevice != &dev || m_blockIdCompactMaxFramesInFlight != maxFrames) {

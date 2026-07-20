@@ -19,6 +19,7 @@
 #include <cstring>
 #include <type_traits>
 #include <limits>
+#include <utility>
 
 namespace nim {
 namespace {
@@ -165,6 +166,70 @@ private:
 };
 
 } // namespace
+
+struct ZVulkanTexture::DeferredResources
+{
+  explicit DeferredResources(VmaAllocator allocator_)
+    : allocator(allocator_)
+  {
+    CHECK(allocator != nullptr);
+  }
+
+  ~DeferredResources()
+  {
+    // Vulkan views must die before the image/allocation they reference.
+    layerImageViews.clear();
+    layerDepthViews.clear();
+    layerStencilViews.clear();
+    genericAspectViews.clear();
+    depthAspectView.reset();
+    stencilAspectView.reset();
+    imageView.reset();
+    sampler.reset();
+    if (image != vk::Image{} && imageAllocation != nullptr) {
+      vmaDestroyImage(allocator, image, imageAllocation);
+      image = vk::Image{};
+      imageAllocation = nullptr;
+    }
+  }
+
+  void takeFrom(ZVulkanTexture& texture) noexcept
+  {
+    CHECK(image == vk::Image{});
+    CHECK(imageAllocation == nullptr);
+    CHECK(!imageView.has_value());
+    CHECK(!sampler.has_value());
+    CHECK(!depthAspectView.has_value());
+    CHECK(!stencilAspectView.has_value());
+    CHECK(layerImageViews.empty());
+    CHECK(layerDepthViews.empty());
+    CHECK(layerStencilViews.empty());
+    CHECK(genericAspectViews.empty());
+
+    image = std::exchange(texture.m_image, vk::Image{});
+    imageAllocation = std::exchange(texture.m_imageAllocation, nullptr);
+    imageView.swap(texture.m_imageView);
+    sampler.swap(texture.m_sampler);
+    depthAspectView.swap(texture.m_depthAspectView);
+    stencilAspectView.swap(texture.m_stencilAspectView);
+    layerImageViews.swap(texture.m_layerImageViews);
+    layerDepthViews.swap(texture.m_layerDepthViews);
+    layerStencilViews.swap(texture.m_layerStencilViews);
+    genericAspectViews.swap(texture.m_genericAspectViews);
+  }
+
+  VmaAllocator allocator = nullptr;
+  vk::Image image{};
+  VmaAllocation imageAllocation = nullptr;
+  std::optional<vk::raii::ImageView> imageView;
+  std::optional<vk::raii::Sampler> sampler;
+  std::optional<vk::raii::ImageView> depthAspectView;
+  std::optional<vk::raii::ImageView> stencilAspectView;
+  std::vector<std::optional<vk::raii::ImageView>> layerImageViews;
+  std::vector<std::optional<vk::raii::ImageView>> layerDepthViews;
+  std::vector<std::optional<vk::raii::ImageView>> layerStencilViews;
+  std::unordered_map<uint32_t, vk::raii::ImageView> genericAspectViews;
+};
 
 // ----- CreateInfo helpers ---------------------------------------------------------------------
 
@@ -327,6 +392,7 @@ ZVulkanTexture::CreateInfo ZVulkanTexture::CreateInfo::makeCube(uint32_t edgeLen
 
 ZVulkanTexture::ZVulkanTexture(ZVulkanDevice& device, const CreateInfo& createInfo)
   : m_device(device)
+  , m_descriptorIdentity(device.allocateTextureDescriptorIdentity())
   , m_createInfo(createInfo)
   , m_extent(createInfo.extent)
   , m_format(createInfo.format)
@@ -376,11 +442,22 @@ ZVulkanTexture::ZVulkanTexture(ZVulkanDevice& device,
 
 ZVulkanTexture::~ZVulkanTexture()
 {
+  if (m_deferredResources != nullptr) {
+    // Device-owned bindless tables can outlive this C++ texture. Transfer every
+    // Vulkan handle into the preallocated holder before queuing the identity;
+    // relevant frame slots retain the holder until their fences are safe.
+    m_deferredResources->takeFrom(*this);
+    (void)m_device.retireBindlessTexture(*this, std::static_pointer_cast<void>(m_deferredResources));
+    return;
+  }
+
   // Destroy views/samplers first to avoid referencing the image during teardown
   m_layerImageViews.clear();
   m_layerDepthViews.clear();
   m_layerStencilViews.clear();
   m_genericAspectViews.clear();
+  m_depthAspectView.reset();
+  m_stencilAspectView.reset();
   if (m_imageView) {
     m_imageView.reset();
   }
@@ -391,6 +468,13 @@ ZVulkanTexture::~ZVulkanTexture()
     vmaDestroyImage(m_device.allocator(), m_image, m_imageAllocation);
     m_image = vk::Image{};
     m_imageAllocation = nullptr;
+  }
+}
+
+void ZVulkanTexture::ensureBindlessRetirementResources()
+{
+  if (m_deferredResources == nullptr) {
+    m_deferredResources = std::make_shared<DeferredResources>(m_device.allocator());
   }
 }
 // ----- Public API -----------------------------------------------------------------------------

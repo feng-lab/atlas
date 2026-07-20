@@ -2,8 +2,10 @@
 
 #include "zvulkan.h"
 
+#include <array>
 #include <cstdint>
 #include <optional>
+#include <span>
 #include <string_view>
 #include <unordered_map>
 #include <vector>
@@ -15,14 +17,14 @@ class ZVulkanTexture;
 
 // Per-frame-slot bindless descriptor table for sampled images.
 //
-// This is intentionally owned by the Vulkan backend's FrameResources so the
-// VkDescriptorSet handle remains stable for the lifetime of a frame-executor
-// slot (ActiveFrame::key()).
+// This is owned by ZVulkanDevice and shared by every renderer backend using the
+// same frame-executor slot. The VkDescriptorSet handle remains stable for the
+// device lifetime.
 //
 // Contract:
-// - Mutations (vkUpdateDescriptorSets) are only allowed when the backend is NOT
-//   recording commands for the slot, and only after the slot's previous
-//   submission fence is complete (frame completion safe point).
+// - Mutations (vkUpdateDescriptorSets) are allowed only when no backend is
+//   recording on the device and after the slot's previous submission fence is
+//   complete (frame completion safe point).
 // - Lookups are allowed during recording but must not allocate new indices.
 class ZVulkanBindlessDescriptorSet final
 {
@@ -40,11 +42,20 @@ public:
   {
     Kind kind = Kind::Texture2D;
     ZVulkanTexture* texture = nullptr;
-    vk::ImageLayout layoutOverride{vk::ImageLayout::eUndefined};
-    vk::ImageAspectFlags aspectOverride{};
     // Optional debug label for crash diagnostics
     std::string_view debugLabel{};
   };
+
+  struct EntryHandle
+  {
+    Kind kind = Kind::Texture2D;
+    uint32_t index = 0u;
+    const ZVulkanTexture* address = nullptr;
+    uint64_t identity = 0u;
+  };
+
+  static constexpr size_t kKindCount = 5u;
+  using PlaceholderDescriptorInfos = std::array<vk::DescriptorImageInfo, kKindCount>;
 
   struct DebugEntryState
   {
@@ -63,18 +74,20 @@ public:
                                uint32_t uTexture2DCapacity,
                                uint32_t uTexture3DCapacity);
 
-  vk::DescriptorSet descriptorSet() const
-  {
-    return m_descriptorSet;
-  }
+  [[nodiscard]] vk::DescriptorSet descriptorSet() const;
 
-  [[nodiscard]] uint64_t generation() const
-  {
-    return m_generation;
-  }
+  // Updating a legacy descriptor binding invalidates every executable command
+  // buffer that bound the set. Update-after-bind descriptors do not, so their
+  // command-buffer compatibility token is intentionally constant.
+  [[nodiscard]] uint64_t commandBufferCompatibilityGeneration() const;
 
   [[nodiscard]] uint32_t capacity(Kind kind) const;
   [[nodiscard]] uint32_t used(Kind kind) const;
+
+  // Start the registration epoch for a newly acquired executor slot. Existing
+  // entries remain cached, but only entries touched in this epoch may be looked
+  // up while recording; untouched entries are eligible for cold eviction.
+  void beginRegistrationEpoch();
 
   // Mutating API: allocate an index (if needed) and write the descriptor.
   // Requires: request.texture != nullptr and the caller has ensured it is safe
@@ -85,33 +98,27 @@ public:
   // or std::nullopt if missing.
   [[nodiscard]] std::optional<uint32_t> lookupTexture(const RegisterRequest& request) const;
 
+  // Direct completion-safe reclamation used by ZVulkanDevice. Destruction
+  // captures exact handles with O(1) per-kind lookups; the slot drain validates
+  // address + stable identity, performs one batched descriptor update, then
+  // releases every exact index.
+  [[nodiscard]] std::optional<EntryHandle>
+  retirementHandle(Kind kind, const ZVulkanTexture* textureAddress, uint64_t textureIdentity) const;
+  void retireEntries(std::span<const EntryHandle> handles, const PlaceholderDescriptorInfos& placeholderInfos);
+
   // Debug: retrieve the currently cached descriptor entry state for the request.
   // Intended for diagnosing stale bindless entries when textures are recreated.
   [[nodiscard]] DebugEntryState debugEntryState(const RegisterRequest& request) const;
 
 private:
-  struct Key
-  {
-    const ZVulkanTexture* texture = nullptr;
-    vk::ImageLayout layout{vk::ImageLayout::eUndefined};
-    vk::ImageAspectFlags aspect{};
-
-    bool operator==(const Key& o) const noexcept
-    {
-      return texture == o.texture && layout == o.layout && aspect == o.aspect;
-    }
-  };
-
-  struct KeyHash
-  {
-    size_t operator()(const Key& k) const noexcept;
-  };
-
   struct EntryState
   {
     bool valid = false;
+    const ZVulkanTexture* texture = nullptr;
     vk::DescriptorImageInfo info{};
+    uint64_t textureIdentity = 0u;
     uint64_t imageGeneration = 0;
+    uint64_t lastTouchedEpoch = 0u;
   };
 
   struct Table
@@ -119,14 +126,16 @@ private:
     uint32_t binding = 0;
     uint32_t capacity = 0;
     uint32_t nextIndex = 0;
-    std::unordered_map<Key, uint32_t, KeyHash> map;
+    std::unordered_map<const ZVulkanTexture*, uint32_t> map;
     std::vector<EntryState> entries;
+    std::vector<uint32_t> freeIndices;
   };
 
   [[nodiscard]] static Table makeTable(uint32_t binding, uint32_t capacity);
 
   [[nodiscard]] Table& tableForKind(Kind kind);
   [[nodiscard]] const Table& tableForKind(Kind kind) const;
+  [[nodiscard]] static size_t indexForKind(Kind kind);
   [[nodiscard]] static const char* kindName(Kind kind);
 
   [[nodiscard]] uint32_t registerInTable(Table& table, const RegisterRequest& request);
@@ -136,7 +145,10 @@ private:
 
   ZVulkanDevice& m_device;
   vk::DescriptorSet m_descriptorSet{};
-  uint64_t m_generation = 0;
+  uint64_t m_descriptorMutationGeneration = 0;
+  uint64_t m_registrationEpoch = 0;
+  std::vector<EntryHandle> m_validRetirementHandles;
+  std::vector<vk::WriteDescriptorSet> m_retirementWrites;
 
   Table m_texture2D;
   Table m_texture2DArray;

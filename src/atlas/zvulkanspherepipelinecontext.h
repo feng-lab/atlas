@@ -19,15 +19,11 @@
 
 namespace nim {
 
-namespace vulkan {
-struct AttachmentFormats;
-}
-
 class Z3DRendererBase;
 class Z3DRendererVulkanBackend;
-class ZVulkanShader;
-class ZVulkanPipeline;
 class ZVulkanBuffer;
+class ZVulkanPipeline;
+class ZVulkanShader;
 
 class ZVulkanSpherePipelineContext
 {
@@ -59,38 +55,16 @@ private:
     float pad2 = 0.0f;
   };
 
-  struct FormatsKey
-  {
-    enum : size_t
-    {
-      kMaxColors = 8
-    };
-    std::array<vk::Format, kMaxColors> colorFormats{};
-    uint32_t colorCount = 0;
-    vk::Format depthFormat = vk::Format::eUndefined; // eUndefined means "no depth"
-
-    static FormatsKey from(const vulkan::AttachmentFormats& formats);
-
-    auto tie() const
-    {
-      return std::tuple(colorCount, colorFormats, depthFormat);
-    }
-
-    bool operator<(const FormatsKey& rhs) const
-    {
-      return tie() < rhs.tie();
-    }
-  };
-
   struct PipelineKey
   {
     bool dynamicMaterial = true;
     Z3DRendererBase::ShaderHookType shaderHookType = Z3DRendererBase::ShaderHookType::Normal;
-    FormatsKey formats;
+    std::vector<vk::Format> colorFormats;
+    std::optional<vk::Format> depthFormat;
 
     auto tie() const
     {
-      return std::tuple(dynamicMaterial, static_cast<int>(shaderHookType), formats);
+      return std::tie(dynamicMaterial, shaderHookType, colorFormats, depthFormat);
     }
 
     bool operator<(const PipelineKey& rhs) const
@@ -101,6 +75,12 @@ private:
 
   struct PipelineInstance
   {
+    PipelineInstance() = default;
+    PipelineInstance(PipelineInstance&&) noexcept = default;
+    PipelineInstance& operator=(PipelineInstance&&) = delete;
+
+    // Declaration order is intentional: the pipeline is destroyed before the
+    // shader modules it was created from.
     std::unique_ptr<ZVulkanShader> shader;
     std::unique_ptr<ZVulkanPipeline> pipeline;
   };
@@ -114,7 +94,7 @@ private:
 
   Z3DRendererVulkanBackend& m_backend;
 
-  std::map<PipelineKey, PipelineInstance> m_pipelineCache;
+  std::map<PipelineKey, PipelineInstance> m_pipelines;
 
   size_t m_vertexCount = 0;
   size_t m_indexCount = 0;
@@ -164,7 +144,7 @@ private:
     ClipPlanesState clipPlanes{};
     vk::DeviceSize objectTransformsOffset = 0;
     vk::DeviceSize materialOffset = 0;
-    uint32_t lastSubmissionId = 0;
+    uint64_t lastUniformCacheGeneration = 0;
   };
   struct FrameUboCache
   {
@@ -211,8 +191,7 @@ private:
                           const RenderBatch& batch,
                           const SpherePayload& payload,
                           bool pickingPass);
-  PipelineInstance& ensurePipeline(const PipelineKey& key, const vulkan::AttachmentFormats& formats);
-  vk::PipelineVertexInputStateCreateInfo makeVertexInputState() const;
+  PipelineInstance& ensurePipeline(const PipelineKey& key);
 
   void uploadGeometry(const SpherePayload& payload);
 
@@ -343,13 +322,13 @@ private:
   {
     vk::Pipeline pipeline{};
     vk::PipelineLayout layout{};
-    std::array<vk::DescriptorSet, 3> baseDescriptorSets{};
+    std::array<vk::DescriptorSet, 2> baseDescriptorSets{};
     // Descriptor set generations are included so cached secondary command
     // buffers are rebuilt whenever any bound descriptor set contents change.
     // This avoids executing a secondary recorded against resources that were
     // later destroyed/recreated (a common cause of validation errors like
     // VUID-vkCmdExecuteCommands-pCommandBuffers-00089).
-    std::array<uint64_t, 3> baseDescriptorGenerations{};
+    std::array<uint64_t, 2> baseDescriptorGenerations{};
     bool hasOit = false;
     vk::DescriptorSet oitDescriptorSet{};
     // OIT descriptor-set generation: changes whenever the shared OIT descriptor

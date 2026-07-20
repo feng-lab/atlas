@@ -11,67 +11,110 @@ layout(push_constant) uniform PPLLResolvePC {
 
 #include "include/ppll_common.glslinc"
 
+// Algorithm crossover only: every visible fragment is retained. Insertion sort
+// is efficient for short lists and heapsort bounds the work for long lists.
 const uint kPPLLSmallListInsertionSortThreshold = 32u;
 
-void ppllSwapFragments(uint a, uint b)
+// Invalid depths are excluded from resolve rather than entering an unordered
+// NaN comparison path.
+bool ppllDepthIsValid(float depth)
 {
-  PPLLFragment tmp = ppll_fragments.fragments[a];
-  ppll_fragments.fragments[a] = ppll_fragments.fragments[b];
-  ppll_fragments.fragments[b] = tmp;
+  return !isnan(depth) && !isinf(depth) && depth >= 0.0 && depth <= 1.0;
 }
 
-// Sift-down for a max-heap by depth (larger depth = farther).
-void ppllSiftDown(uint base, uint count, uint root)
+int ppllCompareRecordIndices(uint base, uint lhsRecordIndex, uint rhsRecordIndex)
+{
+  const uint lhsIndex = base + lhsRecordIndex;
+  const uint rhsIndex = base + rhsRecordIndex;
+  const float lhsDepth = ppll_fragments.fragments[lhsIndex].depth;
+  const float rhsDepth = ppll_fragments.fragments[rhsIndex].depth;
+  if (lhsDepth < rhsDepth) {
+    return -1;
+  }
+  if (rhsDepth < lhsDepth) {
+    return 1;
+  }
+
+  // Exact equal-depth fragments have no scene-order key in the PPLL record, so
+  // their compositing order is intentionally unspecified.
+  return 0;
+}
+
+uint ppllLoadSortIndex(uint base, uint slot)
+{
+  return ppll_fragments.fragments[base + slot].sortIndex;
+}
+
+void ppllStoreSortIndex(uint base, uint slot, uint recordIndex)
+{
+  ppll_fragments.fragments[base + slot].sortIndex = recordIndex;
+}
+
+void ppllInsertionSortRecordIndices(uint base, uint count)
+{
+  for (uint i = 1u; i < count; ++i) {
+    const uint keyRecordIndex = ppllLoadSortIndex(base, i);
+    uint j = i;
+    while (j > 0u) {
+      const uint previousRecordIndex = ppllLoadSortIndex(base, j - 1u);
+      if (ppllCompareRecordIndices(base, previousRecordIndex, keyRecordIndex) <= 0) {
+        break;
+      }
+      ppllStoreSortIndex(base, j, previousRecordIndex);
+      --j;
+    }
+    ppllStoreSortIndex(base, j, keyRecordIndex);
+  }
+}
+
+// The semantic color/depth records remain immutable. Heapsort mutates only
+// scalar index workspace and keeps large depth-complexity lists O(n log n).
+void ppllSiftDownSortIndices(uint base, uint count, uint root, uint rootRecordIndex)
 {
   uint i = root;
-  while (true) {
+  const uint firstLeaf = count / 2u;
+  while (i < firstLeaf) {
     const uint left = 2u * i + 1u;
-    if (left >= count) {
-      break;
-    }
-
     const uint right = left + 1u;
-    uint largest = i;
-
-    float largestDepth = ppll_fragments.fragments[base + largest].depth;
-    const float leftDepth = ppll_fragments.fragments[base + left].depth;
-    if (leftDepth > largestDepth) {
-      largest = left;
-      largestDepth = leftDepth;
-    }
+    uint largestChild = left;
+    uint largestChildRecordIndex = ppllLoadSortIndex(base, left);
     if (right < count) {
-      const float rightDepth = ppll_fragments.fragments[base + right].depth;
-      if (rightDepth > largestDepth) {
-        largest = right;
+      const uint rightRecordIndex = ppllLoadSortIndex(base, right);
+      if (ppllCompareRecordIndices(base, largestChildRecordIndex, rightRecordIndex) < 0) {
+        largestChild = right;
+        largestChildRecordIndex = rightRecordIndex;
       }
     }
 
-    if (largest == i) {
+    if (ppllCompareRecordIndices(base, rootRecordIndex, largestChildRecordIndex) >= 0) {
       break;
     }
-    ppllSwapFragments(base + i, base + largest);
-    i = largest;
+    ppllStoreSortIndex(base, i, largestChildRecordIndex);
+    i = largestChild;
+  }
+  ppllStoreSortIndex(base, i, rootRecordIndex);
+}
+
+void ppllHeapSortRecordIndices(uint base, uint count)
+{
+  for (uint i = count / 2u; i > 0u; --i) {
+    const uint root = i - 1u;
+    ppllSiftDownSortIndices(base, count, root, ppllLoadSortIndex(base, root));
+  }
+
+  for (uint end = count - 1u; end > 0u; --end) {
+    const uint maxRecordIndex = ppllLoadSortIndex(base, 0u);
+    const uint replacementRecordIndex = ppllLoadSortIndex(base, end);
+    ppllStoreSortIndex(base, end, maxRecordIndex);
+    ppllSiftDownSortIndices(base, end, 0u, replacementRecordIndex);
   }
 }
 
-// In-place heapsort by depth (ascending: near -> far).
-// This is exact and avoids the O(n^2) worst-case behavior of insertion sort.
-void ppllHeapSortByDepth(uint base, uint count)
+void ppllCompositeFragment(vec4 color, inout vec3 accumRgb, inout float accumAlpha)
 {
-  if (count <= 1u) {
-    return;
-  }
-
-  // Build max-heap.
-  for (uint i = count / 2u; i > 0u; --i) {
-    ppllSiftDown(base, count, i - 1u);
-  }
-
-  // Extract max repeatedly to produce ascending order.
-  for (uint end = count - 1u; end > 0u; --end) {
-    ppllSwapFragments(base, base + end);
-    ppllSiftDown(base, end, 0u);
-  }
+  const float oneMinusA = 1.0 - accumAlpha;
+  accumRgb += color.rgb * oneMinusA;
+  accumAlpha += color.a * oneMinusA;
 }
 
 void main()
@@ -105,6 +148,9 @@ void main()
       clamp(ivec2(gl_FragCoord.xy), ivec2(0), opaqueDepthSize - ivec2(1));
     opaqueDepth = texelFetch(atlas_bindlessSampler2DNearest(pc.opaque_depth_texture), clampedCoord, 0).r;
   }
+  if (!ppllDepthIsValid(opaqueDepth)) {
+    opaqueDepth = 1.0;
+  }
 
   // Guard against out-of-bounds reads if offsets/counts are corrupted.
   const uint capacity = ppll_params.fragmentCapacity;
@@ -123,31 +169,14 @@ void main()
     return;
   }
 
-  // For tiny lists, insertion sort is typically faster; for large depth-complexity
-  // pixels, heapsort avoids quadratic blow-ups that can trigger GPU timeouts.
-  if (count <= kPPLLSmallListInsertionSortThreshold) {
-    for (uint i = 1u; i < count; ++i) {
-      PPLLFragment key = ppll_fragments.fragments[base + i];
-      uint j = i;
-      while (j > 0u && ppll_fragments.fragments[base + (j - 1u)].depth > key.depth) {
-        ppll_fragments.fragments[base + j] = ppll_fragments.fragments[base + (j - 1u)];
-        --j;
-      }
-      ppll_fragments.fragments[base + j] = key;
-    }
-  } else {
-    ppllHeapSortByDepth(base, count);
-  }
-
-  // Compute the number of visible transparent fragments in front of opaqueDepth.
-  // Since the list is sorted near->far, we can stop at the first occluded fragment.
   uint visibleCount = 0u;
-  for (uint i = 0u; i < count; ++i) {
-    const float d = ppll_fragments.fragments[base + i].depth;
-    if (d >= opaqueDepth) {
-      break;
+  for (uint recordIndex = 0u; recordIndex < count; ++recordIndex) {
+    const float depth = ppll_fragments.fragments[base + recordIndex].depth;
+    if (!ppllDepthIsValid(depth) || depth >= opaqueDepth) {
+      continue;
     }
-    visibleCount = i + 1u;
+    ppllStoreSortIndex(base, visibleCount, recordIndex);
+    ++visibleCount;
   }
   if (visibleCount == 0u) {
     FragData0 = vec4(0.0);
@@ -155,16 +184,24 @@ void main()
     return;
   }
 
+  // Sort only scalar indices; color and depth stay immutable. Every valid
+  // visible fragment remains represented exactly once in the workspace.
+  if (visibleCount <= kPPLLSmallListInsertionSortThreshold) {
+    ppllInsertionSortRecordIndices(base, visibleCount);
+  } else {
+    ppllHeapSortRecordIndices(base, visibleCount);
+  }
+
   vec3 accumRgb = vec3(0.0);
   float accumAlpha = 0.0;
-  for (uint i = 0u; i < visibleCount; ++i) {
-    const PPLLFragment frag = ppll_fragments.fragments[base + i];
-    const float oneMinusA = 1.0 - accumAlpha;
-    accumRgb += frag.color.rgb * oneMinusA;
-    accumAlpha += frag.color.a * oneMinusA;
+  for (uint slot = 0u; slot < visibleCount; ++slot) {
+    const uint recordIndex = ppllLoadSortIndex(base, slot);
+    ppllCompositeFragment(ppll_fragments.fragments[base + recordIndex].color,
+                          accumRgb,
+                          accumAlpha);
   }
 
   FragData0 = vec4(accumRgb, accumAlpha);
-  // Nearest visible depth (first element after sort).
-  gl_FragDepth = ppll_fragments.fragments[base].depth;
+  const uint nearestRecordIndex = ppllLoadSortIndex(base, 0u);
+  gl_FragDepth = ppll_fragments.fragments[base + nearestRecordIndex].depth;
 }

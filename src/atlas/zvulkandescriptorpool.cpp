@@ -3,50 +3,44 @@
 #include "zvulkancontext.h"
 #include "zexception.h"
 #include "zlog.h"
-#include <algorithm>
 
 namespace nim {
 
-ZVulkanDescriptorPool::ZVulkanDescriptorPool(ZVulkanDevice& device)
+ZVulkanDescriptorPool::ZVulkanDescriptorPool(ZVulkanDevice& device, ZVulkanDescriptorPoolKind kind)
   : m_device(device)
+  , m_kind(kind)
 {
-  const auto& bindlessCaps = m_device.context().effectiveBindlessSampledImageCapacities();
-  const uint32_t bindlessSum = bindlessCaps.totalSampledImages();
-  CHECK(bindlessSum > 0u) << "Bindless capacities not computed before descriptor pool creation";
-
-  // Pool sizing policy:
-  // - Atlas uses sampled-image descriptors only for the bindless table (set 0).
-  //   Allocate exactly enough for the selected bindless capacities so unexpected
-  //   non-bindless sampled-image usage fails fast.
-  // - Bindless sampler state is provided via immutable samplers. We still
-  //   include the corresponding descriptor type in the pool to satisfy Vulkan's
-  //   allocation accounting for the set layout.
-  const uint32_t sampledImages = bindlessSum;
-  const uint32_t samplers = 3u; // linear clamp + nearest clamp + 3D border-zero clamp
-
-  std::array<vk::DescriptorPoolSize, 6> poolSizes{
-    vk::DescriptorPoolSize{.type = vk::DescriptorType::eUniformBuffer,        .descriptorCount = 1024         },
-    vk::DescriptorPoolSize{.type = vk::DescriptorType::eUniformBufferDynamic, .descriptorCount = 2048         },
-    vk::DescriptorPoolSize{.type = vk::DescriptorType::eSampledImage,         .descriptorCount = sampledImages},
-    vk::DescriptorPoolSize{.type = vk::DescriptorType::eSampler,              .descriptorCount = samplers     },
-    // Add storage buffers for compute workloads (e.g., Block-ID compaction)
-    vk::DescriptorPoolSize{.type = vk::DescriptorType::eStorageBuffer,        .descriptorCount = 1024         },
-    // Add storage images for compute sampling (Block-ID compaction storage image loads)
-    vk::DescriptorPoolSize{.type = vk::DescriptorType::eStorageImage,         .descriptorCount = 2048         },
+  m_device.checkOwnerThread("create ordinary descriptor pool");
+  // Ordinary backend pools contain no sampled-image or sampler descriptors and
+  // deliberately omit eUpdateAfterBind. Only the device-owned bindless pool
+  // consumes the device-global update-after-bind descriptor budget.
+  const std::array<vk::DescriptorPoolSize, 4> poolSizes{
+    vk::DescriptorPoolSize{.type = vk::DescriptorType::eUniformBuffer,
+                           .descriptorCount = ZVulkanDeviceSupport::DescriptorPoolPolicy::kUniformBufferDescriptors},
+    vk::DescriptorPoolSize{.type = vk::DescriptorType::eUniformBufferDynamic,
+                           .descriptorCount =
+                             ZVulkanDeviceSupport::DescriptorPoolPolicy::kUniformBufferDynamicDescriptors          },
+    vk::DescriptorPoolSize{.type = vk::DescriptorType::eStorageBuffer,
+                           .descriptorCount = ZVulkanDeviceSupport::DescriptorPoolPolicy::kStorageBufferDescriptors},
+    vk::DescriptorPoolSize{.type = vk::DescriptorType::eStorageImage,
+                           .descriptorCount = ZVulkanDeviceSupport::DescriptorPoolPolicy::kStorageImageDescriptors },
   };
-  vk::DescriptorPoolCreateFlags flags{};
-  if (m_device.context().supportsDescriptorIndexingSampledImageUpdateAfterBind()) {
-    flags |= vk::DescriptorPoolCreateFlagBits::eUpdateAfterBind;
-  }
-  vk::DescriptorPoolCreateInfo poolInfo{.flags = flags,
-                                        .maxSets = 4096,
+  vk::DescriptorPoolCreateInfo poolInfo{.flags = {},
+                                        .maxSets = ZVulkanDeviceSupport::DescriptorPoolPolicy::kMaxSets,
                                         .poolSizeCount = static_cast<uint32_t>(poolSizes.size()),
                                         .pPoolSizes = poolSizes.data()};
   m_descriptorPool.emplace(m_device.context().device(), poolInfo);
 }
 
+ZVulkanDescriptorPool::~ZVulkanDescriptorPool()
+{
+  m_device.checkOwnerThread("destroy ordinary descriptor pool");
+  m_descriptorPool.reset();
+}
+
 vk::DescriptorSet ZVulkanDescriptorPool::allocateDescriptorSet(vk::DescriptorSetLayout layout)
 {
+  m_device.checkOwnerThread("allocate ordinary descriptor set");
   // Use RAII allocation so we stay in the Hpp/RAII style, but explicitly
   // release ownership so the pool (not the RAII wrapper) owns the lifetime.
   vk::DescriptorSetAllocateInfo ai{.descriptorPool = **m_descriptorPool,
@@ -64,6 +58,8 @@ vk::DescriptorSet ZVulkanDescriptorPool::allocateDescriptorSet(vk::DescriptorSet
 
 void ZVulkanDescriptorPool::reset()
 {
+  m_device.checkOwnerThread("reset transient descriptor pool");
+  CHECK(m_kind == ZVulkanDescriptorPoolKind::Transient) << "Only transient Vulkan descriptor pools may be reset";
   if (m_descriptorPool) {
     m_descriptorPool->reset();
   }

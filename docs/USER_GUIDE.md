@@ -1375,7 +1375,11 @@ For automation or cluster rendering:
    - `--output_tile_size 1024 --output_tile_border 64` (default for 3D animation export)
    - `--output_tile_size 512 --output_tile_border 64` for huge out-of-core or low-VRAM exports where smaller tiles improve page-cache reuse
    - `--limit_memory_usage_in_gb_to 12`
-   - On Linux: `--use_gpu_devices=0,1 --__use_EGL`
+   - On Linux: `--use_gpu_devices=0,1`. With OpenGL these are EGL device IDs and Atlas enables EGL automatically;
+     with Vulkan these are preference-sorted Vulkan device indices and each export worker receives the matching
+     `--atlas_vk_device_index` preference. Otherwise equal-ranked Vulkan adapters use device UUID as a stable final
+     tie-break. Invalid or incompatible values warn and use automatic Vulkan selection, which can place multiple workers
+     on the same adapter.
 4. Monitor CLI logs for progress updates and errors while the export is running.
 5. Atlas exits non-zero if the export reports an error. In headless mode the first rendering/export error aborts the
    export instead of continuing and returning success.
@@ -1400,7 +1404,8 @@ For reproducible still-image capture from saved workspaces:
 3. Optional flags:
    - `--output_tile_size 1024 --output_tile_border 64`
    - `--limit_memory_usage_in_gb_to 12`
-   - On Linux: `--use_gpu_devices=0 --__use_EGL`
+   - On Linux: `--use_gpu_devices=0`. The value selects an EGL device under OpenGL or the preference-sorted Vulkan
+     device under Vulkan; Atlas configures the corresponding backend-specific device flag automatically.
 4. Atlas blocks until deferred `View3DGeneral` and per-object `View3D` scene settings finish applying, then captures
    the image file. There is no scene-apply timeout in this mode; the export does not proceed until the saved scene
    state is fully ready.
@@ -1612,6 +1617,7 @@ Tips
 | “Can not read file ...” | Unsupported format or missing file | Validate path, convert format, or ensure file exists. |
 | Scene load waits indefinitely | 3D window not ready | Watch logs; ensure 3D window is visible. Use `--atlas_block_scene_3d_apply` only when necessary. |
 | 3D window fails to open | GPU initialization error | Update GPU drivers, verify OpenGL/Vulkan support, and check the startup logs for renderer initialization errors. |
+| Runtime switch to Vulkan reports an initialization error | No compatible Vulkan context or device could be created | Atlas keeps OpenGL active and restores the Render Backend selection; review the reported driver/device error before retrying. |
 | Exported animations missing frames | Out-of-disk space or canceled job | Increase disk space, rerun export, check progress log. |
 | Full-resolution render never starts | Insufficient GPU memory or aggressive cuts | Reduce `atlas_image_block_size`, limit visible region, disable other full-res objects. |
 
@@ -1694,7 +1700,9 @@ Use **Help → Shortcuts** in either the 2D or 3D window to open this section di
 | `--output_tile_size`, `--output_tile_border` | Enable tiled rendering for high-resolution outputs. Animation export defaults to `1024`/`64`; use `512`/`64` for huge out-of-core or low-VRAM exports where smaller tiles improve page-cache reuse. Scene export uses its built-in still-image defaults unless either flag is provided explicitly. |
 | `--limit_memory_usage_in_gb_to` | Cap GPU memory usage (GB). |
 | `--atlas_vk_residency_budget_bytes` | Strict byte cap for Atlas-owned Vulkan device-local residency. When set, Atlas keeps each existing Vulkan pass hot set within the cap by making needed resources resident and evicting cold backing at safe points; paged image caches are sized from the effective Vulkan budget rather than uncapped physical VRAM. If one required pass working set exceeds the cap, export fails with a memory diagnostic instead of allocating past the cap. |
-| `--use_gpu_devices` | Specify comma-separated GPU indices (Linux), for example `0,1`. |
+| `--atlas_vk_device_index` | Prefer a Vulkan adapter by its preference-sorted startup index; `-1` uses automatic selection. Otherwise equal-ranked adapters use device UUID as the stable final tie-break. Atlas uses a compatible preferred adapter exactly. Invalid, out-of-range, or incompatible values log a warning and fall back to the first fully compatible Vulkan adapter. |
+| `--atlas_perf_mode` | Vulkan performance collection mode: `off` disables collector timing/scopes/output while retaining the render-frame identity required for resource and presentation ordering; `light` records top-level submission/pass metrics (default), and `full` also records nested GPU scopes. |
+| `--use_gpu_devices` | Specify comma-separated backend device indices for Linux headless export, for example `0,1`. OpenGL values are EGL device IDs; Vulkan values are preference-sorted Vulkan indices and are passed to workers as `--atlas_vk_device_index` preferences. Rejected Vulkan preferences warn and use automatic selection, which can place multiple workers on the same adapter. Scene export accepts exactly one value. |
 | `--__use_EGL` | Force EGL context creation (Linux headless). |
 | `--v=LEVEL` | Adjust log verbosity; `--v=1` prints additional diagnostics. |
 

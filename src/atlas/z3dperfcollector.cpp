@@ -64,10 +64,27 @@ ABSL_FLAG(bool,
 
 namespace nim {
 
+namespace {
+
+inline constexpr char kPerfFrameSchema[] = "atlas.perf.frame";
+inline constexpr uint64_t kPerfFrameSchemaVersion = 1u;
+
+} // namespace
+
 Z3DPerfCollector& Z3DPerfCollector::instance()
 {
   static Z3DPerfCollector inst;
   return inst;
+}
+
+bool Z3DPerfCollector::enabled()
+{
+  return absl::GetFlag(FLAGS_atlas_perf_mode) != PerfMode::Off;
+}
+
+bool Z3DPerfCollector::nestedGpuScopesEnabled()
+{
+  return absl::GetFlag(FLAGS_atlas_perf_mode) == PerfMode::Full;
 }
 
 void Z3DPerfCollector::addSubmission(uint64_t token,
@@ -213,6 +230,7 @@ void Z3DPerfCollector::flush(uint64_t token)
       cpuByLabel[s.label] += s.ms;
     }
     agg.drawsSubmitted += sub.stats.drawsSubmitted;
+    agg.fenceWaits += sub.stats.fenceWaits;
     agg.descriptorSetsAllocated += sub.stats.descriptorSetsAllocated;
     agg.pipelinesCreated += sub.stats.pipelinesCreated;
     agg.pipelinesBoundCount += sub.stats.pipelinesBoundCount;
@@ -334,12 +352,15 @@ void Z3DPerfCollector::flush(uint64_t token)
   }
 
   // One-line frame summary: include concise stats instead of a second line
-  std::string stats = fmt::format(" | stats: draws={} upload_hi={}B ubo_hi={}B static_staged={}B rb={}B",
-                                  agg.drawsSubmitted,
-                                  agg.uploadHighWatermarkBytes,
-                                  agg.uniformHighWatermarkBytes,
-                                  agg.staticBytesStaged,
-                                  agg.readbackBytesCopied);
+  std::string stats =
+    fmt::format(" | stats: submissions={} waits={} draws={} upload_hi={}B ubo_hi={}B static_staged={}B rb={}B",
+                td.submissions.size(),
+                agg.fenceWaits,
+                agg.drawsSubmitted,
+                agg.uploadHighWatermarkBytes,
+                agg.uniformHighWatermarkBytes,
+                agg.staticBytesStaged,
+                agg.readbackBytesCopied);
   stats += fmt::format(
     " dsets={} pipes+={} bound={} segs={} clr={} ld={} dwr={} rew={} sec2=a{} f{} m{} h{} b{} e{} mask=0x{:x}",
     agg.descriptorSetsAllocated,
@@ -618,7 +639,7 @@ void Z3DPerfCollector::flush(uint64_t token)
         std::ofstream ofs = openOFStream(outFilename, std::ios::binary | std::ios::app);
         if (!exists) {
           ofs
-            << "frame,cpu_ms,gpu_ms,top1_label,top1_ms,top1_pct,top2_label,top2_ms,top2_pct,top3_label,top3_ms,top3_pct,top4_label,top4_ms,top4_pct,top5_label,top5_ms,top5_pct,upload_hi,static_staged,readback,all_ms,all_samples,dsets,pipes_created,pipes_bound,segs,clears,loads,dwr,rew\n";
+            << "frame,cpu_ms,gpu_ms,top1_label,top1_ms,top1_pct,top2_label,top2_ms,top2_pct,top3_label,top3_ms,top3_pct,top4_label,top4_ms,top4_pct,top5_label,top5_ms,top5_pct,upload_hi,static_staged,readback,all_ms,all_samples,dsets,pipes_created,pipes_bound,segs,clears,loads,dwr,rew,submissions,fence_waits\n";
         }
         auto getTop = [&](size_t i) {
           if (i < sortedGpu.size()) {
@@ -631,7 +652,7 @@ void Z3DPerfCollector::flush(uint64_t token)
           return (totalGpuMs > 0.0) ? (ms * 100.0 / totalGpuMs) : 0.0;
         };
         ofs << fmt::format(
-          "{}, {:.3f}, {:.3f}, {}, {:.3f}, {:.0f}, {}, {:.3f}, {:.0f}, {}, {:.3f}, {:.0f}, {}, {:.3f}, {:.0f}, {}, {:.3f}, {:.0f}, {}, {}, {}, {:.3f}, {}, {}, {}, {}, {}, {}, {}, {}, {}\n",
+          "{}, {:.3f}, {:.3f}, {}, {:.3f}, {:.0f}, {}, {:.3f}, {:.0f}, {}, {:.3f}, {:.0f}, {}, {:.3f}, {:.0f}, {}, {:.3f}, {:.0f}, {}, {}, {}, {:.3f}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}\n",
           token,
           totalCpuMs,
           totalGpuMs,
@@ -662,10 +683,14 @@ void Z3DPerfCollector::flush(uint64_t token)
           agg.attachmentClears,
           agg.attachmentLoads,
           agg.descriptorWritesWhileRecording,
-          agg.boundSetRewriteAttempts);
+          agg.boundSetRewriteAttempts,
+          td.submissions.size(),
+          agg.fenceWaits);
         ofs.close();
       } else if (fmtKind == "json") {
         json::object jo;
+        jo["schema"] = kPerfFrameSchema;
+        jo["schema_version"] = kPerfFrameSchemaVersion;
         jo["frame"] = token;
         jo["cpu_ms"] = totalCpuMs;
         jo["gpu_ms"] = totalGpuMs;
@@ -689,6 +714,8 @@ void Z3DPerfCollector::flush(uint64_t token)
         st["cones_staged"] = agg.conesBytesStaged;
         st["ellipsoids_staged"] = agg.ellipsoidsBytesStaged;
         st["readback"] = agg.readbackBytesCopied;
+        st["submissions"] = td.submissions.size();
+        st["fence_waits"] = agg.fenceWaits;
         st["all_ms"] = agg.allMaxMs;
         st["all_samples"] = agg.allSamples;
         st["descriptor_sets"] = agg.descriptorSetsAllocated;

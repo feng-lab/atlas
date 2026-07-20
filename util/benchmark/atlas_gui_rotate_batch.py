@@ -47,6 +47,8 @@ INJECT_SCRIPT = SCRIPT_DIR / "macos_gui_drag_benchmark.py"
 SUMMARIZE_SCRIPT = SCRIPT_DIR / "summarize_gui_capture_fps.py"
 BUILD_CAPTURE_SCRIPT = SCRIPT_DIR / "build_macos_window_capture_sckit.sh"
 HOME = Path.home()
+GLOBAL_RENDER_BACKEND_JSON_KEY = "Render Backend StringIntOption"
+BACKEND_DISPLAY_NAMES = {"opengl": "OpenGL", "vulkan": "Vulkan"}
 
 
 @dataclass(frozen=True)
@@ -100,6 +102,21 @@ def _parse_args() -> argparse.Namespace:
             / "MacOS"
             / "Atlas"
         ),
+    )
+    parser.add_argument(
+        "--backend",
+        choices=("opengl", "vulkan"),
+        default=None,
+        help=(
+            "Optional Atlas render backend override. When omitted, preserve the user's "
+            "current Atlas default."
+        ),
+    )
+    parser.add_argument(
+        "--extra-atlas-arg",
+        action="append",
+        default=[],
+        help="Additional raw argument appended to the Atlas launch command; repeat as needed.",
     )
     parser.add_argument("--address", default="localhost:50051")
     parser.add_argument(
@@ -356,16 +373,88 @@ def _launch_atlas(
 ) -> tuple[subprocess.Popen[str], Path]:
     launch_log_path = run_dir / "atlas_launch.log"
     launch_log = launch_log_path.open("w", encoding="utf-8")
+    command = [
+        str(Path(args.atlas_binary).resolve()),
+        "--atlas_log_benchmark_render_timings",
+    ]
+    command.extend(args.extra_atlas_arg)
+    if args.backend is not None:
+        # The harness-owned backend is authoritative even if unrestricted
+        # extra args contain another backend flag.
+        command.append(f"--atlas_default_render_backend={args.backend}")
+    (run_dir / "atlas_launch.json").write_text(
+        json.dumps(
+            {
+                "backend_override": args.backend,
+                "extra_atlas_args": args.extra_atlas_arg,
+                "command": command,
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
     process = subprocess.Popen(
-        [
-            str(Path(args.atlas_binary).resolve()),
-            "--atlas_log_benchmark_render_timings",
-        ],
+        command,
         stdout=launch_log,
         stderr=subprocess.STDOUT,
         text=True,
     )
     return process, launch_log_path
+
+
+def _verify_effective_backend(
+    client: SceneClient, requested_backend: str | None, run_dir: Path
+) -> dict[str, Any]:
+    status: dict[str, Any] = {
+        "requested_backend": requested_backend,
+        "expected_value": BACKEND_DISPLAY_NAMES.get(requested_backend),
+        "effective_value": None,
+        "readback_succeeded": False,
+        "matches_requested": None,
+        "verified": False,
+        "source": "SceneClient.GetParamValues(global Render Backend)",
+    }
+    try:
+        values = client.get_param_values(
+            id=3, json_keys=[GLOBAL_RENDER_BACKEND_JSON_KEY]
+        )
+        effective = values.get(GLOBAL_RENDER_BACKEND_JSON_KEY)
+        if effective not in BACKEND_DISPLAY_NAMES.values():
+            raise RuntimeError(
+                f"authoritative global backend value is missing or invalid: {effective!r}"
+            )
+        status["effective_value"] = effective
+        status["readback_succeeded"] = True
+    except Exception as exc:
+        status["error"] = f"{type(exc).__name__}: {exc}"
+        (run_dir / "backend_status.json").write_text(
+            json.dumps(status, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
+        if requested_backend is not None:
+            raise RuntimeError(
+                "Could not verify the effective Atlas render backend from the "
+                f"structured global parameter readback: {exc}"
+            ) from exc
+        return status
+
+    expected = status["expected_value"]
+    status["matches_requested"] = (
+        None if expected is None else status["effective_value"] == expected
+    )
+    status["verified"] = status["readback_succeeded"] and (
+        status["matches_requested"] is not False
+    )
+    (run_dir / "backend_status.json").write_text(
+        json.dumps(status, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    if status["matches_requested"] is False:
+        raise RuntimeError(
+            f"Requested Atlas backend {expected}, but authoritative readback reports "
+            f"{status['effective_value']}; refusing to label a fallback as {expected}"
+        )
+    return status
 
 
 def _object_ids(list_objects_response: Any) -> list[int]:
@@ -624,7 +713,11 @@ def _load_rotate_metrics(summary_path: Path) -> dict[str, Any]:
     raise RuntimeError(f"rotate action not found in {summary_path}")
 
 
-def _aggregate_runs(artifacts: list[RunArtifacts], output_dir: Path) -> None:
+def _aggregate_runs(
+    artifacts: list[RunArtifacts],
+    output_dir: Path,
+    backend_status: dict[str, Any],
+) -> None:
     measured = [artifact for artifact in artifacts if artifact.kind == "measured"]
     metrics_by_name: dict[str, list[float]] = {
         "changed_samples_per_second": [],
@@ -656,6 +749,7 @@ def _aggregate_runs(artifacts: list[RunArtifacts], output_dir: Path) -> None:
                 metrics_by_name[name].append(float(value))
 
     aggregate = {
+        "backend": backend_status,
         "measured_run_count": len(measured),
         "metrics": {name: _stats(values) for name, values in metrics_by_name.items()},
         "per_run": per_run,
@@ -670,6 +764,10 @@ def _aggregate_runs(artifacts: list[RunArtifacts], output_dir: Path) -> None:
         "# Atlas GUI Rotate Benchmark Summary",
         "",
         f"Measured runs: {len(measured)}",
+        "",
+        f"Backend: requested={backend_status.get('requested_backend')!r}, "
+        f"effective={backend_status.get('effective_value')!r}, "
+        f"verified={backend_status.get('verified')}",
         "",
         "| Metric | Count | Mean | Median | Std | Min | Max | P95 |",
         "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
@@ -717,6 +815,11 @@ def main() -> int:
     bootstrap_dir.mkdir(parents=True, exist_ok=True)
     process, launch_log_path = _launch_atlas(args, bootstrap_dir)
     artifacts: list[RunArtifacts] = []
+    backend_status: dict[str, Any] = {
+        "requested_backend": args.backend,
+        "effective_value": None,
+        "verified": False,
+    }
     client: SceneClient | None = None
     try:
         deadline = time.monotonic() + args.launch_timeout_seconds
@@ -734,6 +837,7 @@ def main() -> int:
             time.sleep(0.25)
         client = SceneClient(address=args.address)
         _wait_for_rpc_ready(client, args.launch_timeout_seconds)
+        backend_status = _verify_effective_backend(client, args.backend, bootstrap_dir)
         atlas_log_path = _wait_for_new_atlas_log(
             args.atlas_log_path,
             preexisting_logs=preexisting_logs,
@@ -804,7 +908,7 @@ def main() -> int:
                 )
             )
 
-        _aggregate_runs(artifacts, output_root / "aggregate")
+        _aggregate_runs(artifacts, output_root / "aggregate", backend_status)
         return 0
     finally:
         _terminate_process(process)

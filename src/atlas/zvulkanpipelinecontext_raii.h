@@ -47,6 +47,8 @@ struct ZVulkanComputePassSpec
   const vk::raii::PipelineLayout* pipelineLayout{nullptr};
   std::span<const vk::DescriptorSet> descriptorSets{};
   std::span<const uint32_t> dynamicOffsets{};
+  // Exclusive descriptor-set-index upper bound, not a requirement that every
+  // lower-numbered set be bound when its shaders do not statically use it.
   std::optional<uint32_t> expectedDescriptorSetCount{};
   uint32_t descriptorSetFirst{0};
   std::span<const ZVulkanDescriptorBindInfo> extraDescriptorBinds{};
@@ -85,6 +87,8 @@ struct ZVulkanGraphicsDrawSpec
 
   std::span<const vk::DescriptorSet> descriptorSets{};
   std::span<const uint32_t> dynamicOffsets{};
+  // Exclusive descriptor-set-index upper bound, not a requirement that every
+  // lower-numbered set be bound when its shaders do not statically use it.
   std::optional<uint32_t> expectedDescriptorSetCount{};
   uint32_t descriptorSetFirst{0};
   std::span<const ZVulkanDescriptorBindInfo> extraDescriptorBinds{};

@@ -531,7 +531,7 @@ void ZVulkanResidencyManager::reclaimBeforeManagedTextureAllocation(ResourceClas
           retryPressure.reclaimBytes,
           inFlightBefore,
           reason.empty() ? "<unspecified>" : std::string(reason));
-        m_device.frameExecutor().waitForAllInFlight();
+        (void)m_device.waitForAllFramesAndDrainBindlessRetirements();
         waitedForCompletion = true;
         pressure = allocationPressureFor(allocationBytes);
         if (!pressure.needsReclaim()) {

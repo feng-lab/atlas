@@ -33,6 +33,7 @@
 #include "z3dmeshfilter.h"
 #include "zcancellation.h"
 #include "zcpuinfo.h"
+#include "zexception.h"
 #include "z3dperfcollector.h"
 #include "zabslflagtypes.h"
 #include "zqtexecutor.h"
@@ -93,7 +94,8 @@ ABSL_FLAG(nim::RenderBackend,
           atlas_default_render_backend,
           nim::RenderBackend::OpenGL,
           "Default 3D rendering backend at startup. Values: opengl, vulkan. "
-          "This sets the initial value of the 'Render Backend' global parameter; it can be changed in the UI.");
+          "This sets only the initial value of the 'Render Backend' global parameter; runtime controls such as the UI "
+          "or an animation may change it later.");
 
 ABSL_FLAG(bool,
           atlas_log_benchmark_render_timings,
@@ -535,17 +537,26 @@ void Z3DRenderingEngine::CheckOpenGLStateFilterWrapper::warn(const Z3DFilter* p,
 
 void Z3DRenderingEngine::ProfileFilterWrapper::afterFilterProcess(const Z3DFilter* p)
 {
+  if (!Z3DPerfCollector::enabled()) {
+    return;
+  }
   m_benchTimer.recordEvent(p->className().toStdString());
 }
 
 void Z3DRenderingEngine::ProfileFilterWrapper::beforeNetworkProcess()
 {
-  const uint64_t token = Z3DRenderGlobalState::instance().currentPerfFrameToken();
+  if (!Z3DPerfCollector::enabled()) {
+    return;
+  }
+  const uint64_t token = Z3DRenderGlobalState::instance().currentRenderFrameToken();
   m_benchTimer.resetAndStart(fmt::format("Network [frame#{}]", token));
 }
 
 void Z3DRenderingEngine::ProfileFilterWrapper::afterNetworkProcess()
 {
+  if (!Z3DPerfCollector::enabled()) {
+    return;
+  }
   STOP_AND_LOG(m_benchTimer)
 }
 
@@ -809,8 +820,14 @@ void Z3DRenderingEngine::takeFixedSizeScreenShot(const QString& filename,
   });
   try {
     const auto token = captureCancellationSource->getToken();
-    takeFixedSizeScreenShotWithoutResetCanvasSizePrivate(
-      filename, width, height, sst, true, token, tileSize, tileBorder);
+    takeFixedSizeScreenShotWithoutResetCanvasSizePrivate(filename,
+                                                         width,
+                                                         height,
+                                                         sst,
+                                                         true,
+                                                         token,
+                                                         tileSize,
+                                                         tileBorder);
     Q_EMIT progressChanged(98);
   }
   catch (const ZCancellationException&) {
@@ -1228,7 +1245,6 @@ void Z3DRenderingEngine::init()
       // Reset partially-initialized Vulkan state so a later backend switch can retry cleanly.
       m_vkDevice.reset();
       m_vkContext.reset();
-
       startupBackend = RenderBackend::OpenGL;
     }
   }
@@ -1655,10 +1671,13 @@ Z3DRenderingEngine::processFrame(bool stereo, bool progressiveRendering, folly::
 
   getGLFocus();
 
-  // Mark the start of a new user-visible frame for perf aggregation.
-  Z3DRenderGlobalState::instance().beginNewPerfFrameToken();
+  // Render identity remains active in perf mode `off`: asynchronous readback
+  // publication and PPLL resource selection both depend on it. Only Vulkan
+  // light/full frames are registered with the performance collector.
   auto& renderState = Z3DRenderGlobalState::instance();
-  const uint64_t perfFrameToken = renderState.currentPerfFrameToken();
+  const bool collectPerf = !glMode && Z3DPerfCollector::enabled();
+  const uint64_t renderFrameToken = renderState.beginNewRenderFrameToken(collectPerf);
+  const uint64_t perfFrameToken = collectPerf ? renderFrameToken : 0u;
   auto closePerfTokenGuard = folly::makeGuard([perfFrameToken]() {
     // Progressive rendering is intentionally interruptible: deep render loops
     // (raycaster paging, compaction, etc.) poll the cancellation token and can
@@ -1666,7 +1685,9 @@ Z3DRenderingEngine::processFrame(bool stereo, bool progressiveRendering, folly::
     // on exceptional exits, Z3DPerfCollector will observe an "open" token and
     // refuse to flush later ones (ordered summaries), making perf logs appear
     // to never trigger.
-    nim::Z3DPerfCollector::instance().markClosed(perfFrameToken);
+    if (perfFrameToken != 0u) {
+      nim::Z3DPerfCollector::instance().markClosed(perfFrameToken);
+    }
   });
 
   // Notify filter wrappers (now that token is available for tagging).
@@ -2668,24 +2689,55 @@ void Z3DRenderingEngine::handleRenderBackendChanged()
   }
 }
 
+void Z3DRenderingEngine::recoverFromVulkanInitializationFailure(const QString& error)
+{
+  CHECK(QThread::currentThread() == thread()) << "Vulkan initialization recovery must run on the rendering thread";
+  CHECK(m_globalParas != nullptr);
+  CHECK(m_compositor != nullptr);
+  CHECK(m_compositor->rendererBase().activeBackend() == RenderBackend::OpenGL)
+    << "Failed Vulkan initialization can only recover while OpenGL is still active";
+  CHECK(m_vkDevice == nullptr) << "Vulkan initialization reported failure after publishing a device";
+
+  // Restore the source of truth before logging or emitting the user-facing
+  // error, because those callbacks may immediately inspect engine parameters.
+  m_globalParas->restoreOpenGLAfterFailedVulkanInitialization();
+  LOG(ERROR) << error;
+  reportRenderingError(error);
+  QCoreApplication::postEvent(this, new QEvent(QEvent::UpdateRequest), Qt::LowEventPriority);
+}
+
 void Z3DRenderingEngine::applyBackendSwitch()
 {
   VLOG(1) << "Entering applyBackendSwitch";
-  stopVulkanCompletionPolling();
-  // Deferred render requests are tied to the previous Vulkan backend state.
-  // Drop any queued Vulkan backpressure work before rebuilding backend-owned
-  // resources so a stale deferred event cannot fire after the switch.
-  m_vkDeferredRenderEventType.reset();
   auto resetScheduleGuard = folly::makeGuard([this]() {
     m_backendSwitchScheduled = false;
   });
 
   const auto backend = static_cast<RenderBackend>(m_globalParas->renderBackend.associatedData());
   std::scoped_lock lock(targetSwitchMutex());
-  VLOG(1) << fmt::format("Switching rendering backend to {}", enumToString(backend));
+  const RenderBackend sourceBackend = m_compositor->rendererBase().activeBackend();
+  CHECK(backend == RenderBackend::OpenGL || backend == RenderBackend::Vulkan);
+  CHECK(sourceBackend == RenderBackend::OpenGL || sourceBackend == RenderBackend::Vulkan);
+  if (backend == sourceBackend) {
+    VLOG(1) << "Requested rendering backend is already active";
+    // A queued switch can coalesce OpenGL->Vulkan->OpenGL while the first
+    // request cancels an active render. Resume that render even though no
+    // backend resources need to change.
+    QCoreApplication::postEvent(this, new QEvent(QEvent::UpdateRequest), Qt::LowEventPriority);
+    return;
+  }
+
+  stopVulkanCompletionPolling();
+  // Deferred render requests are tied to the previous Vulkan backend state.
+  // Drop any queued Vulkan backpressure work before rebuilding backend-owned
+  // resources so a stale deferred event cannot fire after the switch.
+  m_vkDeferredRenderEventType.reset();
+  VLOG(1) << fmt::format("Switching rendering backend to {}", enumToStringOr(backend, "<unknown>"));
 
   if (backend == RenderBackend::OpenGL) {
     // If switching away from Vulkan, ensure the GPU is idle before destroying scratch resources
+    CHECK(sourceBackend == RenderBackend::Vulkan);
+    CHECK(m_vkDevice != nullptr) << "Active Vulkan backend has no Vulkan device";
     VLOG(1) << "Waiting for Vulkan device to become idle before switching to OpenGL";
     try {
       m_vkDevice->context().device().waitIdle();
@@ -2717,9 +2769,12 @@ void Z3DRenderingEngine::applyBackendSwitch()
         m_vkContext = std::make_unique<ZVulkanContext>();
       }
       catch (const std::exception& e) {
-        const auto errorMsg = fmt::format("Failed to create Vulkan context: {}", e.what());
-        LOG(ERROR) << errorMsg;
-        reportRenderingError(errorMsg);
+        recoverFromVulkanInitializationFailure(
+          QString::fromStdString(fmt::format("Failed to create Vulkan context: {}", e.what())));
+        return;
+      }
+      catch (...) {
+        recoverFromVulkanInitializationFailure(QStringLiteral("Failed to create Vulkan context: unknown exception"));
         return;
       }
       VLOG(1) << "Vulkan context created";
@@ -2732,9 +2787,17 @@ void Z3DRenderingEngine::applyBackendSwitch()
         m_vkDevice = m_vkContext->createDevice();
       }
       catch (const std::exception& e) {
-        const auto errorMsg = fmt::format("Failed to create Vulkan device: {}", e.what());
-        LOG(ERROR) << errorMsg;
-        reportRenderingError(errorMsg);
+        recoverFromVulkanInitializationFailure(
+          QString::fromStdString(fmt::format("Failed to create Vulkan device: {}", e.what())));
+        return;
+      }
+      catch (...) {
+        recoverFromVulkanInitializationFailure(QStringLiteral("Failed to create Vulkan device: unknown exception"));
+        return;
+      }
+      if (!m_vkDevice) {
+        recoverFromVulkanInitializationFailure(
+          QStringLiteral("Failed to create Vulkan device: device creation returned no device"));
         return;
       }
       VLOG(1) << "Vulkan device created";
@@ -2792,7 +2855,7 @@ void Z3DRenderingEngine::applyBackendSwitch()
   // that all filters have switched away from Vulkan, it is safe to force-flush
   // any closed tokens to prevent incomplete tokens (e.g. dropped submissions)
   // from blocking ordered summaries in subsequent frames.
-  if (backend == RenderBackend::OpenGL) {
+  if (sourceBackend == RenderBackend::Vulkan) {
     Z3DPerfCollector::instance().maybeFlush(true);
   }
 
@@ -2800,7 +2863,17 @@ void Z3DRenderingEngine::applyBackendSwitch()
   VLOG(1) << "Resetting scratch pool state after backend switch";
   m_scratchPool->reset();
   m_scratchPool->setDefaultBackend(backend);
-  VLOG(1) << fmt::format("Scratch pool default backend set to {}", enumToString(backend));
+  VLOG(1) << fmt::format("Scratch pool default backend set to {}", enumToStringOr(backend, "<unknown>"));
+
+  if (sourceBackend == RenderBackend::Vulkan) {
+    CHECK(m_vkDevice != nullptr);
+    // Replacing the Vulkan backends and resetting the scratch pool can destroy
+    // registered textures after each backend's pre-switch drain. No Vulkan
+    // frame will consume those new retirements while OpenGL remains active, so
+    // finish them at this final device-wide descriptor-mutation safe point.
+    CHECK(m_vkDevice->waitForAllFramesAndDrainBindlessRetirements())
+      << "Vulkan-to-OpenGL switch left a command buffer recording during the final bindless retirement drain";
+  }
 
   if (backend == RenderBackend::Vulkan) {
     // Drop any cached GL shaders tied to the current GL context before
@@ -2825,7 +2898,7 @@ void Z3DRenderingEngine::applyBackendSwitch()
   VLOG(1) << "Backend switch state reset; requesting update";
 
   QCoreApplication::postEvent(this, new QEvent(QEvent::UpdateRequest), Qt::LowEventPriority);
-  VLOG(1) << fmt::format("Backend switch to {} complete; update event posted", enumToString(backend));
+  VLOG(1) << fmt::format("Backend switch to {} complete; update event posted", enumToStringOr(backend, "<unknown>"));
 }
 
 void Z3DRenderingEngine::pollVulkanCompletionsOnce()
@@ -3015,50 +3088,6 @@ void Z3DRenderingEngine::maybeKickDeferredRenderAfterVulkanPoll()
   const QEvent::Type type = *m_vkDeferredRenderEventType;
   m_vkDeferredRenderEventType.reset();
   QCoreApplication::postEvent(this, new QEvent(type), Qt::LowEventPriority);
-}
-
-bool Z3DRenderingEngine::switchVulkanDeviceIndex(int index)
-{
-  if (!m_vkContext || !m_vkDevice) {
-    LOG(ERROR) << "Vulkan not initialized; cannot switch device";
-    return false;
-  }
-  // Ensure GPU idle
-  try {
-    m_vkContext->device().waitIdle();
-  }
-  catch (const std::exception& e) {
-    LOG(WARNING) << "Vulkan waitIdle failed before device switch: " << e.what();
-  }
-
-  if (index < 0) {
-    LOG(ERROR) << "Invalid Vulkan device index (<0)";
-    return false;
-  }
-
-  const size_t idx = static_cast<size_t>(index);
-  if (!m_vkContext->setSelectedDeviceIndex(idx)) {
-    return false;
-  }
-
-  // Recreate wrapper and wire into scratch pool
-  m_vkDevice.reset();
-  try {
-    m_vkDevice = m_vkContext->createDevice();
-  }
-  catch (const std::exception& e) {
-    LOG(ERROR) << "Failed to recreate Vulkan device wrapper: " << e.what();
-    return false;
-  }
-  if (m_scratchPool) {
-    m_scratchPool->setVulkanDevice(m_vkDevice.get());
-  }
-
-  updateGenericGpuInfoFromVulkanPhysicalDevice(m_vkContext->physicalDevice());
-
-  m_vkContext->logGpuInfo();
-
-  return true;
 }
 
 } // namespace nim

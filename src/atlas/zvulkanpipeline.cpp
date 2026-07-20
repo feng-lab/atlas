@@ -17,9 +17,25 @@ ZVulkanPipeline::ZVulkanPipeline(ZVulkanDevice& device,
                                  const vk::PrimitiveTopology& topology)
   : m_device(device)
   , m_shader(shader)
-  , m_vertexInputInfo(vertexInputInfo)
   , m_topology(topology)
-{}
+{
+  CHECK(vertexInputInfo.pNext == nullptr)
+    << "ZVulkanPipeline requires an owning vertex-input description without a pNext chain";
+  CHECK(vertexInputInfo.vertexBindingDescriptionCount == 0 || vertexInputInfo.pVertexBindingDescriptions != nullptr)
+    << "ZVulkanPipeline vertex binding count requires binding descriptions";
+  CHECK(vertexInputInfo.vertexAttributeDescriptionCount == 0 || vertexInputInfo.pVertexAttributeDescriptions != nullptr)
+    << "ZVulkanPipeline vertex attribute count requires attribute descriptions";
+  m_vertexInputFlags = vertexInputInfo.flags;
+  if (vertexInputInfo.vertexBindingDescriptionCount > 0) {
+    m_vertexBindings.assign(vertexInputInfo.pVertexBindingDescriptions,
+                            vertexInputInfo.pVertexBindingDescriptions + vertexInputInfo.vertexBindingDescriptionCount);
+  }
+  if (vertexInputInfo.vertexAttributeDescriptionCount > 0) {
+    m_vertexAttributes.assign(vertexInputInfo.pVertexAttributeDescriptions,
+                              vertexInputInfo.pVertexAttributeDescriptions +
+                                vertexInputInfo.vertexAttributeDescriptionCount);
+  }
+}
 
 void ZVulkanPipeline::setDescriptorSetLayouts(const std::vector<vk::DescriptorSetLayout>& layouts)
 {
@@ -189,11 +205,17 @@ void ZVulkanPipeline::create()
     .blendConstants = std::array<float, 4>{0.0f, 0.0f, 0.0f, 0.0f}
   };
 
-  std::array<vk::DynamicState, 2> dynFixed = {vk::DynamicState::eViewport, vk::DynamicState::eScissor};
   // Do not use VK_EXT_vertex_input_dynamic_state; rely on static vertex input descriptions.
-  const vk::DynamicState* dynPtr = dynFixed.data();
-  const uint32_t dynCount = static_cast<uint32_t>(dynFixed.size());
-  vk::PipelineDynamicStateCreateInfo dynamicState{.dynamicStateCount = dynCount, .pDynamicStates = dynPtr};
+  const std::array dynamicStates{vk::DynamicState::eViewport, vk::DynamicState::eScissor};
+  vk::PipelineDynamicStateCreateInfo dynamicState{.dynamicStateCount = static_cast<uint32_t>(dynamicStates.size()),
+                                                  .pDynamicStates = dynamicStates.data()};
+
+  vk::PipelineVertexInputStateCreateInfo vertexInputInfo{};
+  vertexInputInfo.flags = m_vertexInputFlags;
+  vertexInputInfo.vertexBindingDescriptionCount = static_cast<uint32_t>(m_vertexBindings.size());
+  vertexInputInfo.pVertexBindingDescriptions = m_vertexBindings.empty() ? nullptr : m_vertexBindings.data();
+  vertexInputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(m_vertexAttributes.size());
+  vertexInputInfo.pVertexAttributeDescriptions = m_vertexAttributes.empty() ? nullptr : m_vertexAttributes.data();
 
   const auto& shaderStages = m_shader.shaderStages();
 
@@ -207,7 +229,7 @@ void ZVulkanPipeline::create()
   vk::GraphicsPipelineCreateInfo pipelineInfo{.pNext = &renderingCreateInfo,
                                               .stageCount = static_cast<uint32_t>(shaderStages.size()),
                                               .pStages = shaderStages.data(),
-                                              .pVertexInputState = &m_vertexInputInfo,
+                                              .pVertexInputState = &vertexInputInfo,
                                               .pInputAssemblyState = &inputAssembly,
                                               .pTessellationState = nullptr,
                                               .pViewportState = &viewportState,

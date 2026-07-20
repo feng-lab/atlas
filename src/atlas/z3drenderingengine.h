@@ -285,12 +285,6 @@ public:
     Q_EMIT renderingError(QString(error));
   }
 
-  // Switch Vulkan physical device at runtime by sorted index. Recreates the
-  // logical device and updates dependent components (scratch pool, caps).
-  // Returns true on success. Call at a safe point (no in-flight rendering);
-  // the engine will wait idle on the old device before switching.
-  bool switchVulkanDeviceIndex(int index);
-
   void reportCancelError() const
   {
     Q_EMIT renderingError("cancelled");
@@ -394,6 +388,7 @@ private:
 
   void ensureGLContext();
   // Vulkan init deferred
+  void recoverFromVulkanInitializationFailure(const QString& error);
 
   void rotateX();
 
@@ -560,8 +555,6 @@ private:
   int m_sceneApplyOutstanding = 0;
 
   // (m_observedWGs and m_shuttingDown declared above to ensure lifetime beyond compositor)
-
-
 };
 
 } // namespace nim

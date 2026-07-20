@@ -400,7 +400,7 @@ void ZVulkanLinePipelineContext::updateUBOs(Z3DRendererBase& renderer,
   void* frameKey = m_backend.activeFrameKey();
   CHECK(frameKey != nullptr) << "Line updateUBOs called without an active Vulkan frame-slot key";
   if (payload.streamKey != 0) {
-    const uint32_t submissionId = m_backend.activeSubmissionId();
+    const uint64_t cacheGeneration = m_backend.activeUniformCacheGeneration();
     FrameUboCache& frameCache = m_uboCacheByFrameKey[frameKey];
     auto& entries = frameCache.byStream[payload.streamKey];
     UboCacheEntry* reusableEntry = nullptr;
@@ -413,13 +413,13 @@ void ZVulkanLinePipelineContext::updateUBOs(Z3DRendererBase& renderer,
       if (cached.params == payload.params && cached.followCoordTransform == payload.followCoordTransform &&
           cached.followSizeScale == payload.followSizeScale && cached.followOpacity == payload.followOpacity &&
           clipPlanesEqual(cached.clipPlanes, batch.clipPlanes)) {
-        cached.lastSubmissionId = submissionId;
+        cached.lastUniformCacheGeneration = cacheGeneration;
         m_dynObjectTransformsOffset = cached.objectTransformsOffset;
         m_dynMaterialOffset = cached.materialOffset;
         return;
       }
 
-      if (cached.lastSubmissionId != submissionId && reusableEntry == nullptr) {
+      if (cached.lastUniformCacheGeneration != cacheGeneration && reusableEntry == nullptr) {
         reusableEntry = &cached;
       }
     }
@@ -438,7 +438,7 @@ void ZVulkanLinePipelineContext::updateUBOs(Z3DRendererBase& renderer,
       reusableEntry->followSizeScale = payload.followSizeScale;
       reusableEntry->followOpacity = payload.followOpacity;
       reusableEntry->clipPlanes = batch.clipPlanes;
-      reusableEntry->lastSubmissionId = submissionId;
+      reusableEntry->lastUniformCacheGeneration = cacheGeneration;
       m_dynObjectTransformsOffset = reusableEntry->objectTransformsOffset;
       m_dynMaterialOffset = reusableEntry->materialOffset;
       return;
@@ -461,7 +461,7 @@ void ZVulkanLinePipelineContext::updateUBOs(Z3DRendererBase& renderer,
     entry.clipPlanes = batch.clipPlanes;
     entry.objectTransformsOffset = transformsSlice.offset;
     entry.materialOffset = materialSlice.offset;
-    entry.lastSubmissionId = submissionId;
+    entry.lastUniformCacheGeneration = cacheGeneration;
     entries.push_back(std::move(entry));
     return;
   }
@@ -1946,12 +1946,20 @@ void ZVulkanLinePipelineContext::record(Z3DRendererBase& renderer,
   auto& pipeline = ensurePipeline(key, payload, formats);
 
   // Build descriptor sets for draw-only recording
-  const std::array<vk::DescriptorSet, 3> descriptorSets{m_backend.bindlessSampledImageDescriptorSet(),
-                                                        dsLighting,
-                                                        dsTransforms};
+  const std::array<vk::DescriptorSet, 3> allDescriptorSets{m_backend.bindlessSampledImageDescriptorSet(),
+                                                           dsLighting,
+                                                           dsTransforms};
+  // Wide-line SPIR-V statically samples wpc.line_texture even while the
+  // USE_1DTEXTURE specialization is false, so every smooth-line variant must
+  // bind set 0. Thin lines need it only for DDP peel.
+  const bool usesBindlessSet = payload.useSmoothLine || usesDdpPeelPc;
+  const std::span<const vk::DescriptorSet> descriptorSets =
+    usesBindlessSet ? std::span<const vk::DescriptorSet>(allDescriptorSets)
+                    : std::span<const vk::DescriptorSet>(allDescriptorSets).subspan(vkbind::kSetLighting);
+  const uint32_t descriptorSetFirst = usesBindlessSet ? vkbind::kSetBindlessSampledImages : vkbind::kSetLighting;
   // Dynamic offsets added to drawSpec after it is constructed below.
 
-  uint32_t expectedSets = static_cast<uint32_t>(descriptorSets.size());
+  uint32_t expectedSets = descriptorSetFirst + static_cast<uint32_t>(descriptorSets.size());
   std::array<vk::DescriptorSet, 1> oitDescriptorSets{};
   std::array<ZVulkanDescriptorBindInfo, 1> extraBinds{};
   uint32_t extraBindCount = 0;
@@ -2048,7 +2056,7 @@ void ZVulkanLinePipelineContext::record(Z3DRendererBase& renderer,
     drawSpec.scissors = std::span<const vk::Rect2D>(&scissor, 1);
     drawSpec.pipelineHandle = pipeline.pipeline->pipelineHandle();
     drawSpec.pipelineLayoutHandle = pipeline.pipeline->pipelineLayoutHandle();
-    drawSpec.descriptorSetFirst = 0;
+    drawSpec.descriptorSetFirst = descriptorSetFirst;
     drawSpec.descriptorSets = descriptorSets;
     // Dynamic offsets order must match set/binding order:
     // - lighting (set1,b0)
@@ -2221,7 +2229,7 @@ void ZVulkanLinePipelineContext::record(Z3DRendererBase& renderer,
   drawSpec.scissors = std::span<const vk::Rect2D>(&scissor, 1);
   drawSpec.pipelineHandle = pipeline.pipeline->pipelineHandle();
   drawSpec.pipelineLayoutHandle = pipeline.pipeline->pipelineLayoutHandle();
-  drawSpec.descriptorSetFirst = 0;
+  drawSpec.descriptorSetFirst = descriptorSetFirst;
   drawSpec.descriptorSets = descriptorSets;
   const std::array<uint32_t, 4> dynamicOffsets{static_cast<uint32_t>(m_dynLightingOffset),
                                                static_cast<uint32_t>(m_dynFrameTransformsOffset),
@@ -2346,9 +2354,8 @@ void ZVulkanLinePipelineContext::record(Z3DRendererBase& renderer,
     ThinSecondarySignature signature{};
     signature.pipeline = drawSpec.pipelineHandle;
     signature.layout = drawSpec.pipelineLayoutHandle;
-    signature.baseDescriptorSets = descriptorSets;
-    signature.baseDescriptorGenerations = {m_backend.bindlessSampledImageDescriptorSetGeneration(),
-                                           m_backend.sharedLightingDescriptorSetGeneration(),
+    signature.baseDescriptorSets = {dsLighting, dsTransforms};
+    signature.baseDescriptorGenerations = {m_backend.sharedLightingDescriptorSetGeneration(),
                                            m_backend.sharedTransformsDescriptorSetPersistentGeneration()};
     signature.hasOit = hasOit;
     if (hasOit) {
@@ -2376,7 +2383,7 @@ void ZVulkanLinePipelineContext::record(Z3DRendererBase& renderer,
       if (entry.recorded && rawSecondary != vk::CommandBuffer{}) {
         if (entry.signature == signature) {
           m_backend.notifyDrawSecondaryCacheHit();
-          m_backend.notifyDrawSecondaryCacheExecute();
+          m_backend.notifyDrawSecondaryCacheExecute(entry.signature.pipeline);
           cmd.executeCommands({rawSecondary});
           m_backend.notifyDrawSubmitted();
           return;
@@ -2495,7 +2502,7 @@ void ZVulkanLinePipelineContext::record(Z3DRendererBase& renderer,
     });
     entry.recorded = true;
 
-    m_backend.notifyDrawSecondaryCacheExecute();
+    m_backend.notifyDrawSecondaryCacheExecute(entry.signature.pipeline);
     cmd.executeCommands({static_cast<vk::CommandBuffer>(entry.commandBuffer)});
     return;
   }

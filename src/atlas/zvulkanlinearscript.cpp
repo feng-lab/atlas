@@ -4,6 +4,7 @@
 #include "z3drendererbase.h"
 #include "z3drenderervulkanbackend.h"
 #include "z3drenderglobalstate.h"
+#include "z3dperfcollector.h"
 #include "z3dscratchresourcepool.h"
 #include "z3dimg.h"
 #include "zcancellation.h"
@@ -104,10 +105,10 @@ void validateVulkanBatchMetadataOrCrash(std::string_view passLabel, const Render
     }
 
     for (const auto& att : batch.pass.colorAttachments) {
-      CHECK(att.handle.valid())
-        << fmt::format("Vulkan script batch has invalid color attachment handle: pass='{}' batchIndex={}",
-                       passLabel,
-                       i);
+      CHECK(att.handle.valid()) << fmt::format(
+        "Vulkan script batch has invalid color attachment handle: pass='{}' batchIndex={}",
+        passLabel,
+        i);
       CHECK(att.handle.backend == RenderBackend::Vulkan)
         << fmt::format("Vulkan script batch has non-Vulkan color attachment: pass='{}' batchIndex={} handle=0x{:x}",
                        passLabel,
@@ -122,10 +123,10 @@ void validateVulkanBatchMetadataOrCrash(std::string_view passLabel, const Render
 
     if (batch.pass.depthAttachment) {
       const auto& att = *batch.pass.depthAttachment;
-      CHECK(att.handle.valid())
-        << fmt::format("Vulkan script batch has invalid depth attachment handle: pass='{}' batchIndex={}",
-                       passLabel,
-                       i);
+      CHECK(att.handle.valid()) << fmt::format(
+        "Vulkan script batch has invalid depth attachment handle: pass='{}' batchIndex={}",
+        passLabel,
+        i);
       CHECK(att.handle.backend == RenderBackend::Vulkan)
         << fmt::format("Vulkan script batch has non-Vulkan depth attachment: pass='{}' batchIndex={} handle=0x{:x}",
                        passLabel,
@@ -146,12 +147,11 @@ void validateVulkanBatchMetadataOrCrash(std::string_view passLabel, const Render
                          passLabel,
                          i,
                          att.handle.id);
-        CHECK(att.finalUse != AttachmentFinalUse::Unspecified)
-          << fmt::format(
-               "Vulkan script batch missing resolve attachment finalUse: pass='{}' batchIndex={} handle=0x{:x}",
-               passLabel,
-               i,
-               att.handle.id);
+        CHECK(att.finalUse != AttachmentFinalUse::Unspecified) << fmt::format(
+          "Vulkan script batch missing resolve attachment finalUse: pass='{}' batchIndex={} handle=0x{:x}",
+          passLabel,
+          i,
+          att.handle.id);
       }
     }
 
@@ -189,12 +189,11 @@ void validateVulkanBatchMetadataOrCrash(std::string_view passLabel, const Render
                        i,
                        use.handle.id);
       if (use.kind == ExternalImageUseKind::SampledRead) {
-        CHECK(use.aspectHint != ExternalImageAspectHint::Unspecified)
-          << fmt::format(
-               "Vulkan script batch missing aspectHint for sampled external image use: pass='{}' batchIndex={} handle=0x{:x}",
-               passLabel,
-               i,
-               use.handle.id);
+        CHECK(use.aspectHint != ExternalImageAspectHint::Unspecified) << fmt::format(
+          "Vulkan script batch missing aspectHint for sampled external image use: pass='{}' batchIndex={} handle=0x{:x}",
+          passLabel,
+          i,
+          use.handle.id);
       }
     }
 
@@ -207,11 +206,11 @@ void validateVulkanBatchMetadataOrCrash(std::string_view passLabel, const Render
                        passLabel,
                        i,
                        use.handle.id);
-      CHECK(use.kind != ExternalBufferUseKind::Unspecified)
-        << fmt::format("Vulkan script batch missing kind for external buffer use: pass='{}' batchIndex={} handle=0x{:x}",
-                       passLabel,
-                       i,
-                       use.handle.id);
+      CHECK(use.kind != ExternalBufferUseKind::Unspecified) << fmt::format(
+        "Vulkan script batch missing kind for external buffer use: pass='{}' batchIndex={} handle=0x{:x}",
+        passLabel,
+        i,
+        use.handle.id);
     }
   }
 }
@@ -571,6 +570,15 @@ void ZVulkanLinearScript::flush(std::string_view reason)
   flushNodes(resolved, nullptr);
 }
 
+void ZVulkanLinearScript::flushAndWaitForCompletion(std::string_view reason)
+{
+  CHECK_EQ(m_submissionGroupDepth, 0u)
+    << "ZVulkanLinearScript::flushAndWaitForCompletion called inside a scoped submission group";
+  CHECK(!m_nodes.empty()) << "ZVulkanLinearScript::flushAndWaitForCompletion requires pending GPU work";
+  const std::string_view resolved = reason.empty() ? std::string_view("script_flush_wait") : reason;
+  flushNodes(resolved, nullptr, true);
+}
+
 void ZVulkanLinearScript::validateDeps(std::string_view label, std::span<const SegmentHandle> deps) const
 {
   (void)label;
@@ -596,9 +604,12 @@ ZVulkanLinearScript::SegmentHandle ZVulkanLinearScript::raster(std::string_view 
   m_pendingSubmissionHasGpuNodes = true;
   RasterNode node;
   node.label = std::string(label);
-  const auto captureStart = std::chrono::steady_clock::now();
+  const bool collectPerf = Z3DPerfCollector::enabled();
+  const auto captureStart = collectPerf ? std::chrono::steady_clock::now() : std::chrono::steady_clock::time_point{};
   node.state = m_renderer.captureVulkanBatches(recordBatches, label);
-  node.captureMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - captureStart).count();
+  if (collectPerf) {
+    node.captureMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - captureStart).count();
+  }
   m_nodes.emplace_back(std::move(node));
   if (strictResidencyFlushEachNode()) {
     flushNodes("strict_residency_node", nullptr);
@@ -673,16 +684,18 @@ ZVulkanLinearScript::commands(std::string_view label,
 ZVulkanLinearScript::SegmentHandle
 ZVulkanLinearScript::commandsInSubmission(std::string_view label,
                                           std::span<const SegmentHandle> deps,
-                                          const std::function<void(Z3DRendererVulkanBackend&)>& record)
+                                          const std::function<void(Z3DRendererVulkanBackend&)>& record,
+                                          ZVulkanSubmissionRequirements requirements)
 {
-  return commandsInSubmissionWithScratchUses(label, deps, {}, record);
+  return commandsInSubmissionWithScratchUses(label, deps, {}, record, requirements);
 }
 
 ZVulkanLinearScript::SegmentHandle ZVulkanLinearScript::commandsInSubmissionWithScratchUses(
   std::string_view label,
   std::span<const SegmentHandle> deps,
   std::span<const Z3DScratchResourcePool::VulkanScratchTextureUse> scratchTextureUses,
-  const std::function<void(Z3DRendererVulkanBackend&)>& record)
+  const std::function<void(Z3DRendererVulkanBackend&)>& record,
+  ZVulkanSubmissionRequirements requirements)
 {
   validateDeps(label, deps);
   CHECK(record) << "ZVulkanLinearScript::commandsInSubmissionWithScratchUses requires a valid function";
@@ -692,6 +705,7 @@ ZVulkanLinearScript::SegmentHandle ZVulkanLinearScript::commandsInSubmissionWith
   node.label = std::string(label);
   node.record = record;
   node.scratchTextureUses.assign(scratchTextureUses.begin(), scratchTextureUses.end());
+  node.requirements = requirements;
   m_nodes.emplace_back(std::move(node));
   return handle;
 }
@@ -1009,7 +1023,9 @@ std::vector<ZVulkanTexture*> ZVulkanLinearScript::collectTexturePointersForNodes
   return textures;
 }
 
-void ZVulkanLinearScript::flushNodes(std::string_view reason, /*nullable*/ const ReadbackBufferSpec* readback)
+void ZVulkanLinearScript::flushNodes(std::string_view reason,
+                                     /*nullable*/ const ReadbackBufferSpec* readback,
+                                     bool waitForCompletion)
 {
   if (m_nodes.empty() && readback == nullptr) {
     CHECK(m_preRecordNodes.empty()) << "ZVulkanLinearScript: preRecord actions enqueued without any GPU work";
@@ -1045,41 +1061,61 @@ void ZVulkanLinearScript::flushNodes(std::string_view reason, /*nullable*/ const
   uint32_t commandsNodeCount = 0;
   uint32_t batchCount = 0;
   const uint32_t preRecordNodeCount = static_cast<uint32_t>(m_preRecordNodes.size());
+  Z3DRendererVulkanBackend::SubmissionRequirements submissionRequirements =
+    Z3DRendererVulkanBackend::requirementMask(Z3DRendererVulkanBackend::SubmissionRequirement::None);
 
-  const auto uniformHintStart = std::chrono::steady_clock::now();
+  const auto collectSubmissionRequirements = [&](const RendererCPUState& state) {
+    for (const auto& batch : state.batches) {
+      if (batch.shaderHook.type == ShaderHookType::DualDepthPeelingInit ||
+          batch.shaderHook.type == ShaderHookType::DualDepthPeelingPeel) {
+        submissionRequirements |=
+          Z3DRendererVulkanBackend::requirementMask(Z3DRendererVulkanBackend::SubmissionRequirement::DDPGating);
+      }
+    }
+  };
+
+  const bool collectPerf = Z3DPerfCollector::enabled();
+  const auto uniformHintStart =
+    collectPerf ? std::chrono::steady_clock::now() : std::chrono::steady_clock::time_point{};
   size_t uniformBytesHint = m_backend.estimateFrameUniformOverheadBytes();
   for (const auto& node : m_nodes) {
     if (const auto* rasterNode = std::get_if<RasterNode>(&node)) {
       rasterNodeCount++;
       batchCount += static_cast<uint32_t>(rasterNode->state.batches.size());
       uniformBytesHint += rasterNode->state.uniformBytesEstimate;
+      collectSubmissionRequirements(rasterNode->state);
     } else if (const auto* replayNode = std::get_if<ReplayNode>(&node)) {
       replayNodeCount++;
       CHECK(replayNode->state) << "ZVulkanLinearScript replay node missing state";
       batchCount += static_cast<uint32_t>(replayNode->state->batches.size());
       uniformBytesHint += replayNode->state->uniformBytesEstimate;
+      collectSubmissionRequirements(*replayNode->state);
     } else if (const auto* cmdNode = std::get_if<CommandsNode>(&node)) {
-      (void)cmdNode;
       commandsNodeCount++;
+      submissionRequirements |= cmdNode->requirements;
       // commands()/preRecord() are call-site defined and may mutate backend state
       // beyond what we can infer from batches.
     }
   }
   m_backend.hintNextUniformArenaMinCapacity(uniformBytesHint);
   const double uniformHintMs =
-    std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - uniformHintStart).count();
+    collectPerf ? std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - uniformHintStart).count()
+                : 0.0;
 
   if (!m_frameOpen) {
-    Z3DRendererVulkanBackend::BeginRenderScriptStats stats{};
-    stats.uniformHintMs = uniformHintMs;
-    stats.uniformHintBytes = uniformBytesHint;
-    stats.nodeCount = nodeCount;
-    stats.rasterNodeCount = rasterNodeCount;
-    stats.replayNodeCount = replayNodeCount;
-    stats.commandsNodeCount = commandsNodeCount;
-    stats.preRecordNodeCount = preRecordNodeCount;
-    stats.batchCount = batchCount;
-    m_backend.setPendingBeginRenderScriptStats(std::move(stats));
+    m_backend.setPendingBeginRenderRequirements(submissionRequirements);
+    if (collectPerf) {
+      Z3DRendererVulkanBackend::BeginRenderScriptStats stats{};
+      stats.uniformHintMs = uniformHintMs;
+      stats.uniformHintBytes = uniformBytesHint;
+      stats.nodeCount = nodeCount;
+      stats.rasterNodeCount = rasterNodeCount;
+      stats.replayNodeCount = replayNodeCount;
+      stats.commandsNodeCount = commandsNodeCount;
+      stats.preRecordNodeCount = preRecordNodeCount;
+      stats.batchCount = batchCount;
+      m_backend.setPendingBeginRenderScriptStats(std::move(stats));
+    }
   }
 
   const auto pendingNodeSpan = std::span<const Node>(m_nodes.data(), m_nodes.size());
@@ -1958,8 +1994,8 @@ void ZVulkanLinearScript::flushNodes(std::string_view reason, /*nullable*/ const
   // resources from the just-finished submission.
   scratchHotProtection->reset();
 
-  if (readback == nullptr && strictResidencyFlushEachNode()) {
-    m_backend.requireCompletionSafePointWaitForActiveSubmission("strict_residency_node");
+  if (readback == nullptr && (waitForCompletion || strictResidencyFlushEachNode())) {
+    m_backend.requireCompletionSafePointWaitForActiveSubmission(waitForCompletion ? reason : "strict_residency_node");
   }
 
   closeFrame(reason);
@@ -1999,7 +2035,7 @@ void ZVulkanLinearScript::executeNodes(std::span<Node> nodes)
     m_backend.beginPassScope(label);
     std::optional<size_t> gpuScope;
     if (!label.empty()) {
-      gpuScope = m_backend.beginGpuScope(label);
+      gpuScope = m_backend.beginGpuScope(label, /*isPassScope=*/true);
     }
     auto scopeGuard = folly::makeGuard([&]() {
       if (gpuScope.has_value()) {
@@ -2037,7 +2073,7 @@ void ZVulkanLinearScript::executeNodes(std::span<Node> nodes)
         m_backend.beginPassScope(label);
         std::optional<size_t> gpuScope;
         if (!label.empty()) {
-          gpuScope = m_backend.beginGpuScope(label);
+          gpuScope = m_backend.beginGpuScope(label, /*isPassScope=*/true);
         }
         auto scopeGuard = folly::makeGuard([&]() {
           if (gpuScope.has_value()) {
@@ -2077,7 +2113,7 @@ void ZVulkanLinearScript::executeNodes(std::span<Node> nodes)
       m_backend.beginPassScope(label);
       std::optional<size_t> gpuScope;
       if (!label.empty()) {
-        gpuScope = m_backend.beginGpuScope(label);
+        gpuScope = m_backend.beginGpuScope(label, /*isPassScope=*/true);
       }
       auto scopeGuard = folly::makeGuard([&]() {
         if (gpuScope.has_value()) {
@@ -2100,7 +2136,7 @@ void ZVulkanLinearScript::executeNodes(std::span<Node> nodes)
       m_backend.beginPassScope(label);
       std::optional<size_t> gpuScope;
       if (!label.empty()) {
-        gpuScope = m_backend.beginGpuScope(label);
+        gpuScope = m_backend.beginGpuScope(label, /*isPassScope=*/true);
       }
       auto scopeGuard = folly::makeGuard([&]() {
         if (gpuScope.has_value()) {

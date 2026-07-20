@@ -12,15 +12,10 @@
 
 namespace nim {
 
-namespace vulkan {
-struct AttachmentFormats;
-}
-
 class Z3DRendererBase;
 class Z3DRendererVulkanBackend;
-class ZVulkanShader;
 class ZVulkanPipeline;
-class ZVulkanBuffer;
+class ZVulkanShader;
 
 class ZVulkanBackgroundPipelineContext
 {
@@ -47,7 +42,7 @@ private:
 
     auto tie() const
     {
-      return std::tuple(mode, orientation, colorFormats, depthFormat);
+      return std::tie(mode, orientation, colorFormats, depthFormat);
     }
 
     bool operator<(const PipelineKey& rhs) const
@@ -58,16 +53,21 @@ private:
 
   struct PipelineInstance
   {
+    PipelineInstance() = default;
+    PipelineInstance(PipelineInstance&&) noexcept = default;
+    PipelineInstance& operator=(PipelineInstance&&) = delete;
+
+    // Declaration order is intentional: the pipeline is destroyed before the
+    // shader modules it was created from.
     std::unique_ptr<ZVulkanShader> shader;
     std::unique_ptr<ZVulkanPipeline> pipeline;
   };
 
   Z3DRendererVulkanBackend& m_backend;
 
-  std::map<PipelineKey, PipelineInstance> m_pipelineCache;
+  std::map<PipelineKey, PipelineInstance> m_pipelines;
 
-  PipelineInstance& ensurePipeline(const PipelineKey& key, const vulkan::AttachmentFormats& formats);
-  vk::PipelineVertexInputStateCreateInfo makeVertexInputState() const;
+  PipelineInstance& ensurePipeline(const PipelineKey& key);
 };
 
 } // namespace nim

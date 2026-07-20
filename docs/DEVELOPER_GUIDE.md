@@ -344,6 +344,11 @@ Testing (Linking Atlas Code)
   - Custom-main tools that include `test/ztest.h`, such as `zbenchmark`, should link `atlas_test_paths` directly.
 - Runtime resources (shaders/assets) remain app-packaged; unit tests around Vulkan/RAII pipeline contracts do not depend on runtime discovery.
 - GPU/UI-heavy tests should be gated/opt-in and prefer offscreen surfaces or SwiftShader where available.
+- `zvulkandevicesupporttest` keeps pure device-selection coverage in normal Release `ctest` discovery. Its Vulkan startup,
+  lifetime, and wrong-thread tests are correctness-only and skip unless `ATLAS_ENABLE_VULKAN_SMOKE_TEST=1`; when enabled,
+  configure `VK_DRIVER_FILES`/`VK_ICD_FILENAMES` for a software ICD and verify context, logical-device, VMA startup, and
+  device-owned bindless slot/retirement lifetimes. This is an explicit local correctness check; normal platform CI remains
+  limited to its existing build and packaging workflow. Do not put performance assertions in this smoke test.
 - Neuroglancer precomputed E2E tests:
   - `test/zneuroglancerprecomputede2etest.cpp` is a networked smoke test (public GCS URLs) gated by `ATLAS_ENABLE_NETWORK_TESTS=1`.
   - The same test file exercises both HTTP backends. Atlas test binaries use the test main rather than the app main, so backend selection is set inside the test with Abseil flags instead of relying on application flagfile setup.
@@ -409,8 +414,24 @@ Lookup Tables (LUTs)
 - Renderers/pipeline contexts create and cache backend LUT textures:
   - OpenGL: per-renderer 1D RGBA8 textures for colormaps/transfer functions.
 - Vulkan: pipeline contexts create 2D Nx1 `ZVulkanTexture`s via a small helper (MoltenVK portability — Metal lacks native 1D); LUTs are uploaded as RGBA8, registered in the bindless sampled-image tables (set=0), and referenced by index from shaders (push constants / UBOs).
-  - Vulkan descriptor arena (Stage 2): pipeline contexts allocate truly transient *per-pass* descriptor sets from the backend’s per-frame arena via `Z3DRendererVulkanBackend::allocateFrameDescriptorSet(layout)`. Do not create per-context descriptor pools. The arena is reset once per frame (scheduled in `endRender()`, applied at the backend’s frame-completion safe point after the frame fence signals).
-  - Per-frame-slot persistent descriptor arena: descriptor sets that must keep stable handles across frames (notably bindless tables) are allocated from the backend’s per-slot pool via `allocatePersistentDescriptorSet(layout)` and are not reset each submission. These are created/updated only after the slot’s completion safe point.
+  - Vulkan transient descriptor arena: pipeline contexts allocate truly transient *per-pass* descriptor sets from the
+    backend's per-frame-slot arena via `Z3DRendererVulkanBackend::allocateFrameDescriptorSet(layout)`. Do not create
+    per-context descriptor pools. The arena is reset once the slot's fence reaches the completion safe point. This is an
+    ordinary descriptor pool: it has no sampled-image/sampler budget and never uses update-after-bind.
+  - Per-frame-slot persistent descriptor arena: backend-common sets that require stable handles across submissions are
+    allocated from the backend's per-slot pool via `allocatePersistentDescriptorSet(layout)`. This is also an ordinary,
+    non-update-after-bind pool; bindless sampled-image tables do not live here.
+  - Device-owned bindless state: `ZVulkanDevice` owns the set 0 layout, its immutable samplers, the index-0 placeholder
+    textures, and one dedicated bindless descriptor pool sized exactly for all configured frame-executor slots
+    (update-after-bind when that optional limit class is selected). The device allocates one bindless table from that pool
+    per executor slot. Every Vulkan renderer backend using the device shares the table for a given slot instead of
+    reserving another full bindless capacity. Bindless pool construction and update-after-bind reservation are private to
+    the device; backends can create only explicitly named ordinary transient or persistent pools.
+  - Frame-executor topology is immutable for the Vulkan context/logical-device lifetime. `ZVulkanContext` snapshots the
+    startup frame count before physical-device descriptor-budget evaluation; that same value constructs the slot ring,
+    bindless table, and descriptor set per slot for every sequential `ZVulkanDevice` wrapper. Changing the flag later does
+    not resize a wrapper. Changing the count requires replacing the context/logical device; there is no supported
+    frame-ring resize/trim operation.
   - Backend-shared per-frame-slot descriptor sets: Atlas centralizes common descriptor state (lighting UBO, transforms UBOs, OIT SSBOs, and image helper UBO views) in backend-owned descriptor sets allocated from the persistent pool and reused across pipeline contexts. Pipeline contexts should bind these shared sets rather than allocating duplicate “common UBO sets” each submission.
   - Frame-completion safe point: the backend defines a frame-slot “completion safe point” (`applyPendingArenaReset`) that is reached after the executor observes a slot fence as complete (slot reuse, explicit waits, and opportunistic pumping after `pollCompletions()`). At that point it:
     - resets per-frame descriptor resources,
@@ -426,10 +447,14 @@ Lookup Tables (LUTs)
   - Shared fullscreen quad: use `Z3DRendererVulkanBackend::fullscreenQuadVertexBuffer()` in full-screen passes (background, copy, blend, glow) instead of creating per-context VBOs.
   - Vulkan descriptor guardrails:
     - No `vkUpdateDescriptorSets` during command-buffer recording. All descriptor writes must happen in the `beginRender()` pre-record phase (after the frame-slot completion safe point, before `vk::CommandBuffer::begin()`).
-    - Sampled-image inputs are bindless (set=0). Register textures into the per-frame-slot bindless tables during the pre-record phase and pass indices via push constants / UBOs; do not bind per-pass sampled-image descriptor sets.
+    - Sampled-image inputs are bindless (set=0). Register textures into the device-owned table for the current executor slot
+      during the pre-record phase and pass indices via push constants / UBOs; do not bind per-pass sampled-image descriptor
+      sets. Table indices and generations are slot-local even though all backends share the slot table.
     - Per-draw variation must use dynamic UBO offsets and push constants; do not allocate/update per-draw descriptor sets.
     - Bindless sampled-image tables use `VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE` (not combined image samplers). Sampler state is provided via immutable samplers in the set 0 layout (see `Resources/shader/vulkan/include/bindless.glslinc`): linear clamp for 2D/2D-array sampling, linear border-zero for 3D image volumes/caches, and nearest clamp for integer fetches.
-    - Never free descriptor sets individually; rely on per-frame pool reset for transient descriptor arenas. Per-frame-slot persistent pools live for the lifetime of the slot. Clear any retained per-frame descriptor wrappers before reset (backend handles this at the completion safe point).
+    - Never free descriptor sets individually. Rely on per-frame pool reset for transient descriptor arenas; backend
+      persistent pools and the device-owned bindless pool live until their owner is torn down. Clear any retained per-frame
+      descriptor wrappers before reset (the backend handles this at the completion safe point).
 
 ImgRaycaster Vulkan
 
@@ -445,6 +470,15 @@ Threading Model
 
 - UI thread: widgets (`Z3DCanvas`, main window), menu actions, docks, drag-and-drop.
 - Rendering thread: all engine code, rendering parameters, compositor, and object views.
+- Vulkan logical-device ownership is rendering-thread-only. `ZVulkanDevice` captures its owner thread and hard-checks
+  descriptor accounting, bindless mutation/retirement, frame-executor access, ordinary pool construction, and teardown.
+  The checks intentionally replace partial mutex/atomic protection: bindless table operations are not a cross-thread API.
+  Retained bindless-table references and every `ZVulkanFrameExecutor::ActiveFrame` operation repeat the owner check rather
+  than relying on the checked device accessor. The executor counts live frame leases and refuses teardown while any remain,
+  preventing an escaped lease from retaining a dangling executor pointer.
+  One `ZVulkanContext` permits exactly one live `ZVulkanDevice` wrapper for its logical `vk::Device`, which makes device-
+  global descriptor accounting unambiguous. Destroy that wrapper before the context; create another only after the first
+  has fully drained and been destroyed.
 - Cross-thread rules:
   - Do not manipulate engine or parameter QObjects directly from UI.
   - Use `QMetaObject::invokeMethod` to post to engine thread; use `Qt::BlockingQueuedConnection` if you must wait.
@@ -603,6 +637,9 @@ Global Cut Mode (Binding)
 Vulkan Notes
 
 - Backend selection is a session-level switch. GL remains supported; Vulkan is the preferred backend for parity.
+- A runtime OpenGL-to-Vulkan request is committed only after both the Vulkan context and device exist. If either external
+  initialization step fails, restore the Render Backend parameter (including Vulkan-only transparency options) to
+  OpenGL before reporting the error; Vulkan-only engine paths must continue to guard a missing device.
 - Renderers expose backend‑neutral batch data via `enqueueRenderBatches`; Vulkan records via the explicit entry points in `Z3DRendererBase` (no implicit frame begin/end).
 - Per-eye `Z3DScratchResourcePool` leases stay with each filter. Vulkan dynamic rendering targets are expressed via `RendererFrameState::ActiveSurface` and set with `setActiveSurfaceWithLoadStore(...)` at the call site.
 - Keep renderer parameters persistent at the filter; renderer objects hold transient GPU resources only.
@@ -625,7 +662,11 @@ Vulkan Notes
   - `ZVulkanTexture::UploadRegion::finalLayout` defaults to `vk::ImageLayout::eUndefined` and is a hard `CHECK` in `uploadSubImage` / `uploadData`.
   - Call sites must pass the intended post-upload layout (typically `eShaderReadOnlyOptimal` for sampled color images; `eDepthReadOnlyOptimal` when preparing depth for sampling) instead of relying on implicit defaults.
 - Enforcement (fail-fast correctness):
-  - Atlas does not rely on UPDATE_AFTER_BIND for correctness. When supported, Atlas enables update-after-bind for bindless set/layout/pool creation so large bindless arrays are accounted against descriptor indexing limits. Atlas still treats descriptor writes during recording as invariant violations (hard `CHECK` in `ZVulkanDescriptorSet`).
+  - Atlas supports both descriptor validity classes explicitly. When sampled-image update-after-bind is enabled, only the
+    device-owned bindless set, layout, and dedicated pool use it, so their large arrays are accounted against descriptor-
+    indexing limits. On the legacy path, any set-0 write advances a set-wide command-buffer compatibility generation.
+    Backend transient and persistent pools remain ordinary pools. Both paths still treat descriptor writes during recording
+    as invariant violations (hard `CHECK` in `ZVulkanDescriptorSet` and `ZVulkanBindlessDescriptorSet`).
 - Vulkan residency broker (`ZVulkanResidencyManager`):
   - `ZVulkanDevice` owns one device-level broker that coordinates Vulkan memory pressure across allocation classes instead of leaving each pipeline context to make local decisions. Large allocation wrappers ask the broker before over-budget allocations and retry once after broker reclaim if VMA still fails.
   - Resource classes are explicit: completed transient upload pages, free scratch backing, static geometry, dense R8 2D/3D image textures, paged R8 image caches, readback staging, and non-evictable compositor/attachment-style requests. Providers register callbacks with the broker; render code continues to request normal textures/buffers through backend helpers.
@@ -644,6 +685,12 @@ Vulkan Pipeline Invariants
 
 - Dynamic rendering is used; a new segment is begun only when attachment sets change.
 - Graphics pipeline keys include attachment formats: `colorFormats[]` and optional `depthFormat` are part of the key in all Vulkan pipeline contexts to avoid layout mismatches.
+- `ZVulkanPipeline` is the single graphics-pipeline configuration implementation. Pipeline contexts keep their shader
+  and pipeline instances context-local, cache them by the complete pipeline key, and destroy each pipeline before the
+  shader modules used to create it. `ZVulkanPipeline` owns copies of vertex binding and attribute descriptions, so
+  contexts may safely build those descriptions in cache-miss-local arrays. Do not add a parallel graphics-state model
+  unless representative simple and complex contexts demonstrate a material reduction in total and per-pipeline code.
+- `ZVulkanPipelineCommandRecorder` remains the single draw/dispatch encoder.
 - Composite/resolve passes (DDP final, WA resolve, WB resolve) must write to exactly one color attachment; depth is disabled in the pipeline and no depth attachment is bound.
 - Texture-copy passes that do not propagate depth (for example the final RGBA8 readback copy) must use the no-depth copy variant: no destination depth attachment, no source depth descriptor lookup, `VK_FORMAT_UNDEFINED` depth pipeline format, depth test/write disabled, and a fragment shader with no `FragDepth` output.
 - Descriptor writes during command-buffer recording are forbidden. All descriptor sets must be primed before recording begins; per-draw variation uses dynamic offsets and bindless indices.
@@ -689,21 +736,110 @@ Vulkan Pipeline Invariants
 
 Performance Instrumentation
 
-- Aggregated frame timing: the rendering engine emits a monotonically increasing token per user‑visible frame (one engine‑driven filter pipeline evaluation). The Vulkan backend tags each submission with this token and a submission index.
-- Per‑submission CPU and GPU scopes are ingested and a single summary is logged once a token is safe to flush (typically on the next submission, after fences signal). Summaries appear at `VLOG(1)`.
+- The rendering engine always emits a monotonically increasing identity per user-visible frame (one engine-driven filter
+  pipeline evaluation), and Vulkan assigns every submission within that frame a non-zero index. These identities are
+  correctness state: PPLL ring selection, monotonic asynchronous presentation, and completion-safe-point matching require
+  them even when instrumentation is off. Persistent uniform caches use a separate backend-local 64-bit generation that
+  never repeats at a render-frame boundary. The perf collector consumes the frame/submission identities when enabled.
+- Per‑submission CPU and GPU scopes are ingested and a single summary is logged at INFO once a token is safe to flush
+  (typically on the next submission, after fences signal).
+- Frame summaries and JSON/CSV output include submission count and synchronous fence-wait count, alongside existing CPU
+  recording scopes, upload/readback byte counts, descriptor allocation, pipeline-creation counts, and unique pipeline-bind
+  counts. Fence
+  waits include both an explicit completion/readback boundary and a blocking frame-ring slot reuse; zero-time fence polls
+  are not counted as waits. The central graphics/compute command recorder reports pipeline binds, including callers that
+  pass raw handles.
+- Immediate submissions emit concise `VLOG(1)` records with submission, wait, and timing counts; their CPU clocks are read
+  only when that verbosity is enabled. They remain
+  feature-local synchronous boundaries and are not hidden in a device-global upload runtime.
 - Modes (Abseil flags):
-  - `--atlas_perf_mode=off|light|full` (default `light`). `full` adds nested per‑filter GPU scopes inside compositor passes.
+  - `--atlas_perf_mode=off|light|full` (default `light`). `off` keeps only the functional render-frame identity and skips
+    collector timing, GPU timestamp queries, filter/script CPU timing, pipeline-bind accounting, and collector ingestion.
+    `light` records structurally marked top-level submission/pass metrics. `full` additionally records nested GPU scopes
+    inside those passes.
   - `--atlas_perf_trace=/path/to/trace.json` writes a Chrome trace file for each flushed frame (overwrites).
+
+Vulkan export benchmark harness
+
+- `util/benchmark/export_scene_animation_stability.py` runs complete scene and animation export matrices for OpenGL,
+  Vulkan, or both. Each Vulkan invocation receives a unique run-local NDJSON path and uses
+  `--vulkan-perf-mode=off|light|full`; a successful instrumented run with missing/empty perf output is a failure.
+- Current JSON performance-summary lines identify themselves as `schema="atlas.perf.frame"`, `schema_version=1`, and must
+  contain every version-1 field, including `submissions` and `fence_waits`. For cross-revision comparisons, the harness also
+  recognizes the exact pre-schema unversioned record shape that predates those two counters. Such records remain valid,
+  but both counters are reported as unavailable rather than synthesized as zero. Unknown, partial, unmarked-current, or
+  mixed record profiles fail validation.
+- The harness derives the exact expected animation frame count from `Animation3D.Duration`, the requested FPS, and the
+  inclusive-start/exclusive-end range. Non-zero Atlas exits, missing/zero-byte outputs, and any exact frame-count mismatch
+  are retained in the aggregate and make the harness exit non-zero; remaining planned runs still execute.
+- Reproducibility metadata includes Git revision/dirty state, executable SHA-256, complete top-level scene/animation
+  SHA-256 values, OS/CPU/RAM, best-effort GPU/driver data, ICD environment, dimensions, FPS/range, and exact Atlas args.
+  Hashing intentionally covers the top-level inputs rather than recursively fetching every referenced local/remote asset,
+  which would distort benchmark setup time. Use `--gpu-name`/`--gpu-driver` when platform discovery is insufficient.
+- Outputs include per-run manifests, `run_summary.csv`, `file_hashes.csv`, stability and aggregate JSON, and aggregate
+  Markdown. `--run-label` identifies a run; `--baseline-root` writes complete baseline/candidate duration and exact
+  same-backend output-hash comparisons. No arbitrary regression threshold is baked into the script.
+- `util/benchmark/atlas_gui_rotate_batch.py` accepts an optional `--backend` plus repeatable `--extra-atlas-arg` and records
+  the exact launch command. It still requires its existing macOS GUI capture/calibration workflow.
 
 Descriptor & Recording Guardrails (Vulkan)
 
 - No descriptor writes while a frame is recording. Atlas treats any `vkUpdateDescriptorSets` during recording as an invariant violation (hard `CHECK`).
 - Sampled-image inputs are bindless:
   - Shaders read from set=0 tables (`Resources/shader/vulkan/include/bindless.glslinc`) using indices passed via push constants / UBOs and `nonuniformEXT(...)`.
-  - Bindless registration happens in the `beginRender()` pre-record phase (typically via `ZVulkanLinearScript` preRecord actions). Record paths use lookup-only APIs and crash if an expected texture is missing.
+  - `ZVulkanDevice` owns one table for each frame-executor slot. The slot table is shared by all renderer-backend
+    instances attached to that device, while its assigned indices and compatibility state remain local to that slot.
+  - Bindless registration happens in the `beginRender()` pre-record phase (typically via `ZVulkanLinearScript` preRecord
+    actions), after the slot's previous fence has completed. Acquiring the slot starts a registration epoch: entries used
+    by the current submission are touched, while cold entries from older backend submissions may be replaced if capacity
+    is needed. Record paths use lookup-only APIs, require the current epoch and image generation/view, and crash if an
+    expected texture was not primed or its backing changed afterward.
+  - Mutable slot access requires the executor's current `ActiveFrame` acquisition lease. The lease carries a monotonic
+    serial, and its descriptor-write safe phase closes when the command buffer is first exposed for recording. Submitted,
+    completed-but-not-reacquired, abandoned, and stale/reused-slot handles therefore cannot update or retire descriptors.
+  - Because slot tables are shared, the recording guard is device-wide: no backend may update a bindless descriptor while
+    any backend attached to that device is recording commands that can bind the table.
+  - Each per-kind table directly maps canonical `ZVulkanTexture*` identity to its stable index. Canonical layout/aspect/view
+    changes rewrite that index; Atlas does not retain an unused alternate-view key model. Full-table cold replacement keeps
+    the epoch scan but rekeys the existing hash-map node, avoiding a capacity-plus-one allocation/rehash window.
+  - Texture destruction performs one direct lookup per table kind and queues the resulting exact
+    `(kind, index, address, identity)` handle for each slot that still contains it. The
+    texture transfers its image views, sampler, image, and VMA allocation into a shared retirement holder instead of
+    destroying them immediately. After `beginFrame()` has completed a slot's prior fence wait, the device validates all exact
+    handles, replaces every still-owned descriptor with its table kind's placeholder in one batched
+    `vkUpdateDescriptorSets`, and recycles those indices. A token superseded by a safe rewrite/eviction is a no-op and cannot
+    retire the newer occupant. The final relevant slot releases the holder (views first, then image/allocation), so another
+    in-flight slot can never reference destroyed Vulkan objects. A newer texture allocated at the same CPU address is also
+    protected by its different identity.
+  - Strict memory-budget recovery waits for all submitted frames and then drains every now-safe retirement queue, so
+    deferred images contribute no stale VMA pressure after GPU idle. If an unsubmitted command buffer is still recording,
+    it is outside the fence wait and may reference the table; the all-slot drain is deliberately deferred until its normal
+    slot safe point rather than invalidating that recording.
+  - Vulkan-to-OpenGL switching performs one final device-wide retirement drain after every renderer backend has switched
+    and after the scratch pool has reset. Those destruction steps can queue retirements after the backends' earlier
+    pre-switch drains, and no later Vulkan frame exists to consume them while OpenGL remains active. `vkDeviceWaitIdle`
+    alone is insufficient because it does not consume Atlas' CPU retirement queues, replace their descriptors with
+    placeholders, or release their deferred image holders. Failure to reach the final descriptor-mutation safe point is an
+    engine invariant violation.
+  - Shared-table capacity is a per-submission working-set contract, not a device-lifetime union of every live backend.
+    When no never-used or destruction-retired index remains, registration may evict only an entry untouched in the current
+    slot epoch. If every non-placeholder entry is already touched, the current submission genuinely exceeds the effective
+    table capacity and Atlas fails fast with the corresponding capacity flag instead of dropping a texture.
+  - Cached secondary-command-buffer validity is capability-aware. On legacy descriptor sets, any descriptor write can
+    invalidate every executable command buffer that bound set 0, so mesh signatures include the slot table's set-wide
+    mutation generation. With update-after-bind, descriptor rewrites leave those command buffers valid; the compatibility
+    token is constant and mesh signatures rely on the stable slot set plus the numeric bindless indices already present in
+    push constants. Non-DDP sphere, cone, ellipsoid, and thin-line shaders do not statically use set 0, so those draws bind
+    only lighting/transforms starting at set 1 and their secondary signatures have no bindless dependency. Smooth/wide-line
+    SPIR-V statically samples its line texture and therefore continues to bind set 0 even when its current specialization
+    disables the textured color path. DDP peel binds set 0 and is not secondary-cached.
 - Helper compute pipelines (DDP/PPLL/Block-ID compaction) must allocate + write descriptor sets in the pre-record phase; dispatch paths only bind pre-primed sets.
 - Prefer explicit or immutable samplers in set layouts to avoid platform-specific sampler class issues.
-- Per‑frame descriptor arenas are monotonic: allocate during the frame, reset once after the frame fence. Clear any retained per-frame descriptor wrappers before reset.
+- Ordinary per-frame transient and persistent pools do not use update-after-bind. Transient arenas are monotonic: allocate
+  during the frame and reset once after the frame fence. Clear any retained per-frame descriptor wrappers before reset.
+- When update-after-bind is selected, the only such allocation is the dedicated device-owned bindless pool.
+  `ZVulkanDevice` centrally reserves and releases its exact descriptor count against
+  `maxUpdateAfterBindDescriptorsInAllPools`; never duplicate that reservation per backend.
 - Validation/telemetry: end‑of‑frame VLOG may include segment counts, descriptor guardrail counters, and skip reasons (format mismatches, etc.).
 
 Pipeline Context Recorder
@@ -845,7 +981,12 @@ primaryRecorder.endRenderingSegment(backgroundSegment);
 - Vulkan frame: one GPU submission slot managed by `ZVulkanFrameExecutor` (primary command buffer + fence/semaphores). A Vulkan frame may stay open across multiple passes to reduce submission overhead.
 - Preferred callsite abstraction for orchestration (compositor + image filter pipelines such as raycaster/slice): `ZVulkanLinearScript` (`src/atlas/zvulkanlinearscript.h`).
   - Call sites should express logic linearly as segments + explicit CPU readback boundaries (for branching/loop control flow), without directly managing `beginVulkanFrame/endVulkanFrame` or toggling global readback wait policy.
-  - CPU readback boundaries are the only place the script forces a fence wait for that submission; interactive presentation stays non-blocking by default.
+  - CPU readback and explicitly requested completion-safe-point boundaries are the only places the script forces a fence
+    wait for that submission; interactive presentation stays non-blocking by default. There is no special first-submit
+    wait after backend startup. Frame-ring reuse may still wait when all configured slots are genuinely in flight.
+  - A command node may carry a typed `SubmissionRequirement` bitset. DDP reset/count nodes request `DDPGating`, and
+    captured DDP shader hooks infer the same requirement; ordinary submissions therefore skip DDP buffers, compute
+    pipeline setup, and descriptor priming.
   - Call sites that need cancellation (and other exceptions) to propagate must call `script.flush(...)` explicitly; the script destructor performs a best-effort flush but must not throw and therefore swallows cancellation.
   - Guideline (conceptual): keep each script node small and single-purpose. In dynamic rendering there are no classic Vulkan "subpasses"; the closest equivalent is a rendering segment (`vkCmdBeginRendering`…`vkCmdEndRendering`) targeting one attachment set. Prefer one output surface / attachment set per `script.raster(...)` node, and split nodes when switching render targets so labels and load/store/final-use contracts remain easy to reason about.
 - Recording session: one “batch collection + submit” scope inside an already-open Vulkan frame. `Z3DRendererBase::recordVulkanBatchesInActiveFrame(...)` (and the compositor helper `recordInVulkanFrame`) open a session, collect CPU batches, and call `Z3DRendererVulkanBackend::processBatches(...)` to emit commands into the active command buffer.
@@ -854,6 +995,17 @@ primaryRecorder.endRenderingSegment(backgroundSegment);
   - Segment coalescing is allowed only when begin-rendering state matches: render area + the ordered attachment set + per-attachment load/store/clear + final-use contracts. Do not merge segments across incompatible pass metadata; doing so creates silent state leakage (wrong clears, wrong final layouts, or read-while-write feedback loops).
   - External resource dependencies are explicit: passes must declare external image/buffer uses in `BackendPassDesc` so Vulkan can insert layout transitions and buffer memory barriers without label/payload heuristics.
 - Frame-completion safe point: after the submission fence signals, the backend reaches `applyPendingArenaReset` and runs after-completion hooks. Anything that depends on “GPU really finished” (scratch reuse, descriptor arena reset, block-ID compaction parsing) must be attached to this safe point.
+- Exact PPLL deliberately uses two submissions: count/scan plus its required CPU prefix readback, then
+  scan-add/store/resolve. Frame-local reset/scan/barrier command nodes stay with adjacent raster work via
+  `commandsInSubmission`; do not turn opaque resource effects into same-submission commands without declaring their
+  resource contracts. The store-to-resolve dependency must explicitly make fragment-shader SSBO writes visible to the
+  resolve fragment shader; do not rely on command order alone for that memory dependency.
+  PPLL parameters and buffers are reused within one render-frame token, so a second invocation must not prime them while
+  the previous store/resolve is pending. The compositor uses an explicit completion-safe-point boundary only for actual
+  reuse (normal then stay-on-top PPLL, or left then right eye); the common mono/single-PPLL path remains asynchronous.
+  Scan dispatches whose block count exceeds `maxComputeWorkGroupCount[0]` remain inside those submissions and are split
+  into complete ordered chunks. A push-constant base block makes each shader chunk address its original global range, so
+  large outputs are neither capped nor truncated.
 
 Vulkan Entry Points (explicit)
 
@@ -915,6 +1067,7 @@ Vulkan Descriptor Set/Binding Map
     - binding 4: `utexture3D atlas_bindlessUTexture3D[]` (sampled images)
     - binding 5: immutable sampler `atlas_samplerLinearClamp`
     - binding 6: immutable sampler `atlas_samplerNearestClamp`
+    - binding 7: immutable sampler `atlas_samplerLinearBorderZero3D`
     - Index 0 in every table is reserved for a placeholder texture ("no texture").
     - Shaders should use the helper macros (e.g., `atlas_bindlessSampler2DLinear(idx)`) instead of directly spelling sampler constructors.
   - Set 1 — Lighting UBO (std140, dynamic):
@@ -936,8 +1089,15 @@ Vulkan Descriptor Set/Binding Map
 - Passing sampled inputs:
   - Shaders receive bindless indices via push constants or small UBOs; sampling uses `nonuniformEXT(index)`.
   - Registration and index assignment happens in the beginRender pre-record phase (typically via `ZVulkanLinearScript`).
-  - Bindless descriptor sets are per frame-executor slot (keyed by `activeFrameKey()`): allocate once from the slot’s persistent pool, keep the handle stable for cached command buffers, and only mutate the table after the slot’s previous submission completes (the completion safe point) and before command buffer recording begins.
-- Required device features (Vulkan 1.2; enabled in `ZVulkanContext`): `descriptorIndexing`, `runtimeDescriptorArray`, `shaderSampledImageArrayNonUniformIndexing`, `descriptorBindingPartiallyBound`. (`descriptorBindingVariableDescriptorCount` is optional; Atlas sizes bindless tables explicitly.)
+  - `ZVulkanDevice` owns one bindless descriptor set per frame-executor slot (keyed by `activeFrameKey()`) and allocates all
+    of them from its dedicated bindless pool. All renderer backends on the device share the current slot's set. The set
+    handle stays stable for cached command buffers and may be mutated only after that slot's previous submission completes
+    and before any backend begins command-buffer recording.
+  - Indices are slot-local; the same texture may have a different index in another slot. Each acquired slot begins a new
+    registration epoch, and recording-time lookup accepts only entries touched for that submission. Legacy tables expose a
+    set-wide mutation generation for command-buffer compatibility. Update-after-bind tables expose a constant compatibility
+    token because current descriptor contents do not invalidate executable command buffers.
+- Required device features (Vulkan 1.3; enabled in `ZVulkanContext`): `descriptorIndexing`, `runtimeDescriptorArray`, `shaderSampledImageArrayNonUniformIndexing`, `descriptorBindingPartiallyBound`. (`descriptorBindingVariableDescriptorCount` is optional; Atlas sizes bindless tables explicitly.)
 - Compute helpers may bind additional sets for non-sampled resources (e.g., Block-ID compaction uses a per-pass set for its output SSBO). Set 0 remains reserved for bindless sampled images.
 
 Bindless capacity flags (requested; clamped to device limits):
@@ -948,19 +1108,25 @@ Bindless capacity flags (requested; clamped to device limits):
 - `--atlas_vk_bindless_utexture3d_capacity`
 
 Policy:
-- These flags specify the *requested* bindless descriptor table capacities for set=0 sampled images.
+- These flags specify the *requested* per-submission bindless descriptor table capacities for set=0 sampled images. Shared
+  device tables retain cold entries as a cache, but can recycle an entry not touched by the current registration epoch.
 - Atlas computes an *effective* capacity policy once per Vulkan logical device creation:
   - Queries classic descriptor limits (`VkPhysicalDeviceLimits`) and descriptor indexing limits
     (`VkPhysicalDeviceDescriptorIndexingProperties`).
-  - If `descriptorBindingSampledImageUpdateAfterBind` is enabled, Atlas creates the bindless set/layout/pools with
-    update-after-bind enabled so large descriptor arrays are accounted against the descriptor indexing limits (this is
-    required on some drivers such as MoltenVK which expose very small sampler limits).
+  - If `descriptorBindingSampledImageUpdateAfterBind` is enabled, Atlas creates only the dedicated bindless set/layout/pool
+    with update-after-bind enabled. The device-level reservation is exact:
+    `frameSlotCount * (sum(effective sampled-image table capacities) + 3 immutable sampler descriptors)`.
+    Fixed UBO, SSBO, and storage-image capacity from ordinary backend pools is not charged to the update-after-bind budget.
+  - `ZVulkanDevice` owns the reservation counter, validates pool creation against
+    `maxUpdateAfterBindDescriptorsInAllPools`, and releases the reservation only after the bindless pool is destroyed.
+    Backend instance count therefore cannot multiply or bypass the device-global limit.
   - If the requested capacities exceed the device’s limits, Atlas clamps them downward and logs a warning with the
     requested vs effective values and the limiting constraint.
   - If the device cannot satisfy the minimum bindless contract (at least 1 entry in each table so index 0 can be the
     reserved placeholder), Atlas fails fast during Vulkan device creation with a clear error.
 - Effective capacities are treated as immutable for the device lifetime because pipeline layouts depend on them. To
-  apply new requested values, restart Atlas (or switch Vulkan devices).
+  apply new requested values, restart Atlas. Runtime physical-device switching is intentionally unsupported because every
+  backend, scratch resource, descriptor table, and VMA allocation belongs to the existing logical-device lifetime.
 
 Guidelines
 - Allocate frame‑scoped descriptor sets from the backend arena; avoid per‑context pools.
@@ -1171,6 +1337,9 @@ Notes
   - To compare real scene inputs, run Atlas with `--atlas_benchmark_blockid_collectors` and optionally set `--atlas_benchmark_blockid_collectors_runs=N`. The OpenGL block-ID paths then replay the same downloaded buffers through the production-default state, dense bitset, current TBB concurrent set, filtered TBB concurrent set, Boost concurrent flat set, thread-local vector/sort, thread-local Abseil/Folly hash-set merge, and sequential integer-sort states, validate identical results, and log sorted end-to-end timings for each render pass. With the flag off, replay buffers are not copied.
   - Synthetic CPU-only collector timing lives in `zbenchmark`. Use a filter such as `--benchmark_filter=BlockIdCollector` to run the generated 1024x1024 RGBA32UI-equivalent stress cases plus real-log-shaped sparse readback cases without adding benchmark noise to normal `ctest` runs.
   - Vulkan raycaster block-ID compaction is selected with `--atlas_vk_blockid_compaction_method`. The current production default is `append_storage_parallel_flush_gpu_unique`; benchmark candidates include `append_sampled_parallel_flush`, `append_storage_parallel_flush`, `append_storage_parallel_flush_gpu_unique`, `dense_bitset_readback`, and `dense_bitset_flags_readback`. Run with `--atlas_benchmark_vk_blockid_compaction` to record those candidates against the same real attachments, validate identical compacted IDs, and log GPU time, payload readback time, payload size, and CPU parse time per method.
+  - Vulkan raycaster and slice compaction read the small headers at the frame-completion boundary, then read each
+    non-empty exact ID/bitset payload needed by that result. Capacity mismatches remain hard failures; payloads are never
+    truncated.
   - Paged-image page-directory and page-table metadata uploads are demand driven: texture accessors restore metadata when backend textures are missing or invalidated, and `Z3DImg::updateAndUploadPageDirectoryCaches()` uploads after actual page-table changes. OpenGL and Vulkan upload the full page-directory and page-table cache after paging changes, but skip the upload entirely when a paging pass discovers that no metadata changed. Render prep must not reupload the full metadata textures every pass because page-table caches can be hundreds of MiB.
   - `Z3DImg` owns the canonical CPU page-directory/page-table state and exposes a per-channel page-cache generation. Vulkan image renderers share the backend-owned `ZVulkanPagedImageBlockUploader`, so raycaster and slice paths sample the same page-directory/page-table/image-cache texture owner for a backend. The uploader records the generation uploaded into its metadata textures and refreshes when the shared CPU generation changes, preserving the no-op upload fast path without allowing stale metadata after cache resets or future uploader recreation.
 
@@ -1235,6 +1404,22 @@ Transparency Methods
     - Vulkan has two implementations for DDP-quality transparency: classic multi-pass DDP and exact OIT via a per-pixel fragment list (PPLL).
       The selection is controlled by the `Transparency` parameter (`Dual Depth Peeling` vs `Per-Pixel Fragment List (PPLL Exact)`).
     - Vulkan DDP records bounded CPU chunks controlled by `--atlas_vk_ddp_cpu_chunk_passes` (default 4) and reads back the changed flag between chunks so it can stop recording later chunks after convergence. When `drawIndirectCount` is available and `--atlas_vk_ddp_indirect_count=true`, the first peel in each chunk guarantees the per-submission indirect draw arguments exist, then later peels in that same chunk use device-side count gating to skip geometry after convergence. Setting `--atlas_vk_ddp_cpu_chunk_passes<=0` is a compatibility/debug path that records the full peel loop in one submission.
+    - DDP gating resources are a typed per-submission requirement. Non-DDP frames bind a valid placeholder for the shared
+      OIT DDP binding and do not allocate/prime the changed flag, indirect-count buffer, device-args arena, or DDP count
+      descriptor set.
+    - PPLL fragment storage uses per-pixel atomic cursors, whose append order is unspecified. Resolve leaves the semantic
+      color/depth records immutable, rejects non-finite/out-of-range and opaque-occluded depths, compacts the remaining
+      record indices, and sorts those indices by numerical depth. Short lists use insertion sort; longer lists use heap
+      sort so high depth complexity remains O(n log n). The threshold is only an algorithm crossover: every valid visible
+      fragment remains represented exactly once, with no cap, drop, or truncation.
+      Exact equal-depth fragments have no scene-order key in the PPLL record, so their compositing order is intentionally
+      unspecified. Do not add depth-bit or color-bit tie-breaks solely to force identical output hashes. The scalar index
+      workspace reuses existing `std430` padding, keeps the record stride at 32 bytes, and limits sorting writes to scalar
+      indices while the semantic color/depth records remain unchanged.
+    - PPLL fullscreen resolve enables `LessOrEqual` depth testing and depth writes. When compositing into an initialized
+      target, resolve must load that target's depth attachment; when starting a new target, it clears depth to `1.0`.
+      Count/store share the output depth only when no separate opaque-depth attachment is supplied. Weighted Blended has
+      the same conditional load/clear requirement; Weighted Average and DDP use an `Always` depth comparison for resolve.
   - Weighted Average and Weighted Blended (OIT approximations)
 - Images are blended via `Z3DTextureBlendRenderer` and the compositor’s merge shaders; image layers from multiple filters are collected/merged consistently.
 
@@ -1298,16 +1483,32 @@ Additional Architecture Notes
 Vulkan device selection
 
 - On initialization, all physical devices are enumerated and logged. Devices are sorted by preference: discrete > integrated
-  > virtual > CPU, then larger device-local memory capacity, then higher API version. The first suitable device (Vulkan 1.3,
-  required extensions, required queue families) is selected and used to create the logical device and queues.
+  > virtual > CPU, then larger device-local memory capacity, then higher API version. Otherwise equal-ranked devices use
+  their immutable Vulkan device UUID as the final ascending tie-break, so independently launched export workers resolve the
+  same sorted indices even if the driver enumeration order differs. UUID does not override any capability preference and is
+  included in the device log. `ZVulkanDeviceSupport` evaluates each device once against the complete Atlas contract: Vulkan
+  1.3, graphics queue, portability extension and triangle-fan support where applicable,
+  clip/blend/non-solid-fill/fragment-store features and limits, compute workgroup dimensions, dynamic
+  rendering/synchronization2, descriptor indexing/capacity (including the six-buffer shared OIT layout, eight-output
+  Block-ID rendering, and PPLL combined fragment outputs), and required image format/usage/filtering combinations. Selection
+  and logical-device creation consume that same immutable result.
+- Update-after-bind selection charges only the device-owned bindless pool against
+  `maxUpdateAfterBindDescriptorsInAllPools`: one copy of the five effective sampled-image table capacities plus three
+  immutable sampler descriptors for each configured frame-executor slot. Backend transient and persistent pools do not
+  use update-after-bind and therefore do not consume that device-global budget. The evaluator clamps bindless capacity to
+  the exact shared reservation (or falls back to legacy descriptor limits), and `ZVulkanDevice` owns and verifies that
+  single reservation for the private bindless pool. Per-stage clamping still reserves the
+  fixed UBO, SSBO, storage-image, and maximum color-output footprint against `maxPerStageResources` or
+  `maxPerStageUpdateAfterBindResources`; bindless pool construction reuses the evaluated effective capacities.
 - `ZVulkanContext::physicalDevice()` returns the currently selected device. `deviceCount()` and `physicalDevice(index)` can be
   used for explicit per-device introspection. The selected index is exposed via `selectedDeviceIndex()`.
-- Override device selection at startup via `--atlas_vk_device_index=N` (sorted order). When set to a suitable device index,
-  the context selects that device instead of the auto-selected one.
-- Runtime switching: call `Z3DRenderingEngine::switchVulkanDeviceIndex(N)` at a safe point (no in-flight rendering) to switch
-  to device N. The engine waits idle, recreates the logical device wrapper, updates the scratch pool device, refreshes
-  backend‑agnostic GPU caps, and logs the new device inventory.
-
+- Prefer a Vulkan device at startup via `--atlas_vk_device_index=N` (sorted order), or use `-1` for automatic selection.
+  A compatible preferred device is selected exactly. An invalid, out-of-range, or incompatible preference logs a warning
+  with the reason and falls back to the first fully compatible Vulkan device in preference order.
+- Linux headless export maps `--use_gpu_devices` according to the requested backend. OpenGL values select EGL devices;
+  Vulkan values select indices from this preference-sorted list. Multi-process animation workers receive a corresponding
+  `--atlas_vk_device_index` preference. A rejected worker preference logs a warning and uses automatic selection, so export
+  automation should treat those warnings as a possible sign that multiple workers fell back to the same adapter.
 Compositor Pass Graph (Vulkan)
 
 - Offscreen only; no swapchain.

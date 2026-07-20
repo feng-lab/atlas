@@ -4,6 +4,7 @@
 #include "z3dgpuinfo.h"
 #include "z3dcameracontrolwidget.h"
 #include "z3drendererstates.h"
+#include <QThread>
 #include <algorithm>
 #include <utility>
 
@@ -71,46 +72,8 @@ Z3DGlobalParameters::Z3DGlobalParameters(RenderBackend backend)
 
   addParameter(transparencyMethod);
 
-  // Vulkan-only option: expose exact OIT (PPLL) only when Vulkan backend is active.
-  // Keep OpenGL UI clean (and avoid misleading selection of a Vulkan-only mode).
-  const QString ddpLabel = QStringLiteral("Dual Depth Peeling");
-  const QString ppllLabel = QStringLiteral("Per-Pixel Fragment List (PPLL Exact)");
-  RenderBackend lastBackendForTransparencyOptions = backend;
-  auto updateTransparencyOptionsForBackend = [this, ddpLabel, ppllLabel, lastBackendForTransparencyOptions]() mutable {
-    const RenderBackend backend = static_cast<RenderBackend>(renderBackend.associatedData());
-    const bool shouldExposePPLL = (backend == RenderBackend::Vulkan);
-    const bool hasPPLL = transparencyMethod.hasOption(ppllLabel);
-    if (shouldExposePPLL) {
-      if (!hasPPLL) {
-        transparencyMethod.addOptionWithData(
-          std::make_pair(ppllLabel, static_cast<int>(TransparencyMode::PerPixelFragmentList)));
-      }
-      // Temporary Vulkan performance workaround:
-      //
-      // If the user is switching from OpenGL->Vulkan while using Dual Depth Peeling,
-      // default to PPLL on Vulkan. Our current Vulkan DDP implementation performs a
-      // CPU readback for device-limit handling and is therefore much slower than
-      // PPLL in practice. Users can still manually re-select DDP in the UI if
-      // they need it.
-      if (lastBackendForTransparencyOptions == RenderBackend::OpenGL && transparencyMethod.isSelected(ddpLabel)) {
-        transparencyMethod.select(ppllLabel);
-      }
-      lastBackendForTransparencyOptions = backend;
-      return;
-    }
-
-    if (!hasPPLL) {
-      lastBackendForTransparencyOptions = backend;
-      return;
-    }
-    if (transparencyMethod.isSelected(ppllLabel)) {
-      transparencyMethod.select(ddpLabel);
-    }
-    transparencyMethod.removeOption(ppllLabel);
-    lastBackendForTransparencyOptions = backend;
-  };
-
-  updateTransparencyOptionsForBackend();
+  // Vulkan-only option: expose exact OIT (PPLL) only when Vulkan is selected.
+  updateTransparencyOptionsForBackend(backend);
   addParameter(weightedBlendedDepthScale);
   weightedBlendedDepthScale.setDescription(
     QStringLiteral("Tuning scalar for Weighted Blended transparency. Increase to reduce bleed-through;"
@@ -158,7 +121,9 @@ Z3DGlobalParameters::Z3DGlobalParameters(RenderBackend backend)
           &ZStringIntOptionParameter::valueChanged,
           this,
           &Z3DGlobalParameters::markGlobalSceneStateDirty);
-  connect(&renderBackend, &ZStringIntOptionParameter::valueChanged, this, updateTransparencyOptionsForBackend);
+  connect(&renderBackend, &ZStringIntOptionParameter::valueChanged, this, [this]() {
+    updateTransparencyOptionsForBackend(static_cast<RenderBackend>(renderBackend.associatedData()));
+  });
 
   // lights
   QString lightname = "Key Light";
@@ -366,6 +331,53 @@ Z3DGlobalParameters::Z3DGlobalParameters(RenderBackend backend)
     QStringLiteral("Detected display scale (read-only); used to auto-tune anti-aliasing."));
 
   pickingManager.setDevicePixelRatio(devicePixelRatio.get());
+}
+
+void Z3DGlobalParameters::updateTransparencyOptionsForBackend(RenderBackend backend)
+{
+  CHECK(backend == RenderBackend::OpenGL || backend == RenderBackend::Vulkan)
+    << "Cannot update transparency options for an invalid render backend";
+  const QString ddpLabel = QStringLiteral("Dual Depth Peeling");
+  const QString ppllLabel = QStringLiteral("Per-Pixel Fragment List (PPLL Exact)");
+  const bool hasPPLL = transparencyMethod.hasOption(ppllLabel);
+
+  if (backend == RenderBackend::Vulkan) {
+    const bool enteringVulkan = !hasPPLL;
+    if (enteringVulkan) {
+      transparencyMethod.addOptionWithData(
+        std::make_pair(ppllLabel, static_cast<int>(TransparencyMode::PerPixelFragmentList)));
+    }
+    // Vulkan DDP currently has a CPU readback cost, so preserve the existing
+    // OpenGL->Vulkan default to PPLL. Users can still select DDP afterwards.
+    if (enteringVulkan && transparencyMethod.isSelected(ddpLabel)) {
+      transparencyMethod.select(ppllLabel);
+    }
+    return;
+  }
+
+  if (hasPPLL) {
+    if (transparencyMethod.isSelected(ppllLabel)) {
+      transparencyMethod.select(ddpLabel);
+    }
+    transparencyMethod.removeOption(ppllLabel);
+  }
+}
+
+void Z3DGlobalParameters::restoreOpenGLAfterFailedVulkanInitialization()
+{
+  CHECK(QThread::currentThread() == thread()) << "Render backend recovery must run on the parameters owner thread";
+  CHECK_EQ(renderBackend.associatedData(), static_cast<int>(RenderBackend::Vulkan))
+    << "Vulkan initialization recovery requires a pending Vulkan selection";
+  CHECK(camera.get().getBackend() == RenderBackend::OpenGL)
+    << "Vulkan initialization may only recover to a still-active OpenGL backend";
+
+  // applyBackendSwitch() can run synchronously from renderBackend.valueChanged,
+  // while the normal parameter setter is deliberately non-reentrant.
+  renderBackend.restoreSelectionWithoutValueChanged(enumToQString(RenderBackend::OpenGL));
+  updateTransparencyOptionsForBackend(RenderBackend::OpenGL);
+  markGlobalSceneStateDirty();
+
+  CHECK_EQ(renderBackend.associatedData(), static_cast<int>(RenderBackend::OpenGL));
 }
 
 void Z3DGlobalParameters::setDevicePixelRatio(float f)

@@ -29,6 +29,7 @@ public:
   {
     // Work submitted
     uint32_t drawsSubmitted = 0;
+    uint32_t fenceWaits = 0;
 
     // Descriptor/arena
     uint32_t descriptorSetsAllocated = 0;
@@ -103,6 +104,13 @@ public:
   };
 
   static Z3DPerfCollector& instance();
+
+  // `off` disables performance-token registration, CPU/GPU scopes, and
+  // collector ingestion; functional render-frame identity remains active.
+  // `light` keeps top-level submission/pass metrics; `full` additionally
+  // enables nested GPU scopes recorded inside those passes.
+  [[nodiscard]] static bool enabled();
+  [[nodiscard]] static bool nestedGpuScopesEnabled();
 
   // Ingest a submission's scopes under a token.
   void addSubmission(uint64_t token,

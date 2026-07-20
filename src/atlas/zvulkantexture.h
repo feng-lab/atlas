@@ -166,6 +166,19 @@ public:
     return m_imageGeneration;
   }
 
+  // Stable for this C++ texture object's lifetime, even if its CPU address is
+  // later reused by another object. Bindless caches combine this with
+  // imageGeneration() to distinguish object replacement from image recreation.
+  [[nodiscard]] uint64_t descriptorIdentity() const
+  {
+    return m_descriptorIdentity;
+  }
+
+  // Internal bindless-lifetime hook. Registration calls this while allocation
+  // is still allowed so the noexcept destructor can later transfer Vulkan
+  // handles into a preallocated completion-safe retirement holder.
+  void ensureBindlessRetirementResources();
+
   // Best-effort: returns the VMA allocation size when resident, otherwise 0.
   [[nodiscard]] uint64_t allocationSizeBytes() const;
 
@@ -285,6 +298,8 @@ public:
                                   bool flipY = true);
 
 private:
+  struct DeferredResources;
+
   void createImage();
   void allocateMemory();
   void createImageView();
@@ -294,6 +309,8 @@ private:
   vk::ImageView imageViewForAspect(vk::ImageAspectFlags aspect) const;
 
   ZVulkanDevice& m_device;
+  const uint64_t m_descriptorIdentity;
+  std::shared_ptr<DeferredResources> m_deferredResources;
   CreateInfo m_createInfo;
   vk::Extent3D m_extent;
   vk::Format m_format;

@@ -56,6 +56,7 @@
 #include <span>
 #include <string_view>
 #include <thread>
+#include <utility>
 #include <vector>
 #include <cstring>
 #include <cstdint>
@@ -373,11 +374,9 @@ void Z3DRendererVulkanBackend::preBackendSwitch()
   Z3DRenderGlobalState::instance().scratchPool().setVulkanReleaseScheduler({});
   Z3DRenderGlobalState::instance().scratchPool().setVulkanMemoryPressureHandler({});
 
-  // Drop shared placeholders; they'll be recreated lazily on next use.
-  m_defaultPlaceholder2D.reset();
-  m_defaultSampler.reset();
-  m_nearestClampSampler.reset();
-  m_linearBorderZero3DSampler.reset();
+  // Drop backend-local descriptor resources; device-owned bindless resources
+  // are released with ZVulkanDevice after every backend has drained.
+  m_defaultPlaceholderStorageBuffer.reset();
   m_sharedDescriptorLayouts = {};
   // Finish any in-flight frame before we start tearing resources down.
   if (m_frameRecording && m_activeFrameHandle && m_activeFrameHandle->valid()) {
@@ -388,6 +387,7 @@ void Z3DRendererVulkanBackend::preBackendSwitch()
       LOG(ERROR) << "Vulkan command buffer end during backend switch failed: " << e.what();
     }
     m_frameRecording = false;
+    releaseDeviceDescriptorSetRecording();
   }
   m_activeFrameHandle.reset();
   m_activeFrame = nullptr;
@@ -419,6 +419,10 @@ void Z3DRendererVulkanBackend::preBackendSwitch()
 
 void Z3DRendererVulkanBackend::beginPassScope(std::string_view label)
 {
+  if (!Z3DPerfCollector::enabled()) {
+    m_passScope = {};
+    return;
+  }
   m_passScope = {};
   m_passScope.active = true;
   m_passScope.label = std::string(label);
@@ -501,7 +505,7 @@ void Z3DRendererVulkanBackend::endPassScope()
 
 void Z3DRendererVulkanBackend::notifyDrawSubmitted()
 {
-  if (m_activeFrame) {
+  if (m_activeFrame && m_activeFrame->perfCollectionEnabled) {
     m_activeFrame->drawsSubmitted++;
   }
   if (m_passScope.active) {
@@ -565,6 +569,13 @@ void Z3DRendererVulkanBackend::setPendingBeginRenderPreRecordActions(std::vector
   m_pendingBeginRenderPreRecordLabel = std::string(debugLabel);
 }
 
+void Z3DRendererVulkanBackend::setPendingBeginRenderRequirements(SubmissionRequirements requirements)
+{
+  CHECK_EQ(m_pendingBeginRenderRequirements, requirementMask(SubmissionRequirement::None))
+    << "Pending beginRender submission requirements already set";
+  m_pendingBeginRenderRequirements = requirements;
+}
+
 void Z3DRendererVulkanBackend::setPendingBeginRenderScriptStats(BeginRenderScriptStats stats)
 {
   CHECK(!m_pendingBeginRenderScriptStats.has_value()) << "Pending beginRender script stats already set";
@@ -573,7 +584,9 @@ void Z3DRendererVulkanBackend::setPendingBeginRenderScriptStats(BeginRenderScrip
 
 void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
 {
-  const auto beginRenderEntry = std::chrono::steady_clock::now();
+  const bool perfCollectionEnabled = Z3DPerfCollector::enabled();
+  const auto beginRenderEntry =
+    perfCollectionEnabled ? std::chrono::steady_clock::now() : std::chrono::steady_clock::time_point{};
 
   // Expose the thread-local "current backend" only after a frame slot is active.
   // This avoids call sites (debug validation, descriptor helpers) observing a
@@ -587,6 +600,9 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
   m_pendingBeginRenderPreRecordLabel.clear();
   std::optional<BeginRenderScriptStats> scriptStats = std::move(m_pendingBeginRenderScriptStats);
   m_pendingBeginRenderScriptStats.reset();
+  const SubmissionRequirements submissionRequirements =
+    std::exchange(m_pendingBeginRenderRequirements, requirementMask(SubmissionRequirement::None));
+  const bool requiresDDPGating = (submissionRequirements & requirementMask(SubmissionRequirement::DDPGating)) != 0u;
   // Per-frame recording state
   m_externalBufferUseStates.clear();
   if (m_lineContext) {
@@ -725,6 +741,7 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
   }
 
   if (width == 0U || height == 0U) {
+    CHECK(!m_deviceDescriptorSetRecording);
     m_activeFrameHandle.reset();
     m_activeFrame = nullptr;
     m_frameRecording = false;
@@ -735,8 +752,13 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
     return;
   }
 
+  // Device-owned placeholders may issue immediate upload commands, so prepare
+  // the complete bindless lifetime domain before acquiring the submission slot
+  // whose command buffer this backend will record.
+  m_sharedDevice->prepareBindlessDescriptorState();
   m_activeFrameHandle = device().frameExecutor().beginFrame();
   if (!m_activeFrameHandle || !m_activeFrameHandle->valid()) {
+    CHECK(!m_deviceDescriptorSetRecording);
     m_activeFrame = nullptr;
     m_frameRecording = false;
     m_submissionResourcePinningOpen = false;
@@ -745,6 +767,11 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
     s_currentBackend = nullptr;
     return;
   }
+
+  // beginFrame() has completed this slot's prior fence wait. Reclaim retired
+  // descriptors/resources and start the slot-local registration epoch before
+  // any current-submission texture indices are assigned.
+  m_sharedDevice->beginBindlessFrameSlot(*m_activeFrameHandle);
 
   auto& frameResources = ensureFrameResourcesForKey(m_activeFrameHandle->key());
   CHECK(m_staticCacheEpoch < std::numeric_limits<uint64_t>::max()) << "Static cache epoch overflow";
@@ -777,7 +804,9 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
   ensureUniformArena(frameResources);
   ensurePersistentUniformArena(frameResources);
   ensureBindlessSampledImagesOnFrame(frameResources);
-  ensureDDPGatingResources(frameResources);
+  if (requiresDDPGating) {
+    ensureDDPGatingResources(frameResources);
+  }
   // Expose frame resources early so suballocateUniform can target this frame.
   m_activeFrame = &frameResources;
   m_submissionResourcePinningOpen = true;
@@ -902,23 +931,30 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
   // Capture the frame name from the renderer (if provided)
   frameResources.frameName = std::string(renderer.currentFrameLabel());
   frameResources.progressivePassHint = renderer.currentRenderPassIsProgressive();
-  const auto now = std::chrono::steady_clock::now();
-  frameResources.beginRenderPreambleMs = std::chrono::duration<double, std::milli>(now - beginRenderEntry).count();
-  const auto perfStart = Z3DRenderGlobalState::instance().currentPerfFrameStartTime();
-  if (perfStart.time_since_epoch().count() != 0) {
-    frameResources.preCpuStartMs = std::chrono::duration<double, std::milli>(now - perfStart).count();
-  } else {
-    frameResources.preCpuStartMs.reset();
-  }
-  frameResources.cpuStart = now;
-  frameResources.cpuEnd = {};
-  // Tag this submission with the current real-frame token and a submission index
-  frameResources.realFrameToken = Z3DRenderGlobalState::instance().currentPerfFrameToken();
+  frameResources.perfCollectionEnabled = perfCollectionEnabled;
+  frameResources.realFrameToken = Z3DRenderGlobalState::instance().currentRenderFrameToken();
+  CHECK_GT(frameResources.realFrameToken, 0u) << "Vulkan submission requires an active render-frame token";
   frameResources.submissionId =
-    Z3DRenderGlobalState::instance().nextPerfFrameSubmissionId(frameResources.realFrameToken);
-  if (frameResources.realFrameToken != 0) {
-    Z3DPerfCollector::instance().noteSubmissionStarted(frameResources.realFrameToken, frameResources.submissionId);
+    Z3DRenderGlobalState::instance().nextRenderFrameSubmissionId(frameResources.realFrameToken);
+  CHECK_LT(m_nextUniformCacheGeneration, std::numeric_limits<uint64_t>::max())
+    << "Vulkan persistent-uniform cache generation overflow";
+  frameResources.uniformCacheGeneration = ++m_nextUniformCacheGeneration;
+  if (perfCollectionEnabled) {
+    const auto now = std::chrono::steady_clock::now();
+    frameResources.beginRenderPreambleMs = std::chrono::duration<double, std::milli>(now - beginRenderEntry).count();
+    const auto perfStart = Z3DRenderGlobalState::instance().currentPerfFrameStartTime();
+    if (perfStart.time_since_epoch().count() != 0) {
+      frameResources.preCpuStartMs = std::chrono::duration<double, std::milli>(now - perfStart).count();
+    } else {
+      frameResources.preCpuStartMs.reset();
+    }
+    frameResources.cpuStart = now;
+  } else {
+    frameResources.beginRenderPreambleMs = 0.0;
+    frameResources.preCpuStartMs.reset();
+    frameResources.cpuStart = {};
   }
+  frameResources.cpuEnd = {};
   // Reset Stage 3 instrumentation
   frameResources.renderingSegmentsBegan = 0;
   frameResources.attachmentClears = 0;
@@ -944,6 +980,7 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
   frameResources.pendingColorReadbacks.clear();
   frameResources.pendingBufferReadbacks.clear();
   frameResources.forceFenceWaitForCompletionSafePoint = false;
+  frameResources.fenceWaits = m_activeFrameHandle->waitedForReuse() ? 1u : 0u;
   frameResources.readbackBytesCopied = 0;
   frameResources.readbackSlotsInFlight = 0;
   frameResources.allSamples = 0;
@@ -1004,7 +1041,7 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
 
   // Prime helper compute descriptor sets that are bound during recording. This
   // keeps vkUpdateDescriptorSets out of command buffer recording on all paths.
-  {
+  if (requiresDDPGating) {
     ensureDDPComputePipeline();
     CHECK(m_ddpCountSetLayout.has_value()) << "DDP count compute descriptor set layout missing";
     CHECK(m_activeFrame != nullptr) << "DDP compute priming requires an active frame";
@@ -1025,6 +1062,11 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
   // descriptor priming is intentionally avoided to keep all common descriptor
   // state centralized and stable across frames.
 
+  // Completion callbacks and pre-record warmups can destroy the last texture
+  // after the initial slot drain. Sanitize remaining retired descriptors before
+  // recording; their GPU holders stay alive for any other in-flight slots.
+  m_sharedDevice->drainBindlessRetirements(*m_activeFrameHandle);
+
   vk::CommandBufferBeginInfo beginInfo{.flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit};
   auto& cmdBuffer = m_activeFrameHandle->commandBuffer();
   if (VLOG_IS_ON(2)) {
@@ -1032,9 +1074,16 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
   }
   cmdBuffer.begin(beginInfo);
   if (timestampQueriesEnabled()) {
+    if (static_cast<vk::QueryPool>(frameResources.queryPool) == vk::QueryPool{}) {
+      auto& vkDevice = m_sharedDevice->context().device();
+      vk::QueryPoolCreateInfo queryInfo{.queryType = vk::QueryType::eTimestamp, .queryCount = kMaxTimestampQueries};
+      frameResources.queryPool = vk::raii::QueryPool(vkDevice, queryInfo);
+    }
     cmdBuffer.resetQueryPool(*frameResources.queryPool, 0, kMaxTimestampQueries);
   }
 
+  m_sharedDevice->beginDescriptorSetRecording(this);
+  m_deviceDescriptorSetRecording = true;
   m_frameRecording = true;
 
   // Install scratch-pool deferred release scheduler for this backend.
@@ -1140,6 +1189,7 @@ void Z3DRendererVulkanBackend::endRender(Z3DRendererBase& renderer)
     s_currentBackend = nullptr;
   });
   if (!m_activeFrame || !m_activeFrameHandle || !m_activeFrameHandle->valid()) {
+    releaseDeviceDescriptorSetRecording();
     m_submissionResourcePinningOpen = false;
     return;
   }
@@ -1149,6 +1199,7 @@ void Z3DRendererVulkanBackend::endRender(Z3DRendererBase& renderer)
   m_lastSubmittedFrameKey = frameHandle.key();
 
   auto resetActiveStateGuard = folly::makeGuard([this]() {
+    releaseDeviceDescriptorSetRecording();
     m_frameRecording = false;
     m_submissionResourcePinningOpen = false;
     m_activeFrameHandle.reset();
@@ -1247,8 +1298,10 @@ void Z3DRendererVulkanBackend::endRender(Z3DRendererBase& renderer)
   }
 
   m_frameRecording = false;
+  releaseDeviceDescriptorSetRecording();
 
-  frame.cpuEnd = std::chrono::steady_clock::now();
+  frame.cpuEnd =
+    frame.perfCollectionEnabled ? std::chrono::steady_clock::now() : std::chrono::steady_clock::time_point{};
 
   auto& context = m_sharedDevice->context();
   auto& queue = context.graphicsQueue();
@@ -1276,8 +1329,7 @@ void Z3DRendererVulkanBackend::endRender(Z3DRendererBase& renderer)
                                                !m_activeFrame->pendingBufferReadbacks.empty()));
   const bool progressivePassHint = frame.progressivePassHint;
   const bool waitForReadbacksPolicy = !progressivePassHint;
-  const bool needFenceWait = (m_pumpFenceAfterFirstSubmit || frame.forceFenceWaitForCompletionSafePoint ||
-                              (hasReadbacks && waitForReadbacksPolicy));
+  const bool needFenceWait = frame.forceFenceWaitForCompletionSafePoint || (hasReadbacks && waitForReadbacksPolicy);
   if (VLOG_IS_ON(1)) {
     VLOG(1) << fmt::format(
       "VK queueSubmit: frame='{}' token={} submit#{} cmd=0x{:x} fence=0x{:x} has_readback={} progressive_pass_hint={} wait_for_readbacks_policy={} force_safe_point_wait={} will_wait={} pending_color_readbacks={} pending_buffer_readbacks={}",
@@ -1311,6 +1363,15 @@ void Z3DRendererVulkanBackend::endRender(Z3DRendererBase& renderer)
     LOG(ERROR) << "Vulkan queue submit failed: " << e.what();
   }
 
+  // Register only work that actually reached the queue. Registering during
+  // beginRender() leaves the collector waiting forever if recording or
+  // submission fails before a GPU completion can ingest the submission.
+  if (submitted && frame.perfCollectionEnabled) {
+    CHECK_GT(frame.realFrameToken, 0u);
+    CHECK_GT(frame.submissionId, 0u);
+    Z3DPerfCollector::instance().noteSubmissionStarted(frame.realFrameToken, frame.submissionId);
+  }
+
   if (!submitted) {
     if (!frame.residencyPinnedTextures.empty()) {
       for (auto* tex : frame.residencyPinnedTextures) {
@@ -1339,8 +1400,18 @@ void Z3DRendererVulkanBackend::endRender(Z3DRendererBase& renderer)
       }
       frame.pinnedStaticSegments.clear();
     }
+    // This recording never became a collector submission. Clear its perf
+    // identity before any later frame-slot safe point inspects the record.
+    frame.realFrameToken = 0;
+    frame.submissionId = 0;
+    frame.perfCollectionEnabled = false;
+    frame.cpuStart = {};
+    frame.cpuEnd = {};
+    frame.preCpuStartMs.reset();
+    frame.gpuScopes.clear();
+    frame.cpuScopes.clear();
+    frame.nextQuery = 0;
   }
-
   // Collect this submission's CPU/GPU timings when the fence completes.
   //
   // Why: all Vulkan renderer backends share a single ZVulkanFrameExecutor ring
@@ -1391,11 +1462,6 @@ void Z3DRendererVulkanBackend::endRender(Z3DRendererBase& renderer)
             backend->enterCompletionSafePointForKeyIfMatches(frameKey, expectedToken, expectedSubmissionId);
           });
         });
-    } else {
-      // Avoid stalling the perf collector on a started submission that never
-      // reaches the GPU. This is an external failure path, so we still emit the
-      // CPU-side timing/log line best-effort (GPU scopes may be unavailable).
-      collectFrameTimings(frame);
     }
   }
 
@@ -1428,6 +1494,7 @@ void Z3DRendererVulkanBackend::endRender(Z3DRendererBase& renderer)
       const folly::CancellationToken cancellationToken = Z3DRenderGlobalState::instance().currentCancellationToken();
       void* waitedKey = frameHandle.key();
       bool waitedKeyCompleted = false;
+      bool countedBlockingWait = false;
       bool cancellationRequested = false;
       while (!waitedKeyCompleted) {
         cancellationRequested |= cancellationToken.isCancellationRequested();
@@ -1445,6 +1512,12 @@ void Z3DRendererVulkanBackend::endRender(Z3DRendererBase& renderer)
         }
 
         if (!waitedKeyCompleted) {
+          if (!countedBlockingWait) {
+            CHECK_LT(frame.fenceWaits, std::numeric_limits<uint32_t>::max())
+              << "Vulkan submission fence-wait count overflow";
+            ++frame.fenceWaits;
+            countedBlockingWait = true;
+          }
           std::this_thread::sleep_for(kPollInterval);
         }
       }
@@ -1460,11 +1533,6 @@ void Z3DRendererVulkanBackend::endRender(Z3DRendererBase& renderer)
       }
     }
 
-    // Fence signaled; safe-point work executed.
-    if (m_pumpFenceAfterFirstSubmit) {
-      VLOG(1) << "VK pumped first-frame fence: delivered readback callbacks";
-      m_pumpFenceAfterFirstSubmit = false;
-    }
   } else {
     // Poll completion callbacks; some fences may have signaled already.
     m_completedFrameKeysScratch.clear();
@@ -2534,76 +2602,6 @@ void Z3DRendererVulkanBackend::ensureDefaultPlaceholders()
 {
   ensureDevice();
   CHECK(m_sharedDevice != nullptr) << "Shared Vulkan device missing in ensureDefaultPlaceholders";
-  if (!m_defaultPlaceholder2D) {
-    // 1x1 RGBA8 white texture for placeholder sampling
-    m_defaultPlaceholder2D =
-      m_sharedDevice->createTexture(1,
-                                    1,
-                                    vk::Format::eR8G8B8A8Unorm,
-                                    vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
-                                    vk::MemoryPropertyFlagBits::eDeviceLocal);
-    uint32_t pixel = 0xffffffffu;
-    m_defaultPlaceholder2D->uploadData(&pixel, sizeof(pixel), vk::ImageLayout::eShaderReadOnlyOptimal);
-  }
-  if (!m_defaultPlaceholder2DArray) {
-    auto info =
-      ZVulkanTexture::CreateInfo::make2DArray(1,
-                                              1,
-                                              1,
-                                              vk::Format::eR8G8B8A8Unorm,
-                                              vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
-                                              vk::MemoryPropertyFlagBits::eDeviceLocal,
-                                              1u,
-                                              true,
-                                              vk::ImageLayout::eShaderReadOnlyOptimal);
-    m_defaultPlaceholder2DArray = m_sharedDevice->createTexture(info);
-    uint32_t pixel = 0xffffffffu;
-    m_defaultPlaceholder2DArray->uploadData(&pixel, sizeof(pixel), vk::ImageLayout::eShaderReadOnlyOptimal);
-  }
-  if (!m_defaultPlaceholder3D) {
-    auto info =
-      ZVulkanTexture::CreateInfo::make3D(1,
-                                         1,
-                                         1,
-                                         vk::Format::eR8Unorm,
-                                         vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
-                                         vk::MemoryPropertyFlagBits::eDeviceLocal,
-                                         1u,
-                                         true,
-                                         vk::ImageLayout::eShaderReadOnlyOptimal);
-    m_defaultPlaceholder3D = m_sharedDevice->createTexture(info);
-    const uint8_t zero = 0u;
-    m_defaultPlaceholder3D->uploadData(&zero, sizeof(zero), vk::ImageLayout::eShaderReadOnlyOptimal);
-  }
-  if (!m_defaultPlaceholderU2D) {
-    auto info =
-      ZVulkanTexture::CreateInfo::make2D(1,
-                                         1,
-                                         vk::Format::eR32G32B32A32Uint,
-                                         vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
-                                         vk::MemoryPropertyFlagBits::eDeviceLocal,
-                                         1u,
-                                         true,
-                                         vk::ImageLayout::eShaderReadOnlyOptimal);
-    m_defaultPlaceholderU2D = m_sharedDevice->createTexture(info);
-    std::array<uint32_t, 4> zero{0u, 0u, 0u, 0u};
-    m_defaultPlaceholderU2D->uploadData(zero.data(), sizeof(zero), vk::ImageLayout::eShaderReadOnlyOptimal);
-  }
-  if (!m_defaultPlaceholderU3D) {
-    auto info =
-      ZVulkanTexture::CreateInfo::make3D(1,
-                                         1,
-                                         1,
-                                         vk::Format::eR32G32B32A32Uint,
-                                         vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
-                                         vk::MemoryPropertyFlagBits::eDeviceLocal,
-                                         1u,
-                                         true,
-                                         vk::ImageLayout::eShaderReadOnlyOptimal);
-    m_defaultPlaceholderU3D = m_sharedDevice->createTexture(info);
-    std::array<uint32_t, 4> zero{0u, 0u, 0u, 0u};
-    m_defaultPlaceholderU3D->uploadData(zero.data(), sizeof(zero), vk::ImageLayout::eShaderReadOnlyOptimal);
-  }
   if (!m_defaultPlaceholderStorageBuffer) {
     // Tiny 4-byte storage buffer used to satisfy unused SSBO bindings.
     m_defaultPlaceholderStorageBuffer = m_sharedDevice->createBuffer(sizeof(uint32_t),
@@ -2613,13 +2611,13 @@ void Z3DRendererVulkanBackend::ensureDefaultPlaceholders()
     const uint32_t zero = 0u;
     m_defaultPlaceholderStorageBuffer->copyData(&zero, sizeof(zero));
   }
-  ensureSharedSamplers();
 }
 
 ZVulkanTexture& Z3DRendererVulkanBackend::defaultPlaceholderTexture2D()
 {
-  ensureDefaultPlaceholders();
-  return *m_defaultPlaceholder2D;
+  ensureDevice();
+  CHECK(m_sharedDevice != nullptr) << "Shared Vulkan device missing in defaultPlaceholderTexture2D";
+  return m_sharedDevice->defaultBindlessPlaceholderTexture2D();
 }
 
 void Z3DRendererVulkanBackend::ensureSharedDescriptorLayouts()
@@ -2628,92 +2626,6 @@ void Z3DRendererVulkanBackend::ensureSharedDescriptorLayouts()
   CHECK(m_sharedDevice != nullptr) << "Shared Vulkan device missing in ensureSharedDescriptorLayouts";
 
   auto& vkDevice = m_sharedDevice->context().device();
-
-  const auto& caps = m_sharedDevice->context().effectiveBindlessSampledImageCapacities();
-  const uint32_t cap2D = caps.texture2D;
-  const uint32_t cap2DArray = caps.texture2DArray;
-  const uint32_t cap3D = caps.texture3D;
-  const uint32_t capU2D = caps.uTexture2D;
-  const uint32_t capU3D = caps.uTexture3D;
-
-  if (!m_sharedDescriptorLayouts.bindlessSampledImages) {
-    const bool useUpdateAfterBind = m_sharedDevice->context().supportsDescriptorIndexingSampledImageUpdateAfterBind();
-
-    const vk::ShaderStageFlags fragStage = vk::ShaderStageFlagBits::eFragment;
-    const vk::ShaderStageFlags compStage = vk::ShaderStageFlagBits::eCompute;
-    ensureSharedSamplers();
-    CHECK(m_defaultSampler.has_value() && m_nearestClampSampler.has_value() && m_linearBorderZero3DSampler.has_value())
-      << "Bindless set layout requires shared samplers to be initialized";
-    const std::array<vk::Sampler, 1> linearSamplers{**m_defaultSampler};
-    const std::array<vk::Sampler, 1> nearestSamplers{**m_nearestClampSampler};
-    const std::array<vk::Sampler, 1> linearBorderZero3DSamplers{**m_linearBorderZero3DSampler};
-    std::array<vk::DescriptorSetLayoutBinding, 8> bindings{
-      vk::DescriptorSetLayoutBinding{.binding = vkbind::kBindingBindlessTexture2D,
-                                     .descriptorType = vk::DescriptorType::eSampledImage,
-                                     .descriptorCount = cap2D,
-                                     .stageFlags = fragStage},
-      vk::DescriptorSetLayoutBinding{.binding = vkbind::kBindingBindlessTexture2DArray,
-                                     .descriptorType = vk::DescriptorType::eSampledImage,
-                                     .descriptorCount = cap2DArray,
-                                     .stageFlags = fragStage},
-      vk::DescriptorSetLayoutBinding{.binding = vkbind::kBindingBindlessTexture3D,
-                                     .descriptorType = vk::DescriptorType::eSampledImage,
-                                     .descriptorCount = cap3D,
-                                     .stageFlags = fragStage},
-      vk::DescriptorSetLayoutBinding{.binding = vkbind::kBindingBindlessUTexture2D,
-                                     .descriptorType = vk::DescriptorType::eSampledImage,
-                                     .descriptorCount = capU2D,
-                                     .stageFlags = compStage},
-      vk::DescriptorSetLayoutBinding{.binding = vkbind::kBindingBindlessUTexture3D,
-                                     .descriptorType = vk::DescriptorType::eSampledImage,
-                                     .descriptorCount = capU3D,
-                                     .stageFlags = fragStage},
-      vk::DescriptorSetLayoutBinding{.binding = vkbind::kBindingBindlessSamplerLinearClamp,
-                                     .descriptorType = vk::DescriptorType::eSampler,
-                                     .descriptorCount = 1,
-                                     .stageFlags = fragStage,
-                                     .pImmutableSamplers = linearSamplers.data()},
-      vk::DescriptorSetLayoutBinding{.binding = vkbind::kBindingBindlessSamplerNearestClamp,
-                                     .descriptorType = vk::DescriptorType::eSampler,
-                                     .descriptorCount = 1,
-                                     .stageFlags = fragStage | compStage,
-                                     .pImmutableSamplers = nearestSamplers.data()},
-      vk::DescriptorSetLayoutBinding{.binding = vkbind::kBindingBindlessSamplerLinearBorderZero3D,
-                                     .descriptorType = vk::DescriptorType::eSampler,
-                                     .descriptorCount = 1,
-                                     .stageFlags = fragStage,
-                                     .pImmutableSamplers = linearBorderZero3DSamplers.data()},
-    };
-
-    // Enable descriptor indexing on these bindings:
-    // - Partially bound: not all array elements must be populated.
-    // - Update-after-bind: when enabled, large bindless arrays are accounted
-    //   against descriptor indexing limits.
-    std::array<vk::DescriptorBindingFlags, 8> bindingFlags{};
-    for (size_t i = 0; i < 5; ++i) {
-      vk::DescriptorBindingFlags f = vk::DescriptorBindingFlagBits::ePartiallyBound;
-      if (useUpdateAfterBind) {
-        f |= vk::DescriptorBindingFlagBits::eUpdateAfterBind;
-      }
-      bindingFlags[i] = f;
-    }
-    vk::DescriptorSetLayoutBindingFlagsCreateInfo flagsInfo{
-      .bindingCount = static_cast<uint32_t>(bindingFlags.size()),
-      .pBindingFlags = bindingFlags.data(),
-    };
-
-    vk::DescriptorSetLayoutCreateFlags layoutFlags{};
-    if (useUpdateAfterBind) {
-      layoutFlags |= vk::DescriptorSetLayoutCreateFlagBits::eUpdateAfterBindPool;
-    }
-    vk::DescriptorSetLayoutCreateInfo info{
-      .pNext = &flagsInfo,
-      .flags = layoutFlags,
-      .bindingCount = static_cast<uint32_t>(bindings.size()),
-      .pBindings = bindings.data(),
-    };
-    m_sharedDescriptorLayouts.bindlessSampledImages.emplace(vkDevice, info);
-  }
 
   if (!m_sharedDescriptorLayouts.lighting) {
     vk::DescriptorSetLayoutBinding binding{.binding = 0,
@@ -2726,7 +2638,7 @@ void Z3DRendererVulkanBackend::ensureSharedDescriptorLayouts()
   }
 
   if (!m_sharedDescriptorLayouts.transforms) {
-    std::array<vk::DescriptorSetLayoutBinding, 3> bindings{
+    std::array<vk::DescriptorSetLayoutBinding, vkbind::kTransformsUniformBufferDescriptorCount> bindings{
       vk::DescriptorSetLayoutBinding{.binding = 0,
                                      .descriptorType = vk::DescriptorType::eUniformBufferDynamic,
                                      .descriptorCount = 1,
@@ -2753,7 +2665,7 @@ void Z3DRendererVulkanBackend::ensureSharedDescriptorLayouts()
     // - binding 0: OIT params SSBO (viewport, pixelCount) for exact per-pixel fragment list (PPLL/A-buffer)
     // - binding 1: DDP "changed" flag SSBO (preserved binding index for existing shaders)
     // - bindings 2..5: PPLL buffers (counts/offsets/cursors/fragments)
-    std::array<vk::DescriptorSetLayoutBinding, 6> bindings{
+    std::array<vk::DescriptorSetLayoutBinding, vkbind::kOITStorageBufferBindingCount> bindings{
       vk::DescriptorSetLayoutBinding{.binding = vkbind::kBindingOITParams,
                                      .descriptorType = vk::DescriptorType::eStorageBuffer,
                                      .descriptorCount = 1,
@@ -2819,9 +2731,9 @@ void Z3DRendererVulkanBackend::ensureSharedDescriptorLayouts()
 
 vk::DescriptorSetLayout Z3DRendererVulkanBackend::bindlessSampledImageDescriptorSetLayout()
 {
-  ensureSharedDescriptorLayouts();
-  return m_sharedDescriptorLayouts.bindlessSampledImages ? **m_sharedDescriptorLayouts.bindlessSampledImages
-                                                         : vk::DescriptorSetLayout{};
+  ensureDevice();
+  CHECK(m_sharedDevice != nullptr) << "Shared Vulkan device missing in bindlessSampledImageDescriptorSetLayout";
+  return m_sharedDevice->bindlessSampledImageDescriptorSetLayout();
 }
 
 vk::DescriptorSetLayout Z3DRendererVulkanBackend::lightingDescriptorSetLayout()
@@ -2875,13 +2787,13 @@ vk::DescriptorSet Z3DRendererVulkanBackend::bindlessSampledImageDescriptorSet() 
   return m_activeFrame->bindlessSampledImages->descriptorSet();
 }
 
-uint64_t Z3DRendererVulkanBackend::bindlessSampledImageDescriptorSetGeneration() const
+uint64_t Z3DRendererVulkanBackend::bindlessSampledImageCommandBufferCompatibilityGeneration() const
 {
   if (!m_activeFrame || !m_activeFrameHandle || !m_activeFrameHandle->valid()) {
     return 0;
   }
   CHECK(m_activeFrame->bindlessSampledImages != nullptr) << "Bindless descriptor set missing on active frame-slot";
-  return m_activeFrame->bindlessSampledImages->generation();
+  return m_activeFrame->bindlessSampledImages->commandBufferCompatibilityGeneration();
 }
 
 vk::DescriptorSet Z3DRendererVulkanBackend::sharedEmptyDescriptorSet() const
@@ -3081,6 +2993,13 @@ uint32_t Z3DRendererVulkanBackend::bindlessRegisterSampledImageAuto(ZVulkanTextu
 
   ensureBindlessSampledImagesOnFrame(*m_activeFrame);
   CHECK(m_activeFrame->bindlessSampledImages != nullptr) << "Bindless descriptor set missing on active frame-slot";
+  CHECK(m_activeFrameHandle.has_value() && m_activeFrameHandle->valid())
+    << "Bindless registration requires an acquired executor frame";
+
+  // A pre-record cache replacement can destroy an old texture immediately
+  // before registering its replacement. Drain here so that retired index is
+  // available before table-capacity evaluation.
+  m_sharedDevice->drainBindlessRetirements(*m_activeFrameHandle);
 
   if (device().residencyManager().ensureResidentIfManaged(&texture,
                                                           debugLabel.empty() ? std::string_view("bindless_register")
@@ -3336,42 +3255,6 @@ void Z3DRendererVulkanBackend::bindlessPrePrimeImgSliceBlockIdCompaction(
                         << (debugLabel.empty() ? "" : " (") << debugLabel << (debugLabel.empty() ? "" : ")");
 
   m_imgSliceContext->preRecordPrimeBlockIdCompaction(blockIdLease, sliceCount, sliceIndex, maxBlockId);
-}
-
-void Z3DRendererVulkanBackend::ensureSharedSamplers()
-{
-  CHECK(m_sharedDevice != nullptr) << "Shared Vulkan device missing in ensureSharedSamplers";
-  auto& vkDevice = m_sharedDevice->context().device();
-  if (!m_defaultSampler) {
-    vk::SamplerCreateInfo samplerInfo{.magFilter = vk::Filter::eLinear,
-                                      .minFilter = vk::Filter::eLinear,
-                                      .mipmapMode = vk::SamplerMipmapMode::eNearest,
-                                      .addressModeU = vk::SamplerAddressMode::eClampToEdge,
-                                      .addressModeV = vk::SamplerAddressMode::eClampToEdge,
-                                      .addressModeW = vk::SamplerAddressMode::eClampToEdge,
-                                      .borderColor = vk::BorderColor::eFloatOpaqueWhite};
-    m_defaultSampler.emplace(vkDevice, samplerInfo);
-  }
-  if (!m_nearestClampSampler) {
-    vk::SamplerCreateInfo nearestInfo{.magFilter = vk::Filter::eNearest,
-                                      .minFilter = vk::Filter::eNearest,
-                                      .mipmapMode = vk::SamplerMipmapMode::eNearest,
-                                      .addressModeU = vk::SamplerAddressMode::eClampToEdge,
-                                      .addressModeV = vk::SamplerAddressMode::eClampToEdge,
-                                      .addressModeW = vk::SamplerAddressMode::eClampToEdge,
-                                      .borderColor = vk::BorderColor::eFloatOpaqueWhite};
-    m_nearestClampSampler.emplace(vkDevice, nearestInfo);
-  }
-  if (!m_linearBorderZero3DSampler) {
-    vk::SamplerCreateInfo linearBorderInfo{.magFilter = vk::Filter::eLinear,
-                                           .minFilter = vk::Filter::eLinear,
-                                           .mipmapMode = vk::SamplerMipmapMode::eNearest,
-                                           .addressModeU = vk::SamplerAddressMode::eClampToBorder,
-                                           .addressModeV = vk::SamplerAddressMode::eClampToBorder,
-                                           .addressModeW = vk::SamplerAddressMode::eClampToBorder,
-                                           .borderColor = vk::BorderColor::eFloatTransparentBlack};
-    m_linearBorderZero3DSampler.emplace(vkDevice, linearBorderInfo);
-  }
 }
 
 Z3DRendererVulkanBackend::FrameResources::UploadArena::Page*
@@ -3895,7 +3778,35 @@ struct PPLLParamsStd430
 
 static_assert(sizeof(PPLLParamsStd430) == 32, "PPLL params must match std430 layout (32B)");
 
-constexpr size_t kPPLLFragmentStrideBytes = 32; // vec4 + float (+ padding) in std430
+struct PPLLScanPushConstants
+{
+  uint32_t baseBlock = 0u;
+};
+
+static_assert(sizeof(PPLLScanPushConstants) == sizeof(uint32_t));
+
+// vec4 + float + a resolve-only uint index; std430 rounds the record to 32 bytes.
+constexpr size_t kPPLLFragmentStrideBytes = 32;
+
+void dispatchPPLLScanChunks(vk::raii::CommandBuffer& cmd,
+                            vk::PipelineLayout layout,
+                            uint32_t blockCount,
+                            uint32_t maxWorkGroupCountX)
+{
+  CHECK(layout != vk::PipelineLayout{});
+  CHECK_GT(blockCount, 0u);
+  CHECK_GT(maxWorkGroupCountX, 0u);
+
+  uint32_t baseBlock = 0u;
+  while (baseBlock < blockCount) {
+    const uint32_t groupCount = std::min(blockCount - baseBlock, maxWorkGroupCountX);
+    const PPLLScanPushConstants pushConstants{.baseBlock = baseBlock};
+    cmd.pushConstants(layout, vk::ShaderStageFlagBits::eCompute, 0, sizeof(pushConstants), &pushConstants);
+    cmd.dispatch(groupCount, 1, 1);
+    baseBlock += groupCount;
+  }
+  CHECK_EQ(baseBlock, blockCount) << "PPLL scan dispatch chunking did not cover every block";
+}
 
 } // namespace
 
@@ -3914,7 +3825,9 @@ void Z3DRendererVulkanBackend::ensurePPLLResources(const glm::uvec4& viewport, u
 
   ppll.pixelCount = static_cast<uint32_t>(pixelCount64);
   ppll.blockCount =
-    (ppll.pixelCount == 0u) ? 0u : ((ppll.pixelCount + PPLLResources::kBlockSize - 1u) / PPLLResources::kBlockSize);
+    pixelCount64 == 0u
+      ? 0u
+      : static_cast<uint32_t>((pixelCount64 + PPLLResources::kBlockSize - 1u) / PPLLResources::kBlockSize);
   ppll.requestedFragmentCount = requestedFragments;
   const uint64_t fragCount = std::max<uint64_t>(requestedFragments, 1u);
   CHECK(fragCount <= static_cast<uint64_t>(std::numeric_limits<uint32_t>::max()))
@@ -4049,6 +3962,7 @@ void Z3DRendererVulkanBackend::ensureDDPComputePipeline()
   m_ddpCountPipeline.emplace(device,
                              nullptr,
                              vk::ComputePipelineCreateInfo{.stage = stage, .layout = **m_ddpCountPipelineLayout});
+  notifyPipelineCreated();
 }
 
 void Z3DRendererVulkanBackend::ensurePPLLComputePipelines()
@@ -4072,6 +3986,9 @@ void Z3DRendererVulkanBackend::ensurePPLLComputePipelines()
       device,
       vk::ShaderModuleCreateInfo{.codeSize = code.size() * sizeof(uint32_t), .pCode = code.data()});
   };
+  const vk::PushConstantRange scanPushConstantRange{.stageFlags = vk::ShaderStageFlagBits::eCompute,
+                                                    .offset = 0,
+                                                    .size = sizeof(PPLLScanPushConstants)};
 
   if (!m_ppllScanLocalPipeline) {
     std::array<vk::DescriptorSetLayoutBinding, 4> bindings{
@@ -4100,7 +4017,9 @@ void Z3DRendererVulkanBackend::ensurePPLLComputePipelines()
     m_ppllScanLocalPipelineLayout.emplace(
       device,
       vk::PipelineLayoutCreateInfo{.setLayoutCount = static_cast<uint32_t>(setLayouts.size()),
-                                   .pSetLayouts = setLayouts.data()});
+                                   .pSetLayouts = setLayouts.data(),
+                                   .pushConstantRangeCount = 1,
+                                   .pPushConstantRanges = &scanPushConstantRange});
 
     auto module = loadModule(QStringLiteral("ppll_scan_local.comp.spv"));
     vk::PipelineShaderStageCreateInfo stage{.stage = vk::ShaderStageFlagBits::eCompute,
@@ -4110,6 +4029,7 @@ void Z3DRendererVulkanBackend::ensurePPLLComputePipelines()
       device,
       nullptr,
       vk::ComputePipelineCreateInfo{.stage = stage, .layout = **m_ppllScanLocalPipelineLayout});
+    notifyPipelineCreated();
   }
 
   if (!m_ppllScanAddPipeline) {
@@ -4135,7 +4055,9 @@ void Z3DRendererVulkanBackend::ensurePPLLComputePipelines()
     m_ppllScanAddPipelineLayout.emplace(
       device,
       vk::PipelineLayoutCreateInfo{.setLayoutCount = static_cast<uint32_t>(setLayouts.size()),
-                                   .pSetLayouts = setLayouts.data()});
+                                   .pSetLayouts = setLayouts.data(),
+                                   .pushConstantRangeCount = 1,
+                                   .pPushConstantRanges = &scanPushConstantRange});
 
     auto module = loadModule(QStringLiteral("ppll_scan_add.comp.spv"));
     vk::PipelineShaderStageCreateInfo stage{.stage = vk::ShaderStageFlagBits::eCompute,
@@ -4145,6 +4067,7 @@ void Z3DRendererVulkanBackend::ensurePPLLComputePipelines()
       device,
       nullptr,
       vk::ComputePipelineCreateInfo{.stage = stage, .layout = **m_ppllScanAddPipelineLayout});
+    notifyPipelineCreated();
   }
 }
 
@@ -4175,7 +4098,7 @@ void Z3DRendererVulkanBackend::primePPLLForStorePass(const glm::uvec4& viewport,
     m_ppllFrameRing.resize(desiredRing);
   }
   const size_t ringSize = m_ppllFrameRing.empty() ? 1 : m_ppllFrameRing.size();
-  const uint64_t realFrameToken = Z3DRenderGlobalState::instance().currentPerfFrameToken();
+  const uint64_t realFrameToken = Z3DRenderGlobalState::instance().currentRenderFrameToken();
   m_activePPLLIndex = static_cast<size_t>(realFrameToken % ringSize);
 
   ensurePPLLResources(viewport, requestedFragments);
@@ -4335,12 +4258,15 @@ void Z3DRendererVulkanBackend::primeOITDescriptorSet(ZVulkanDescriptorSet& set)
 {
   // Do not write descriptors during recording; callers must prime in beginRender().
   CHECK(!isRecording()) << "primeOITDescriptorSet called while recording";
+  ensureDefaultPlaceholders();
   if (auto* buf = ppllParamsBufferObj()) {
     set.updateStorageBuffer(vkbind::kBindingOITParams, *buf);
   }
-  if (auto* buf = ddpChangedFlagBufferObj()) {
-    set.updateStorageBuffer(vkbind::kBindingOITDDPFlag, *buf);
-  }
+  ZVulkanBuffer* ddpFlag = (m_activeFrame != nullptr && m_activeFrame->ddpChangedFlag)
+                             ? m_activeFrame->ddpChangedFlag.get()
+                             : m_defaultPlaceholderStorageBuffer.get();
+  CHECK(ddpFlag != nullptr) << "OIT descriptor set requires a DDP flag or placeholder buffer";
+  set.updateStorageBuffer(vkbind::kBindingOITDDPFlag, *ddpFlag);
   if (auto* buf = ppllCountsBufferObj()) {
     set.updateStorageBuffer(vkbind::kBindingOITPPLLCounts, *buf);
   }
@@ -4357,55 +4283,49 @@ void Z3DRendererVulkanBackend::primeOITDescriptorSet(ZVulkanDescriptorSet& set)
 
 vk::Buffer Z3DRendererVulkanBackend::ddpChangedFlagBuffer()
 {
-  if (!m_activeFrame) {
-    return {};
-  }
-  ensureDDPGatingResources(*m_activeFrame);
-  return m_activeFrame->ddpChangedFlag ? m_activeFrame->ddpChangedFlag->buffer() : vk::Buffer{};
+  CHECK(m_activeFrame != nullptr) << "DDP changed-flag buffer requires an active submission";
+  CHECK(m_activeFrame->ddpChangedFlag != nullptr)
+    << "DDP changed-flag buffer was not declared in the submission requirements";
+  return m_activeFrame->ddpChangedFlag->buffer();
 }
 
 vk::Buffer Z3DRendererVulkanBackend::ddpIndirectCountBuffer()
 {
-  if (!m_activeFrame) {
-    return {};
-  }
-  ensureDDPGatingResources(*m_activeFrame);
-  return m_activeFrame->ddpIndirectCount ? m_activeFrame->ddpIndirectCount->buffer() : vk::Buffer{};
+  CHECK(m_activeFrame != nullptr) << "DDP indirect-count buffer requires an active submission";
+  CHECK(m_activeFrame->ddpIndirectCount != nullptr)
+    << "DDP indirect-count buffer was not declared in the submission requirements";
+  return m_activeFrame->ddpIndirectCount->buffer();
 }
 
 ZVulkanBuffer* Z3DRendererVulkanBackend::ddpChangedFlagBufferObj()
 {
-  if (!m_activeFrame) {
-    return nullptr;
-  }
-  ensureDDPGatingResources(*m_activeFrame);
+  CHECK(m_activeFrame != nullptr) << "DDP changed-flag buffer requires an active submission";
+  CHECK(m_activeFrame->ddpChangedFlag != nullptr)
+    << "DDP changed-flag buffer was not declared in the submission requirements";
   return m_activeFrame->ddpChangedFlag.get();
 }
 
 ZVulkanBuffer* Z3DRendererVulkanBackend::ddpIndirectCountBufferObj()
 {
-  if (!m_activeFrame) {
-    return nullptr;
-  }
-  ensureDDPGatingResources(*m_activeFrame);
+  CHECK(m_activeFrame != nullptr) << "DDP indirect-count buffer requires an active submission";
+  CHECK(m_activeFrame->ddpIndirectCount != nullptr)
+    << "DDP indirect-count buffer was not declared in the submission requirements";
   return m_activeFrame->ddpIndirectCount.get();
 }
 
 vk::Buffer Z3DRendererVulkanBackend::ddpDeviceArgsBuffer()
 {
-  if (!m_activeFrame) {
-    return vk::Buffer{};
-  }
-  ensureDDPGatingResources(*m_activeFrame);
-  return m_activeFrame->ddpArgsDevice.buffer ? m_activeFrame->ddpArgsDevice.buffer->buffer() : vk::Buffer{};
+  CHECK(m_activeFrame != nullptr) << "DDP device-args buffer requires an active submission";
+  CHECK(m_activeFrame->ddpArgsDevice.buffer != nullptr)
+    << "DDP device-args buffer was not declared in the submission requirements";
+  return m_activeFrame->ddpArgsDevice.buffer->buffer();
 }
 
 vk::DeviceSize Z3DRendererVulkanBackend::ddpAllocDeviceArgsSlot(size_t bytes)
 {
-  if (!m_activeFrame) {
-    return 0;
-  }
-  ensureDDPGatingResources(*m_activeFrame);
+  CHECK(m_activeFrame != nullptr) << "DDP device-args allocation requires an active submission";
+  CHECK(m_activeFrame->ddpArgsDevice.buffer != nullptr)
+    << "DDP device-args arena was not declared in the submission requirements";
   auto& arena = m_activeFrame->ddpArgsDevice;
   // Align to 16 bytes to satisfy both VkDraw(Indexed)IndirectCommand requirements
   const size_t align = 16;
@@ -4435,10 +4355,9 @@ vk::DeviceSize Z3DRendererVulkanBackend::ddpAllocDeviceArgsSlot(size_t bytes)
 
 void Z3DRendererVulkanBackend::ddpResetForPass(vk::raii::CommandBuffer& cmd, bool firstPass)
 {
-  if (!m_activeFrame) {
-    return;
-  }
-  ensureDDPGatingResources(*m_activeFrame);
+  CHECK(m_activeFrame != nullptr) << "DDP reset requires an active submission";
+  CHECK(m_activeFrame->ddpChangedFlag != nullptr && m_activeFrame->ddpIndirectCount != nullptr)
+    << "DDP reset resources were not declared in the submission requirements";
   // Indirect-count gating is a "next-pass" signal: ddp_count.comp writes the
   // count after a peel pass based on ddpChangedFlag. Do not clobber it at the
   // start of subsequent passes; only seed the very first peel so it executes.
@@ -4564,6 +4483,7 @@ void Z3DRendererVulkanBackend::ddpDispatchCountCompute(vk::raii::CommandBuffer& 
     << "ddpDispatchCountCompute requires a pre-record primed descriptor set";
   // Dispatch (1,1,1)
   cmd.bindPipeline(vk::PipelineBindPoint::eCompute, **m_ddpCountPipeline);
+  notifyPipelineBound(**m_ddpCountPipeline);
   cmd.bindDescriptorSets(vk::PipelineBindPoint::eCompute,
                          **m_ddpCountPipelineLayout,
                          1,
@@ -4588,12 +4508,16 @@ void Z3DRendererVulkanBackend::ppllDispatchScanLocal(vk::raii::CommandBuffer& cm
     << "ppllDispatchScanLocal requires a pre-record primed descriptor set";
 
   cmd.bindPipeline(vk::PipelineBindPoint::eCompute, **m_ppllScanLocalPipeline);
+  notifyPipelineBound(**m_ppllScanLocalPipeline);
   cmd.bindDescriptorSets(vk::PipelineBindPoint::eCompute,
                          **m_ppllScanLocalPipelineLayout,
                          1,
                          {m_activeFrame->ppllScanLocalComputeDescriptorSet->descriptorSet()},
                          {});
-  cmd.dispatch(ppll.blockCount, 1, 1);
+  dispatchPPLLScanChunks(cmd,
+                         **m_ppllScanLocalPipelineLayout,
+                         ppll.blockCount,
+                         device().context().selectedDeviceSupport().maxComputeWorkGroupCountX);
 }
 
 void Z3DRendererVulkanBackend::ppllDispatchScanAdd(vk::raii::CommandBuffer& cmd)
@@ -4612,12 +4536,16 @@ void Z3DRendererVulkanBackend::ppllDispatchScanAdd(vk::raii::CommandBuffer& cmd)
     << "ppllDispatchScanAdd requires a pre-record primed descriptor set";
 
   cmd.bindPipeline(vk::PipelineBindPoint::eCompute, **m_ppllScanAddPipeline);
+  notifyPipelineBound(**m_ppllScanAddPipeline);
   cmd.bindDescriptorSets(vk::PipelineBindPoint::eCompute,
                          **m_ppllScanAddPipelineLayout,
                          1,
                          {m_activeFrame->ppllScanAddComputeDescriptorSet->descriptorSet()},
                          {});
-  cmd.dispatch(ppll.blockCount, 1, 1);
+  dispatchPPLLScanChunks(cmd,
+                         **m_ppllScanAddPipelineLayout,
+                         ppll.blockCount,
+                         device().context().selectedDeviceSupport().maxComputeWorkGroupCountX);
 }
 
 void Z3DRendererVulkanBackend::scheduleStaticCopyIndirect(vk::Buffer dst,
@@ -4737,11 +4665,12 @@ void* Z3DRendererVulkanBackend::persistentUniformMappedAt(vk::DeviceSize offset,
   return static_cast<char*>(arena.mapped) + off;
 }
 
-uint32_t Z3DRendererVulkanBackend::activeSubmissionId() const
+uint64_t Z3DRendererVulkanBackend::activeUniformCacheGeneration() const
 {
-  CHECK(m_activeFrame != nullptr) << "activeSubmissionId called without an active frame";
-  CHECK_NE(m_activeFrame->submissionId, 0u) << "activeSubmissionId called before beginRender assigned a submission";
-  return m_activeFrame->submissionId;
+  CHECK(m_activeFrame != nullptr) << "activeUniformCacheGeneration called without an active frame";
+  CHECK_NE(m_activeFrame->uniformCacheGeneration, 0u)
+    << "activeUniformCacheGeneration called before beginRender assigned a generation";
+  return m_activeFrame->uniformCacheGeneration;
 }
 
 bool Z3DRendererVulkanBackend::prepareStaticPromotionBudget(StaticPressureDomain domain,
@@ -5856,6 +5785,8 @@ Z3DRendererVulkanBackend::allocatePersistentDescriptorSet(vk::DescriptorSetLayou
 void Z3DRendererVulkanBackend::flushForTeardown(std::string_view reason)
 {
   if (!m_sharedDevice) {
+    CHECK(!m_deviceDescriptorSetRecording)
+      << "Backend lost its Vulkan device while still owning the descriptor recording guard";
     return;
   }
 
@@ -5910,6 +5841,7 @@ void Z3DRendererVulkanBackend::flushForTeardown(std::string_view reason)
     unpinUnsubmittedResidency();
     releaseUnsubmittedExternalResidency();
     unpinUnsubmittedStaticSegments();
+    releaseDeviceDescriptorSetRecording();
     m_frameRecording = false;
     m_submissionResourcePinningOpen = false;
     m_activeFrameHandle.reset();
@@ -5920,6 +5852,7 @@ void Z3DRendererVulkanBackend::flushForTeardown(std::string_view reason)
       s_currentBackend = nullptr;
     }
   }
+  releaseDeviceDescriptorSetRecording();
 
   // Wait for all submitted frames to finish so fence-gated callbacks can run safely.
   m_sharedDevice->frameExecutor().waitForAllInFlight();
@@ -6304,6 +6237,7 @@ void* Z3DRendererVulkanBackend::activeFrameKey() const
 
 void Z3DRendererVulkanBackend::resetFrameResources()
 {
+  releaseDeviceDescriptorSetRecording();
   m_activeFrameHandle.reset();
   m_activeFrame = nullptr;
   m_lastSubmittedFrameKey = nullptr;
@@ -6312,6 +6246,16 @@ void Z3DRendererVulkanBackend::resetFrameResources()
   m_frames.clear();
   m_frameResourceMap.clear();
   m_frameDevice = nullptr;
+}
+
+void Z3DRendererVulkanBackend::releaseDeviceDescriptorSetRecording()
+{
+  if (!m_deviceDescriptorSetRecording) {
+    return;
+  }
+  CHECK(m_sharedDevice != nullptr) << "Descriptor recording guard owner lost its Vulkan device";
+  m_sharedDevice->endDescriptorSetRecording(this);
+  m_deviceDescriptorSetRecording = false;
 }
 
 Z3DRendererVulkanBackend::FrameResources& Z3DRendererVulkanBackend::ensureFrameResourcesForKey(void* key)
@@ -6335,98 +6279,37 @@ Z3DRendererVulkanBackend::FrameResources& Z3DRendererVulkanBackend::ensureFrameR
   m_frameResourceMap.emplace(key, index);
 
   auto& frame = m_frames.back();
-  auto& vkDevice = m_sharedDevice->context().device();
-  vk::QueryPoolCreateInfo queryInfo{.queryType = vk::QueryType::eTimestamp, .queryCount = kMaxTimestampQueries};
-  frame.queryPool = vk::raii::QueryPool(vkDevice, queryInfo);
-  frame.descriptorPool = m_sharedDevice->createDescriptorPool();
-  frame.persistentDescriptorPool = m_sharedDevice->createDescriptorPool();
+  frame.descriptorPool = m_sharedDevice->createTransientDescriptorPool();
+  frame.persistentDescriptorPool = m_sharedDevice->createPersistentDescriptorPool();
   return frame;
 }
 
 void Z3DRendererVulkanBackend::ensureArenaOnFrame(FrameResources& frame)
 {
   if (!frame.descriptorPool) {
-    frame.descriptorPool = m_sharedDevice->createDescriptorPool();
+    frame.descriptorPool = m_sharedDevice->createTransientDescriptorPool();
   }
 }
 
 void Z3DRendererVulkanBackend::ensurePersistentArenaOnFrame(FrameResources& frame)
 {
   if (!frame.persistentDescriptorPool) {
-    frame.persistentDescriptorPool = m_sharedDevice->createDescriptorPool();
+    frame.persistentDescriptorPool = m_sharedDevice->createPersistentDescriptorPool();
   }
 }
 
 void Z3DRendererVulkanBackend::ensureBindlessSampledImagesOnFrame(FrameResources& frame)
 {
   CHECK(m_sharedDevice != nullptr) << "Shared Vulkan device missing in ensureBindlessSampledImagesOnFrame";
-  ensureSharedDescriptorLayouts();
-  ensurePersistentArenaOnFrame(frame);
-
-  if (frame.bindlessSampledImages) {
+  CHECK(m_activeFrameHandle.has_value() && m_activeFrameHandle->valid())
+    << "Bindless frame-slot table requested without an active executor frame";
+  auto& deviceTable = m_sharedDevice->bindlessSampledImagesForFrame(*m_activeFrameHandle);
+  if (frame.bindlessSampledImages != nullptr) {
+    CHECK(frame.bindlessSampledImages == &deviceTable)
+      << "Backend frame resources changed device-owned bindless slot identity";
     return;
   }
-
-  const vk::DescriptorSetLayout layout = bindlessSampledImageDescriptorSetLayout();
-  CHECK(static_cast<VkDescriptorSetLayout>(layout) != VK_NULL_HANDLE) << "Bindless descriptor set layout missing";
-  CHECK(frame.persistentDescriptorPool) << "Persistent descriptor pool missing for bindless allocation";
-  vk::DescriptorSet raw = frame.persistentDescriptorPool->allocateDescriptorSet(layout);
-  CHECK(static_cast<VkDescriptorSet>(raw) != VK_NULL_HANDLE) << "Failed to allocate bindless descriptor set";
-
-  const auto& caps = m_sharedDevice->context().effectiveBindlessSampledImageCapacities();
-  frame.bindlessSampledImages = std::make_unique<ZVulkanBindlessDescriptorSet>(*m_sharedDevice,
-                                                                               raw,
-                                                                               caps.texture2D,
-                                                                               caps.texture2DArray,
-                                                                               caps.texture3D,
-                                                                               caps.uTexture2D,
-                                                                               caps.uTexture3D);
-
-  // Reserve index 0 in every bindless table for well-defined placeholder
-  // sampling. This allows shaders to use index=0 as "no texture" without
-  // relying on partially-bound behavior for out-of-range indices.
-  ensureDefaultPlaceholders();
-
-  {
-    ZVulkanBindlessDescriptorSet::RegisterRequest req{};
-    req.kind = ZVulkanBindlessDescriptorSet::Kind::Texture2D;
-    req.texture = m_defaultPlaceholder2D.get();
-    req.debugLabel = "bindless_placeholder_2d";
-    const uint32_t idx = frame.bindlessSampledImages->registerTexture(req);
-    CHECK(idx == 0u) << "Bindless placeholder 2D expected to reserve index 0 (got " << idx << ")";
-  }
-  {
-    ZVulkanBindlessDescriptorSet::RegisterRequest req{};
-    req.kind = ZVulkanBindlessDescriptorSet::Kind::Texture2DArray;
-    req.texture = m_defaultPlaceholder2DArray.get();
-    req.debugLabel = "bindless_placeholder_2darray";
-    const uint32_t idx = frame.bindlessSampledImages->registerTexture(req);
-    CHECK(idx == 0u) << "Bindless placeholder 2DArray expected to reserve index 0 (got " << idx << ")";
-  }
-  {
-    ZVulkanBindlessDescriptorSet::RegisterRequest req{};
-    req.kind = ZVulkanBindlessDescriptorSet::Kind::Texture3D;
-    req.texture = m_defaultPlaceholder3D.get();
-    req.debugLabel = "bindless_placeholder_3d";
-    const uint32_t idx = frame.bindlessSampledImages->registerTexture(req);
-    CHECK(idx == 0u) << "Bindless placeholder 3D expected to reserve index 0 (got " << idx << ")";
-  }
-  {
-    ZVulkanBindlessDescriptorSet::RegisterRequest req{};
-    req.kind = ZVulkanBindlessDescriptorSet::Kind::UTexture2D;
-    req.texture = m_defaultPlaceholderU2D.get();
-    req.debugLabel = "bindless_placeholder_u2d";
-    const uint32_t idx = frame.bindlessSampledImages->registerTexture(req);
-    CHECK(idx == 0u) << "Bindless placeholder u2D expected to reserve index 0 (got " << idx << ")";
-  }
-  {
-    ZVulkanBindlessDescriptorSet::RegisterRequest req{};
-    req.kind = ZVulkanBindlessDescriptorSet::Kind::UTexture3D;
-    req.texture = m_defaultPlaceholderU3D.get();
-    req.debugLabel = "bindless_placeholder_u3d";
-    const uint32_t idx = frame.bindlessSampledImages->registerTexture(req);
-    CHECK(idx == 0u) << "Bindless placeholder u3D expected to reserve index 0 (got " << idx << ")";
-  }
+  frame.bindlessSampledImages = &deviceTable;
 }
 
 void Z3DRendererVulkanBackend::ensureSharedDescriptorSetsOnFrame(FrameResources& frame)
@@ -6646,7 +6529,7 @@ void Z3DRendererVulkanBackend::recordAllMsForCompletionSafePoint(double millisec
 {
   FrameResources* frame = m_frameInCompletionSafePoint.load(std::memory_order_acquire);
   CHECK(frame != nullptr) << "recordAllMsForCompletionSafePoint must be called during the completion safe point";
-  if (milliseconds < 0.0) {
+  if (!frame->perfCollectionEnabled || milliseconds < 0.0) {
     return;
   }
 
@@ -7259,14 +7142,16 @@ folly::coro::Task<void> Z3DRendererVulkanBackend::EndOfFrameBufferReadbackTicket
 
 void Z3DRendererVulkanBackend::notifyPipelineCreated()
 {
-  if (m_activeFrame) {
-    m_activeFrame->pipelinesCreated++;
+  if (m_activeFrame && m_activeFrame->perfCollectionEnabled) {
+    CHECK_LT(m_activeFrame->pipelinesCreated, std::numeric_limits<uint32_t>::max())
+      << "Vulkan per-submission pipeline creation count overflow";
+    ++m_activeFrame->pipelinesCreated;
   }
 }
 
 void Z3DRendererVulkanBackend::notifyPipelineBound(vk::Pipeline pipeline)
 {
-  if (!m_activeFrame) {
+  if (!m_activeFrame || !m_activeFrame->perfCollectionEnabled) {
     return;
   }
   // Track unique pipeline bindings for per-frame instrumentation
@@ -7276,14 +7161,14 @@ void Z3DRendererVulkanBackend::notifyPipelineBound(vk::Pipeline pipeline)
 
 void Z3DRendererVulkanBackend::notifyDrawSecondaryCacheAttempt()
 {
-  if (m_activeFrame) {
+  if (m_activeFrame && m_activeFrame->perfCollectionEnabled) {
     m_activeFrame->drawSecondaryCacheAttempts++;
   }
 }
 
 void Z3DRendererVulkanBackend::notifyDrawSecondaryCacheKeyFound()
 {
-  if (m_activeFrame) {
+  if (m_activeFrame && m_activeFrame->perfCollectionEnabled) {
     m_activeFrame->drawSecondaryCacheKeyFound++;
   }
 }
@@ -7295,7 +7180,7 @@ void Z3DRendererVulkanBackend::notifyDrawSecondaryCacheSignatureMismatch()
 
 void Z3DRendererVulkanBackend::notifyDrawSecondaryCacheSignatureMismatchMask(uint32_t mask)
 {
-  if (!m_activeFrame) {
+  if (!m_activeFrame || !m_activeFrame->perfCollectionEnabled) {
     return;
   }
   m_activeFrame->drawSecondaryCacheSignatureMismatches++;
@@ -7304,21 +7189,23 @@ void Z3DRendererVulkanBackend::notifyDrawSecondaryCacheSignatureMismatchMask(uin
 
 void Z3DRendererVulkanBackend::notifyDrawSecondaryCacheHit()
 {
-  if (m_activeFrame) {
+  if (m_activeFrame && m_activeFrame->perfCollectionEnabled) {
     m_activeFrame->drawSecondaryCacheHits++;
   }
 }
 
 void Z3DRendererVulkanBackend::notifyDrawSecondaryCacheBuild()
 {
-  if (m_activeFrame) {
+  if (m_activeFrame && m_activeFrame->perfCollectionEnabled) {
     m_activeFrame->drawSecondaryCacheBuilds++;
   }
 }
 
-void Z3DRendererVulkanBackend::notifyDrawSecondaryCacheExecute()
+void Z3DRendererVulkanBackend::notifyDrawSecondaryCacheExecute(vk::Pipeline pipeline)
 {
-  if (m_activeFrame) {
+  CHECK(pipeline != vk::Pipeline{}) << "Secondary command-buffer execution requires a valid graphics pipeline";
+  notifyPipelineBound(pipeline);
+  if (m_activeFrame && m_activeFrame->perfCollectionEnabled) {
     m_activeFrame->drawSecondaryCacheExecutes++;
   }
 }
@@ -7622,6 +7509,7 @@ void Z3DRendererVulkanBackend::collectFrameTimings(FrameResources& frame)
   if (frame.realFrameToken != 0) {
     Z3DPerfCollector::Stats stats{};
     stats.drawsSubmitted = frame.drawsSubmitted;
+    stats.fenceWaits = frame.fenceWaits;
     stats.descriptorSetsAllocated = frame.descriptorSetsAllocated;
     stats.pipelinesCreated = frame.pipelinesCreated;
     stats.pipelinesBoundCount = static_cast<uint32_t>(frame.pipelinesBound.size());
@@ -7684,7 +7572,7 @@ void Z3DRendererVulkanBackend::collectFrameTimings(FrameResources& frame)
 
 bool Z3DRendererVulkanBackend::timestampQueriesEnabled() const
 {
-  if (!m_sharedDevice) {
+  if (!m_sharedDevice || !Z3DPerfCollector::enabled()) {
     return false;
   }
   // Strict residency-budget runs are for proving Atlas-owned resources stay
@@ -7693,12 +7581,15 @@ bool Z3DRendererVulkanBackend::timestampQueriesEnabled() const
   return !m_sharedDevice->residencyManager().strictBudgetActive();
 }
 
-std::optional<size_t> Z3DRendererVulkanBackend::beginGpuScope(std::string_view label)
+std::optional<size_t> Z3DRendererVulkanBackend::beginGpuScope(std::string_view label, bool isPassScope)
 {
   if (!m_activeFrame || !m_activeFrameHandle || !m_activeFrameHandle->valid() || label.empty() || !m_frameRecording) {
     return std::nullopt;
   }
   if (!timestampQueriesEnabled()) {
+    return std::nullopt;
+  }
+  if (!isPassScope && !Z3DPerfCollector::nestedGpuScopesEnabled()) {
     return std::nullopt;
   }
   auto& frame = *m_activeFrame;
@@ -7711,7 +7602,6 @@ std::optional<size_t> Z3DRendererVulkanBackend::beginGpuScope(std::string_view l
                                                       *frame.queryPool,
                                                       startIndex);
   const uint32_t endIndex = frame.nextQuery++;
-  const bool isPassScope = (m_passScope.active && (m_passScope.label == label));
   frame.gpuScopes.push_back(GpuScopeRecord{std::string(label), startIndex, endIndex, isPassScope});
   return frame.gpuScopes.size() - 1;
 }
@@ -7733,7 +7623,7 @@ void Z3DRendererVulkanBackend::endGpuScope(size_t token)
 
 void Z3DRendererVulkanBackend::recordCpuScope(std::string_view label, double milliseconds)
 {
-  if (!m_activeFrame || label.empty()) {
+  if (!m_activeFrame || !m_activeFrame->perfCollectionEnabled || label.empty()) {
     return;
   }
   m_activeFrame->cpuScopes.push_back(CpuScopeRecord{std::string(label), milliseconds});

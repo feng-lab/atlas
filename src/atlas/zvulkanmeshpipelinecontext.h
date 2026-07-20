@@ -175,7 +175,7 @@ private:
     bool followSizeScale = true;
     ClipPlanesState clipPlanes{};
     vk::DeviceSize objectTransformsOffset = 0;
-    uint32_t lastSubmissionId = 0;
+    uint64_t lastUniformCacheGeneration = 0;
   };
 
   struct MaterialCacheEntry
@@ -186,7 +186,7 @@ private:
     bool useCustomColor = false;
     glm::vec4 customColor{1.0f};
     vk::DeviceSize materialOffset = 0;
-    uint32_t lastSubmissionId = 0;
+    uint64_t lastUniformCacheGeneration = 0;
   };
 
   struct StreamUboCache

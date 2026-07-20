@@ -27,6 +27,7 @@
 #include <vector>
 #include <cstring>
 #include <cstdint>
+#include <utility>
 
 #include <folly/coro/Invoke.h>
 #include <folly/coro/Task.h>
@@ -72,21 +73,6 @@ ZVulkanSpherePipelineContext::ZVulkanSpherePipelineContext(Z3DRendererVulkanBack
 {}
 
 ZVulkanSpherePipelineContext::~ZVulkanSpherePipelineContext() = default;
-
-ZVulkanSpherePipelineContext::FormatsKey
-ZVulkanSpherePipelineContext::FormatsKey::from(const vulkan::AttachmentFormats& formats)
-{
-  FormatsKey key{};
-  const size_t count = std::min(formats.colorFormats.size(), key.colorFormats.size());
-  key.colorCount = static_cast<uint32_t>(count);
-  for (size_t i = 0; i < count; ++i) {
-    key.colorFormats[i] = formats.colorFormats[i];
-  }
-  if (formats.depthFormat.has_value()) {
-    key.depthFormat = *formats.depthFormat;
-  }
-  return key;
-}
 
 void ZVulkanSpherePipelineContext::resetFrame()
 {
@@ -301,25 +287,29 @@ void ZVulkanSpherePipelineContext::record(Z3DRendererBase& renderer,
   PipelineKey key;
   key.dynamicMaterial = payload.useDynamicMaterial && !pickingPass;
   key.shaderHookType = shaderHook;
-  key.formats = FormatsKey::from(formats);
+  key.colorFormats = formats.colorFormats;
+  key.depthFormat = formats.depthFormat;
 
-  PipelineInstance& pipeline = ensurePipeline(key, formats);
+  auto& pipeline = ensurePipeline(key);
 
   // Draw-only recording under backend-managed segment: no attachment handling here
 
-  const std::array<vk::DescriptorSet, 3> boundSets{m_backend.bindlessSampledImageDescriptorSet(),
-                                                   dsLighting,
-                                                   dsTransforms};
+  const std::array<vk::DescriptorSet, 3> allBoundSets{m_backend.bindlessSampledImageDescriptorSet(),
+                                                      dsLighting,
+                                                      dsTransforms};
+  const std::span<const vk::DescriptorSet> boundSets =
+    usesDdpPeelPc ? std::span<const vk::DescriptorSet>(allBoundSets)
+                  : std::span<const vk::DescriptorSet>(allBoundSets).subspan(vkbind::kSetLighting);
 
   ZVulkanPipelineCommandRecorder::GraphicsDrawSpec drawSpec{};
   drawSpec.viewports = std::span<const vk::Viewport>(&viewport, 1);
   drawSpec.scissors = std::span<const vk::Rect2D>(&scissor, 1);
   drawSpec.pipelineHandle = pipeline.pipeline->pipelineHandle();
   drawSpec.pipelineLayoutHandle = pipeline.pipeline->pipelineLayoutHandle();
-  drawSpec.descriptorSetFirst = vkbind::kSetBindlessSampledImages;
+  drawSpec.descriptorSetFirst = usesDdpPeelPc ? vkbind::kSetBindlessSampledImages : vkbind::kSetLighting;
   drawSpec.descriptorSets = boundSets;
 
-  uint32_t expectedSets = static_cast<uint32_t>(boundSets.size());
+  uint32_t expectedSets = drawSpec.descriptorSetFirst + static_cast<uint32_t>(boundSets.size());
   std::array<vk::DescriptorSet, 1> oitSets{m_backend.sharedOITDescriptorSet()};
   std::array<ZVulkanDescriptorBindInfo, 1> extraDescriptorBinds{};
   extraDescriptorBinds[0].firstSet = vkbind::kSetOIT;
@@ -396,9 +386,8 @@ void ZVulkanSpherePipelineContext::record(Z3DRendererBase& renderer,
     SecondarySignature signature{};
     signature.pipeline = drawSpec.pipelineHandle;
     signature.layout = drawSpec.pipelineLayoutHandle;
-    signature.baseDescriptorSets = boundSets;
-    signature.baseDescriptorGenerations = {m_backend.bindlessSampledImageDescriptorSetGeneration(),
-                                           m_backend.sharedLightingDescriptorSetGeneration(),
+    signature.baseDescriptorSets = {dsLighting, dsTransforms};
+    signature.baseDescriptorGenerations = {m_backend.sharedLightingDescriptorSetGeneration(),
                                            m_backend.sharedTransformsDescriptorSetPersistentGeneration()};
     signature.hasOit = true;
     signature.oitDescriptorSet = m_backend.sharedOITDescriptorSet();
@@ -424,7 +413,7 @@ void ZVulkanSpherePipelineContext::record(Z3DRendererBase& renderer,
       if (entry.recorded && rawSecondary != vk::CommandBuffer{}) {
         if (entry.signature == signature) {
           m_backend.notifyDrawSecondaryCacheHit();
-          m_backend.notifyDrawSecondaryCacheExecute();
+          m_backend.notifyDrawSecondaryCacheExecute(entry.signature.pipeline);
           cmd.executeCommands({rawSecondary});
           m_backend.notifyDrawSubmitted();
           return;
@@ -546,7 +535,7 @@ void ZVulkanSpherePipelineContext::record(Z3DRendererBase& renderer,
     });
     entry.recorded = true;
 
-    m_backend.notifyDrawSecondaryCacheExecute();
+    m_backend.notifyDrawSecondaryCacheExecute(entry.signature.pipeline);
     cmd.executeCommands({static_cast<vk::CommandBuffer>(entry.commandBuffer)});
     return;
   }
@@ -677,7 +666,7 @@ void ZVulkanSpherePipelineContext::updateTransformUBO(Z3DRendererBase& renderer,
   void* frameKey = m_backend.activeFrameKey();
   CHECK(frameKey != nullptr) << "Sphere updateTransformUBO called without an active Vulkan frame-slot key";
   if (payload.streamKey != 0) {
-    const uint32_t submissionId = m_backend.activeSubmissionId();
+    const uint64_t cacheGeneration = m_backend.activeUniformCacheGeneration();
     FrameUboCache& frameCache = m_uboCacheByFrameKey[frameKey];
     auto& entries = frameCache.byStream[payload.streamKey];
     UboCacheEntry* reusableEntry = nullptr;
@@ -690,13 +679,13 @@ void ZVulkanSpherePipelineContext::updateTransformUBO(Z3DRendererBase& renderer,
       if (cached.params == payload.params && cached.followCoordTransform == payload.followCoordTransform &&
           cached.followSizeScale == payload.followSizeScale && cached.followOpacity == payload.followOpacity &&
           clipPlanesEqual(cached.clipPlanes, batch.clipPlanes)) {
-        cached.lastSubmissionId = submissionId;
+        cached.lastUniformCacheGeneration = cacheGeneration;
         m_dynObjectTransformsOffset = cached.objectTransformsOffset;
         m_dynMaterialOffset = cached.materialOffset;
         return;
       }
 
-      if (cached.lastSubmissionId != submissionId && reusableEntry == nullptr) {
+      if (cached.lastUniformCacheGeneration != cacheGeneration && reusableEntry == nullptr) {
         reusableEntry = &cached;
       }
     }
@@ -715,7 +704,7 @@ void ZVulkanSpherePipelineContext::updateTransformUBO(Z3DRendererBase& renderer,
       reusableEntry->followSizeScale = payload.followSizeScale;
       reusableEntry->followOpacity = payload.followOpacity;
       reusableEntry->clipPlanes = batch.clipPlanes;
-      reusableEntry->lastSubmissionId = submissionId;
+      reusableEntry->lastUniformCacheGeneration = cacheGeneration;
       m_dynObjectTransformsOffset = reusableEntry->objectTransformsOffset;
       m_dynMaterialOffset = reusableEntry->materialOffset;
       return;
@@ -738,7 +727,7 @@ void ZVulkanSpherePipelineContext::updateTransformUBO(Z3DRendererBase& renderer,
     entry.clipPlanes = batch.clipPlanes;
     entry.objectTransformsOffset = objectSlice.offset;
     entry.materialOffset = materialSlice.offset;
-    entry.lastSubmissionId = submissionId;
+    entry.lastUniformCacheGeneration = cacheGeneration;
     entries.push_back(std::move(entry));
     return;
   }
@@ -753,19 +742,14 @@ void ZVulkanSpherePipelineContext::updateTransformUBO(Z3DRendererBase& renderer,
   m_dynMaterialOffset = materialSlice.offset;
 }
 
-ZVulkanSpherePipelineContext::PipelineInstance&
-ZVulkanSpherePipelineContext::ensurePipeline(const PipelineKey& key, const vulkan::AttachmentFormats& formats)
+ZVulkanSpherePipelineContext::PipelineInstance& ZVulkanSpherePipelineContext::ensurePipeline(const PipelineKey& key)
 {
-  auto it = m_pipelineCache.find(key);
-  if (it != m_pipelineCache.end()) {
-    return it->second;
+  const auto found = m_pipelines.find(key);
+  if (found != m_pipelines.end()) {
+    return found->second;
   }
 
-  auto& device = m_backend.device();
-
-  PipelineInstance instance;
-
-  auto selectFragmentShader = [](Z3DRendererBase::ShaderHookType hook) -> QString {
+  const auto selectFragmentShader = [](Z3DRendererBase::ShaderHookType hook) -> QString {
     switch (hook) {
       case Z3DRendererBase::ShaderHookType::DualDepthPeelingInit:
         return QStringLiteral("dual_peeling_init_sphere.frag.spv");
@@ -785,165 +769,27 @@ ZVulkanSpherePipelineContext::ensurePipeline(const PipelineKey& key, const vulka
     }
   };
 
-  instance.shader =
+  auto& device = m_backend.device();
+  auto shader =
     std::make_unique<ZVulkanShader>(device,
                                     ZVulkanShader::spirvResourcePath(QStringLiteral("sphere.vert.spv")),
                                     ZVulkanShader::spirvResourcePath(selectFragmentShader(key.shaderHookType)),
                                     std::nullopt);
 
-  // Dynamic material specialization (match GL's DYNAMIC_MATERIAL_PROPERTY)
-  {
-    const uint32_t useDynamic = key.dynamicMaterial ? 1u : 0u;
-    std::array<vk::SpecializationMapEntry, 1> entries{
-      vk::SpecializationMapEntry{.constantID = 60, .offset = 0, .size = sizeof(uint32_t)}
-    };
-    std::array<uint32_t, 1> data{useDynamic};
-    auto entriesVec = std::vector<vk::SpecializationMapEntry>(entries.begin(), entries.end());
-    auto dataVec = std::vector<uint8_t>(reinterpret_cast<const uint8_t*>(data.data()),
-                                        reinterpret_cast<const uint8_t*>(data.data()) + sizeof(data));
-    instance.shader->setSpecializationConstants(vk::ShaderStageFlagBits::eVertex, entriesVec, dataVec);
-    instance.shader->setSpecializationConstants(vk::ShaderStageFlagBits::eFragment, entriesVec, dataVec);
-  }
+  // Dynamic material specialization (match GL's DYNAMIC_MATERIAL_PROPERTY).
+  const std::array<vk::SpecializationMapEntry, 1> dynamicMaterialEntries{
+    vk::SpecializationMapEntry{.constantID = 60, .offset = 0, .size = sizeof(uint32_t)}
+  };
+  const std::array<uint32_t, 1> dynamicMaterialData{key.dynamicMaterial ? 1u : 0u};
+  const std::vector<vk::SpecializationMapEntry> specializationEntries(dynamicMaterialEntries.begin(),
+                                                                      dynamicMaterialEntries.end());
+  const std::vector<uint8_t> specializationData(reinterpret_cast<const uint8_t*>(dynamicMaterialData.data()),
+                                                reinterpret_cast<const uint8_t*>(dynamicMaterialData.data()) +
+                                                  sizeof(dynamicMaterialData));
+  shader->setSpecializationConstants(vk::ShaderStageFlagBits::eVertex, specializationEntries, specializationData);
+  shader->setSpecializationConstants(vk::ShaderStageFlagBits::eFragment, specializationEntries, specializationData);
 
-  auto vertexInput = makeVertexInputState();
-  instance.pipeline = device.createPipeline(*instance.shader, vertexInput, vk::PrimitiveTopology::eTriangleList);
-  const vk::DescriptorSetLayout bindlessLayout = m_backend.bindlessSampledImageDescriptorSetLayout();
-  CHECK(bindlessLayout) << "Sphere pipeline missing bindless descriptor set layout";
-  const vk::DescriptorSetLayout lightingLayout = m_backend.lightingDescriptorSetLayout();
-  CHECK(lightingLayout) << "Sphere pipeline missing lighting descriptor set layout";
-  const vk::DescriptorSetLayout transformsLayout = m_backend.transformDescriptorSetLayout();
-  CHECK(transformsLayout) << "Sphere pipeline missing transforms descriptor set layout";
-  const vk::DescriptorSetLayout oitLayout = m_backend.oitDescriptorSetLayout();
-  CHECK(oitLayout) << "Sphere pipeline missing OIT descriptor set layout";
-  std::vector<vk::DescriptorSetLayout> layouts{bindlessLayout, lightingLayout, transformsLayout, oitLayout};
-  instance.pipeline->setAttachmentFormats(formats.colorFormats, formats.depthFormat);
-  instance.pipeline->setDescriptorSetLayouts(layouts);
-  instance.pipeline->setCullMode(vk::CullModeFlagBits::eNone);
-  instance.pipeline->setFrontFace(vk::FrontFace::eCounterClockwise);
-
-  // Dual-depth-peeling peel shader consumes bindless blender indices via push constants.
-  vk::PushConstantRange pcRange{.stageFlags = vk::ShaderStageFlagBits::eFragment,
-                                .offset = 0,
-                                .size = static_cast<uint32_t>(sizeof(DDPPeelPushConstants))};
-  instance.pipeline->setPushConstantRanges({pcRange});
-
-  vk::PipelineColorBlendAttachmentState baseBlend{};
-  baseBlend.colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
-                             vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA;
-  baseBlend.blendEnable = false;
-
-  auto makeAttachments =
-    [&](vk::BlendFactor srcColor, vk::BlendFactor dstColor, vk::BlendFactor srcAlpha, vk::BlendFactor dstAlpha) {
-      std::vector<vk::PipelineColorBlendAttachmentState> attachments(formats.colorFormats.size(), baseBlend);
-      for (auto& attachment : attachments) {
-        attachment.blendEnable = true;
-        attachment.srcColorBlendFactor = srcColor;
-        attachment.dstColorBlendFactor = dstColor;
-        attachment.colorBlendOp = vk::BlendOp::eAdd;
-        attachment.srcAlphaBlendFactor = srcAlpha;
-        attachment.dstAlphaBlendFactor = dstAlpha;
-        attachment.alphaBlendOp = vk::BlendOp::eAdd;
-      }
-      instance.pipeline->setColorBlendAttachments(std::move(attachments));
-    };
-
-  switch (key.shaderHookType) {
-    case Z3DRendererBase::ShaderHookType::PerPixelFragmentListCount:
-    case Z3DRendererBase::ShaderHookType::PerPixelFragmentListStore:
-      // Exact OIT PPLL: depth test against opaque depth, but do not write depth.
-      instance.pipeline->setDepthTestEnable(true);
-      instance.pipeline->setDepthWriteEnable(false);
-      break;
-    case Z3DRendererBase::ShaderHookType::WeightedAverageInit:
-      makeAttachments(vk::BlendFactor::eOne, vk::BlendFactor::eOne, vk::BlendFactor::eOne, vk::BlendFactor::eOne);
-      // Match GL WA init: depth-test against the (loaded) opaque depth buffer
-      // when a depth attachment is present, but do not write depth.
-      instance.pipeline->setDepthTestEnable(formats.depthFormat.has_value());
-      instance.pipeline->setDepthWriteEnable(false);
-      break;
-    case Z3DRendererBase::ShaderHookType::WeightedBlendedInit: {
-      if (!formats.colorFormats.empty()) {
-        std::vector<vk::PipelineColorBlendAttachmentState> attachments;
-        attachments.reserve(formats.colorFormats.size());
-        for (size_t i = 0; i < formats.colorFormats.size(); ++i) {
-          auto state = baseBlend;
-          state.blendEnable = true;
-          if (i == 0) {
-            state.srcColorBlendFactor = vk::BlendFactor::eOne;
-            state.dstColorBlendFactor = vk::BlendFactor::eOne;
-            state.srcAlphaBlendFactor = vk::BlendFactor::eOne;
-            state.dstAlphaBlendFactor = vk::BlendFactor::eOne;
-          } else {
-            state.srcColorBlendFactor = vk::BlendFactor::eZero;
-            state.dstColorBlendFactor = vk::BlendFactor::eOneMinusSrcColor;
-            state.srcAlphaBlendFactor = vk::BlendFactor::eZero;
-            state.dstAlphaBlendFactor = vk::BlendFactor::eOneMinusSrcColor;
-          }
-          state.colorBlendOp = vk::BlendOp::eAdd;
-          state.alphaBlendOp = vk::BlendOp::eAdd;
-          attachments.push_back(state);
-        }
-        instance.pipeline->setColorBlendAttachments(std::move(attachments));
-      }
-      instance.pipeline->setDepthTestEnable(true);
-      instance.pipeline->setDepthWriteEnable(false);
-      break;
-    }
-    case Z3DRendererBase::ShaderHookType::DualDepthPeelingInit:
-    case Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel: {
-      std::vector<vk::PipelineColorBlendAttachmentState> attachments;
-      attachments.reserve(formats.colorFormats.size());
-      for (size_t i = 0; i < formats.colorFormats.size(); ++i) {
-        auto state = baseBlend;
-        if (i == 0 || i == 3) {
-          state.blendEnable = true;
-          state.srcColorBlendFactor = vk::BlendFactor::eOne;
-          state.dstColorBlendFactor = vk::BlendFactor::eOne;
-          state.colorBlendOp = vk::BlendOp::eMax;
-          state.srcAlphaBlendFactor = vk::BlendFactor::eOne;
-          state.dstAlphaBlendFactor = vk::BlendFactor::eOne;
-          state.alphaBlendOp = vk::BlendOp::eMax;
-        } else if (i == 1 || i == 4) {
-          state.blendEnable = true;
-          state.srcColorBlendFactor = vk::BlendFactor::eOne;
-          state.dstColorBlendFactor = vk::BlendFactor::eOne;
-          state.colorBlendOp = vk::BlendOp::eMax;
-          state.srcAlphaBlendFactor = vk::BlendFactor::eOne;
-          state.dstAlphaBlendFactor = vk::BlendFactor::eOne;
-          state.alphaBlendOp = vk::BlendOp::eMax;
-        } else if (i == 2 || i == 5) {
-          state.blendEnable = true;
-          state.srcColorBlendFactor = vk::BlendFactor::eOne;
-          state.dstColorBlendFactor = vk::BlendFactor::eOne;
-          // Match GL DDP peel: back-temp uses MAX blending (one fragment per pixel).
-          state.colorBlendOp = vk::BlendOp::eMax;
-          state.srcAlphaBlendFactor = vk::BlendFactor::eOne;
-          state.dstAlphaBlendFactor = vk::BlendFactor::eOne;
-          state.alphaBlendOp = vk::BlendOp::eMax;
-        } else {
-          state.blendEnable = false;
-        }
-        attachments.push_back(state);
-      }
-      instance.pipeline->setColorBlendAttachments(std::move(attachments));
-      // Match GL DDP: depth-tested against the (loaded) opaque depth buffer, but do not write depth.
-      instance.pipeline->setDepthTestEnable(true);
-      instance.pipeline->setDepthWriteEnable(false);
-      break;
-    }
-    default:
-      break;
-  }
-
-  instance.pipeline->create();
-
-  auto [inserted, _] = m_pipelineCache.insert({key, std::move(instance)});
-  return inserted->second;
-}
-
-vk::PipelineVertexInputStateCreateInfo ZVulkanSpherePipelineContext::makeVertexInputState() const
-{
-  static std::array<vk::VertexInputBindingDescription, 4> bindings{
+  const std::array vertexBindings{
     vk::VertexInputBindingDescription{.binding = 0,
                                       .stride = static_cast<uint32_t>(sizeof(glm::vec4)),
                                       .inputRate = vk::VertexInputRate::eVertex}, // centerRadius
@@ -957,7 +803,7 @@ vk::PipelineVertexInputStateCreateInfo ZVulkanSpherePipelineContext::makeVertexI
                                       .stride = static_cast<uint32_t>(sizeof(glm::vec4)),
                                       .inputRate = vk::VertexInputRate::eVertex}  // specular/shininess
   };
-  static std::array<vk::VertexInputAttributeDescription, 4> attrs{
+  const std::array vertexAttributes{
     vk::VertexInputAttributeDescription{.location = 0,
                                         .binding = 0,
                                         .format = vk::Format::eR32G32B32A32Sfloat,
@@ -972,12 +818,113 @@ vk::PipelineVertexInputStateCreateInfo ZVulkanSpherePipelineContext::makeVertexI
                                         .format = vk::Format::eR32G32B32A32Sfloat,
                                         .offset = 0                                                               }
   };
-  static vk::PipelineVertexInputStateCreateInfo info{};
-  info.vertexBindingDescriptionCount = static_cast<uint32_t>(bindings.size());
-  info.pVertexBindingDescriptions = bindings.data();
-  info.vertexAttributeDescriptionCount = static_cast<uint32_t>(attrs.size());
-  info.pVertexAttributeDescriptions = attrs.data();
-  return info;
+  vk::PipelineVertexInputStateCreateInfo vertexInput{};
+  vertexInput.vertexBindingDescriptionCount = static_cast<uint32_t>(vertexBindings.size());
+  vertexInput.pVertexBindingDescriptions = vertexBindings.data();
+  vertexInput.vertexAttributeDescriptionCount = static_cast<uint32_t>(vertexAttributes.size());
+  vertexInput.pVertexAttributeDescriptions = vertexAttributes.data();
+
+  auto pipeline = device.createPipeline(*shader, vertexInput, vk::PrimitiveTopology::eTriangleList);
+
+  const vk::DescriptorSetLayout bindlessLayout = m_backend.bindlessSampledImageDescriptorSetLayout();
+  CHECK(bindlessLayout) << "Sphere pipeline missing bindless descriptor set layout";
+  const vk::DescriptorSetLayout lightingLayout = m_backend.lightingDescriptorSetLayout();
+  CHECK(lightingLayout) << "Sphere pipeline missing lighting descriptor set layout";
+  const vk::DescriptorSetLayout transformsLayout = m_backend.transformDescriptorSetLayout();
+  CHECK(transformsLayout) << "Sphere pipeline missing transforms descriptor set layout";
+  const vk::DescriptorSetLayout oitLayout = m_backend.oitDescriptorSetLayout();
+  CHECK(oitLayout) << "Sphere pipeline missing OIT descriptor set layout";
+  pipeline->setDescriptorSetLayouts({bindlessLayout, lightingLayout, transformsLayout, oitLayout});
+  pipeline->setAttachmentFormats(key.colorFormats, key.depthFormat);
+  pipeline->setCullMode(vk::CullModeFlagBits::eNone);
+
+  // Dual-depth-peeling peel shader consumes bindless blender indices via push constants.
+  pipeline->setPushConstantRanges({
+    vk::PushConstantRange{.stageFlags = vk::ShaderStageFlagBits::eFragment,
+                          .offset = 0,
+                          .size = static_cast<uint32_t>(sizeof(DDPPeelPushConstants))}
+  });
+
+  const auto baseBlend = vulkan::toVkBlendAttachment(BlendState{});
+  std::vector<vk::PipelineColorBlendAttachmentState> blendAttachments(key.colorFormats.size(), baseBlend);
+
+  switch (key.shaderHookType) {
+    case Z3DRendererBase::ShaderHookType::PerPixelFragmentListCount:
+    case Z3DRendererBase::ShaderHookType::PerPixelFragmentListStore:
+      // Exact OIT PPLL: depth test against opaque depth, but do not write depth.
+      pipeline->setDepthTestEnable(true);
+      pipeline->setDepthWriteEnable(false);
+      break;
+    case Z3DRendererBase::ShaderHookType::WeightedAverageInit: {
+      for (auto& attachment : blendAttachments) {
+        attachment.blendEnable = true;
+        attachment.srcColorBlendFactor = vk::BlendFactor::eOne;
+        attachment.dstColorBlendFactor = vk::BlendFactor::eOne;
+        attachment.colorBlendOp = vk::BlendOp::eAdd;
+        attachment.srcAlphaBlendFactor = vk::BlendFactor::eOne;
+        attachment.dstAlphaBlendFactor = vk::BlendFactor::eOne;
+        attachment.alphaBlendOp = vk::BlendOp::eAdd;
+      }
+      // Match GL WA init: depth-test against the (loaded) opaque depth buffer
+      // when a depth attachment is present, but do not write depth.
+      pipeline->setDepthTestEnable(key.depthFormat.has_value());
+      pipeline->setDepthWriteEnable(false);
+      break;
+    }
+    case Z3DRendererBase::ShaderHookType::WeightedBlendedInit: {
+      for (size_t i = 0; i < blendAttachments.size(); ++i) {
+        auto& attachment = blendAttachments[i];
+        attachment.blendEnable = true;
+        if (i == 0) {
+          attachment.srcColorBlendFactor = vk::BlendFactor::eOne;
+          attachment.dstColorBlendFactor = vk::BlendFactor::eOne;
+          attachment.srcAlphaBlendFactor = vk::BlendFactor::eOne;
+          attachment.dstAlphaBlendFactor = vk::BlendFactor::eOne;
+        } else {
+          attachment.srcColorBlendFactor = vk::BlendFactor::eZero;
+          attachment.dstColorBlendFactor = vk::BlendFactor::eOneMinusSrcColor;
+          attachment.srcAlphaBlendFactor = vk::BlendFactor::eZero;
+          attachment.dstAlphaBlendFactor = vk::BlendFactor::eOneMinusSrcColor;
+        }
+        attachment.colorBlendOp = vk::BlendOp::eAdd;
+        attachment.alphaBlendOp = vk::BlendOp::eAdd;
+      }
+      pipeline->setDepthTestEnable(true);
+      pipeline->setDepthWriteEnable(false);
+      break;
+    }
+    case Z3DRendererBase::ShaderHookType::DualDepthPeelingInit:
+    case Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel: {
+      for (size_t i = 0; i < blendAttachments.size(); ++i) {
+        auto& attachment = blendAttachments[i];
+        if (i < 6) {
+          attachment.blendEnable = true;
+          attachment.srcColorBlendFactor = vk::BlendFactor::eOne;
+          attachment.dstColorBlendFactor = vk::BlendFactor::eOne;
+          attachment.colorBlendOp = vk::BlendOp::eMax;
+          attachment.srcAlphaBlendFactor = vk::BlendFactor::eOne;
+          attachment.dstAlphaBlendFactor = vk::BlendFactor::eOne;
+          attachment.alphaBlendOp = vk::BlendOp::eMax;
+        }
+      }
+      // Match GL DDP: depth-tested against the (loaded) opaque depth buffer, but do not write depth.
+      pipeline->setDepthTestEnable(true);
+      pipeline->setDepthWriteEnable(false);
+      break;
+    }
+    default:
+      break;
+  }
+
+  pipeline->setColorBlendAttachments(std::move(blendAttachments));
+  pipeline->create();
+
+  PipelineInstance instance;
+  instance.shader = std::move(shader);
+  instance.pipeline = std::move(pipeline);
+  auto [inserted, didInsert] = m_pipelines.emplace(key, std::move(instance));
+  CHECK(didInsert) << "Vulkan sphere pipeline insertion failed after a cache miss";
+  return inserted->second;
 }
 
 void ZVulkanSpherePipelineContext::uploadGeometry(const SpherePayload& payload)

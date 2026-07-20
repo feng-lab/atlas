@@ -21,6 +21,7 @@
 #include <QFileInfo>
 #include <QThread>
 
+#include <limits>
 #include <string>
 #include <utility>
 #include <vector>
@@ -39,6 +40,8 @@ ABSL_DECLARE_FLAG(int32_t, output_tile_size);
 ABSL_DECLARE_FLAG(int32_t, output_tile_border);
 ABSL_DECLARE_FLAG(std::vector<std::string>, use_gpu_devices);
 ABSL_DECLARE_FLAG(uint32_t, use_gpu_device);
+ABSL_DECLARE_FLAG(nim::RenderBackend, atlas_default_render_backend);
+ABSL_DECLARE_FLAG(int32_t, atlas_vk_device_index);
 
 #if defined(__linux__)
 ABSL_DECLARE_FLAG(bool, __use_EGL);
@@ -96,8 +99,16 @@ bool configureSingleGpuFromFlags(QString& error)
     return false;
   }
 
-  absl::SetFlag(&FLAGS_use_gpu_device, gpuId);
-  absl::SetFlag(&FLAGS___use_EGL, true);
+  if (absl::GetFlag(FLAGS_atlas_default_render_backend) == RenderBackend::Vulkan) {
+    if (gpuId > static_cast<uint32_t>(std::numeric_limits<int32_t>::max())) {
+      error = QString("Vulkan device index %1 exceeds the supported command-line range").arg(gpuId);
+      return false;
+    }
+    absl::SetFlag(&FLAGS_atlas_vk_device_index, static_cast<int32_t>(gpuId));
+  } else {
+    absl::SetFlag(&FLAGS_use_gpu_device, gpuId);
+    absl::SetFlag(&FLAGS___use_EGL, true);
+  }
   return true;
 #else
   error = "Flag --use_gpu_devices is Linux only";

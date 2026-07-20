@@ -968,7 +968,7 @@ void ZVulkanMeshPipelineContext::record(Z3DRendererBase& renderer,
       signature.pipeline = drawSpec.pipelineHandle;
       signature.layout = drawSpec.pipelineLayoutHandle;
       signature.descriptorSets = {baseDescriptorSets[0], dsLighting, dsTransforms, dsOit};
-      signature.descriptorGenerations = {m_backend.bindlessSampledImageDescriptorSetGeneration(),
+      signature.descriptorGenerations = {m_backend.bindlessSampledImageCommandBufferCompatibilityGeneration(),
                                          m_backend.sharedLightingDescriptorSetGeneration(),
                                          usePersistentTransforms
                                            ? m_backend.sharedTransformsDescriptorSetPersistentGeneration()
@@ -998,7 +998,7 @@ void ZVulkanMeshPipelineContext::record(Z3DRendererBase& renderer,
         if (entry.recorded && rawSecondary != vk::CommandBuffer{}) {
           if (entry.signature == signature) {
             m_backend.notifyDrawSecondaryCacheHit();
-            m_backend.notifyDrawSecondaryCacheExecute();
+            m_backend.notifyDrawSecondaryCacheExecute(entry.signature.pipeline);
             cmd.executeCommands({rawSecondary});
             m_backend.notifyDrawSubmitted();
             continue;
@@ -1118,7 +1118,7 @@ void ZVulkanMeshPipelineContext::record(Z3DRendererBase& renderer,
       });
       entry.recorded = true;
 
-      m_backend.notifyDrawSecondaryCacheExecute();
+      m_backend.notifyDrawSecondaryCacheExecute(entry.signature.pipeline);
       cmd.executeCommands({static_cast<vk::CommandBuffer>(entry.commandBuffer)});
       continue;
     }
@@ -1153,7 +1153,7 @@ void ZVulkanMeshPipelineContext::updateTransformUBO(Z3DRendererBase& renderer,
   void* frameKey = m_backend.activeFrameKey();
   CHECK(frameKey != nullptr) << "Mesh updateTransformUBO called without an active Vulkan frame-slot key";
   if (payload.streamKey != 0) {
-    const uint32_t submissionId = m_backend.activeSubmissionId();
+    const uint64_t cacheGeneration = m_backend.activeUniformCacheGeneration();
     FrameUboCache& frameCache = m_uboCacheByFrameKey[frameKey];
     StreamUboCache& streamCache = frameCache.byStream[payload.streamKey];
     ObjectTransformsCacheEntry* reusableEntry = nullptr;
@@ -1161,12 +1161,12 @@ void ZVulkanMeshPipelineContext::updateTransformUBO(Z3DRendererBase& renderer,
     for (auto& cached : streamCache.objectTransforms) {
       if (cached.params == payload.params && cached.followCoordTransform == payload.followCoordTransform &&
           cached.followSizeScale == payload.followSizeScale && clipPlanesEqual(cached.clipPlanes, batch.clipPlanes)) {
-        cached.lastSubmissionId = submissionId;
+        cached.lastUniformCacheGeneration = cacheGeneration;
         m_dynObjectTransformsOffset = cached.objectTransformsOffset;
         return;
       }
 
-      if (cached.lastSubmissionId != submissionId && reusableEntry == nullptr) {
+      if (cached.lastUniformCacheGeneration != cacheGeneration && reusableEntry == nullptr) {
         reusableEntry = &cached;
       }
     }
@@ -1180,7 +1180,7 @@ void ZVulkanMeshPipelineContext::updateTransformUBO(Z3DRendererBase& renderer,
       reusableEntry->followCoordTransform = payload.followCoordTransform;
       reusableEntry->followSizeScale = payload.followSizeScale;
       reusableEntry->clipPlanes = batch.clipPlanes;
-      reusableEntry->lastSubmissionId = submissionId;
+      reusableEntry->lastUniformCacheGeneration = cacheGeneration;
       m_dynObjectTransformsOffset = reusableEntry->objectTransformsOffset;
       return;
     }
@@ -1195,7 +1195,7 @@ void ZVulkanMeshPipelineContext::updateTransformUBO(Z3DRendererBase& renderer,
     entry.followSizeScale = payload.followSizeScale;
     entry.clipPlanes = batch.clipPlanes;
     entry.objectTransformsOffset = slice.offset;
-    entry.lastSubmissionId = submissionId;
+    entry.lastUniformCacheGeneration = cacheGeneration;
     streamCache.objectTransforms.push_back(std::move(entry));
     return;
   }
@@ -1256,7 +1256,7 @@ void ZVulkanMeshPipelineContext::updateMaterialUBO(Z3DRendererBase& renderer,
   void* frameKey = m_backend.activeFrameKey();
   CHECK(frameKey != nullptr) << "Mesh updateMaterialUBO called without an active Vulkan frame-slot key";
   if (usePersistentTransforms && payload.streamKey != 0) {
-    const uint32_t submissionId = m_backend.activeSubmissionId();
+    const uint64_t cacheGeneration = m_backend.activeUniformCacheGeneration();
     FrameUboCache& frameCache = m_uboCacheByFrameKey[frameKey];
     StreamUboCache& streamCache = frameCache.byStream[payload.streamKey];
 
@@ -1282,12 +1282,12 @@ void ZVulkanMeshPipelineContext::updateMaterialUBO(Z3DRendererBase& renderer,
       if (cached.params == payload.params && cached.followOpacity == payload.followOpacity &&
           cached.pickingPass == pickingPass && cached.useCustomColor == useCustomColor &&
           vec4Equal(cached.customColor, colorValue)) {
-        cached.lastSubmissionId = submissionId;
+        cached.lastUniformCacheGeneration = cacheGeneration;
         m_dynMaterialOffset = cached.materialOffset;
         return;
       }
 
-      if (cached.lastSubmissionId != submissionId && reusableEntry == nullptr) {
+      if (cached.lastUniformCacheGeneration != cacheGeneration && reusableEntry == nullptr) {
         reusableEntry = &cached;
       }
     }
@@ -1301,7 +1301,7 @@ void ZVulkanMeshPipelineContext::updateMaterialUBO(Z3DRendererBase& renderer,
       reusableEntry->pickingPass = pickingPass;
       reusableEntry->useCustomColor = useCustomColor;
       reusableEntry->customColor = colorValue;
-      reusableEntry->lastSubmissionId = submissionId;
+      reusableEntry->lastUniformCacheGeneration = cacheGeneration;
       m_dynMaterialOffset = reusableEntry->materialOffset;
       return;
     }
@@ -1317,7 +1317,7 @@ void ZVulkanMeshPipelineContext::updateMaterialUBO(Z3DRendererBase& renderer,
     entry.useCustomColor = useCustomColor;
     entry.customColor = colorValue;
     entry.materialOffset = slice.offset;
-    entry.lastSubmissionId = submissionId;
+    entry.lastUniformCacheGeneration = cacheGeneration;
     entries.push_back(std::move(entry));
     return;
   }

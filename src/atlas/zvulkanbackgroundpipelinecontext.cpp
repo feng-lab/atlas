@@ -3,18 +3,16 @@
 #include "z3dbackgroundrenderer.h"
 #include "z3drendererbase.h"
 #include "z3drenderervulkanbackend.h"
-#include "zvulkancontext.h"
 #include "zvulkandevice.h"
-#include "zvulkanpipeline.h"
-#include "zvulkanshader.h"
 #include "zvulkanbuffer.h"
+#include "zvulkanpipeline.h"
 #include "zvulkanrenderconversions.h"
 #include "zvulkanpipelinecontext_raii.h"
-#include "zexception.h"
+#include "zvulkanshader.h"
 
-#include <algorithm>
 #include <array>
 #include <cstddef>
+#include <utility>
 
 namespace nim {
 
@@ -45,7 +43,6 @@ void ZVulkanBackgroundPipelineContext::record(Z3DRendererBase& renderer,
                                               vk::raii::CommandBuffer& cmd)
 {
   (void)renderer;
-  (void)payload;
 
   // Shared fullscreen quad geometry
   const uint32_t vertexCount = 4;
@@ -60,7 +57,7 @@ void ZVulkanBackgroundPipelineContext::record(Z3DRendererBase& renderer,
   key.colorFormats = formats.colorFormats;
   key.depthFormat = formats.depthFormat;
 
-  PipelineInstance& pipeline = ensurePipeline(key, formats);
+  auto& pipeline = ensurePipeline(key);
 
   auto& quad = m_backend.fullscreenQuadVertexBuffer();
 
@@ -72,8 +69,6 @@ void ZVulkanBackgroundPipelineContext::record(Z3DRendererBase& renderer,
   constants.color1 = payload.color1;
   constants.color2 = payload.color2;
   constants.region = payload.region;
-
-
 
   ZVulkanPipelineCommandRecorder::GraphicsDrawSpec drawSpec{};
   drawSpec.viewports = std::span<const vk::Viewport>(&viewport, 1);
@@ -94,40 +89,49 @@ void ZVulkanBackgroundPipelineContext::record(Z3DRendererBase& renderer,
 
   ZVulkanPipelineCommandRecorder recorder(cmd);
   recorder.recordGraphicsDraw(drawSpec);
-
 }
 
 ZVulkanBackgroundPipelineContext::PipelineInstance&
-ZVulkanBackgroundPipelineContext::ensurePipeline(const PipelineKey& key, const vulkan::AttachmentFormats& formats)
+ZVulkanBackgroundPipelineContext::ensurePipeline(const PipelineKey& key)
 {
-  auto it = m_pipelineCache.find(key);
-  if (it != m_pipelineCache.end()) {
-    return it->second;
+  const auto found = m_pipelines.find(key);
+  if (found != m_pipelines.end()) {
+    return found->second;
   }
 
   auto& device = m_backend.device();
+  auto shader = std::make_unique<ZVulkanShader>(device,
+                                                ZVulkanShader::spirvResourcePath(QStringLiteral("pass.vert.spv")),
+                                                ZVulkanShader::spirvResourcePath(QStringLiteral("background.frag.spv")),
+                                                std::nullopt);
 
-  // No descriptor sets are used for background; pipelines bind only push constants
+  const std::array vertexBindings{
+    vk::VertexInputBindingDescription{.binding = 0,
+                                      .stride = static_cast<uint32_t>(sizeof(glm::vec3)),
+                                      .inputRate = vk::VertexInputRate::eVertex}
+  };
+  const std::array vertexAttributes{
+    vk::VertexInputAttributeDescription{.location = 0,
+                                        .binding = 0,
+                                        .format = vk::Format::eR32G32B32Sfloat,
+                                        .offset = 0}
+  };
+  vk::PipelineVertexInputStateCreateInfo vertexInput{};
+  vertexInput.vertexBindingDescriptionCount = static_cast<uint32_t>(vertexBindings.size());
+  vertexInput.pVertexBindingDescriptions = vertexBindings.data();
+  vertexInput.vertexAttributeDescriptionCount = static_cast<uint32_t>(vertexAttributes.size());
+  vertexInput.pVertexAttributeDescriptions = vertexAttributes.data();
 
-  PipelineInstance instance;
-  instance.shader =
-    std::make_unique<ZVulkanShader>(device,
-                                    ZVulkanShader::spirvResourcePath(QStringLiteral("pass.vert.spv")),
-                                    ZVulkanShader::spirvResourcePath(QStringLiteral("background.frag.spv")),
-                                    std::nullopt);
+  auto pipeline = device.createPipeline(*shader, vertexInput, vk::PrimitiveTopology::eTriangleStrip);
+  pipeline->setAttachmentFormats(key.colorFormats, key.depthFormat);
+  pipeline->setCullMode(vk::CullModeFlagBits::eNone);
+  pipeline->setDepthTestEnable(false);
+  pipeline->setDepthWriteEnable(false);
+  pipeline->setColorBlendAttachments(
+    std::vector<vk::PipelineColorBlendAttachmentState>(key.colorFormats.size(),
+                                                       vulkan::toVkBlendAttachment(BlendState{})));
 
-  auto vertexInput = makeVertexInputState();
-  instance.pipeline = device.createPipeline(*instance.shader, vertexInput, vk::PrimitiveTopology::eTriangleStrip);
-  std::vector<vk::DescriptorSetLayout> layouts{}; // no descriptor sets needed
-  instance.pipeline->setAttachmentFormats(formats.colorFormats, formats.depthFormat);
-  instance.pipeline->setDescriptorSetLayouts(layouts);
-  instance.pipeline->setCullMode(vk::CullModeFlagBits::eNone);
-  instance.pipeline->setFrontFace(vk::FrontFace::eCounterClockwise);
-  // Background should not participate in depth testing/writes
-  instance.pipeline->setDepthTestEnable(false);
-  instance.pipeline->setDepthWriteEnable(false);
-
-  std::array<vk::SpecializationMapEntry, 5> entries{
+  const std::array<vk::SpecializationMapEntry, 5> entries{
     vk::SpecializationMapEntry{.constantID = 30, .offset = 0 * sizeof(uint32_t), .size = sizeof(uint32_t)},
     vk::SpecializationMapEntry{.constantID = 31, .offset = 1 * sizeof(uint32_t), .size = sizeof(uint32_t)},
     vk::SpecializationMapEntry{.constantID = 32, .offset = 2 * sizeof(uint32_t), .size = sizeof(uint32_t)},
@@ -145,46 +149,31 @@ ZVulkanBackgroundPipelineContext::ensurePipeline(const PipelineKey& key, const v
   const bool gradientB2T =
     key.mode == BackgroundMode::Gradient && key.orientation == BackgroundGradientOrientation::BottomToTop;
 
-  std::array<uint32_t, 5> specData{static_cast<uint32_t>(isUniform),
-                                   static_cast<uint32_t>(gradientL2R),
-                                   static_cast<uint32_t>(gradientR2L),
-                                   static_cast<uint32_t>(gradientT2B),
-                                   static_cast<uint32_t>(gradientB2T)};
+  const std::array<uint32_t, 5> specData{static_cast<uint32_t>(isUniform),
+                                         static_cast<uint32_t>(gradientL2R),
+                                         static_cast<uint32_t>(gradientR2L),
+                                         static_cast<uint32_t>(gradientT2B),
+                                         static_cast<uint32_t>(gradientB2T)};
 
-  instance.shader->setSpecializationConstants(
+  shader->setSpecializationConstants(
     vk::ShaderStageFlagBits::eFragment,
     std::vector<vk::SpecializationMapEntry>(entries.begin(), entries.end()),
     std::vector<uint8_t>(reinterpret_cast<const uint8_t*>(specData.data()),
                          reinterpret_cast<const uint8_t*>(specData.data()) + sizeof(specData)));
 
-  vk::PushConstantRange range{.stageFlags = vk::ShaderStageFlagBits::eFragment,
-                              .offset = 0,
-                              .size = static_cast<uint32_t>(sizeof(BackgroundPushConstants))};
-  instance.pipeline->setPushConstantRanges({range});
-  instance.pipeline->create();
+  pipeline->setPushConstantRanges({
+    vk::PushConstantRange{.stageFlags = vk::ShaderStageFlagBits::eFragment,
+                          .offset = 0,
+                          .size = static_cast<uint32_t>(sizeof(BackgroundPushConstants))}
+  });
+  pipeline->create();
 
-  auto [inserted, _] = m_pipelineCache.insert({key, std::move(instance)});
+  PipelineInstance instance;
+  instance.shader = std::move(shader);
+  instance.pipeline = std::move(pipeline);
+  auto [inserted, didInsert] = m_pipelines.emplace(key, std::move(instance));
+  CHECK(didInsert) << "Vulkan background pipeline insertion failed after a cache miss";
   return inserted->second;
-}
-
-vk::PipelineVertexInputStateCreateInfo ZVulkanBackgroundPipelineContext::makeVertexInputState() const
-{
-  static vk::VertexInputBindingDescription binding{.binding = 0,
-                                                   .stride = static_cast<uint32_t>(sizeof(glm::vec3)),
-                                                   .inputRate = vk::VertexInputRate::eVertex};
-  static std::array<vk::VertexInputAttributeDescription, 1> attrs{
-    vk::VertexInputAttributeDescription{.location = 0,
-                                        .binding = 0,
-                                        .format = vk::Format::eR32G32B32Sfloat,
-                                        .offset = 0}
-  };
-
-  static vk::PipelineVertexInputStateCreateInfo info{};
-  info.vertexBindingDescriptionCount = 1;
-  info.pVertexBindingDescriptions = &binding;
-  info.vertexAttributeDescriptionCount = static_cast<uint32_t>(attrs.size());
-  info.pVertexAttributeDescriptions = attrs.data();
-  return info;
 }
 
 } // namespace nim

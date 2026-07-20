@@ -103,12 +103,13 @@ Z3DRenderGlobalState& Z3DRenderGlobalState::instance()
 
 Z3DRenderGlobalState::Z3DRenderGlobalState() = default;
 
-uint32_t Z3DRenderGlobalState::nextPerfFrameSubmissionId(uint64_t token)
+uint32_t Z3DRenderGlobalState::nextRenderFrameSubmissionId(uint64_t token)
 {
   CHECK_GT(token, 0u);
-  CHECK_EQ(token, m_currentPerfFrameToken) << "Perf submission ID requested for a non-current token. token=" << token
-                                           << " current=" << m_currentPerfFrameToken;
-  return ++m_currentPerfFrameSubmissionCursor;
+  CHECK_EQ(token, m_currentRenderFrameToken)
+    << "Render submission ID requested for a non-current render token. token=" << token
+    << " current=" << m_currentRenderFrameToken;
+  return ++m_currentRenderFrameSubmissionCursor;
 }
 
 Z3DScratchResourcePool& Z3DRenderGlobalState::accessScratchPool() const

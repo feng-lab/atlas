@@ -23,6 +23,8 @@ void ZVulkanDescriptorSet::updateUniformBuffer(uint32_t binding, ZVulkanBuffer& 
     CHECK(false) << "Descriptor write attempted during recording (uniform buffer) at binding " << binding;
     return;
   }
+  CHECK(m_device.descriptorSetWritesAllowed())
+    << "Descriptor write attempted while another Vulkan backend is recording commands";
   vk::DescriptorBufferInfo bufferInfo{.buffer = buffer.buffer(), .offset = 0, .range = buffer.size()};
   const uint64_t bit = (1ull << binding);
   if ((m_initializedMask & bit) != 0ull) {
@@ -64,6 +66,8 @@ void ZVulkanDescriptorSet::updateUniformBufferDynamic(uint32_t binding,
                  << binding;
     return;
   }
+  CHECK(m_device.descriptorSetWritesAllowed())
+    << "Descriptor write attempted while another Vulkan backend is recording commands";
   vk::DescriptorBufferInfo bufferInfo{.buffer = buffer.buffer(), .offset = 0, .range = range};
   const uint64_t bit = (1ull << binding);
   if ((m_initializedMask & bit) != 0ull) {
@@ -133,6 +137,8 @@ void ZVulkanDescriptorSet::updateStorageBuffer(uint32_t binding, ZVulkanBuffer& 
     CHECK(false) << "Descriptor write attempted during recording (storage buffer) at binding " << binding;
     return;
   }
+  CHECK(m_device.descriptorSetWritesAllowed())
+    << "Descriptor write attempted while another Vulkan backend is recording commands";
   // Invariant: storage buffer descriptors require buffers created with STORAGE_BUFFER usage.
   CHECK(static_cast<bool>(buffer.usage() & vk::BufferUsageFlagBits::eStorageBuffer))
     << "Storage buffer bound at binding " << binding << " was not created with VK_BUFFER_USAGE_STORAGE_BUFFER_BIT";
@@ -177,6 +183,8 @@ void ZVulkanDescriptorSet::updateStorageImage(uint32_t binding,
     CHECK(false) << "Descriptor write attempted during recording (storage image) at binding " << binding;
     return;
   }
+  CHECK(m_device.descriptorSetWritesAllowed())
+    << "Descriptor write attempted while another Vulkan backend is recording commands";
   const vk::ImageLayout effectiveLayout =
     (layoutOverride == vk::ImageLayout::eUndefined) ? texture.descriptorLayout() : layoutOverride;
   CHECK(effectiveLayout == vk::ImageLayout::eGeneral)

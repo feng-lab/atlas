@@ -839,6 +839,7 @@ set(SOURCES
     zprocess.cpp zprocess.h
     zvulkan.h
     zvulkanmemoryutils.h
+    zvulkandevicesupport.h
     zvulkancontext.h
     zvulkancontext.cpp
     zvulkandevice.h
@@ -873,6 +874,7 @@ set(SOURCES
     zvulkanshaderstate.h
     zvulkanlinearscript.h
     zvulkanlinearscript.cpp
+    zvulkansubmissionrequirements.h
     zvulkanlinepipelinecontext.h
     zvulkanlinepipelinecontext.cpp
     zvulkanmeshpipelinecontext.h

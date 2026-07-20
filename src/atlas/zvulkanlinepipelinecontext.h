@@ -349,8 +349,8 @@ private:
   {
     vk::Pipeline pipeline{};
     vk::PipelineLayout layout{};
-    std::array<vk::DescriptorSet, 3> baseDescriptorSets{};
-    std::array<uint64_t, 3> baseDescriptorGenerations{};
+    std::array<vk::DescriptorSet, 2> baseDescriptorSets{};
+    std::array<uint64_t, 2> baseDescriptorGenerations{};
     bool hasOit = false;
     vk::DescriptorSet oitDescriptorSet{};
     uint64_t oitDescriptorGeneration = 0;
@@ -425,7 +425,7 @@ private:
     ClipPlanesState clipPlanes{};
     vk::DeviceSize objectTransformsOffset = 0;
     vk::DeviceSize materialOffset = 0;
-    uint32_t lastSubmissionId = 0;
+    uint64_t lastUniformCacheGeneration = 0;
   };
   struct FrameUboCache
   {

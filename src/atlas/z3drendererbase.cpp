@@ -473,7 +473,7 @@ void Z3DRendererBase::recordVulkanBatchesInActiveFrame(const std::function<void(
     m_backend->beginPassScope(label);
     beganPassScope = true;
     if (!label.empty()) {
-      gpuScope = vkBackend->beginGpuScope(label);
+      gpuScope = vkBackend->beginGpuScope(label, /*isPassScope=*/true);
     }
   }
   if (recordBatches) {

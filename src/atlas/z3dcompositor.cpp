@@ -6,6 +6,7 @@
 #include "z3dtexture.h"
 #include "z3drendercommands.h"
 #include "z3drenderglobalstate.h"
+#include "z3dperfcollector.h"
 #include "zbenchtimer.h"
 #include "z3dscratchresourcepool.h"
 #include "zlog.h"
@@ -1694,14 +1695,12 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
                       transparencyMode == TransparencyMode::WeightedAverage ||
                       transparencyMode == TransparencyMode::WeightedBlended;
   const auto nonOpaqueLayers = collectNonOpaqueImageLayers(eye);
-  const bool haveAnyNonOpaqueLayer = std::any_of(nonOpaqueLayers.begin(),
-                                                 nonOpaqueLayers.end(),
-                                                 [](const Z3DCompositorImageLayer& layer) {
-                                                   const auto& c = layer.colorAttachment.handle;
-                                                   const auto& d = layer.depthAttachment.handle;
-                                                   return c.backend == RenderBackend::Vulkan && c.valid() &&
-                                                          d.backend == RenderBackend::Vulkan && d.valid();
-                                                 });
+  const bool haveAnyNonOpaqueLayer =
+    std::any_of(nonOpaqueLayers.begin(), nonOpaqueLayers.end(), [](const Z3DCompositorImageLayer& layer) {
+      const auto& c = layer.colorAttachment.handle;
+      const auto& d = layer.depthAttachment.handle;
+      return c.backend == RenderBackend::Vulkan && c.valid() && d.backend == RenderBackend::Vulkan && d.valid();
+    });
   const bool needTempSceneForNonOITImages = (!useOIT && haveAnyNonOpaqueLayer && (sceneOutLease == outLease));
 
   // Mirror GL: when handle/on-top overlays are present (or when we need to composite
@@ -1836,6 +1835,12 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
                                       nonOpaqueLayers,
                                       clearResolve,
                                       script);
+          // PPLL buffers and host-visible parameters are selected by render
+          // token. Finish this invocation before a stay-on-top invocation or
+          // the right eye can reuse the same mutable resource set.
+          if (!onTopTransparentFilters.empty() || eye == LeftEye) {
+            script.flushAndWaitForCompletion("transparency_ppll_resource_reuse");
+          }
           break;
         case TransparencyMode::WeightedAverage:
           renderTransparentWAVulkan(transparentFilters, lease, eye, depthHandle, nonOpaqueLayers, clearResolve, script);
@@ -2521,6 +2526,9 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
                                         onTopImageLayers,
                                         /*clearResolveTarget=*/true,
                                         script);
+            if (eye == LeftEye) {
+              script.flushAndWaitForCompletion("transparency_ppll_stereo_resource_reuse");
+            }
             break;
           case TransparencyMode::WeightedAverage:
             renderTransparentWAVulkan(onTopTransparentFilters,
@@ -2969,7 +2977,7 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
     auto installFinalColorReadback = [this, scratchPool](Z3DLocalColorBuffer* localPtr,
                                                          Z3DScratchResourcePool::RenderTargetLease* targetPtr,
                                                          Z3DEye eyeCopy,
-                                                         uint64_t perfFrameToken,
+                                                         uint64_t renderFrameToken,
                                                          const void* mapped,
                                                          const glm::uvec2& size,
                                                          std::function<void()> releaseSlot,
@@ -2980,14 +2988,14 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
       const char* suffix = noCopy ? " (no copy)" : "";
       VLOG(1) << fmt::format("VK final readback ready{} frame#{} mapped={} size={}x{} eye={}",
                              suffix,
-                             perfFrameToken,
+                             renderFrameToken,
                              mapped,
                              size.x,
                              size.y,
                              static_cast<int>(eyeCopy));
 
       const size_t eyeIndex = static_cast<size_t>(eyeCopy);
-      CHECK_LT(eyeIndex, m_lastPublishedPerfFrameToken.size())
+      CHECK_LT(eyeIndex, m_lastPublishedRenderFrameToken.size())
         << "VK final readback eye index out of range: eye=" << static_cast<int>(eyeCopy);
 
       bool dropStale = false;
@@ -2999,11 +3007,11 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
       {
         const std::scoped_lock lock(m_globalParameters.targetSwitchMutex);
 
-        lastPublishedToken = m_lastPublishedPerfFrameToken[eyeIndex];
-        if (perfFrameToken != 0 && lastPublishedToken != 0 && perfFrameToken < lastPublishedToken) {
+        lastPublishedToken = m_lastPublishedRenderFrameToken[eyeIndex];
+        if (renderFrameToken != 0 && lastPublishedToken != 0 && renderFrameToken < lastPublishedToken) {
           dropStale = true;
-        } else if (perfFrameToken != 0) {
-          m_lastPublishedPerfFrameToken[eyeIndex] = perfFrameToken;
+        } else if (renderFrameToken != 0) {
+          m_lastPublishedRenderFrameToken[eyeIndex] = renderFrameToken;
         }
 
         if (!dropStale) {
@@ -3070,7 +3078,7 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
 
       if (dropStale) {
         VLOG(1) << fmt::format("VK final readback drop stale frame#{} < last#{} eye={}",
-                               perfFrameToken,
+                               renderFrameToken,
                                lastPublishedToken,
                                static_cast<int>(eyeCopy));
         if (releaseSlot) {
@@ -3108,62 +3116,69 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
       }
     };
 
-    auto enqueueFinalReadbackInActiveFrame = [installFinalColorReadback](
-                                               Z3DRendererVulkanBackend& backend,
-                                               ZVulkanTexture& tex,
-                                               Z3DLocalColorBuffer* localPtr,
-                                               Z3DScratchResourcePool::RenderTargetLease* targetPtr,
-                                               Z3DEye eyeCopy,
-                                               std::string_view ticketLabel,
-                                               std::string_view consumeLabel,
-                                               bool noCopy) {
-      CHECK(localPtr != nullptr) << "VK enqueue final readback requires local color buffer";
-      CHECK(targetPtr != nullptr) << "VK enqueue final readback requires output target lease";
-      const char* suffix = noCopy ? " (no copy)" : "";
-      VLOG(1) << fmt::format("VK enqueue final readback{} tex=0x{:x} size={}x{} eye={}",
-                             suffix,
-                             reinterpret_cast<uint64_t>(&tex),
-                             tex.width(),
-                             tex.height(),
-                             static_cast<int>(eyeCopy));
-      // Measure end-to-end latency from the engine's perf-frame start (Network
-      // wrapper "Since Start") until the result is published/host-ready and
-      // renderingFinished is emitted. This matches OpenGL's synchronous UX
-      // timing better than measuring only enqueue→ready latency in Vulkan.
-      auto perfFrameStartTs = Z3DRenderGlobalState::instance().currentPerfFrameStartTime();
-      if (perfFrameStartTs.time_since_epoch().count() == 0) {
-        // Perf timing should never be missing, but do not crash on a logging
-        // metric. Fall back to "now" so the value is still bounded.
-        perfFrameStartTs = std::chrono::steady_clock::now();
-      }
-      const uint64_t perfFrameToken = Z3DRenderGlobalState::instance().currentPerfFrameToken();
-      auto ticket = backend.requestEndOfFrameColorReadbackTicket(tex, eyeCopy, ticketLabel);
-      backend.registerAfterCurrentFrameCompletionHook(
-        currentRenderThreadExecutorKeepAlive(consumeLabel),
-        [installFinalColorReadback,
-         localPtr,
-         targetPtr,
-         eyeCopy,
-         perfFrameStartTs,
-         perfFrameToken,
-         ticket = std::move(ticket),
-         noCopy](Z3DRendererVulkanBackend& backend) mutable -> folly::coro::Task<void> {
-          co_await Z3DRendererVulkanBackend::waitActiveSubmissionFence(ticket.fence);
-          installFinalColorReadback(localPtr,
-                                    targetPtr,
-                                    eyeCopy,
-                                    perfFrameToken,
-                                    ticket.mapped,
-                                    ticket.size,
-                                    std::move(ticket.releaseSlot),
-                                    noCopy);
-          const double allMs =
-            std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - perfFrameStartTs).count();
-          backend.recordAllMsForCompletionSafePoint(allMs);
-          co_return;
-        },
-        consumeLabel);
-    };
+    auto enqueueFinalReadbackInActiveFrame =
+      [installFinalColorReadback](Z3DRendererVulkanBackend& backend,
+                                  ZVulkanTexture& tex,
+                                  Z3DLocalColorBuffer* localPtr,
+                                  Z3DScratchResourcePool::RenderTargetLease* targetPtr,
+                                  Z3DEye eyeCopy,
+                                  std::string_view ticketLabel,
+                                  std::string_view consumeLabel,
+                                  bool noCopy) {
+        CHECK(localPtr != nullptr) << "VK enqueue final readback requires local color buffer";
+        CHECK(targetPtr != nullptr) << "VK enqueue final readback requires output target lease";
+        const char* suffix = noCopy ? " (no copy)" : "";
+        VLOG(1) << fmt::format("VK enqueue final readback{} tex=0x{:x} size={}x{} eye={}",
+                               suffix,
+                               reinterpret_cast<uint64_t>(&tex),
+                               tex.width(),
+                               tex.height(),
+                               static_cast<int>(eyeCopy));
+        // Measure end-to-end latency from the engine's perf-frame start (Network
+        // wrapper "Since Start") until the result is published/host-ready and
+        // renderingFinished is emitted. This matches OpenGL's synchronous UX
+        // timing better than measuring only enqueue→ready latency in Vulkan.
+        const bool collectPerf = Z3DPerfCollector::enabled();
+        auto perfFrameStartTs = collectPerf ? Z3DRenderGlobalState::instance().currentPerfFrameStartTime()
+                                            : std::chrono::steady_clock::time_point{};
+        if (collectPerf && perfFrameStartTs.time_since_epoch().count() == 0) {
+          // Perf timing should never be missing, but do not crash on a logging
+          // metric. Fall back to "now" so the value is still bounded.
+          perfFrameStartTs = std::chrono::steady_clock::now();
+        }
+        // Presentation ordering is a correctness contract, not instrumentation:
+        // retain the render-frame identity when performance collection is off.
+        const uint64_t renderFrameToken = Z3DRenderGlobalState::instance().currentRenderFrameToken();
+        auto ticket = backend.requestEndOfFrameColorReadbackTicket(tex, eyeCopy, ticketLabel);
+        backend.registerAfterCurrentFrameCompletionHook(
+          currentRenderThreadExecutorKeepAlive(consumeLabel),
+          [installFinalColorReadback,
+           localPtr,
+           targetPtr,
+           eyeCopy,
+           collectPerf,
+           perfFrameStartTs,
+           renderFrameToken,
+           ticket = std::move(ticket),
+           noCopy](Z3DRendererVulkanBackend& backend) mutable -> folly::coro::Task<void> {
+            co_await Z3DRendererVulkanBackend::waitActiveSubmissionFence(ticket.fence);
+            installFinalColorReadback(localPtr,
+                                      targetPtr,
+                                      eyeCopy,
+                                      renderFrameToken,
+                                      ticket.mapped,
+                                      ticket.size,
+                                      std::move(ticket.releaseSlot),
+                                      noCopy);
+            if (collectPerf) {
+              const double allMs =
+                std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - perfFrameStartTs).count();
+              backend.recordAllMsForCompletionSafePoint(allMs);
+            }
+            co_return;
+          },
+          consumeLabel);
+      };
 
     // Request readback while a Vulkan frame is active so backend can insert the copy before endRender.
     // If final color is not RGBA8, first render a copy to an RGBA8 scratch surface, then enqueue the readback inside
@@ -3402,33 +3417,33 @@ void Z3DCompositor::recordSceneSegmentsVulkan(const std::vector<Z3DBoundedFilter
                                        RenderBackend::Vulkan));
       script.keepAlive(blurYLease);
 
-      const auto segGlowGeom = script.raster("glow_geometry",
-                                             deps ? std::initializer_list<ZVulkanLinearScript::SegmentHandle>{deps}
-                                                  : std::initializer_list<ZVulkanLinearScript::SegmentHandle>{},
-                                             [&]() {
-                                               m_rendererBase.setActiveSurfaceWithLoadStore(*glowGeomLease,
-                                                                                            LoadOp::Clear,
-                                                                                            StoreOp::Store,
-                                                                                            LoadOp::Clear,
-                                                                                            StoreOp::Store);
-                                               for (auto& att :
-                                                    m_rendererBase.frameState().activeSurface.colorAttachments) {
-                                                 att.finalUse = AttachmentFinalUse::Sampled;
-                                               }
-                                               if (m_rendererBase.frameState().activeSurface.depthAttachment) {
-                                                 m_rendererBase.frameState().activeSurface.depthAttachment->finalUse =
-                                                   AttachmentFinalUse::Sampled;
-                                               }
-                                               const auto glowGeomSurface = m_rendererBase.frameState().activeSurface;
-                                               recordFilterBatchesToSurfaceUnified(
-                                                 m_rendererBase,
-                                                 filter,
-                                                 glowGeomSurface,
-                                                 [&]() {
-                                                   filter->renderOpaque(eye);
-                                                 },
-                                                 /*propagateHookPara=*/false);
-                                             });
+      const auto segGlowGeom =
+        script.raster("glow_geometry",
+                      deps ? std::initializer_list<ZVulkanLinearScript::SegmentHandle>{deps}
+                           : std::initializer_list<ZVulkanLinearScript::SegmentHandle>{},
+                      [&]() {
+                        m_rendererBase.setActiveSurfaceWithLoadStore(*glowGeomLease,
+                                                                     LoadOp::Clear,
+                                                                     StoreOp::Store,
+                                                                     LoadOp::Clear,
+                                                                     StoreOp::Store);
+                        for (auto& att : m_rendererBase.frameState().activeSurface.colorAttachments) {
+                          att.finalUse = AttachmentFinalUse::Sampled;
+                        }
+                        if (m_rendererBase.frameState().activeSurface.depthAttachment) {
+                          m_rendererBase.frameState().activeSurface.depthAttachment->finalUse =
+                            AttachmentFinalUse::Sampled;
+                        }
+                        const auto glowGeomSurface = m_rendererBase.frameState().activeSurface;
+                        recordFilterBatchesToSurfaceUnified(
+                          m_rendererBase,
+                          filter,
+                          glowGeomSurface,
+                          [&]() {
+                            filter->renderOpaque(eye);
+                          },
+                          /*propagateHookPara=*/false);
+                      });
 
       // Sync glow parameters from the filter to the compositor renderer.
       if (auto* mode = dynamic_cast<ZStringIntOptionParameter*>(filter->parameter("Glow Mode"))) {
@@ -4700,6 +4715,9 @@ void Z3DCompositor::renderTransparentDDPVulkan(const std::vector<Z3DBoundedFilte
   auto* vulkanBackend = dynamic_cast<Z3DRendererVulkanBackend*>(m_rendererBase.backend());
   CHECK(vulkanBackend != nullptr) << "renderTransparentDDPVulkan requires Vulkan backend";
 
+  constexpr auto ddpGatingRequirement =
+    Z3DRendererVulkanBackend::requirementMask(Z3DRendererVulkanBackend::SubmissionRequirement::DDPGating);
+
   // Geometry init step must see DualDepthPeelingInit on the compositor renderer
   m_rendererBase.setShaderHookType(Z3DRendererBase::ShaderHookType::DualDepthPeelingInit);
   const auto segInit = script.raster("transparency_ddp_init", {}, [&]() {
@@ -4894,30 +4912,34 @@ void Z3DCompositor::renderTransparentDDPVulkan(const std::vector<Z3DBoundedFilte
   auto recordDdpPeelPass = [&](uint32_t pass,
                                ZVulkanLinearScript::SegmentHandle dep,
                                bool firstPassInSubmission) -> ZVulkanLinearScript::SegmentHandle {
-    const auto segReset = script.commandsInSubmission("transparency_ddp_reset",
-                                                      {dep},
-                                                      [firstPassInSubmission](Z3DRendererVulkanBackend& be) {
-                                                        auto& cmd = be.commandBuffer();
-                                                        if (!firstPassInSubmission) {
-                                                          be.ddpBarrierComputeToTransfer(cmd);
-                                                        }
-                                                        be.ddpResetForPass(cmd, firstPassInSubmission);
-                                                        be.ddpBarrierTransferToFrag(cmd);
-                                                      });
+    const auto segReset = script.commandsInSubmission(
+      "transparency_ddp_reset",
+      {dep},
+      [firstPassInSubmission](Z3DRendererVulkanBackend& be) {
+        auto& cmd = be.commandBuffer();
+        if (!firstPassInSubmission) {
+          be.ddpBarrierComputeToTransfer(cmd);
+        }
+        be.ddpResetForPass(cmd, firstPassInSubmission);
+        be.ddpBarrierTransferToFrag(cmd);
+      },
+      ddpGatingRequirement);
 
     const auto segBlend = drawPass(pass, segReset);
 
     const bool useIndirectCountLocal = useIndirectCount;
-    return script.commandsInSubmission("transparency_ddp_count",
-                                       {segBlend},
-                                       [useIndirectCountLocal](Z3DRendererVulkanBackend& be) {
-                                         auto& cmd = be.commandBuffer();
-                                         be.ddpBarrierFragToCompute(cmd);
-                                         be.ddpDispatchCountCompute(cmd);
-                                         if (useIndirectCountLocal) {
-                                           be.ddpBarrierComputeToIndirect(cmd);
-                                         }
-                                       });
+    return script.commandsInSubmission(
+      "transparency_ddp_count",
+      {segBlend},
+      [useIndirectCountLocal](Z3DRendererVulkanBackend& be) {
+        auto& cmd = be.commandBuffer();
+        be.ddpBarrierFragToCompute(cmd);
+        be.ddpDispatchCountCompute(cmd);
+        if (useIndirectCountLocal) {
+          be.ddpBarrierComputeToIndirect(cmd);
+        }
+      },
+      ddpGatingRequirement);
   };
 
   const int32_t ddpCpuChunkPasses = absl::GetFlag(FLAGS_atlas_vk_ddp_cpu_chunk_passes);
@@ -5183,38 +5205,45 @@ void Z3DCompositor::renderTransparentPPLLVulkan(const std::vector<Z3DBoundedFilt
   uint32_t blockCount = 0u;
 
   {
-    auto sumsBufSlot = script.makeSlot<ZVulkanBuffer*>();
-    const auto segPrimeCount =
-      script.preRecord("transparency_ppll_prime_count",
-                       {},
-                       [ppllViewport, sumsBufSlot](Z3DRendererVulkanBackend& be, Z3DRendererBase& /*renderer*/) {
-                         be.primePPLLForCountPass(ppllViewport);
-                         sumsBufSlot.set(be.ppllBlockSumsBufferObj());
-                       });
+    const auto sumsBufSlot = script.makeSlot<ZVulkanBuffer*>();
+    ZVulkanLinearScript::SegmentHandle segScanLocal;
+    {
+      // Strict-residency mode normally flushes each raster/replay node. PPLL's
+      // count/reset/scan sequence is one bounded submission with explicit
+      // frame-local buffer effects, so keep it intact until the readback below.
+      [[maybe_unused]] auto submissionGroup = script.scopedSubmissionGroup();
+      const auto segPrimeCount =
+        script.preRecord("transparency_ppll_prime_count",
+                         {},
+                         [ppllViewport, sumsBufSlot](Z3DRendererVulkanBackend& be, Z3DRendererBase& /*renderer*/) {
+                           be.primePPLLForCountPass(ppllViewport);
+                           sumsBufSlot.set(be.ppllBlockSumsBufferObj());
+                         });
 
-    setPPLLShaderHookOnBatches(Z3DRendererBase::ShaderHookType::PerPixelFragmentListCount);
+      setPPLLShaderHookOnBatches(Z3DRendererBase::ShaderHookType::PerPixelFragmentListCount);
 
-    const auto segResetCounts =
-      script.commands("transparency_ppll_reset_counts", {segPrimeCount}, [](Z3DRendererVulkanBackend& be) {
-        auto& cmd = be.commandBuffer();
-        be.ppllResetCounts(cmd);
-        be.ppllBarrierTransferToFrag(cmd);
-      });
+      const auto segResetCounts = script.commandsInSubmission("transparency_ppll_reset_counts",
+                                                              {segPrimeCount},
+                                                              [](Z3DRendererVulkanBackend& be) {
+                                                                auto& cmd = be.commandBuffer();
+                                                                be.ppllResetCounts(cmd);
+                                                                be.ppllBarrierTransferToFrag(cmd);
+                                                              });
 
-    const auto segCount = script.replay("transparency_ppll_count", {segResetCounts}, transparentBatches);
+      const auto segCount = script.replay("transparency_ppll_count", {segResetCounts}, transparentBatches);
 
-    const auto segScanLocal =
-      script.commands("transparency_ppll_scan_local", {segCount}, [](Z3DRendererVulkanBackend& be) {
-        auto& cmd = be.commandBuffer();
-        be.ppllBarrierFragToCompute(cmd);
-        be.ppllDispatchScanLocal(cmd);
-      });
+      segScanLocal =
+        script.commandsInSubmission("transparency_ppll_scan_local", {segCount}, [](Z3DRendererVulkanBackend& be) {
+          auto& cmd = be.commandBuffer();
+          be.ppllBarrierFragToCompute(cmd);
+          be.ppllDispatchScanLocal(cmd);
+        });
+    }
 
     const uint64_t pixelCount64 = static_cast<uint64_t>(ppllViewport.z) * static_cast<uint64_t>(ppllViewport.w);
     CHECK(pixelCount64 <= static_cast<uint64_t>(std::numeric_limits<uint32_t>::max()))
       << fmt::format("PPLL pixel count overflow: {}x{} = {}", ppllViewport.z, ppllViewport.w, pixelCount64);
-    const uint32_t pixelCount = static_cast<uint32_t>(pixelCount64);
-    blockCount = (pixelCount == 0u) ? 0u : ((pixelCount + 256u - 1u) / 256u);
+    blockCount = pixelCount64 == 0u ? 0u : static_cast<uint32_t>((pixelCount64 + 256u - 1u) / 256u);
 
     if (blockCount > 0u) {
       blockSums.resize(blockCount, 0u);
@@ -5293,36 +5322,43 @@ void Z3DCompositor::renderTransparentPPLLVulkan(const std::vector<Z3DBoundedFilt
 
   setPPLLShaderHookOnBatches(Z3DRendererBase::ShaderHookType::PerPixelFragmentListStore);
   {
+    // This is PPLL's second and final submission even under strict residency:
+    // scan-add, store, and resolve share the same PPLL buffers and barriers.
+    [[maybe_unused]] auto submissionGroup = script.scopedSubmissionGroup();
     auto blockPrefixesShared = std::make_shared<std::vector<uint32_t>>(std::move(blockPrefixes));
-    const auto segScanAdd =
-      script.commands("transparency_ppll_scan_add",
-                      {segPrimeStore},
-                      [blockPrefixesShared](Z3DRendererVulkanBackend& be) {
-                        auto& cmd = be.commandBuffer();
+    const auto segScanAdd = script.commandsInSubmission("transparency_ppll_scan_add",
+                                                        {segPrimeStore},
+                                                        [blockPrefixesShared](Z3DRendererVulkanBackend& be) {
+                                                          auto& cmd = be.commandBuffer();
 
-                        if (blockPrefixesShared && !blockPrefixesShared->empty()) {
-                          be.ppllWriteBlockPrefixes(blockPrefixesShared->data(), blockPrefixesShared->size());
-                        }
+                                                          if (blockPrefixesShared && !blockPrefixesShared->empty()) {
+                                                            be.ppllWriteBlockPrefixes(blockPrefixesShared->data(),
+                                                                                      blockPrefixesShared->size());
+                                                          }
 
-                        be.ppllDispatchScanAdd(cmd);
-                        be.ppllBarrierComputeToFrag(cmd);
+                                                          be.ppllDispatchScanAdd(cmd);
+                                                          be.ppllBarrierComputeToFrag(cmd);
 
-                        be.ppllResetCursors(cmd);
-                        be.ppllBarrierTransferToFrag(cmd);
-                      });
+                                                          be.ppllResetCursors(cmd);
+                                                          be.ppllBarrierTransferToFrag(cmd);
+                                                        });
 
     // Store geometry fragments (replay transparent draw list).
     const auto segStore = script.replay("transparency_ppll_store", {segScanAdd}, transparentBatches);
 
     const auto segFragBarrier =
-      script.commands("transparency_ppll_barrier_frag", {segStore}, [](Z3DRendererVulkanBackend& be) {
+      script.commandsInSubmission("transparency_ppll_barrier_frag", {segStore}, [](Z3DRendererVulkanBackend& be) {
         auto& cmd = be.commandBuffer();
         be.ppllBarrierFragToFrag(cmd);
       });
 
     // Resolve into output surface (fullscreen composite).
     if (outSurface.depthAttachment) {
-      outSurface.depthAttachment->loadOp = clearResolveTarget ? LoadOp::Clear : LoadOp::DontCare;
+      // The PPLL resolve pipeline depth-tests its fullscreen draw. Preserve the
+      // depth initialized/loaded by the count and store passes when this resolve
+      // is compositing over an existing target; DontCare would make that test
+      // read undefined attachment contents.
+      outSurface.depthAttachment->loadOp = clearResolveTarget ? LoadOp::Clear : LoadOp::Load;
       outSurface.depthAttachment->storeOp = StoreOp::Store;
       outSurface.depthAttachment->clearValue.depth = 1.0f;
     }
@@ -5613,7 +5649,10 @@ void Z3DCompositor::renderTransparentWBVulkan(const std::vector<Z3DBoundedFilter
     outSurface.colorAttachments.resize(1);
   }
   if (outSurface.depthAttachment) {
-    outSurface.depthAttachment->loadOp = clearResolveTarget ? LoadOp::Clear : LoadOp::DontCare;
+    // Weighted-blended resolve also uses LessOrEqual and writes depth. Preserve
+    // an initialized target when compositing; DontCare would make the depth
+    // test consume undefined attachment contents.
+    outSurface.depthAttachment->loadOp = clearResolveTarget ? LoadOp::Clear : LoadOp::Load;
     outSurface.depthAttachment->storeOp = StoreOp::Store;
     outSurface.depthAttachment->clearValue.depth = 1.0f;
   }

@@ -601,6 +601,9 @@ void ZVulkanPipelineCommandRecorder::recordComputePass(const ZVulkanComputePassS
                            reinterpret_cast<uintptr_t>(static_cast<VkPipelineLayout>(**spec.pipelineLayout)));
   }
   m_commandBuffer.bindPipeline(vk::PipelineBindPoint::eCompute, **spec.pipeline);
+  if (auto* backend = Z3DRendererVulkanBackend::current()) {
+    backend->notifyPipelineBound(**spec.pipeline);
+  }
 
   validateDescriptorSets(spec);
   if (!spec.descriptorSets.empty()) {
@@ -855,6 +858,9 @@ void ZVulkanPipelineCommandRecorder::recordGraphicsDraw(const ZVulkanGraphicsDra
 #endif
 
   m_commandBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, pipelineHandle);
+  if (auto* backend = Z3DRendererVulkanBackend::current()) {
+    backend->notifyPipelineBound(pipelineHandle);
+  }
 
   validateDescriptorSets(spec);
   if (!spec.descriptorSets.empty()) {
@@ -867,15 +873,15 @@ void ZVulkanPipelineCommandRecorder::recordGraphicsDraw(const ZVulkanGraphicsDra
                                        offsets);
     // Debug-only alignment validation for draw binds
 #ifndef NDEBUG
-  if (!spec.dynamicOffsets.empty()) {
-    if (auto* be = Z3DRendererVulkanBackend::current()) {
-      const size_t align = be->uniformAlignment();
-      for (uint32_t off : spec.dynamicOffsets) {
-        CHECK((static_cast<size_t>(off) % align) == 0)
-          << "Dynamic UBO offset (draw) not aligned: off=" << off << " align=" << align;
+    if (!spec.dynamicOffsets.empty()) {
+      if (auto* be = Z3DRendererVulkanBackend::current()) {
+        const size_t align = be->uniformAlignment();
+        for (uint32_t off : spec.dynamicOffsets) {
+          CHECK((static_cast<size_t>(off) % align) == 0)
+            << "Dynamic UBO offset (draw) not aligned: off=" << off << " align=" << align;
+        }
       }
     }
-  }
 #endif
 #ifndef NDEBUG
     m_debug.markDescriptorSets(spec.descriptorSetFirst, static_cast<uint32_t>(spec.descriptorSets.size()));

@@ -134,6 +134,7 @@ add_atlas_gtest_executable(zcurlruntimetest)
 # Vulkan RAII pipeline recorder debug checks (debug-only assertions in code)
 # This test only exercises header + a few .cpp symbols; there is no GPU work.
 add_atlas_gtest_executable(zvulkanpipelinecontexttest)
+add_atlas_gtest_executable(zvulkandevicesupporttest)
 add_atlas_gtest_executable(zimgometiffpacktest)
 
 # Consolidate the heaviest Atlas-linked tests into a single executable to avoid paying
@@ -152,6 +153,8 @@ endif ()
 # add_atlas_gtest_executable(zswcpackundomergetest)
 add_executable(
   zatlasheavytest
+  ${CMAKE_CURRENT_LIST_DIR}/z3dglobalparameterstest.cpp
+  ${CMAKE_CURRENT_LIST_DIR}/z3dperfcollectortest.cpp
   ${CMAKE_CURRENT_LIST_DIR}/z3dblockidcollectortest.cpp
   ${CMAKE_CURRENT_LIST_DIR}/zroimaskrastertest.cpp
   ${CMAKE_CURRENT_LIST_DIR}/zcameraparameteranimationtest.cpp

@@ -169,7 +169,7 @@ private:
     ClipPlanesState clipPlanes{};
     vk::DeviceSize objectTransformsOffset = 0;
     vk::DeviceSize materialOffset = 0;
-    uint32_t lastSubmissionId = 0;
+    uint64_t lastUniformCacheGeneration = 0;
   };
   struct FrameUboCache
   {
@@ -344,13 +344,13 @@ private:
   {
     vk::Pipeline pipeline{};
     vk::PipelineLayout layout{};
-    std::array<vk::DescriptorSet, 3> baseDescriptorSets{};
+    std::array<vk::DescriptorSet, 2> baseDescriptorSets{};
     // Descriptor set generations are included so cached secondary command
     // buffers are rebuilt whenever any bound descriptor set contents change.
     // This avoids executing a secondary recorded against resources that were
     // later destroyed/recreated (a common cause of validation errors like
     // VUID-vkCmdExecuteCommands-pCommandBuffers-00089).
-    std::array<uint64_t, 3> baseDescriptorGenerations{};
+    std::array<uint64_t, 2> baseDescriptorGenerations{};
     bool hasOit = false;
     vk::DescriptorSet oitDescriptorSet{};
     // OIT descriptor-set generation: changes whenever the shared OIT descriptor

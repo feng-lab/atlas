@@ -1,4 +1,5 @@
 #include "zvulkancontext.h"
+#include "zvulkanbindings.h"
 #include "zvulkandevice.h"
 #include "zvulkanmemoryutils.h"
 #include "zvulkanuniforms.h"
@@ -7,11 +8,14 @@
 
 #include <set>
 #include <algorithm>
+#include <array>
 #include <initializer_list>
+#include <limits>
 #include "zcommandlineflags.h"
 
 ABSL_FLAG(bool, atlas_debug_vulkan, false, "Whether to enable Vulkan validation and debug utils");
 ABSL_FLAG(int32_t, atlas_vk_device_index, -1, "Preferred Vulkan physical device index (sorted); -1 for auto");
+ABSL_FLAG(int32_t, atlas_vk_frames_in_flight, 2, "Max Vulkan frames in flight (debug: set to 1 to serialize submits)");
 
 ABSL_DECLARE_FLAG(int32_t, atlas_vk_bindless_texture2d_capacity);
 ABSL_DECLARE_FLAG(int32_t, atlas_vk_bindless_texture2darray_capacity);
@@ -21,7 +25,16 @@ ABSL_DECLARE_FLAG(int32_t, atlas_vk_bindless_utexture3d_capacity);
 
 namespace nim {
 
-std::string uuidToString(const vk::ArrayWrapper1D<unsigned char, VK_UUID_SIZE>& uuid)
+namespace {
+
+uint32_t configuredFrameSlotCount()
+{
+  return static_cast<uint32_t>(std::max<int32_t>(1, absl::GetFlag(FLAGS_atlas_vk_frames_in_flight)));
+}
+
+} // namespace
+
+std::string uuidToString(const std::array<uint8_t, VK_UUID_SIZE>& uuid)
 {
   return fmt::format(
     "{:02x}{:02x}{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}",
@@ -381,6 +394,7 @@ VKAPI_ATTR VkBool32 VKAPI_CALL debugUtilsMessengerCallback(vk::DebugUtilsMessage
 
 // ZVulkanContext implementation
 ZVulkanContext::ZVulkanContext()
+  : m_frameSlotCount(configuredFrameSlotCount())
 {
   try {
     // Initialize Vulkan context
@@ -425,6 +439,8 @@ ZVulkanContext::ZVulkanContext()
 
 ZVulkanContext::~ZVulkanContext()
 {
+  CHECK(m_liveDeviceWrapper == nullptr)
+    << "Destroying Vulkan context before its device wrapper and device-owned resources";
   LOG(INFO) << "Destroying ZVulkanContext";
   // RAII will handle cleanup in reverse order
 }
@@ -519,60 +535,6 @@ void ZVulkanContext::logGpuInfo() const
     fmt::format_to(std::back_inserter(summary), "\n");
   }
   LOG(INFO) << summary;
-}
-
-bool ZVulkanContext::setSelectedDeviceIndex(size_t index)
-{
-  if (index >= m_physicalDevices.size()) {
-    LOG(ERROR) << fmt::format("Requested Vulkan device index {} out of range ({} devices)",
-                              index,
-                              m_physicalDevices.size());
-    return false;
-  }
-  if (index == m_selectedDeviceIndex) {
-    VLOG(1) << fmt::format("Vulkan device index {} already selected; no changes", index);
-    return false;
-  }
-
-  // Validate suitability before switching
-  auto& pd = m_physicalDevices[index];
-  if (!checkDeviceExtensionSupport(pd)) {
-    LOG(ERROR) << fmt::format("Vulkan device {} missing required extensions", index);
-    return false;
-  }
-  auto queues = findQueueFamilies(pd);
-  if (!queues.isComplete()) {
-    LOG(ERROR) << fmt::format("Vulkan device {} does not have required queue families", index);
-    return false;
-  }
-  const auto props = pd.getProperties();
-  if (props.apiVersion < VK_MAKE_API_VERSION(0, 1, 3, 0)) {
-    LOG(ERROR) << fmt::format("Vulkan device {} does not support Vulkan 1.3", index);
-    return false;
-  }
-
-  // Destroy logical device and dependent resources before switching
-  m_commandPool.reset();
-  m_graphicsQueue.reset();
-  m_presentQueue.reset();
-  m_device.reset();
-
-  // Switch selection and queue families, and recreate device/queues/pool
-  m_selectedDeviceIndex = index;
-  m_queueFamilyIndices = queues;
-
-  try {
-    createLogicalDevice();
-    createCommandPool();
-  }
-  catch (const std::exception& e) {
-    LOG(ERROR) << fmt::format("Failed to recreate Vulkan logical device for index {}: {}", index, e.what());
-    return false;
-  }
-
-  const auto propsNew = m_physicalDevices[m_selectedDeviceIndex].getProperties();
-  LOG(INFO) << fmt::format("Switched to Vulkan device [{}]: {}", m_selectedDeviceIndex, propsNew.deviceName.data());
-  return true;
 }
 
 void ZVulkanContext::createInstance()
@@ -683,21 +645,188 @@ void ZVulkanContext::setupDebugMessenger()
 }
 
 namespace {
-int deviceTypeRank(vk::PhysicalDeviceType type)
+using BindlessCapacities = ZVulkanDeviceSupport::BindlessSampledImageCapacities;
+using DescriptorLimits = ZVulkanDeviceSupport::DescriptorLimits;
+using ShaderResourcePolicy = ZVulkanDeviceSupport::ShaderResourcePolicy;
+
+constexpr uint32_t kRequiredColorAttachmentCount = ShaderResourcePolicy::kMaximumColorOutputs;
+
+BindlessCapacities requestedBindlessCapacities()
 {
-  switch (type) {
-    case vk::PhysicalDeviceType::eDiscreteGpu:
-      return 4;
-    case vk::PhysicalDeviceType::eIntegratedGpu:
-      return 3;
-    case vk::PhysicalDeviceType::eVirtualGpu:
-      return 2;
-    case vk::PhysicalDeviceType::eCpu:
-      return 1;
-    default:
-      return 0;
-  }
+  BindlessCapacities requested{};
+  requested.texture2D =
+    static_cast<uint32_t>(std::max<int32_t>(1, absl::GetFlag(FLAGS_atlas_vk_bindless_texture2d_capacity)));
+  requested.texture2DArray =
+    static_cast<uint32_t>(std::max<int32_t>(1, absl::GetFlag(FLAGS_atlas_vk_bindless_texture2darray_capacity)));
+  requested.texture3D =
+    static_cast<uint32_t>(std::max<int32_t>(1, absl::GetFlag(FLAGS_atlas_vk_bindless_texture3d_capacity)));
+  requested.uTexture2D =
+    static_cast<uint32_t>(std::max<int32_t>(1, absl::GetFlag(FLAGS_atlas_vk_bindless_utexture2d_capacity)));
+  requested.uTexture3D =
+    static_cast<uint32_t>(std::max<int32_t>(1, absl::GetFlag(FLAGS_atlas_vk_bindless_utexture3d_capacity)));
+  return requested;
 }
+
+DescriptorLimits descriptorLimitsFor(const vk::PhysicalDeviceProperties& properties,
+                                     const vk::PhysicalDeviceDescriptorIndexingProperties& indexingProperties,
+                                     bool updateAfterBind)
+{
+  if (updateAfterBind) {
+    return {.perStageSamplers = indexingProperties.maxPerStageDescriptorUpdateAfterBindSamplers,
+            .perSetSamplers = indexingProperties.maxDescriptorSetUpdateAfterBindSamplers,
+            .perStageSampledImages = indexingProperties.maxPerStageDescriptorUpdateAfterBindSampledImages,
+            .perSetSampledImages = indexingProperties.maxDescriptorSetUpdateAfterBindSampledImages,
+            .perStageResources = indexingProperties.maxPerStageUpdateAfterBindResources};
+  }
+  return {.perStageSamplers = properties.limits.maxPerStageDescriptorSamplers,
+          .perSetSamplers = properties.limits.maxDescriptorSetSamplers,
+          .perStageSampledImages = properties.limits.maxPerStageDescriptorSampledImages,
+          .perSetSampledImages = properties.limits.maxDescriptorSetSampledImages,
+          .perStageResources = properties.limits.maxPerStageResources};
+}
+
+struct BindlessCapacityEvaluation
+{
+  BindlessCapacities effective{};
+  bool clamped = false;
+  std::string clampReason;
+  std::string error;
+};
+
+BindlessCapacityEvaluation evaluateBindlessCapacities(const BindlessCapacities& requested,
+                                                      const DescriptorLimits& limits)
+{
+  BindlessCapacityEvaluation result{.effective = requested};
+
+  constexpr uint32_t kSamplerCountTotal = 3u;
+  constexpr uint32_t kSamplerCountFragment = 3u;
+  constexpr uint32_t kMinimumFragmentSampledImages = 4u;
+  constexpr uint32_t kMinimumComputeSampledImages = 1u;
+  constexpr uint32_t kMinimumTotalSampledImages = kMinimumFragmentSampledImages + kMinimumComputeSampledImages;
+  const auto fragmentAggregateBudget = ShaderResourcePolicy::fragmentBindlessBudget(limits.perStageResources);
+  const auto computeAggregateBudget = ShaderResourcePolicy::computeBindlessBudget(limits.perStageResources);
+
+  if (limits.perStageSamplers < kSamplerCountFragment || limits.perSetSamplers < kSamplerCountTotal ||
+      limits.perStageSampledImages < kMinimumFragmentSampledImages ||
+      limits.perStageSampledImages < kMinimumComputeSampledImages ||
+      limits.perSetSampledImages < kMinimumTotalSampledImages || !fragmentAggregateBudget.has_value() ||
+      *fragmentAggregateBudget < kMinimumFragmentSampledImages || !computeAggregateBudget.has_value() ||
+      *computeAggregateBudget < kMinimumComputeSampledImages) {
+    result.error = fmt::format(
+      "bindless descriptor limits are insufficient (need samplers: per-stage>={} per-set>={}; sampled images: "
+      "per-stage>={} per-set>={}; aggregate resources: fragment>={} compute>={} | reported samplers={}/{} "
+      "sampled-images={}/{} aggregate={})",
+      kSamplerCountFragment,
+      kSamplerCountTotal,
+      kMinimumFragmentSampledImages,
+      kMinimumTotalSampledImages,
+      ShaderResourcePolicy::kGraphicsFragmentFixedResources + kMinimumFragmentSampledImages,
+      ShaderResourcePolicy::kComputeFixedResources + kMinimumComputeSampledImages,
+      limits.perStageSamplers,
+      limits.perSetSamplers,
+      limits.perStageSampledImages,
+      limits.perSetSampledImages,
+      limits.perStageResources);
+    return result;
+  }
+
+  auto clampByPriority = [&result](std::initializer_list<uint32_t*> ordered, uint32_t limit, std::string_view reason) {
+    uint64_t sum = 0u;
+    for (const auto* value : ordered) {
+      sum += *value;
+    }
+    if (sum <= limit) {
+      return;
+    }
+    uint64_t toReduce = sum - limit;
+    for (auto* value : ordered) {
+      if (toReduce == 0u) {
+        break;
+      }
+      const uint64_t reducible = *value - 1u;
+      const uint64_t decrement = std::min(reducible, toReduce);
+      *value -= static_cast<uint32_t>(decrement);
+      toReduce -= decrement;
+    }
+    CHECK(toReduce == 0u) << "Validated bindless descriptor limits failed to preserve minimum capacities";
+    result.clamped = true;
+    if (!result.clampReason.empty()) {
+      result.clampReason.append(", ");
+    }
+    result.clampReason.append(reason);
+  };
+
+  clampByPriority({&result.effective.uTexture2D},
+                  std::min(limits.perStageSampledImages, *computeAggregateBudget),
+                  "compute-stage bindless sampled-image capacity");
+  clampByPriority({&result.effective.texture2D,
+                   &result.effective.texture2DArray,
+                   &result.effective.texture3D,
+                   &result.effective.uTexture3D},
+                  std::min(limits.perStageSampledImages, *fragmentAggregateBudget),
+                  "fragment-stage bindless sampled-image capacity");
+  clampByPriority({&result.effective.texture2D,
+                   &result.effective.texture2DArray,
+                   &result.effective.texture3D,
+                   &result.effective.uTexture3D,
+                   &result.effective.uTexture2D},
+                  limits.perSetSampledImages,
+                  "descriptor-set bindless sampled-image capacity");
+  return result;
+}
+
+struct ImageFormatRequirement
+{
+  vk::Format format = vk::Format::eUndefined;
+  vk::ImageType type = vk::ImageType::e2D;
+  vk::ImageUsageFlags usage{};
+  bool requireLinearFiltering = false;
+  std::string_view label;
+};
+
+constexpr auto kColorScratchUsage = vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled |
+                                    vk::ImageUsageFlagBits::eTransferSrc | vk::ImageUsageFlagBits::eTransferDst;
+constexpr auto kDepthScratchUsage = vk::ImageUsageFlagBits::eDepthStencilAttachment | vk::ImageUsageFlagBits::eSampled |
+                                    vk::ImageUsageFlagBits::eTransferSrc | vk::ImageUsageFlagBits::eTransferDst;
+constexpr auto kSampledUploadUsage = vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst;
+
+const std::array<ImageFormatRequirement, 14> kImageFormatRequirements{
+  ImageFormatRequirement{vk::Format::eR8G8B8A8Unorm,      vk::ImageType::e2D, kColorScratchUsage,  true,  "RGBA8 scratch"            },
+  ImageFormatRequirement{vk::Format::eR32G32B32A32Uint,
+                         vk::ImageType::e2D,
+                         kColorScratchUsage | vk::ImageUsageFlagBits::eStorage,
+                         false,                                                                           "RGBA32UI block-ID scratch"},
+  ImageFormatRequirement{vk::Format::eR32G32B32A32Sfloat,
+                         vk::ImageType::e2D,
+                         kColorScratchUsage,                                                       false,
+                         "RGBA32F scratch"                                                                                           },
+  ImageFormatRequirement{vk::Format::eR16G16B16A16Unorm,
+                         vk::ImageType::e2D,
+                         kColorScratchUsage,                                                       true,
+                         "RGBA16 scratch"                                                                                            },
+  ImageFormatRequirement{vk::Format::eR16G16B16A16Sfloat,
+                         vk::ImageType::e2D,
+                         kColorScratchUsage,                                                       true,
+                         "RGBA16F scratch"                                                                                           },
+  ImageFormatRequirement{vk::Format::eR32G32Sfloat,       vk::ImageType::e2D, kColorScratchUsage,  false, "RG32F scratch"            },
+  ImageFormatRequirement{vk::Format::eR32Sfloat,          vk::ImageType::e2D, kColorScratchUsage,  false, "R32F scratch"             },
+  ImageFormatRequirement{vk::Format::eR16Sfloat,          vk::ImageType::e2D, kColorScratchUsage,  true,  "R16F scratch"             },
+  ImageFormatRequirement{vk::Format::eD32Sfloat,          vk::ImageType::e2D, kDepthScratchUsage,  false, "D32F scratch"             },
+  ImageFormatRequirement{vk::Format::eR8Unorm,            vk::ImageType::e2D, kSampledUploadUsage, true,  "R8 2D image"              },
+  ImageFormatRequirement{vk::Format::eR8Unorm,
+                         vk::ImageType::e3D,
+                         kSampledUploadUsage | vk::ImageUsageFlagBits::eTransferSrc,
+                         true,                                                                            "R8 volume/page cache"     },
+  ImageFormatRequirement{vk::Format::eR8G8B8A8Unorm,
+                         vk::ImageType::e2D,
+                         kSampledUploadUsage,                                                      true,
+                         "RGBA8 LUT/placeholder"                                                                                     },
+  ImageFormatRequirement{vk::Format::eB8G8R8A8Unorm,      vk::ImageType::e2D, kSampledUploadUsage, true,  "BGRA8 font atlas"         },
+  ImageFormatRequirement{vk::Format::eR32G32B32A32Uint,
+                         vk::ImageType::e3D,
+                         kSampledUploadUsage,                                                      false,
+                         "RGBA32UI paged metadata"                                                                                   },
+};
 } // namespace
 
 void ZVulkanContext::pickPhysicalDevice()
@@ -709,10 +838,9 @@ void ZVulkanContext::pickPhysicalDevice()
   struct DeviceInfo
   {
     vk::raii::PhysicalDevice device{nullptr};
-    QueueFamilyIndices queues{};
+    ZVulkanDeviceSupport support{};
     vk::PhysicalDeviceProperties props{};
-    uint64_t deviceLocalMemoryBytes = 0;
-    bool suitable = false;
+    ZVulkanDeviceSupport::PhysicalDevicePreference preference{};
   };
 
   std::vector<DeviceInfo> infos;
@@ -722,66 +850,57 @@ void ZVulkanContext::pickPhysicalDevice()
   for (auto& pd : enumerated) {
     DeviceInfo info;
     info.device = std::move(pd);
-    info.props = info.device.getProperties();
-    info.deviceLocalMemoryBytes = vulkanDeviceLocalMemoryBytes(info.device.getMemoryProperties());
-
-    bool apiOk = (info.props.apiVersion >= VK_MAKE_API_VERSION(0, 1, 3, 0));
-    bool extOk = checkDeviceExtensionSupport(info.device);
-    info.queues = findQueueFamilies(info.device);
-    bool qOk = info.queues.isComplete();
-    info.suitable = apiOk && extOk && qOk;
+    const auto properties = info.device.getProperties2<vk::PhysicalDeviceProperties2, vk::PhysicalDeviceIDProperties>();
+    info.props = properties.get<vk::PhysicalDeviceProperties2>().properties;
+    info.preference.deviceType = info.props.deviceType;
+    info.preference.deviceLocalMemoryBytes = vulkanDeviceLocalMemoryBytes(info.device.getMemoryProperties());
+    info.preference.apiVersion = info.props.apiVersion;
+    const auto& deviceUuid = properties.get<vk::PhysicalDeviceIDProperties>().deviceUUID;
+    std::copy(deviceUuid.begin(), deviceUuid.end(), info.preference.deviceUuid.begin());
+    info.support = evaluateDeviceSupport(info.device);
 
     infos.emplace_back(std::move(info));
   }
 
-  // Sort by power: device type, then device-local memory capacity desc, then API version desc
+  // Sort by power, then use the immutable device UUID to keep public indices
+  // stable when separate worker processes enumerate equally ranked adapters.
   std::sort(infos.begin(), infos.end(), [](const DeviceInfo& a, const DeviceInfo& b) {
-    const int ra = deviceTypeRank(a.props.deviceType);
-    const int rb = deviceTypeRank(b.props.deviceType);
-    if (ra != rb) {
-      return ra > rb; // Discrete > Integrated > Virtual > CPU
-    }
-    if (a.deviceLocalMemoryBytes != b.deviceLocalMemoryBytes) {
-      return a.deviceLocalMemoryBytes > b.deviceLocalMemoryBytes; // then device-local memory capacity desc
-    }
-    return a.props.apiVersion > b.props.apiVersion; // then newer API
+    return ZVulkanDeviceSupport::PhysicalDevicePreference::isPreferredBefore(a.preference, b.preference);
   });
 
   // Move sorted devices into member vector
   m_physicalDevices.clear();
+  m_deviceSupports.clear();
   m_physicalDevices.reserve(infos.size());
+  m_deviceSupports.reserve(infos.size());
   for (auto& di : infos) {
     m_physicalDevices.emplace_back(std::move(di.device));
+    m_deviceSupports.emplace_back(std::move(di.support));
   }
 
-  // Pick the first suitable device as selected
-  m_selectedDeviceIndex = 0;
-  bool found = false;
-  for (size_t i = 0; i < infos.size(); ++i) {
-    if (infos[i].suitable) {
-      m_selectedDeviceIndex = i;
-      m_queueFamilyIndices = infos[i].queues;
-      found = true;
-      break;
-    }
-  }
-  // Honor preferred index when explicitly requested
+  // The explicit index is a preference. If it cannot be honored, select the
+  // first fully compatible device and make the fallback visible in the log.
   const int32_t preferredDeviceIndex = absl::GetFlag(FLAGS_atlas_vk_device_index);
-  if (preferredDeviceIndex >= 0 && static_cast<size_t>(preferredDeviceIndex) < infos.size()) {
-    const size_t pref = static_cast<size_t>(preferredDeviceIndex);
-    if (infos[pref].suitable) {
-      m_selectedDeviceIndex = pref;
-      m_queueFamilyIndices = infos[pref].queues;
-      found = true;
-    } else {
-      LOG(WARNING) << fmt::format("Preferred Vulkan device index {} is not suitable; keeping auto-selected {}",
-                                  pref,
-                                  m_selectedDeviceIndex);
-    }
+  const std::optional<size_t> requestedIndex =
+    preferredDeviceIndex >= 0 ? std::optional<size_t>(static_cast<size_t>(preferredDeviceIndex)) : std::nullopt;
+  if (preferredDeviceIndex < -1) {
+    LOG(WARNING) << fmt::format("Preferred Vulkan device index {} is invalid; using automatic device selection",
+                                preferredDeviceIndex);
   }
-  if (!found) {
-    throw ZException("Failed to find a suitable GPU");
+  auto selection = ZVulkanDeviceSupport::select(m_deviceSupports, requestedIndex);
+  if (!selection.warning.empty()) {
+    LOG(WARNING) << selection.warning;
   }
+  if (!selection.index.has_value()) {
+    throw ZException(selection.error);
+  }
+  m_selectedDeviceIndex = *selection.index;
+  const auto& selectedSupport = selectedDeviceSupport();
+  CHECK(selectedSupport.graphicsFamily.has_value());
+  m_queueFamilyIndices.graphicsFamily = selectedSupport.graphicsFamily;
+  // Atlas is offscreen-only today; retain the existing queue alias until the
+  // remaining pseudo-presentation API is removed separately.
+  m_queueFamilyIndices.presentFamily = selectedSupport.graphicsFamily;
 
   // Log properties for all devices and mark selection
   LOG(INFO) << fmt::format("Found {} Vulkan device(s)", infos.size());
@@ -798,7 +917,14 @@ void ZVulkanContext::pickPhysicalDevice()
     LOG(INFO) << fmt::format("      Vendor ID:            0x{:04x}", p.vendorID);
     LOG(INFO) << fmt::format("      Device ID:            0x{:04x}", p.deviceID);
     LOG(INFO) << fmt::format("      Device Type:          {}", enumOrUnderlying(p.deviceType, 16));
-    LOG(INFO) << fmt::format("      Device-Local Memory:  {} MB", infos[i].deviceLocalMemoryBytes / (1024 * 1024));
+    LOG(INFO) << fmt::format("      Device UUID:          {}", uuidToString(infos[i].preference.deviceUuid));
+    LOG(INFO) << fmt::format("      Device-Local Memory:  {} MB",
+                             infos[i].preference.deviceLocalMemoryBytes / (1024 * 1024));
+    if (!m_deviceSupports[i].compatible()) {
+      LOG(INFO) << fmt::format("      Atlas compatibility:  rejected ({})", m_deviceSupports[i].rejectionSummary());
+    } else {
+      LOG(INFO) << "      Atlas compatibility:  compatible";
+    }
     LOG(INFO) << "-------------------------";
   }
 
@@ -831,36 +957,239 @@ ZVulkanContext::QueueFamilyIndices ZVulkanContext::findQueueFamilies(vk::raii::P
   return indices;
 }
 
-bool ZVulkanContext::checkDeviceExtensionSupport(vk::raii::PhysicalDevice& physicalDevice) const
+ZVulkanDeviceSupport ZVulkanContext::evaluateDeviceSupport(vk::raii::PhysicalDevice& physicalDevice) const
 {
-  std::vector<vk::ExtensionProperties> availableExtensions = physicalDevice.enumerateDeviceExtensionProperties();
+  ZVulkanDeviceSupport result;
+  const auto properties = physicalDevice.getProperties();
+  const auto extensions = physicalDevice.enumerateDeviceExtensionProperties();
+  const auto queueFamilies = findQueueFamilies(physicalDevice);
+  result.graphicsFamily = queueFamilies.graphicsFamily;
+  result.maxComputeWorkGroupCountX = properties.limits.maxComputeWorkGroupCount[0];
 
-  std::vector<const char*> requiredExtensions;
+  auto reject = [&result](ZVulkanDeviceSupport::RejectionCode code, std::string detail) {
+    result.rejections.push_back({.code = code, .detail = std::move(detail)});
+  };
 
-  // Add required extensions based on platform
+  if (properties.apiVersion < VK_MAKE_API_VERSION(0, 1, 3, 0)) {
+    reject(ZVulkanDeviceSupport::RejectionCode::ApiVersion,
+           fmt::format("Vulkan 1.3 is required, device exposes {}", versionToString(properties.apiVersion)));
+  }
+  if (!queueFamilies.graphicsFamily.has_value()) {
+    reject(ZVulkanDeviceSupport::RejectionCode::GraphicsQueue, "no graphics-capable queue family");
+  }
+
 #ifdef __APPLE__
-  requiredExtensions.push_back(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME);
+  const bool portabilitySubsetAvailable = isExtensionAvailable(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME, extensions);
+  if (!portabilitySubsetAvailable) {
+    reject(ZVulkanDeviceSupport::RejectionCode::RequiredExtension,
+           fmt::format("missing required extension {}", VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME));
+  }
 #endif
 
-  // No functional device extensions are required when targeting Vulkan 1.3 minimum.
+  const auto features2 = physicalDevice.getFeatures2<vk::PhysicalDeviceFeatures2,
+                                                     vk::PhysicalDeviceVulkan12Features,
+                                                     vk::PhysicalDeviceVulkan13Features>();
+  const auto& features = features2.get<vk::PhysicalDeviceFeatures2>().features;
+  const auto& features12 = features2.get<vk::PhysicalDeviceVulkan12Features>();
+  const auto& features13 = features2.get<vk::PhysicalDeviceVulkan13Features>();
 
-  // Check if all required extensions are supported
-  for (const auto& requiredExt : requiredExtensions) {
-    bool found = false;
-    for (const auto& availableExt : availableExtensions) {
-      if (strcmp(requiredExt, availableExt.extensionName) == 0) {
-        found = true;
-        break;
+#ifdef __APPLE__
+  if (portabilitySubsetAvailable) {
+    const auto portabilityFeatures2 =
+      physicalDevice.getFeatures2<vk::PhysicalDeviceFeatures2, vk::PhysicalDevicePortabilitySubsetFeaturesKHR>();
+    result.portabilityTriangleFans =
+      portabilityFeatures2.get<vk::PhysicalDevicePortabilitySubsetFeaturesKHR>().triangleFans;
+    if (!result.portabilityTriangleFans) {
+      reject(ZVulkanDeviceSupport::RejectionCode::PortabilityTriangleFans,
+             "VK_KHR_portability_subset triangleFans is required by mesh triangle-fan rendering");
+    }
+  }
+#endif
+
+  if (!features.shaderClipDistance) {
+    reject(ZVulkanDeviceSupport::RejectionCode::ShaderClipDistance,
+           "shaderClipDistance is required for XYZ cut clip planes");
+  }
+  if (properties.limits.maxClipDistances < kVulkanMaxClipDistances ||
+      properties.limits.maxCombinedClipAndCullDistances < kVulkanMaxClipDistances) {
+    reject(ZVulkanDeviceSupport::RejectionCode::ClipDistanceLimit,
+           fmt::format("Atlas requires {} clip distances, device reports maxClipDistances={} and "
+                       "maxCombinedClipAndCullDistances={}",
+                       kVulkanMaxClipDistances,
+                       properties.limits.maxClipDistances,
+                       properties.limits.maxCombinedClipAndCullDistances));
+  }
+  if (!features.independentBlend) {
+    reject(ZVulkanDeviceSupport::RejectionCode::IndependentBlend,
+           "independentBlend is required by multi-attachment transparency passes");
+  }
+  if (!features.fillModeNonSolid) {
+    reject(ZVulkanDeviceSupport::RejectionCode::FillModeNonSolid,
+           "fillModeNonSolid is required by mesh wireframe rendering");
+  }
+  if (!features.fragmentStoresAndAtomics) {
+    reject(ZVulkanDeviceSupport::RejectionCode::FragmentStoresAndAtomics,
+           "fragmentStoresAndAtomics is required by Vulkan OIT passes");
+  }
+  if (properties.limits.maxColorAttachments < kRequiredColorAttachmentCount) {
+    reject(ZVulkanDeviceSupport::RejectionCode::ColorAttachmentLimit,
+           fmt::format("Atlas transparency requires {} color attachments, device reports {}",
+                       kRequiredColorAttachmentCount,
+                       properties.limits.maxColorAttachments));
+  }
+  if (properties.limits.maxFragmentOutputAttachments < ShaderResourcePolicy::kMaximumColorOutputs) {
+    reject(ZVulkanDeviceSupport::RejectionCode::FragmentOutputAttachmentLimit,
+           fmt::format("Block-ID rendering requires {} fragment output attachments, device reports {}",
+                       ShaderResourcePolicy::kMaximumColorOutputs,
+                       properties.limits.maxFragmentOutputAttachments));
+  }
+  if (properties.limits.maxFragmentCombinedOutputResources <
+      ShaderResourcePolicy::kRequiredFragmentCombinedOutputResources) {
+    reject(ZVulkanDeviceSupport::RejectionCode::FragmentCombinedOutputLimit,
+           fmt::format("Atlas fragment shaders require {} combined output resources (eight-output Block-ID rendering; "
+                       "PPLL resolve requires {}), device reports {}",
+                       ShaderResourcePolicy::kRequiredFragmentCombinedOutputResources,
+                       ShaderResourcePolicy::kPPLLFragmentCombinedOutputResources,
+                       properties.limits.maxFragmentCombinedOutputResources));
+  }
+  if (properties.limits.maxComputeWorkGroupInvocations < ShaderResourcePolicy::kRequiredComputeWorkGroupInvocations ||
+      properties.limits.maxComputeWorkGroupSize[0] < ShaderResourcePolicy::kRequiredComputeWorkGroupSizeX ||
+      properties.limits.maxComputeWorkGroupSize[1] < ShaderResourcePolicy::kRequiredComputeWorkGroupSizeY ||
+      properties.limits.maxComputeWorkGroupCount[0] < ShaderResourcePolicy::kMinimumComputeWorkGroupCountX) {
+    reject(ZVulkanDeviceSupport::RejectionCode::ComputeWorkGroupLimits,
+           fmt::format("Atlas compute shaders require max invocations>={}, workgroup size x>={}, y>={}; device reports "
+                       "invocations={} size={}x{}x{} count-x={}",
+                       ShaderResourcePolicy::kRequiredComputeWorkGroupInvocations,
+                       ShaderResourcePolicy::kRequiredComputeWorkGroupSizeX,
+                       ShaderResourcePolicy::kRequiredComputeWorkGroupSizeY,
+                       properties.limits.maxComputeWorkGroupInvocations,
+                       properties.limits.maxComputeWorkGroupSize[0],
+                       properties.limits.maxComputeWorkGroupSize[1],
+                       properties.limits.maxComputeWorkGroupSize[2],
+                       properties.limits.maxComputeWorkGroupCount[0]));
+  }
+  if (!features13.dynamicRendering) {
+    reject(ZVulkanDeviceSupport::RejectionCode::DynamicRendering, "dynamicRendering is required by the Vulkan backend");
+  }
+  if (!features13.synchronization2) {
+    reject(ZVulkanDeviceSupport::RejectionCode::Synchronization2, "synchronization2 is required by the Vulkan backend");
+  }
+  if (properties.limits.maxPerStageDescriptorStorageBuffers < vkbind::kOITStorageBufferBindingCount ||
+      properties.limits.maxDescriptorSetStorageBuffers < vkbind::kOITStorageBufferBindingCount) {
+    reject(ZVulkanDeviceSupport::RejectionCode::DescriptorCapacity,
+           fmt::format("Atlas' shared OIT layout requires {} fragment-stage storage buffers; device reports "
+                       "maxPerStageDescriptorStorageBuffers={} and maxDescriptorSetStorageBuffers={}",
+                       vkbind::kOITStorageBufferBindingCount,
+                       properties.limits.maxPerStageDescriptorStorageBuffers,
+                       properties.limits.maxDescriptorSetStorageBuffers));
+  }
+
+  const bool descriptorFeaturesPresent = features12.descriptorIndexing && features12.runtimeDescriptorArray &&
+                                         features12.shaderSampledImageArrayNonUniformIndexing &&
+                                         features12.descriptorBindingPartiallyBound;
+  if (!descriptorFeaturesPresent) {
+    reject(ZVulkanDeviceSupport::RejectionCode::DescriptorIndexing,
+           fmt::format("required descriptor indexing features are missing "
+                       "(descriptorIndexing={} runtimeDescriptorArray={} "
+                       "shaderSampledImageArrayNonUniformIndexing={} descriptorBindingPartiallyBound={})",
+                       static_cast<bool>(features12.descriptorIndexing),
+                       static_cast<bool>(features12.runtimeDescriptorArray),
+                       static_cast<bool>(features12.shaderSampledImageArrayNonUniformIndexing),
+                       static_cast<bool>(features12.descriptorBindingPartiallyBound)));
+  }
+
+  result.requestedBindlessCapacities = requestedBindlessCapacities();
+  const auto properties2 =
+    physicalDevice.getProperties2<vk::PhysicalDeviceProperties2, vk::PhysicalDeviceDescriptorIndexingProperties>();
+  const auto& indexingProperties = properties2.get<vk::PhysicalDeviceDescriptorIndexingProperties>();
+  result.maxUpdateAfterBindDescriptorsInAllPools = indexingProperties.maxUpdateAfterBindDescriptorsInAllPools;
+
+  // Update-after-bind is optional. Prefer its usually larger limit class only
+  // when both the feature and the reported limits satisfy Atlas' contract;
+  // otherwise fall back to the legacy descriptor limits.
+  BindlessCapacityEvaluation bindlessEvaluation;
+  if (features12.descriptorBindingSampledImageUpdateAfterBind) {
+    const uint32_t frameSlots = m_frameSlotCount;
+    auto updateAfterBindLimits = descriptorLimitsFor(properties, indexingProperties, true);
+    const auto globalBindlessBudget = ZVulkanDeviceSupport::DescriptorPoolPolicy::maxBindlessSampledImagesPerFrameSlot(
+      indexingProperties.maxUpdateAfterBindDescriptorsInAllPools,
+      frameSlots);
+    if (globalBindlessBudget.has_value()) {
+      updateAfterBindLimits.perSetSampledImages =
+        std::min(updateAfterBindLimits.perSetSampledImages, *globalBindlessBudget);
+      bindlessEvaluation = evaluateBindlessCapacities(result.requestedBindlessCapacities, updateAfterBindLimits);
+      if (bindlessEvaluation.error.empty()) {
+        const auto requiredDescriptors =
+          ZVulkanDeviceSupport::DescriptorPoolPolicy::requiredUpdateAfterBindDescriptors(bindlessEvaluation.effective,
+                                                                                         frameSlots);
+        CHECK(requiredDescriptors.has_value()) << "Validated update-after-bind pool budget overflowed";
+        CHECK_LE(*requiredDescriptors,
+                 static_cast<uint64_t>(indexingProperties.maxUpdateAfterBindDescriptorsInAllPools));
+        result.descriptorIndexingSampledImageUpdateAfterBind = true;
+        result.requiredUpdateAfterBindDescriptors = *requiredDescriptors;
+        result.descriptorLimits = updateAfterBindLimits;
+      } else {
+        result.updateAfterBindFallbackReason = std::move(bindlessEvaluation.error);
       }
+    } else {
+      result.updateAfterBindFallbackReason =
+        fmt::format("global update-after-bind descriptor budget {} cannot reserve {} immutable samplers for each of "
+                    "{} frame slots",
+                    indexingProperties.maxUpdateAfterBindDescriptorsInAllPools,
+                    ZVulkanDeviceSupport::DescriptorPoolPolicy::kBindlessSamplerDescriptors,
+                    frameSlots);
+    }
+  }
+  if (!result.descriptorIndexingSampledImageUpdateAfterBind) {
+    result.descriptorLimits = descriptorLimitsFor(properties, indexingProperties, false);
+    bindlessEvaluation = evaluateBindlessCapacities(result.requestedBindlessCapacities, result.descriptorLimits);
+  }
+  if (!bindlessEvaluation.error.empty()) {
+    if (!result.updateAfterBindFallbackReason.empty()) {
+      bindlessEvaluation.error.append("; update-after-bind path unavailable: ");
+      bindlessEvaluation.error.append(result.updateAfterBindFallbackReason);
+    }
+    reject(ZVulkanDeviceSupport::RejectionCode::DescriptorCapacity, std::move(bindlessEvaluation.error));
+  } else {
+    result.effectiveBindlessCapacities = bindlessEvaluation.effective;
+    result.bindlessCapacitiesClamped = bindlessEvaluation.clamped;
+    result.bindlessClampReason = std::move(bindlessEvaluation.clampReason);
+  }
+
+  for (const auto& requirement : kImageFormatRequirements) {
+    try {
+      (void)physicalDevice.getImageFormatProperties(requirement.format,
+                                                    requirement.type,
+                                                    vk::ImageTiling::eOptimal,
+                                                    requirement.usage);
+    }
+    catch (const vk::SystemError& error) {
+      reject(ZVulkanDeviceSupport::RejectionCode::ImageFormatContract,
+             fmt::format("{} format {} does not support image type {} and usage 0x{:x}: {}",
+                         requirement.label,
+                         enumOrUnderlying(requirement.format, 16),
+                         enumOrUnderlying(requirement.type, 16),
+                         static_cast<VkImageUsageFlags>(requirement.usage),
+                         error.what()));
+      continue;
     }
 
-    if (!found) {
-      LOG(INFO) << "  Missing required extension: " << requiredExt;
-      return false;
+    if (requirement.requireLinearFiltering) {
+      const auto formatProperties = physicalDevice.getFormatProperties(requirement.format);
+      if (!(formatProperties.optimalTilingFeatures & vk::FormatFeatureFlagBits::eSampledImageFilterLinear)) {
+        reject(ZVulkanDeviceSupport::RejectionCode::ImageFormatContract,
+               fmt::format("{} format {} does not support linear filtering with optimal tiling",
+                           requirement.label,
+                           enumOrUnderlying(requirement.format, 16)));
+      }
     }
   }
 
-  return true;
+  result.memoryBudget = isExtensionAvailable(VK_EXT_MEMORY_BUDGET_EXTENSION_NAME, extensions);
+  result.calibratedTimestamps = isExtensionAvailable(VK_EXT_CALIBRATED_TIMESTAMPS_EXTENSION_NAME, extensions);
+  result.maintenance7 = isExtensionAvailable(VK_KHR_MAINTENANCE_7_EXTENSION_NAME, extensions);
+  result.nestedCommandBuffer = isExtensionAvailable(VK_EXT_NESTED_COMMAND_BUFFER_EXTENSION_NAME, extensions);
+  return result;
 }
 
 void ZVulkanContext::createLogicalDevice()
@@ -868,6 +1197,13 @@ void ZVulkanContext::createLogicalDevice()
   if (m_physicalDevices.empty()) {
     throw ZException("Attempted to create logical device without a physical device");
   }
+  const auto& support = selectedDeviceSupport();
+  if (!support.compatible()) {
+    throw ZException(fmt::format("Attempted to create a logical device from an incompatible physical device: {}",
+                                 support.rejectionSummary()));
+  }
+  CHECK(support.graphicsFamily.has_value());
+  CHECK(m_queueFamilyIndices.graphicsFamily == support.graphicsFamily);
 
   // Create device with a single queue
   float queuePriority = 1.0f;
@@ -884,56 +1220,93 @@ void ZVulkanContext::createLogicalDevice()
   }
 
   // Specify required device features
+#ifdef __APPLE__
+  auto features2 = m_physicalDevices[m_selectedDeviceIndex]
+                     .getFeatures2<vk::PhysicalDeviceFeatures2,
+                                   vk::PhysicalDeviceVulkan12Features,
+                                   vk::PhysicalDeviceVulkan13Features,
+                                   vk::PhysicalDeviceMaintenance7FeaturesKHR,
+                                   vk::PhysicalDeviceNestedCommandBufferFeaturesEXT,
+                                   vk::PhysicalDevicePortabilitySubsetFeaturesKHR>();
+#else
   auto features2 = m_physicalDevices[m_selectedDeviceIndex]
                      .getFeatures2<vk::PhysicalDeviceFeatures2,
                                    vk::PhysicalDeviceVulkan12Features,
                                    vk::PhysicalDeviceVulkan13Features,
                                    vk::PhysicalDeviceMaintenance7FeaturesKHR,
                                    vk::PhysicalDeviceNestedCommandBufferFeaturesEXT>();
+#endif
   auto& physicalDeviceFeatures = features2.get<vk::PhysicalDeviceFeatures2>().features;
   auto& physicalDeviceVulkan12Features = features2.get<vk::PhysicalDeviceVulkan12Features>();
   auto& physicalDeviceVulkan13Features = features2.get<vk::PhysicalDeviceVulkan13Features>();
   auto& physicalDeviceMaintenance7Features = features2.get<vk::PhysicalDeviceMaintenance7FeaturesKHR>();
   auto& physicalDeviceNestedCommandBufferFeatures = features2.get<vk::PhysicalDeviceNestedCommandBufferFeaturesEXT>();
+#ifdef __APPLE__
+  auto& physicalDevicePortabilityFeatures = features2.get<vk::PhysicalDevicePortabilitySubsetFeaturesKHR>();
+#endif
 
   // Setup enabled features
+#ifdef __APPLE__
+  vk::StructureChain<vk::PhysicalDeviceFeatures2,
+                     vk::PhysicalDeviceVulkan12Features,
+                     vk::PhysicalDeviceVulkan13Features,
+                     vk::PhysicalDeviceMaintenance7FeaturesKHR,
+                     vk::PhysicalDeviceNestedCommandBufferFeaturesEXT,
+                     vk::PhysicalDevicePortabilitySubsetFeaturesKHR>
+    enabledFeatures2;
+#else
   vk::StructureChain<vk::PhysicalDeviceFeatures2,
                      vk::PhysicalDeviceVulkan12Features,
                      vk::PhysicalDeviceVulkan13Features,
                      vk::PhysicalDeviceMaintenance7FeaturesKHR,
                      vk::PhysicalDeviceNestedCommandBufferFeaturesEXT>
     enabledFeatures2;
+#endif
   auto& enabledPhysicalDeviceFeatures2 = enabledFeatures2.get<vk::PhysicalDeviceFeatures2>();
   auto& enabledPhysicalDeviceVulkan12Features = enabledFeatures2.get<vk::PhysicalDeviceVulkan12Features>();
   auto& enabledPhysicalDeviceVulkan13Features = enabledFeatures2.get<vk::PhysicalDeviceVulkan13Features>();
   auto& enabledPhysicalDeviceMaintenance7Features = enabledFeatures2.get<vk::PhysicalDeviceMaintenance7FeaturesKHR>();
   auto& enabledPhysicalDeviceNestedCommandBufferFeatures =
     enabledFeatures2.get<vk::PhysicalDeviceNestedCommandBufferFeaturesEXT>();
+#ifdef __APPLE__
+  auto& enabledPhysicalDevicePortabilityFeatures =
+    enabledFeatures2.get<vk::PhysicalDevicePortabilitySubsetFeaturesKHR>();
+#endif
 
   // Clip planes are required for parity with the OpenGL backend's local/global
   // XYZ cuts. These use gl_ClipDistance in vertex shaders, so we must enable
   // the Vulkan core shaderClipDistance feature and validate the device limit.
   const auto properties = m_physicalDevices[m_selectedDeviceIndex].getProperties();
-  if (physicalDeviceFeatures.shaderClipDistance != VK_TRUE) {
-    throw ZException("Selected Vulkan device does not support shaderClipDistance (required for XYZ cut clip planes)");
-  }
-  if (properties.limits.maxClipDistances < kVulkanMaxClipDistances ||
-      properties.limits.maxCombinedClipAndCullDistances < kVulkanMaxClipDistances) {
-    throw ZException(fmt::format("Selected Vulkan device supports only {} clip distances (combined {}), but Atlas "
-                                 "requires at least {} (extra planes are applied in the fragment shader)",
-                                 properties.limits.maxClipDistances,
-                                 properties.limits.maxCombinedClipAndCullDistances,
-                                 kVulkanMaxClipDistances));
-  }
+  CHECK(physicalDeviceFeatures.shaderClipDistance);
+  CHECK(properties.limits.maxClipDistances >= kVulkanMaxClipDistances);
+  CHECK(properties.limits.maxCombinedClipAndCullDistances >= kVulkanMaxClipDistances);
+  CHECK(properties.limits.maxPerStageDescriptorStorageBuffers >= vkbind::kOITStorageBufferBindingCount);
+  CHECK(properties.limits.maxDescriptorSetStorageBuffers >= vkbind::kOITStorageBufferBindingCount);
+  CHECK(properties.limits.maxFragmentOutputAttachments >= ShaderResourcePolicy::kMaximumColorOutputs);
+  CHECK(properties.limits.maxFragmentCombinedOutputResources >=
+        ShaderResourcePolicy::kRequiredFragmentCombinedOutputResources);
+  CHECK(properties.limits.maxComputeWorkGroupInvocations >= ShaderResourcePolicy::kRequiredComputeWorkGroupInvocations);
+  CHECK(properties.limits.maxComputeWorkGroupSize[0] >= ShaderResourcePolicy::kRequiredComputeWorkGroupSizeX);
+  CHECK(properties.limits.maxComputeWorkGroupSize[1] >= ShaderResourcePolicy::kRequiredComputeWorkGroupSizeY);
+  CHECK_GT(support.maxComputeWorkGroupCountX, 0u);
 
   // Enable basic features
   enabledPhysicalDeviceFeatures2.features.samplerAnisotropy = physicalDeviceFeatures.samplerAnisotropy;
-  enabledPhysicalDeviceFeatures2.features.fillModeNonSolid = physicalDeviceFeatures.fillModeNonSolid;
+  CHECK(physicalDeviceFeatures.fillModeNonSolid);
+  enabledPhysicalDeviceFeatures2.features.fillModeNonSolid = true;
   // Enable independentBlend if supported to allow per-attachment blend state
-  enabledPhysicalDeviceFeatures2.features.independentBlend = physicalDeviceFeatures.independentBlend;
-  // Allow storage buffer/image writes in fragment shader when supported
-  enabledPhysicalDeviceFeatures2.features.fragmentStoresAndAtomics = physicalDeviceFeatures.fragmentStoresAndAtomics;
-  enabledPhysicalDeviceFeatures2.features.shaderClipDistance = VK_TRUE;
+  CHECK(physicalDeviceFeatures.independentBlend);
+  enabledPhysicalDeviceFeatures2.features.independentBlend = true;
+  // Storage buffer/image writes in fragment shaders are required by Vulkan OIT.
+  CHECK(physicalDeviceFeatures.fragmentStoresAndAtomics);
+  enabledPhysicalDeviceFeatures2.features.fragmentStoresAndAtomics = true;
+  enabledPhysicalDeviceFeatures2.features.shaderClipDistance = true;
+
+#ifdef __APPLE__
+  CHECK(support.portabilityTriangleFans);
+  CHECK(physicalDevicePortabilityFeatures.triangleFans);
+  enabledPhysicalDevicePortabilityFeatures.triangleFans = true;
+#endif
 
   if (absl::GetFlag(FLAGS_atlas_debug_vulkan)) {
 #ifdef __APPLE__
@@ -943,7 +1316,7 @@ void ZVulkanContext::createLogicalDevice()
     //
     // Keep this disabled on macOS even in debug mode (Atlas should not rely on
     // robust buffer access semantics for correctness).
-    enabledPhysicalDeviceFeatures2.features.robustBufferAccess = VK_FALSE;
+    enabledPhysicalDeviceFeatures2.features.robustBufferAccess = false;
 #else
     enabledPhysicalDeviceFeatures2.features.robustBufferAccess = physicalDeviceFeatures.robustBufferAccess;
 #endif
@@ -954,12 +1327,8 @@ void ZVulkanContext::createLogicalDevice()
 
   // Vulkan 1.3 is required, but individual features are still optional and must
   // be queried/enabled explicitly.
-  if (physicalDeviceVulkan13Features.dynamicRendering != VK_TRUE) {
-    throw ZException("Selected Vulkan device does not support dynamicRendering (required by Vulkan backend)");
-  }
-  if (physicalDeviceVulkan13Features.synchronization2 != VK_TRUE) {
-    throw ZException("Selected Vulkan device does not support synchronization2 (required by Vulkan backend)");
-  }
+  CHECK(physicalDeviceVulkan13Features.dynamicRendering);
+  CHECK(physicalDeviceVulkan13Features.synchronization2);
   enabledPhysicalDeviceVulkan13Features.dynamicRendering = true;
   enabledPhysicalDeviceVulkan13Features.synchronization2 = true;
   // Optional: enable only if supported by the device.
@@ -990,16 +1359,10 @@ void ZVulkanContext::createLogicalDevice()
   const bool hasNonUniformSampledImages =
     (physicalDeviceVulkan12Features.shaderSampledImageArrayNonUniformIndexing == VK_TRUE);
   const bool hasPartiallyBound = (physicalDeviceVulkan12Features.descriptorBindingPartiallyBound == VK_TRUE);
-  if (!hasDescriptorIndexing || !hasRuntimeDescriptorArray || !hasNonUniformSampledImages || !hasPartiallyBound) {
-    throw ZException(
-      fmt::format("Selected Vulkan device does not support required descriptor indexing features "
-                  "(descriptorIndexing={}, runtimeDescriptorArray={}, shaderSampledImageArrayNonUniformIndexing={}, "
-                  "descriptorBindingPartiallyBound={}).",
-                  (hasDescriptorIndexing ? 1 : 0),
-                  (hasRuntimeDescriptorArray ? 1 : 0),
-                  (hasNonUniformSampledImages ? 1 : 0),
-                  (hasPartiallyBound ? 1 : 0)));
-  }
+  CHECK(hasDescriptorIndexing);
+  CHECK(hasRuntimeDescriptorArray);
+  CHECK(hasNonUniformSampledImages);
+  CHECK(hasPartiallyBound);
   enabledPhysicalDeviceVulkan12Features.descriptorIndexing = true;
   enabledPhysicalDeviceVulkan12Features.runtimeDescriptorArray = true;
   enabledPhysicalDeviceVulkan12Features.shaderSampledImageArrayNonUniformIndexing = true;
@@ -1009,10 +1372,11 @@ void ZVulkanContext::createLogicalDevice()
   // does not update bindless tables while they can be read by the GPU; this is
   // enabled to satisfy descriptor limit accounting on platforms with low
   // legacy sampler limits (e.g., MoltenVK).
-  enabledPhysicalDeviceVulkan12Features.descriptorBindingSampledImageUpdateAfterBind =
-    physicalDeviceVulkan12Features.descriptorBindingSampledImageUpdateAfterBind;
-  m_supportsDescriptorIndexingSampledImageUpdateAfterBind =
-    (enabledPhysicalDeviceVulkan12Features.descriptorBindingSampledImageUpdateAfterBind == VK_TRUE);
+  m_supportsDescriptorIndexingSampledImageUpdateAfterBind = support.descriptorIndexingSampledImageUpdateAfterBind;
+  if (m_supportsDescriptorIndexingSampledImageUpdateAfterBind) {
+    CHECK(physicalDeviceVulkan12Features.descriptorBindingSampledImageUpdateAfterBind);
+    enabledPhysicalDeviceVulkan12Features.descriptorBindingSampledImageUpdateAfterBind = true;
+  }
 
   // Optional: enable variable descriptor count support when available. Atlas
   // currently sizes bindless tables explicitly, but keeping this enabled when
@@ -1025,26 +1389,26 @@ void ZVulkanContext::createLogicalDevice()
   // Add platform-specific required extensions
 #ifdef __APPLE__
   auto deviceExtensionProperties = m_physicalDevices[m_selectedDeviceIndex].enumerateDeviceExtensionProperties();
-  addRequiredExtension(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME, enabledExtensions, deviceExtensionProperties, true);
+  addRequiredExtension(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME, enabledExtensions, deviceExtensionProperties);
 #else
   auto deviceExtensionProperties = m_physicalDevices[m_selectedDeviceIndex].enumerateDeviceExtensionProperties();
 #endif
 
   // Optional: memory budgeting (VK_EXT_memory_budget). Used for cache residency decisions.
-  if (isExtensionAvailable(VK_EXT_MEMORY_BUDGET_EXTENSION_NAME, deviceExtensionProperties)) {
+  if (support.memoryBudget) {
+    CHECK(isExtensionAvailable(VK_EXT_MEMORY_BUDGET_EXTENSION_NAME, deviceExtensionProperties));
     enabledExtensions.push_back(VK_EXT_MEMORY_BUDGET_EXTENSION_NAME);
   }
-  m_supportsCalibratedTimestamps =
-    isExtensionAvailable(VK_EXT_CALIBRATED_TIMESTAMPS_EXTENSION_NAME, deviceExtensionProperties);
+  m_supportsCalibratedTimestamps = support.calibratedTimestamps;
   if (m_supportsCalibratedTimestamps) {
+    CHECK(isExtensionAvailable(VK_EXT_CALIBRATED_TIMESTAMPS_EXTENSION_NAME, deviceExtensionProperties));
     enabledExtensions.push_back(VK_EXT_CALIBRATED_TIMESTAMPS_EXTENSION_NAME);
   }
 
   // Optional: allow mixing inline draws and secondary command buffers inside a
   // vkCmdBeginRendering instance (needed for cached per-draw secondaries).
-  const bool hasMaintenance7 = isExtensionAvailable(VK_KHR_MAINTENANCE_7_EXTENSION_NAME, deviceExtensionProperties);
-  const bool hasNestedCmdBuf =
-    isExtensionAvailable(VK_EXT_NESTED_COMMAND_BUFFER_EXTENSION_NAME, deviceExtensionProperties);
+  const bool hasMaintenance7 = support.maintenance7;
+  const bool hasNestedCmdBuf = support.nestedCommandBuffer;
   if (hasMaintenance7) {
     enabledExtensions.push_back(VK_KHR_MAINTENANCE_7_EXTENSION_NAME);
   }
@@ -1086,128 +1450,15 @@ void ZVulkanContext::createLogicalDevice()
 
 void ZVulkanContext::computeBindlessSampledImageCapacities()
 {
-  if (m_physicalDevices.empty()) {
-    throw ZException("Attempted to compute bindless capacities without a physical device");
-  }
+  const auto& support = selectedDeviceSupport();
+  CHECK(support.compatible());
+  m_requestedBindlessSampledImageCapacities = support.requestedBindlessCapacities;
+  m_effectiveBindlessSampledImageCapacities = support.effectiveBindlessCapacities;
+  m_bindlessSampledImageCapacitiesClamped = support.bindlessCapacitiesClamped;
 
-  // Requested capacities are developer overrides. Clamp to at least 1 so index
-  // 0 can always be reserved for the placeholder texture.
-  BindlessSampledImageCapacities requested{};
-  requested.texture2D =
-    static_cast<uint32_t>(std::max<int32_t>(1, absl::GetFlag(FLAGS_atlas_vk_bindless_texture2d_capacity)));
-  requested.texture2DArray =
-    static_cast<uint32_t>(std::max<int32_t>(1, absl::GetFlag(FLAGS_atlas_vk_bindless_texture2darray_capacity)));
-  requested.texture3D =
-    static_cast<uint32_t>(std::max<int32_t>(1, absl::GetFlag(FLAGS_atlas_vk_bindless_texture3d_capacity)));
-  requested.uTexture2D =
-    static_cast<uint32_t>(std::max<int32_t>(1, absl::GetFlag(FLAGS_atlas_vk_bindless_utexture2d_capacity)));
-  requested.uTexture3D =
-    static_cast<uint32_t>(std::max<int32_t>(1, absl::GetFlag(FLAGS_atlas_vk_bindless_utexture3d_capacity)));
-
-  const bool usesUpdateAfterBind = m_supportsDescriptorIndexingSampledImageUpdateAfterBind;
-
-  auto props2 = m_physicalDevices[m_selectedDeviceIndex]
-                  .getProperties2<vk::PhysicalDeviceProperties2, vk::PhysicalDeviceDescriptorIndexingProperties>();
-  const auto& limits = props2.get<vk::PhysicalDeviceProperties2>().properties.limits;
-  const auto& indexingProps = props2.get<vk::PhysicalDeviceDescriptorIndexingProperties>();
-
-  const uint32_t perStageSamplerLimit = usesUpdateAfterBind ? indexingProps.maxPerStageDescriptorUpdateAfterBindSamplers
-                                                            : limits.maxPerStageDescriptorSamplers;
-  const uint32_t perSetSamplerLimit =
-    usesUpdateAfterBind ? indexingProps.maxDescriptorSetUpdateAfterBindSamplers : limits.maxDescriptorSetSamplers;
-  const uint32_t perStageSampledImageLimit = usesUpdateAfterBind
-                                               ? indexingProps.maxPerStageDescriptorUpdateAfterBindSampledImages
-                                               : limits.maxPerStageDescriptorSampledImages;
-  const uint32_t perSetSampledImageLimit = usesUpdateAfterBind
-                                             ? indexingProps.maxDescriptorSetUpdateAfterBindSampledImages
-                                             : limits.maxDescriptorSetSampledImages;
-
-  if (perStageSamplerLimit == 0u || perSetSamplerLimit == 0u || perStageSampledImageLimit == 0u ||
-      perSetSampledImageLimit == 0u) {
-    throw ZException(
-      fmt::format("Selected Vulkan device reports invalid descriptor limits for bindless tables "
-                  "(perStageSamplers={} perSetSamplers={} perStageSampledImages={} perSetSampledImages={})",
-                  perStageSamplerLimit,
-                  perSetSamplerLimit,
-                  perStageSampledImageLimit,
-                  perSetSampledImageLimit));
-  }
-
-  // Atlas' bindless layout includes immutable samplers for 2D linear clamp,
-  // 3D linear border-zero, and nearest clamp fetches.
-  constexpr uint32_t kSamplerCountTotal = 3u;
-  constexpr uint32_t kSamplerCountFragment = 3u;
-  constexpr uint32_t kSamplerCountCompute = 1u; // nearest clamp only
-  if (perStageSamplerLimit < kSamplerCountFragment || perSetSamplerLimit < kSamplerCountTotal ||
-      perStageSamplerLimit < kSamplerCountCompute) {
-    throw ZException(
-      fmt::format("Selected Vulkan device cannot satisfy the minimum bindless sampler contract "
-                  "(need samplers: total={} frag={} comp={} | limits: perStageSamplers={} perSetSamplers={})",
-                  kSamplerCountTotal,
-                  kSamplerCountFragment,
-                  kSamplerCountCompute,
-                  perStageSamplerLimit,
-                  perSetSamplerLimit));
-  }
-
-  auto effective = requested;
-  bool clamped = false;
-  std::string clampReason;
-
-  auto clampByPriority = [&](std::initializer_list<uint32_t*> ordered, uint32_t limit, std::string_view reason) {
-    uint32_t sum = 0;
-    for (auto* ptr : ordered) {
-      sum += *ptr;
-    }
-    const uint32_t minSum = static_cast<uint32_t>(ordered.size()); // min 1 each
-    if (limit < minSum) {
-      throw ZException(fmt::format("Selected Vulkan device cannot satisfy the minimum bindless descriptor contract: "
-                                   "need at least {} descriptors for {} but device limit is {}",
-                                   minSum,
-                                   reason,
-                                   limit));
-    }
-    if (sum <= limit) {
-      return;
-    }
-    uint32_t toReduce = sum - limit;
-    for (auto* ptr : ordered) {
-      if (toReduce == 0u) {
-        break;
-      }
-      const uint32_t reducible = (*ptr > 1u) ? (*ptr - 1u) : 0u;
-      const uint32_t dec = std::min(reducible, toReduce);
-      *ptr -= dec;
-      toReduce -= dec;
-    }
-    CHECK(toReduce == 0u) << "Failed to clamp bindless capacities to device limit";
-    clamped = true;
-    if (!clampReason.empty()) {
-      clampReason.append(", ");
-    }
-    clampReason.append(reason);
-  };
-
-  // Enforce per-stage limits based on the actual shader stage visibility used
-  // by Atlas' bindless bindings (fragment-only for most tables, compute-only
-  // for utexture2D).
-  clampByPriority({&effective.uTexture2D}, perStageSampledImageLimit, "compute-stage bindless sampled-image capacity");
-  clampByPriority({&effective.texture2D, &effective.texture2DArray, &effective.texture3D, &effective.uTexture3D},
-                  perStageSampledImageLimit,
-                  "fragment-stage bindless sampled-image capacity");
-
-  // Enforce overall descriptor set limits.
-  clampByPriority({&effective.texture2D,
-                   &effective.texture2DArray,
-                   &effective.texture3D,
-                   &effective.uTexture3D,
-                   &effective.uTexture2D},
-                  perSetSampledImageLimit,
-                  "descriptor-set bindless sampled-image capacity");
-
-  m_requestedBindlessSampledImageCapacities = requested;
-  m_effectiveBindlessSampledImageCapacities = effective;
-  m_bindlessSampledImageCapacitiesClamped = clamped;
+  const auto& requested = m_requestedBindlessSampledImageCapacities;
+  const auto& effective = m_effectiveBindlessSampledImageCapacities;
+  const auto& limits = support.descriptorLimits;
 
   const auto reqTotal = requested.totalSampledImages();
   const auto reqFrag = requested.fragmentVisibleSampledImages();
@@ -1219,8 +1470,10 @@ void ZVulkanContext::computeBindlessSampledImageCapacities()
   LOG(INFO) << fmt::format(
     "VK bindless sampled-image capacity policy: update_after_bind={} requested={{2d={} 2darray={} 3d={} u2d={} u3d={} "
     "total={} frag={} comp={}}} effective={{2d={} 2darray={} 3d={} u2d={} u3d={} total={} frag={} comp={}}} "
-    "limits={{perStageSamplers={} perSetSamplers={} perStageSampledImages={} perSetSampledImages={}}}",
-    usesUpdateAfterBind,
+    "limits={{perStageSamplers={} perSetSamplers={} perStageSampledImages={} perSetSampledImages={} "
+    "perStageResources={}}} "
+    "uab_pool_descriptors={}/{}",
+    m_supportsDescriptorIndexingSampledImageUpdateAfterBind,
     requested.texture2D,
     requested.texture2DArray,
     requested.texture3D,
@@ -1237,16 +1490,23 @@ void ZVulkanContext::computeBindlessSampledImageCapacities()
     effTotal,
     effFrag,
     effComp,
-    perStageSamplerLimit,
-    perSetSamplerLimit,
-    perStageSampledImageLimit,
-    perSetSampledImageLimit);
+    limits.perStageSamplers,
+    limits.perSetSamplers,
+    limits.perStageSampledImages,
+    limits.perSetSampledImages,
+    limits.perStageResources,
+    support.requiredUpdateAfterBindDescriptors,
+    support.maxUpdateAfterBindDescriptorsInAllPools);
 
-  if (clamped) {
+  if (!m_supportsDescriptorIndexingSampledImageUpdateAfterBind && !support.updateAfterBindFallbackReason.empty()) {
+    VLOG(1) << "VK update-after-bind descriptor path not selected: " << support.updateAfterBindFallbackReason;
+  }
+
+  if (m_bindlessSampledImageCapacitiesClamped) {
     LOG(WARNING) << fmt::format("VK bindless sampled-image capacities were clamped to device limits ({}). "
                                 "If you expected larger tables, adjust the requested flags and/or use a different "
                                 "Vulkan device.",
-                                clampReason.empty() ? "unknown reason" : clampReason);
+                                support.bindlessClampReason.empty() ? "unknown reason" : support.bindlessClampReason);
   }
 }
 
@@ -1261,7 +1521,24 @@ void ZVulkanContext::createCommandPool()
 
 std::unique_ptr<ZVulkanDevice> ZVulkanContext::createDevice()
 {
-  return std::make_unique<ZVulkanDevice>(*this);
+  CHECK(m_liveDeviceWrapper == nullptr) << "A Vulkan context may have only one live ZVulkanDevice wrapper";
+  auto device = std::make_unique<ZVulkanDevice>(*this);
+  CHECK(m_liveDeviceWrapper == device.get()) << "Vulkan device wrapper did not register its lifetime with the context";
+  return device;
+}
+
+void ZVulkanContext::notifyDeviceWrapperCreated(const ZVulkanDevice* device)
+{
+  CHECK(device != nullptr);
+  CHECK(m_liveDeviceWrapper == nullptr) << "A Vulkan context may have only one live ZVulkanDevice wrapper";
+  m_liveDeviceWrapper = device;
+}
+
+void ZVulkanContext::notifyDeviceWrapperDestroyed(const ZVulkanDevice* device)
+{
+  CHECK(device != nullptr);
+  CHECK(m_liveDeviceWrapper == device) << "Vulkan device-wrapper lifetime callback did not match the context owner";
+  m_liveDeviceWrapper = nullptr;
 }
 
 } // namespace nim

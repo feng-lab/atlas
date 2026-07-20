@@ -1834,6 +1834,7 @@ void ZVulkanImgSlicePipelineContext::ensureBlockIdCompactionPipeline()
       device,
       nullptr,
       vk::ComputePipelineCreateInfo{.stage = stage, .layout = **m_blockIdCompactPipelineLayoutStorage});
+    m_backend.notifyPipelineCreated();
     created = true;
   };
 
@@ -1885,6 +1886,7 @@ void ZVulkanImgSlicePipelineContext::ensureBlockIdCompactionPipeline()
         device,
         nullptr,
         vk::ComputePipelineCreateInfo{.stage = stage, .layout = **m_blockIdCompactPipelineLayoutStorage});
+      m_backend.notifyPipelineCreated();
     };
 
     loadCompute(ZVulkanShader::spirvResourcePath(
@@ -1937,6 +1939,7 @@ void ZVulkanImgSlicePipelineContext::ensureBlockIdCompactionPipeline()
       device,
       nullptr,
       vk::ComputePipelineCreateInfo{.stage = stage, .layout = **m_blockIdCompactPipelineLayoutSampled});
+    m_backend.notifyPipelineCreated();
     created = true;
   };
 
