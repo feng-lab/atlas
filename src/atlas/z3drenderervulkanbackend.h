@@ -771,6 +771,12 @@ public:
   void notifyDrawSecondaryCacheHit();
   void notifyDrawSecondaryCacheBuild();
   void notifyDrawSecondaryCacheExecute(vk::Pipeline pipeline);
+  // Retire a cached draw secondary before removing/replacing its cache entry.
+  // A secondary referenced by the active primary or a pending slot generation
+  // is retained until that slot's completion safe point; one whose slot is
+  // already safe is released immediately. The frame key must be the one stored
+  // in the cache entry's key.
+  void retireDrawSecondaryCommandBuffer(void* frameKey, vk::raii::CommandBuffer&& commandBuffer);
   // Queue a static copy (upload slice -> device-local VB/IB) to be executed
   // outside dynamic rendering before command buffer end in this frame.
   void scheduleStaticCopy(vk::Buffer dst, vk::DeviceSize dstOffset, const UploadSlice& src, bool isIndexBuffer);
@@ -1133,6 +1139,13 @@ private:
     // inputs and/or upload->static transfer destinations). These prevent reuse
     // of suballocated ranges until the submission fence signals.
     std::unordered_set<void*> pinnedStaticSegments;
+
+    // Cached draw secondaries detached by stream eviction or signature
+    // replacement. A cache entry is keyed by exactly one executor frame slot,
+    // so that slot's fence is the complete GPU-use domain for its command
+    // buffer. Keep the RAII owners here until that fence reaches the completion
+    // safe point instead of calling vkFreeCommandBuffers while one is pending.
+    std::vector<vk::raii::CommandBuffer> retiredDrawSecondaryCommandBuffers;
 
     // Pre-record primed compute descriptor sets (no descriptor writes during recording).
     // These descriptor-set handles are allocated from the persistent descriptor

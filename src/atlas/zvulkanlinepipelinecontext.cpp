@@ -252,6 +252,7 @@ void ZVulkanLinePipelineContext::evictStream(uint64_t streamKey)
 
   for (auto it = m_thinSecondaryCache.begin(); it != m_thinSecondaryCache.end();) {
     if (it->first.streamKey == streamKey) {
+      m_backend.retireDrawSecondaryCommandBuffer(it->first.frameKey, std::move(it->second.commandBuffer));
       it = m_thinSecondaryCache.erase(it);
     } else {
       ++it;
@@ -2448,8 +2449,8 @@ void ZVulkanLinePipelineContext::record(Z3DRendererBase& renderer,
       m_backend.notifyDrawSecondaryCacheSignatureMismatchMask(mask);
     }
 
-    ThinSecondaryCacheEntry& entry = m_thinSecondaryCache[cacheKey];
-    entry.signature = signature;
+    ThinSecondaryCacheEntry replacement{};
+    replacement.signature = signature;
     m_backend.notifyDrawSecondaryCacheBuild();
 
     vk::SampleCountFlagBits rasterSamples = vk::SampleCountFlagBits::e1;
@@ -2496,11 +2497,17 @@ void ZVulkanLinePipelineContext::record(Z3DRendererBase& renderer,
     secondaryInfo.commandPool = m_backend.device().context().commandPool();
     secondaryInfo.inheritance = inheritance;
 
-    entry.commandBuffer = buildStaticSecondary(secondaryInfo, [&](vk::raii::CommandBuffer& secondaryCmd) {
+    replacement.commandBuffer = buildStaticSecondary(secondaryInfo, [&](vk::raii::CommandBuffer& secondaryCmd) {
       ZVulkanPipelineCommandRecorder secondaryRecorder(secondaryCmd);
       secondaryRecorder.recordGraphicsDraw(drawSpec);
     });
-    entry.recorded = true;
+    replacement.recorded = true;
+
+    if (itCache != m_thinSecondaryCache.end()) {
+      m_backend.retireDrawSecondaryCommandBuffer(cacheKey.frameKey, std::move(itCache->second.commandBuffer));
+    }
+    auto entryIt = m_thinSecondaryCache.insert_or_assign(cacheKey, std::move(replacement)).first;
+    ThinSecondaryCacheEntry& entry = entryIt->second;
 
     m_backend.notifyDrawSecondaryCacheExecute(entry.signature.pipeline);
     cmd.executeCommands({static_cast<vk::CommandBuffer>(entry.commandBuffer)});

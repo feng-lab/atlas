@@ -4980,6 +4980,32 @@ void Z3DRendererVulkanBackend::pinStaticSliceForActiveSubmission(const StaticSli
   }
 }
 
+void Z3DRendererVulkanBackend::retireDrawSecondaryCommandBuffer(void* frameKey, vk::raii::CommandBuffer&& commandBuffer)
+{
+  CHECK(frameKey != nullptr) << "Cached draw secondary is missing its owning frame-slot key";
+  CHECK(static_cast<vk::CommandBuffer>(commandBuffer) != vk::CommandBuffer{})
+    << "Cannot retire a null cached draw secondary command buffer";
+  CHECK(m_sharedDevice != nullptr) << "Cached draw secondary retirement requires a Vulkan device";
+  CHECK(m_frameDevice == m_sharedDevice)
+    << "Cached draw secondary belongs to frame resources from a different Vulkan device";
+
+  const auto frameIt = m_frameResourceMap.find(frameKey);
+  CHECK(frameIt != m_frameResourceMap.end()) << "Cached draw secondary references an unknown Vulkan frame-slot key";
+  CHECK_LT(frameIt->second, m_frames.size()) << "Cached draw secondary frame-resource index is out of range";
+  FrameResources& frame = m_frames[frameIt->second];
+
+  // When this backend neither owns the slot's current primary nor has a slot
+  // generation awaiting its completion safe point, no GPU work can still
+  // reference this backend-local cached secondary. Consume it here so stream
+  // churn on an already-idle slot cannot accumulate retirement storage.
+  if (activeFrameKey() != frameKey && !frame.arenaResetScheduled) {
+    commandBuffer = vk::raii::CommandBuffer{nullptr};
+    return;
+  }
+
+  frame.retiredDrawSecondaryCommandBuffers.push_back(std::move(commandBuffer));
+}
+
 uint64_t Z3DRendererVulkanBackend::staticArenaSegmentIdForBuffer(vk::Buffer buffer) const
 {
   if (!buffer) {
@@ -6438,6 +6464,12 @@ void Z3DRendererVulkanBackend::applyPendingArenaReset(FrameResources& frame)
   // pollCompletions() observed the fence as signaled). In all cases, it is now
   // safe to run work that must observe the end of the previous submission and
   // then start a new generation for this slot.
+
+  // Eviction/replacement removes cached draw secondaries from lookup at once,
+  // but Vulkan forbids freeing a command buffer while a submission that uses
+  // it is pending. The frame-slot fence is complete here, so their RAII owners
+  // may finally release the physical command buffers.
+  frame.retiredDrawSecondaryCommandBuffers.clear();
 
   if (frame.arenaResetScheduled) {
     CHECK(frame.descriptorPool) << "Descriptor pool missing while reset was scheduled";

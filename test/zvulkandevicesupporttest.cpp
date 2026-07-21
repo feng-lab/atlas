@@ -260,7 +260,7 @@ TEST(ZVulkanDeviceSupportTest, ComputeAggregateBudgetReservesStorageBufferAndIma
 TEST(ZVulkanDeviceSupportTest, ContextRejectsSecondLiveDeviceWrapper)
 {
   if (!vulkanSmokeEnabled()) {
-    GTEST_SKIP() << "Set ATLAS_ENABLE_VULKAN_SMOKE_TEST=1 with a software ICD to run the Vulkan lifetime smoke";
+    GTEST_SKIP() << "Set ATLAS_ENABLE_VULKAN_SMOKE_TEST=1 with a Vulkan ICD to run the Vulkan lifetime smoke";
   }
   enableThreadsafeDeathTests();
   EXPECT_DEATH_IF_SUPPORTED(
@@ -294,7 +294,7 @@ TEST(ZVulkanDeviceSupportTest, ContextRejectsDirectSecondLiveDeviceWrapper)
 TEST(ZVulkanDeviceSupportTest, DeviceRejectsDescriptorAccountingFromAnotherThread)
 {
   if (!vulkanSmokeEnabled()) {
-    GTEST_SKIP() << "Set ATLAS_ENABLE_VULKAN_SMOKE_TEST=1 with a software ICD to run the Vulkan threading smoke";
+    GTEST_SKIP() << "Set ATLAS_ENABLE_VULKAN_SMOKE_TEST=1 with a Vulkan ICD to run the Vulkan threading smoke";
   }
   enableThreadsafeDeathTests();
   EXPECT_DEATH_IF_SUPPORTED(
@@ -367,10 +367,10 @@ TEST(ZVulkanDeviceSupportTest, DeviceRejectsTeardownWithLiveActiveFrameLease)
     "live ActiveFrame leases");
 }
 
-TEST(ZVulkanDeviceSupportTest, SoftwareIcdStartupSmoke)
+TEST(ZVulkanDeviceSupportTest, VulkanIcdStartupSmoke)
 {
   if (!vulkanSmokeEnabled()) {
-    GTEST_SKIP() << "Set ATLAS_ENABLE_VULKAN_SMOKE_TEST=1 with a software ICD to run the Vulkan startup smoke";
+    GTEST_SKIP() << "Set ATLAS_ENABLE_VULKAN_SMOKE_TEST=1 with a Vulkan ICD to run the Vulkan startup smoke";
   }
 
   absl::FlagSaver flagSaver;

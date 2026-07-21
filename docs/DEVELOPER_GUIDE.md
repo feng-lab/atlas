@@ -346,9 +346,10 @@ Testing (Linking Atlas Code)
 - GPU/UI-heavy tests should be gated/opt-in and prefer offscreen surfaces or SwiftShader where available.
 - `zvulkandevicesupporttest` keeps pure device-selection coverage in normal Release `ctest` discovery. Its Vulkan startup,
   lifetime, and wrong-thread tests are correctness-only and skip unless `ATLAS_ENABLE_VULKAN_SMOKE_TEST=1`; when enabled,
-  configure `VK_DRIVER_FILES`/`VK_ICD_FILENAMES` for a software ICD and verify context, logical-device, VMA startup, and
-  device-owned bindless slot/retirement lifetimes. This is an explicit local correctness check; normal platform CI remains
-  limited to its existing build and packaging workflow. Do not put performance assertions in this smoke test.
+  ensure a Vulkan ICD is available. Use `VK_DRIVER_FILES`/`VK_ICD_FILENAMES` when selecting an explicit hardware-backed
+  or CPU software ICD. The tests verify context, logical-device, VMA startup, and device-owned bindless slot/retirement
+  lifetimes. This is an explicit local correctness check; normal platform CI remains limited to its existing build and
+  packaging workflow. Do not put performance assertions in this smoke test.
 - Neuroglancer precomputed E2E tests:
   - `test/zneuroglancerprecomputede2etest.cpp` is a networked smoke test (public GCS URLs) gated by `ATLAS_ENABLE_NETWORK_TESTS=1`.
   - The same test file exercises both HTTP backends. Atlas test binaries use the test main rather than the app main, so backend selection is set inside the test with Abseil flags instead of relying on application flagfile setup.
@@ -435,6 +436,7 @@ Lookup Tables (LUTs)
   - Backend-shared per-frame-slot descriptor sets: Atlas centralizes common descriptor state (lighting UBO, transforms UBOs, OIT SSBOs, and image helper UBO views) in backend-owned descriptor sets allocated from the persistent pool and reused across pipeline contexts. Pipeline contexts should bind these shared sets rather than allocating duplicate “common UBO sets” each submission.
   - Frame-completion safe point: the backend defines a frame-slot “completion safe point” (`applyPendingArenaReset`) that is reached after the executor observes a slot fence as complete (slot reuse, explicit waits, and opportunistic pumping after `pollCompletions()`). At that point it:
     - resets per-frame descriptor resources,
+    - frees cached draw secondary command buffers that stream eviction or signature replacement detached from lookup (each cached secondary is keyed to one frame slot and remains owned by that slot until its fence completes),
     - drains all “after completion” hooks with a barrier (hooks may run on their own executors),
     - then wakes `awaitCurrentFrameCompletion()` awaiters for the previous generation.
   - Scratch-pool recycling: Vulkan scratch image leases are released only after the submitting frame’s fence signals. The pool defers slot reuse by registering an “after completion” hook at the frame-completion safe point (via `registerAfterCurrentFrameCompletionHook()` through the backend-installed scratch scheduler).

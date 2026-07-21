@@ -246,6 +246,7 @@ void ZVulkanMeshPipelineContext::evictStream(uint64_t streamKey)
 
   for (auto it = m_secondaryCache.begin(); it != m_secondaryCache.end();) {
     if (it->first.streamKey == streamKey) {
+      m_backend.retireDrawSecondaryCommandBuffer(it->first.frameKey, std::move(it->second.commandBuffer));
       it = m_secondaryCache.erase(it);
     } else {
       ++it;
@@ -1061,9 +1062,9 @@ void ZVulkanMeshPipelineContext::record(Z3DRendererBase& renderer,
         m_backend.notifyDrawSecondaryCacheSignatureMismatchMask(mask);
       }
 
-      SecondaryCacheEntry& entry = m_secondaryCache[cacheKey];
-      entry.signature = std::move(signature);
-      drawCallsPtr = &entry.signature.draws;
+      SecondaryCacheEntry replacement{};
+      replacement.signature = std::move(signature);
+      drawCallsPtr = &replacement.signature.draws;
       m_backend.notifyDrawSecondaryCacheBuild();
 
       // Secondary inheritance: match the active dynamic rendering segment formats.
@@ -1112,11 +1113,17 @@ void ZVulkanMeshPipelineContext::record(Z3DRendererBase& renderer,
       secondaryInfo.commandPool = m_backend.device().context().commandPool();
       secondaryInfo.inheritance = inheritance;
 
-      entry.commandBuffer = buildStaticSecondary(secondaryInfo, [&](vk::raii::CommandBuffer& secondaryCmd) {
+      replacement.commandBuffer = buildStaticSecondary(secondaryInfo, [&](vk::raii::CommandBuffer& secondaryCmd) {
         ZVulkanPipelineCommandRecorder secondaryRecorder(secondaryCmd);
         secondaryRecorder.recordGraphicsDraw(drawSpec, drawFn);
       });
-      entry.recorded = true;
+      replacement.recorded = true;
+
+      if (itCache != m_secondaryCache.end()) {
+        m_backend.retireDrawSecondaryCommandBuffer(cacheKey.frameKey, std::move(itCache->second.commandBuffer));
+      }
+      auto entryIt = m_secondaryCache.insert_or_assign(cacheKey, std::move(replacement)).first;
+      SecondaryCacheEntry& entry = entryIt->second;
 
       m_backend.notifyDrawSecondaryCacheExecute(entry.signature.pipeline);
       cmd.executeCommands({static_cast<vk::CommandBuffer>(entry.commandBuffer)});
