@@ -26,10 +26,10 @@ permissions:
 env:
   # Centralize Qt version to make upgrades easy
   QT_VERSION: "6.9.2"
-  # Minimum Python version used by CI build environments
+  # Minimum supported Python version; used by the Conda packaging environment.
   PYTHON_VERSION_MIN: "3.12"
-  # Python used by the 3rdparty source build. It does not need the final conda env.
-  LIB_BUILD_PYTHON_VERSION: "3.14"
+  # Stock CPython used by CI build and publishing automation.
+  CI_PYTHON_VERSION: "3.14"
   # Pin a Vulkan SDK version
   VULKAN_SDK_VERSION: 1.4.350.0
   # Split point for 3rdparty build; job1 stops before this lib, job2 starts from this lib.
@@ -107,7 +107,7 @@ jobs:
         if: steps.cache-extlibs-p1.outputs.cache-hit != 'true'
         uses: actions/setup-python@v6
         with:
-          python-version: ${{ env.LIB_BUILD_PYTHON_VERSION }}
+          python-version: ${{ env.CI_PYTHON_VERSION }}
 
       - name: Install Python deps for external deps
         if: steps.cache-extlibs-p1.outputs.cache-hit != 'true'
@@ -158,7 +158,7 @@ jobs:
       - name: Setup Python for external deps
         uses: actions/setup-python@v6
         with:
-          python-version: ${{ env.LIB_BUILD_PYTHON_VERSION }}
+          python-version: ${{ env.CI_PYTHON_VERSION }}
       
       - name: Install Python deps for external deps
         shell: pwsh
@@ -227,6 +227,22 @@ jobs:
         shell: pwsh
         run: |
           & .\util\install_llvm_windows.ps1
+
+      - name: Setup stock CPython for Windows automation and zimg wheel
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.CI_PYTHON_VERSION }}
+
+      - name: Install stock CPython tooling
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          python --version
+          if ($LASTEXITCODE -ne 0) { Write-Error "Stock CPython version check failed"; exit $LASTEXITCODE }
+          python -m pip install --upgrade pip
+          if ($LASTEXITCODE -ne 0) { Write-Error "Stock CPython pip upgrade failed"; exit $LASTEXITCODE }
+          python -m pip install --no-cache-dir aqtinstall requests packaging build twine boto3
+          if ($LASTEXITCODE -ne 0) { Write-Error "Stock CPython tooling install failed"; exit $LASTEXITCODE }
 
       - name: Cache Vulkan SDK (installed)
         id: cache-vulkan
@@ -302,39 +318,6 @@ jobs:
           reg.exe query "HKLM\SOFTWARE\Khronos\Vulkan\Drivers"
           if ($LASTEXITCODE -ne 0) { Write-Error "Failed to query Vulkan driver registry"; exit $LASTEXITCODE }
 
-      - name: Setup conda
-        uses: conda-incubator/setup-miniconda@v4
-        with:
-          auto-update-conda: true
-          activate-environment: ""
-          auto-activate: false
-          channels: defaults
-
-      - name: Create/Reset atlas-ci conda env
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Stop'
-          conda info
-          conda env remove -n atlas-ci -y
-          if ($LASTEXITCODE -ne 0) { Write-Host "No existing atlas-ci env to remove (ok)" }
-          conda create -n atlas-ci -y python=${{ env.PYTHON_VERSION_MIN }}
-          if ($LASTEXITCODE -ne 0) { Write-Error "Failed to create atlas-ci env"; exit $LASTEXITCODE }
-
-      - name: Install conda tooling
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Stop'
-          $condaHook = (& conda 'shell.powershell' 'hook') | Out-String
-          Invoke-Expression $condaHook
-          conda activate atlas-ci
-          conda info
-          conda install -y anaconda-client conda-build pip
-          if ($LASTEXITCODE -ne 0) { Write-Error "Failed to install conda packages into atlas-ci"; exit $LASTEXITCODE }
-          python -m pip install --upgrade pip
-          if ($LASTEXITCODE -ne 0) { Write-Error "Failed to upgrade pip in atlas-ci"; exit $LASTEXITCODE }
-          python -m pip install --no-cache-dir aqtinstall requests packaging build twine boto3
-          if ($LASTEXITCODE -ne 0) { Write-Error "Failed to install Python deps in atlas-ci"; exit $LASTEXITCODE }
-
       - name: Cache Qt (installed)
         uses: actions/cache@v5
         with:
@@ -347,9 +330,6 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $condaHook = (& conda 'shell.powershell' 'hook') | Out-String
-          Invoke-Expression $condaHook
-          conda activate atlas-ci
           $qtRoot = Join-Path $HOME 'Qt'
           New-Item -ItemType Directory -Force -Path $qtRoot | Out-Null
           $qtVer = $env:QT_VERSION
@@ -394,9 +374,6 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $env:Path = "C:\SwiftShader;$env:Path"
-          $condaHook = (& conda 'shell.powershell' 'hook') | Out-String
-          Invoke-Expression $condaHook
-          conda activate atlas-ci
           cd "$env:GITHUB_WORKSPACE"
           python util/build_and_deploy_atlas.py
           if ($LASTEXITCODE -ne 0) { Write-Error "build_and_deploy_atlas failed with exit code $LASTEXITCODE"; exit $LASTEXITCODE }
@@ -405,8 +382,6 @@ jobs:
         shell: bash -l {0}
         run: |
           set -euo pipefail
-          eval "$(conda shell.bash hook)"
-          conda activate atlas-ci
           cd "$GITHUB_WORKSPACE"
           python util/publish_r2.py publish-ifw --os Windows
 
@@ -476,27 +451,65 @@ jobs:
       - name: Deploy artifacts (SSH)
         shell: bash -l {0}
         run: |
-          eval "$(conda shell.bash hook)"
-          conda activate atlas-ci
           set -euo pipefail
           cd "$GITHUB_WORKSPACE"
           python util/deploy_artifacts_ssh.py --os Windows --method scp
 
-      - name: Publish zimg (PyPI + conda)
+      - name: Publish zimg wheel (PyPI)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          python util/publish_zimg.py --phase wheel
+          if ($LASTEXITCODE -ne 0) { Write-Error "zimg wheel/PyPI phase failed"; exit $LASTEXITCODE }
+          Get-ChildItem -Recurse python/zimg/dist | Select-Object FullName
+
+      - name: Setup Conda for zimg packaging
+        if: github.event_name != 'create'
+        uses: conda-incubator/setup-miniconda@v4
+        with:
+          auto-update-conda: true
+          activate-environment: ""
+          auto-activate: false
+          channels: defaults
+
+      - name: Create zimg packaging Conda environment
+        if: github.event_name != 'create'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          conda info
+          conda env remove -n atlas-ci -y
+          if ($LASTEXITCODE -ne 0) { Write-Host "No existing atlas-ci env to remove (ok)" }
+          conda create -n atlas-ci -y python=${{ env.PYTHON_VERSION_MIN }}
+          if ($LASTEXITCODE -ne 0) { Write-Error "Failed to create atlas-ci env"; exit $LASTEXITCODE }
+
+      - name: Install Conda packaging tooling
+        if: github.event_name != 'create'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          conda info
+          conda install -n atlas-ci -y anaconda-client conda-build
+          if ($LASTEXITCODE -ne 0) { Write-Error "Failed to install conda packages into atlas-ci"; exit $LASTEXITCODE }
+
+      - name: Publish zimg Conda package
+        if: github.event_name != 'create'
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
           $condaHook = (& conda 'shell.powershell' 'hook') | Out-String
           Invoke-Expression $condaHook
           conda activate atlas-ci
+          if (-not $env:CONDA_PREFIX) {
+            throw "atlas-ci activation did not set CONDA_PREFIX"
+          }
+
+          python --version
+          if ($LASTEXITCODE -ne 0) { Write-Error "Conda Python version check failed"; exit $LASTEXITCODE }
+
           if ($env:ANACONDA_API_TOKEN) {
             conda config --set anaconda_upload yes
             if ($LASTEXITCODE -ne 0) { Write-Error "conda config failed"; exit $LASTEXITCODE }
           }
-          python -m pip install --upgrade pip
-          if ($LASTEXITCODE -ne 0) { Write-Error "pip upgrade failed"; exit $LASTEXITCODE }
-          python -m pip install --no-cache-dir build twine
-          if ($LASTEXITCODE -ne 0) { Write-Error "pip install build twine failed"; exit $LASTEXITCODE }
-          python util/publish_zimg.py
-          if ($LASTEXITCODE -ne 0) { Write-Error "publish_zimg.py failed"; exit $LASTEXITCODE }
-          Get-ChildItem -Recurse python/zimg/dist | Select-Object FullName
+          python util/publish_zimg.py --phase conda
+          if ($LASTEXITCODE -ne 0) { Write-Error "zimg Conda phase failed"; exit $LASTEXITCODE }

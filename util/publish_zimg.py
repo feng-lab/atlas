@@ -579,10 +579,240 @@ def _stage_conda_zimg_from_wheel(
         return dst_pkg_dir
 
 
+def _build_zimg_wheel(
+    *,
+    py_project_src: Path,
+    zimg_src_dir: Path,
+    out_dir: Path,
+    version: str,
+) -> list[Path]:
+    if not (zimg_src_dir / "CMakeLists.txt").exists():
+        raise RuntimeError(f"Expected CMakeLists.txt missing: {zimg_src_dir}")
+
+    cmd = [sys.executable, "-m", "build", "--wheel", "--outdir", str(out_dir)]
+    atlas_pypi.ensure_empty_dir(out_dir)
+
+    with tempfile.TemporaryDirectory(prefix="zimg_pypi_build_") as tmp:
+        tmp_root = Path(tmp)
+        tmp_project = tmp_root / "zimg"
+        shutil.copytree(
+            py_project_src,
+            tmp_project,
+            ignore=shutil.ignore_patterns("dist", "__pycache__", "*.pyc", "*.pyo"),
+        )
+        atlas_pypi.update_pyproject_version(tmp_project / "pyproject.toml", version)
+
+        if common_dirs.is_windows():
+            # `python -m build` (PEP 517) executes the backend in an isolated venv but
+            # still inherits our process environment. When running under MSYS2 /
+            # MinGW shells, `PATH` often contains GNU toolchains (e.g. `c++.exe`)
+            # which causes CMake+Ninja to silently select the wrong compiler.
+            #
+            # Match `util/build_atlas.py`: enter an MSVC dev environment and scrub
+            # MinGW and Conda from PATH before scikit-build-core invokes CMake.
+            env_base = build_ext_libs.get_vcvars_environment()
+            # Some shells predefine CC/CXX to GNU toolchains; leaving them set can
+            # override the explicit clang-cl selection in the MSVC environment.
+            env_base.pop("CC", None)
+            env_base.pop("CXX", None)
+            env_base.pop("CFLAGS", None)
+            env_base.pop("CXXFLAGS", None)
+            cl_path = shutil.which("cl", path=env_base.get("PATH"))
+            if cl_path is None:
+                raise RuntimeError(
+                    "MSVC environment setup failed: `cl.exe` not found on PATH after vcvarsall.\n"
+                    "This wheel must be built with MSVC-compatible clang-cl (not MinGW). "
+                    "Ensure Visual Studio is installed and "
+                    "`util/common_dirs.py:vs_install_dir()` points to it."
+                )
+            logger.info("Using MSVC environment for wheel build (cl=%s)", cl_path)
+        else:
+            env_base = os.environ.copy()
+        env_base["ZIMG_SRC_DIR"] = str(zimg_src_dir)
+
+        env = env_base.copy()
+        if common_dirs.is_mac():
+            env["MACOSX_DEPLOYMENT_TARGET"] = build_ext_libs.macos_min_version()
+            env["ARCHFLAGS"] = _MACOS_UNIVERSAL2_ARCHFLAGS
+        _apply_scikit_build_core_toolchain_env(env)
+        _run_checked(cmd, cwd=tmp_project, env=env)
+
+    wheels = sorted(out_dir.glob("*.whl"))
+    if common_dirs.is_linux():
+        repaired: list[Path] = []
+        for wheel_path in wheels:
+            repaired.append(
+                _repair_linux_wheel_with_auditwheel(
+                    wheel_path=wheel_path, out_dir=out_dir
+                )
+            )
+        wheels = repaired
+        for wheel_path in wheels:
+            _assert_linux_wheel_has_pypi_compatible_platform_tag(wheel_path=wheel_path)
+            _assert_linux_wheel_contains_expected_libs(wheel_path)
+
+    if common_dirs.is_mac():
+        for wheel_path in wheels:
+            _assert_macos_wheel_has_universal2_tag(
+                wheel_path=wheel_path,
+                macos_target=build_ext_libs.macos_min_version(),
+            )
+            with tempfile.TemporaryDirectory(
+                prefix="zimg_macos_wheel_validate_"
+            ) as validate_dir:
+                validate_root = Path(validate_dir)
+                with zipfile.ZipFile(wheel_path, "r") as zf:
+                    zf.extractall(validate_root)
+                _assert_macos_wheel_is_universal2(
+                    wheel_root=validate_root,
+                    wheel_name=wheel_path.name,
+                )
+
+    if not wheels:
+        raise RuntimeError(f"Wheel build did not produce an artifact in: {out_dir}")
+    for wheel in wheels:
+        logger.info("Built: %s", wheel)
+
+    atlas_pypi.report_dist_artifact_sizes(out_dir)
+    return wheels
+
+
+def _require_single_wheel(wheels: list[Path], *, out_dir: Path) -> Path:
+    if len(wheels) != 1:
+        raise RuntimeError(
+            "Conda packaging requires exactly one prebuilt zimg wheel in "
+            f"{out_dir}; found {len(wheels)}: {[path.name for path in wheels]}"
+        )
+    return wheels[0]
+
+
+def _log_conda_dry_run() -> None:
+    for target_subdir in _conda_target_subdirs():
+        conda_cmd_display = [
+            f"CONDA_SUBDIR={target_subdir}",
+            "conda-build",
+            "--token",
+            "$ANACONDA_API_TOKEN",
+            "--user",
+            _ANACONDA_OWNER,
+            "zimg-recipe",
+        ]
+        logger.info(
+            "Conda build command (%s): %s",
+            target_subdir,
+            " ".join(conda_cmd_display),
+        )
+    logger.info(
+        "Conda prune before upload: matching conda subdir only; keep_after_upload=%d",
+        _CONDA_KEEP_PER_SUBDIR_AFTER_UPLOAD,
+    )
+    logger.info(
+        "Conda upload: enabled by policy (requires ANACONDA_API_TOKEN, conda-build, and anaconda-client)"
+    )
+
+
+def _publish_conda_from_wheels(
+    *,
+    repo_root: Path,
+    wheels: list[Path],
+    out_dir: Path,
+) -> None:
+    conda_token = os.environ.get("ANACONDA_API_TOKEN", "").strip()
+    conda_build_exe = shutil.which("conda-build")
+    anaconda_exe = shutil.which("anaconda")
+
+    conda_source_dir: Path | None = None
+    conda_cmd: list[str] | None = None
+    conda_cmd_display: list[str] | None = None
+    conda_skip_reason: str | None = None
+    if not conda_token:
+        conda_skip_reason = "ANACONDA_API_TOKEN not set"
+    elif conda_build_exe is None:
+        conda_skip_reason = "conda-build not found on PATH"
+    elif anaconda_exe is None:
+        conda_skip_reason = "anaconda-client CLI not found on PATH"
+    else:
+        conda_source_dir = Path(common_dirs.ext_conda_build_dir())
+        conda_cmd = [
+            conda_build_exe,
+            "--token",
+            conda_token,
+            "--user",
+            _ANACONDA_OWNER,
+            "zimg-recipe",
+        ]
+        conda_cmd_display = [
+            "conda-build",
+            "--token",
+            "$ANACONDA_API_TOKEN",
+            "--user",
+            _ANACONDA_OWNER,
+            "zimg-recipe",
+        ]
+
+    if conda_skip_reason is not None:
+        logger.warning("Skipping conda build/upload (%s)", conda_skip_reason)
+        if conda_skip_reason == "conda-build not found on PATH":
+            logger.warning(
+                "To enable conda uploads, install `conda-build` and `anaconda-client` "
+                "(e.g. in a conda env) and ensure `conda-build` is on PATH."
+            )
+        if conda_skip_reason == "anaconda-client CLI not found on PATH":
+            logger.warning(
+                "To enable conda uploads, install `anaconda-client` in the active environment."
+            )
+        return
+
+    assert conda_cmd is not None
+    assert conda_source_dir is not None
+    assert anaconda_exe is not None
+    assert conda_build_exe is not None
+    wheel_path = _require_single_wheel(wheels, out_dir=out_dir)
+    bioformats_jar_path = (
+        repo_root / "src" / "3rdparty" / "build" / "jars" / "bioformats_package.jar"
+    )
+    logger.info("Staging conda zimg package from wheel: %s", wheel_path.name)
+    staged_dir = _stage_conda_zimg_from_wheel(
+        wheel_path=wheel_path,
+        conda_source_dir=conda_source_dir,
+        bioformats_jar_path=bioformats_jar_path,
+    )
+    logger.info("Staged conda package dir: %s", staged_dir)
+    for target_subdir in _conda_target_subdirs():
+        logger.info("Conda upload target subdir: %s", target_subdir)
+        _prune_anaconda_zimg_for_subdir(
+            target_subdir=target_subdir,
+            token=conda_token,
+            anaconda_exe=anaconda_exe,
+        )
+        conda_env = os.environ.copy()
+        conda_env["CONDA_SUBDIR"] = target_subdir
+        _run_checked(
+            conda_cmd,
+            cwd=repo_root,
+            env=conda_env,
+            display_cmd=[
+                f"CONDA_SUBDIR={target_subdir}",
+                *conda_cmd_display,
+            ],
+        )
+
+
 def main() -> int:
     setup_logger()
     parser = argparse.ArgumentParser(
         description=("Build and publish the zimg wheel (PyPI) and conda package."),
+    )
+    parser.add_argument(
+        "--phase",
+        choices=("all", "wheel", "conda"),
+        default="all",
+        help=(
+            "Select the publishing phase. 'all' (default) builds/publishes the "
+            "wheel and then packages it for Conda; 'wheel' runs only the "
+            "wheel/PyPI phase; 'conda' reuses exactly one wheel already present "
+            "in python/zimg/dist and runs only Conda packaging/upload."
+        ),
     )
     parser.add_argument(
         "--dry-run",
@@ -612,23 +842,28 @@ def main() -> int:
     )
 
     args = parser.parse_args()
+    run_wheel_phase = args.phase in {"all", "wheel"}
+    run_conda_phase = args.phase in {"all", "conda"}
+    if args.allow_non_tag_upload and not run_wheel_phase:
+        parser.error("--allow-non-tag-upload requires --phase=all or --phase=wheel")
 
     repo_root = Path(common_dirs.atlas_repository_dir())
     py_project_src = repo_root / "python" / "zimg"
-
     zimg_src_dir = repo_root / "src" / "python"
-    if not (zimg_src_dir / "CMakeLists.txt").exists():
-        raise RuntimeError(f"Expected CMakeLists.txt missing: {zimg_src_dir}")
+    out_dir = repo_root / "python" / "zimg" / "dist"
 
     raw_git_version = atlas_version.read_git_version_from_header()
     git_describe = atlas_version.git_describe_from_git_version(raw_git_version)
     version = atlas_pypi.pep440_version_from_git_describe(git_describe)
     logger.info("Detected tag: %s -> zimg version: %s", git_describe, version)
+    logger.info("Publish phase: %s", args.phase)
     is_release_tag = atlas_pypi.is_clean_release_tag(git_describe)
 
-    want_conda_upload = True
+    want_conda_upload = run_conda_phase
     conda_policy_skip_reason: str | None = None
-    if args.conda_upload == "never":
+    if not run_conda_phase:
+        conda_policy_skip_reason = "phase does not include Conda packaging"
+    elif args.conda_upload == "never":
         want_conda_upload = False
         conda_policy_skip_reason = "disabled via --conda-upload=never"
     elif args.conda_upload == "auto" and is_release_tag:
@@ -637,13 +872,20 @@ def main() -> int:
             "disabled for clean release tags (--conda-upload=auto)"
         )
 
-    allowed_env_keys = {"PYPI_API_TOKEN"}
+    allowed_env_keys: set[str] = set()
+    if run_wheel_phase:
+        allowed_env_keys.add("PYPI_API_TOKEN")
     if want_conda_upload:
         allowed_env_keys.add("ANACONDA_API_TOKEN")
-    if common_dirs.is_mac():
+    if common_dirs.is_mac() and run_wheel_phase:
         allowed_env_keys.add("MACOS_CODESIGN_IDENTITY")
     atlas_env.load_repo_dotenv(allowed_keys=allowed_env_keys)
-    if common_dirs.is_mac() and os.environ.get("PYPI_API_TOKEN", "").strip():
+
+    if (
+        common_dirs.is_mac()
+        and run_wheel_phase
+        and os.environ.get("PYPI_API_TOKEN", "").strip()
+    ):
         identity = os.environ.get("MACOS_CODESIGN_IDENTITY", "").strip()
         if not identity or identity == "-":
             raise RuntimeError(
@@ -652,241 +894,76 @@ def main() -> int:
                 "Application identity before publishing."
             )
 
-    out_dir = repo_root / "python" / "zimg" / "dist"
-    cmd = [sys.executable, "-m", "build", "--wheel", "--outdir", str(out_dir)]
-
     if args.dry_run:
-        logger.info("Build command: %s", " ".join(cmd))
-        logger.info("Conda upload policy: %s", args.conda_upload)
+        if run_wheel_phase:
+            cmd = [
+                sys.executable,
+                "-m",
+                "build",
+                "--wheel",
+                "--outdir",
+                str(out_dir),
+            ]
+            logger.info("Build command: %s", " ".join(cmd))
+            atlas_pypi.maybe_upload_to_pypi(
+                out_dir,
+                project="zimg",
+                version=version,
+                git_describe=git_describe,
+                raw_git_version=raw_git_version,
+                dry_run=True,
+                allow_non_tag_upload=args.allow_non_tag_upload,
+                skip_existing=args.allow_non_tag_upload,
+            )
+        else:
+            logger.info("Wheel/PyPI phase: skipped")
+
+        if run_conda_phase:
+            logger.info("Conda upload policy: %s", args.conda_upload)
+            if want_conda_upload:
+                _log_conda_dry_run()
+            else:
+                assert conda_policy_skip_reason is not None
+                logger.info("Conda: skipped (%s)", conda_policy_skip_reason)
+        else:
+            logger.info("Conda phase: skipped")
+        return 0
+
+    wheels: list[Path] = []
+    if run_wheel_phase:
+        wheels = _build_zimg_wheel(
+            py_project_src=py_project_src,
+            zimg_src_dir=zimg_src_dir,
+            out_dir=out_dir,
+            version=version,
+        )
         atlas_pypi.maybe_upload_to_pypi(
             out_dir,
             project="zimg",
             version=version,
             git_describe=git_describe,
             raw_git_version=raw_git_version,
-            dry_run=True,
+            dry_run=False,
             allow_non_tag_upload=args.allow_non_tag_upload,
             skip_existing=args.allow_non_tag_upload,
         )
+    else:
+        logger.info("Wheel/PyPI phase: skipped")
+
+    if run_conda_phase:
         if want_conda_upload:
-            # Dry-run: print the command we'd run without checking tool/env availability.
-            for target_subdir in _conda_target_subdirs():
-                conda_cmd_display = [
-                    f"CONDA_SUBDIR={target_subdir}",
-                    "conda-build",
-                    "--token",
-                    "$ANACONDA_API_TOKEN",
-                    "--user",
-                    _ANACONDA_OWNER,
-                    "zimg-recipe",
-                ]
-                logger.info(
-                    "Conda build command (%s): %s",
-                    target_subdir,
-                    " ".join(conda_cmd_display),
-                )
-            logger.info(
-                "Conda prune before upload: matching conda subdir only; keep_after_upload=%d",
-                _CONDA_KEEP_PER_SUBDIR_AFTER_UPLOAD,
-            )
-            logger.info(
-                "Conda upload: enabled by policy (requires ANACONDA_API_TOKEN, conda-build, and anaconda-client)"
+            if not wheels:
+                wheels = sorted(out_dir.glob("*.whl"))
+            _publish_conda_from_wheels(
+                repo_root=repo_root,
+                wheels=wheels,
+                out_dir=out_dir,
             )
         else:
             assert conda_policy_skip_reason is not None
-            logger.info("Conda: skipped (%s)", conda_policy_skip_reason)
-        return 0
-
-    atlas_pypi.ensure_empty_dir(out_dir)
-
-    with tempfile.TemporaryDirectory(prefix="zimg_pypi_build_") as tmp:
-        tmp_root = Path(tmp)
-        tmp_project = tmp_root / "zimg"
-        shutil.copytree(
-            py_project_src,
-            tmp_project,
-            ignore=shutil.ignore_patterns("dist", "__pycache__", "*.pyc", "*.pyo"),
-        )
-        atlas_pypi.update_pyproject_version(tmp_project / "pyproject.toml", version)
-
-        if common_dirs.is_windows():
-            # `python -m build` (PEP 517) executes the backend in an isolated venv but
-            # still inherits our process environment. When running under MSYS2 /
-            # MinGW shells, `PATH` often contains GNU toolchains (e.g. `c++.exe`)
-            # which causes CMake+Ninja to silently select the wrong compiler.
-            #
-            # Match `util/build_atlas.py`: enter an MSVC dev environment and scrub
-            # MinGW from PATH so scikit-build-core configures with MSVC.
-            env_base = build_ext_libs.get_vcvars_environment()
-            # Build deterministically with MSVC. Some shells (MSYS2) predefine CC/CXX
-            # to GNU toolchains; leaving them set can override CMake's compiler
-            # selection even when the MSVC environment is active.
-            env_base.pop("CC", None)
-            env_base.pop("CXX", None)
-            env_base.pop("CFLAGS", None)
-            env_base.pop("CXXFLAGS", None)
-            cl_path = shutil.which("cl", path=env_base.get("PATH"))
-            if cl_path is None:
-                raise RuntimeError(
-                    "MSVC environment setup failed: `cl.exe` not found on PATH after vcvarsall.\n"
-                    "This wheel must be built with MSVC (not MinGW). Ensure Visual Studio "
-                    "is installed and `util/common_dirs.py:vs_install_dir()` points to it."
-                )
-            logger.info("Using MSVC toolchain for wheel build (cl=%s)", cl_path)
-        else:
-            env_base = os.environ.copy()
-        env_base["ZIMG_SRC_DIR"] = str(zimg_src_dir)
-
-        env = env_base.copy()
-        if common_dirs.is_mac():
-            env["MACOSX_DEPLOYMENT_TARGET"] = build_ext_libs.macos_min_version()
-            env["ARCHFLAGS"] = _MACOS_UNIVERSAL2_ARCHFLAGS
-        _apply_scikit_build_core_toolchain_env(env)
-        _run_checked(cmd, cwd=tmp_project, env=env)
-
-    wheels = sorted(out_dir.glob("*.whl"))
-    if wheels:
-        if common_dirs.is_linux():
-            repaired: list[Path] = []
-            for wheel_path in wheels:
-                repaired.append(
-                    _repair_linux_wheel_with_auditwheel(
-                        wheel_path=wheel_path, out_dir=out_dir
-                    )
-                )
-            wheels = repaired
-            for wheel_path in wheels:
-                _assert_linux_wheel_has_pypi_compatible_platform_tag(
-                    wheel_path=wheel_path
-                )
-
-        if common_dirs.is_mac():
-            for wheel_path in wheels:
-                _assert_macos_wheel_has_universal2_tag(
-                    wheel_path=wheel_path,
-                    macos_target=build_ext_libs.macos_min_version(),
-                )
-                with tempfile.TemporaryDirectory(
-                    prefix="zimg_macos_wheel_validate_"
-                ) as validate_dir:
-                    validate_root = Path(validate_dir)
-                    with zipfile.ZipFile(wheel_path, "r") as zf:
-                        zf.extractall(validate_root)
-                    _assert_macos_wheel_is_universal2(
-                        wheel_root=validate_root,
-                        wheel_name=wheel_path.name,
-                    )
-        if common_dirs.is_linux():
-            for wheel_path in wheels:
-                _assert_linux_wheel_contains_expected_libs(wheel_path)
-        for wheel in wheels:
-            logger.info("Built: %s", wheel)
+            logger.info("Skipping conda build/upload (%s)", conda_policy_skip_reason)
     else:
-        logger.warning("No wheels found in: %s", out_dir)
-
-    if not wheels:
-        raise RuntimeError("Wheel build did not produce any artifacts.")
-
-    atlas_pypi.report_dist_artifact_sizes(out_dir)
-
-    atlas_pypi.maybe_upload_to_pypi(
-        out_dir,
-        project="zimg",
-        version=version,
-        git_describe=git_describe,
-        raw_git_version=raw_git_version,
-        dry_run=False,
-        allow_non_tag_upload=args.allow_non_tag_upload,
-        skip_existing=args.allow_non_tag_upload,
-    )
-
-    if want_conda_upload:
-        conda_token = os.environ.get("ANACONDA_API_TOKEN", "").strip()
-        conda_build_exe = shutil.which("conda-build")
-        anaconda_exe = shutil.which("anaconda")
-
-        conda_source_dir: Path | None = None
-        conda_cmd: list[str] | None = None
-        conda_cmd_display: list[str] | None = None
-        conda_skip_reason: str | None = None
-        if not conda_token:
-            conda_skip_reason = "ANACONDA_API_TOKEN not set"
-        elif conda_build_exe is None:
-            conda_skip_reason = "conda-build not found on PATH"
-        elif anaconda_exe is None:
-            conda_skip_reason = "anaconda-client CLI not found on PATH"
-        else:
-            conda_source_dir = Path(common_dirs.ext_conda_build_dir())
-            conda_cmd = [
-                conda_build_exe,
-                "--token",
-                conda_token,
-                "--user",
-                _ANACONDA_OWNER,
-                "zimg-recipe",
-            ]
-            conda_cmd_display = [
-                "conda-build",
-                "--token",
-                "$ANACONDA_API_TOKEN",
-                "--user",
-                _ANACONDA_OWNER,
-                "zimg-recipe",
-            ]
-
-        if conda_skip_reason is None:
-            assert conda_cmd is not None
-            assert conda_source_dir is not None
-            assert anaconda_exe is not None
-            assert conda_build_exe is not None
-            wheel_path = wheels[0]
-            bioformats_jar_path = (
-                repo_root
-                / "src"
-                / "3rdparty"
-                / "build"
-                / "jars"
-                / "bioformats_package.jar"
-            )
-            logger.info("Staging conda zimg package from wheel: %s", wheel_path.name)
-            staged_dir = _stage_conda_zimg_from_wheel(
-                wheel_path=wheel_path,
-                conda_source_dir=conda_source_dir,
-                bioformats_jar_path=bioformats_jar_path,
-            )
-            logger.info("Staged conda package dir: %s", staged_dir)
-            for target_subdir in _conda_target_subdirs():
-                logger.info("Conda upload target subdir: %s", target_subdir)
-                _prune_anaconda_zimg_for_subdir(
-                    target_subdir=target_subdir,
-                    token=conda_token,
-                    anaconda_exe=anaconda_exe,
-                )
-                conda_env = os.environ.copy()
-                conda_env["CONDA_SUBDIR"] = target_subdir
-                _run_checked(
-                    conda_cmd,
-                    cwd=repo_root,
-                    env=conda_env,
-                    display_cmd=[
-                        f"CONDA_SUBDIR={target_subdir}",
-                        *conda_cmd_display,
-                    ],
-                )
-        else:
-            logger.warning("Skipping conda build/upload (%s)", conda_skip_reason)
-            if conda_skip_reason == "conda-build not found on PATH":
-                logger.warning(
-                    "To enable conda uploads, install `conda-build` and `anaconda-client` "
-                    "(e.g. in a conda env) and ensure `conda-build` is on PATH."
-                )
-            if conda_skip_reason == "anaconda-client CLI not found on PATH":
-                logger.warning(
-                    "To enable conda uploads, install `anaconda-client` in the active environment."
-                )
-    else:
-        assert conda_policy_skip_reason is not None
-        logger.info("Skipping conda build/upload (%s)", conda_policy_skip_reason)
+        logger.info("Conda phase: skipped")
 
     return 0
 
