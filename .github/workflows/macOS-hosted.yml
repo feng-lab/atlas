@@ -1,0 +1,190 @@
+name: macOS (GitHub-hosted)
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+env:
+  VULKAN_SDK_VERSION: 1.4.350.1
+  QT_VERSION: "6.9.3"
+  # Stock CPython for build, deployment, artifact publication, and wheel publication.
+  CI_PYTHON_VERSION: "3.14"
+  # Python used only after the stock-Python work, for the Conda package publication phase.
+  PYTHON_VERSION_MIN: "3.12"
+  HOMEBREW_NO_AUTO_UPDATE: "1"
+
+jobs:
+  ext-cache-probe:
+    runs-on: macos-15
+    outputs:
+      hit: ${{ steps.cache-extlibs-probe.outputs.cache-hit }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event_name == 'create' && github.event.ref || github.ref }}
+          fetch-depth: 1
+          sparse-checkout: |
+            util/atlas_deps_filelist.py
+          sparse-checkout-cone-mode: false
+
+      - name: Probe 3rdparty build cache
+        id: cache-extlibs-probe
+        uses: actions/cache/restore@v5
+        with:
+          path: src/3rdparty/build
+          key: ${{ runner.os }}-ext-${{ hashFiles('util/atlas_deps_filelist.py') }}
+          lookup-only: true
+
+  build-env:
+    needs: ext-cache-probe
+    if: ${{ needs.ext-cache-probe.outputs.hit != 'true' }}
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event_name == 'create' && github.event.ref || github.ref }}
+          fetch-depth: 1
+          submodules: recursive
+
+      - name: Load CI env (masked)
+        uses: ./.github/actions/load-dotenv
+        with:
+          dotenv: ${{ secrets.ATLAS_ENV_LOCAL }}
+
+      - name: Cache 3rdparty build
+        id: cache-extlibs
+        uses: actions/cache@v5
+        with:
+          path: src/3rdparty/build
+          key: ${{ runner.os }}-ext-${{ hashFiles('util/atlas_deps_filelist.py') }}
+
+      - name: Setup stock CPython
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.CI_PYTHON_VERSION }}
+
+      - name: Install Python dependencies for external libraries
+        if: ${{ steps.cache-extlibs.outputs.cache-hit != 'true' }}
+        shell: bash -l {0}
+        run: |
+          set -euo pipefail
+          python --version
+          python -m pip install --upgrade pip
+          python -m pip install --no-cache-dir requests packaging boto3
+
+      - name: Install external-library prerequisites
+        if: ${{ steps.cache-extlibs.outputs.cache-hit != 'true' }}
+        shell: bash -l {0}
+        run: |
+          set -euo pipefail
+          brew install p7zip git golang autoconf || true
+
+      - name: Build external libraries
+        if: ${{ steps.cache-extlibs.outputs.cache-hit != 'true' }}
+        shell: bash -l {0}
+        run: |
+          set -euo pipefail
+          python util/build_ext_libs.py all
+
+  build:
+    needs:
+      - ext-cache-probe
+      - build-env
+    if: ${{ always() && needs.ext-cache-probe.result == 'success' && (needs.build-env.result == 'success' || needs.build-env.result == 'skipped') }}
+    runs-on: macos-15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # Fetch full history and tags so git_describe works.
+          ref: ${{ github.event_name == 'create' && github.event.ref || github.ref }}
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Load CI env (masked)
+        uses: ./.github/actions/load-dotenv
+        with:
+          dotenv: ${{ secrets.ATLAS_ENV_LOCAL }}
+
+      - name: Restore 3rdparty build
+        uses: actions/cache@v5
+        with:
+          path: src/3rdparty/build
+          key: ${{ runner.os }}-ext-${{ hashFiles('util/atlas_deps_filelist.py') }}
+
+      - name: Setup stock CPython
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.CI_PYTHON_VERSION }}
+
+      - name: Install stock-Python build and publishing tools
+        shell: bash -l {0}
+        run: |
+          set -euo pipefail
+          python --version
+          python -m pip install --upgrade pip
+          python -m pip install --no-cache-dir aqtinstall requests packaging build twine boto3
+
+      - name: Install base packages
+        shell: bash -l {0}
+        run: |
+          set -euo pipefail
+          brew install p7zip git golang autoconf || true
+
+      - name: Cache Vulkan SDK
+        uses: actions/cache@v5
+        with:
+          path: ~/VulkanSDK/${{ env.VULKAN_SDK_VERSION }}
+          key: ${{ runner.os }}-vulkan-${{ env.VULKAN_SDK_VERSION }}
+
+      - name: Cache Qt
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/Qt/${{ env.QT_VERSION }}
+            ~/Qt/Tools/QtInstallerFramework
+          key: ${{ runner.os }}-qt-${{ env.QT_VERSION }}
+
+      - name: Cache Atlas test data
+        uses: actions/cache@v5
+        with:
+          enableCrossOsArchive: true
+          path: atlas_test_data
+          key: ${{ format('testdata-{0}', hashFiles('util/atlas_test_data_filelist.py')) }}
+          restore-keys: |
+            testdata-
+
+      - name: Build and publish with stock Python
+        uses: ./.github/actions/macos-build-common
+        with:
+          qt-version: ${{ env.QT_VERSION }}
+          vulkan-version: ${{ env.VULKAN_SDK_VERSION }}
+
+      - name: Setup Conda for zimg package publication
+        if: ${{ github.event_name != 'create' }}
+        uses: conda-incubator/setup-miniconda@v4
+        with:
+          auto-update-conda: true
+          activate-environment: ""
+          auto-activate: false
+          channels: defaults
+
+      - name: Publish zimg Conda package
+        if: ${{ github.event_name != 'create' }}
+        shell: bash -l {0}
+        run: |
+          set -euo pipefail
+          conda info
+          conda env remove -n atlas-ci -y || true
+          conda create -n atlas-ci -y "python=${PYTHON_VERSION_MIN}"
+          conda install -n atlas-ci -y anaconda-client conda-build
+          eval "$(conda shell.bash hook)"
+          conda activate atlas-ci
+          python --version
+          if [ -n "${ANACONDA_API_TOKEN:-}" ]; then
+            conda config --env --set anaconda_upload yes
+          fi
+          python util/publish_zimg.py --phase conda

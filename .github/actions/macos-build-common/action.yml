@@ -1,5 +1,5 @@
-name: macOS Build and Publish
-description: Install macOS build SDKs, build Atlas, publish artifacts, and optionally clean up on self-hosted runners.
+name: macOS Common Build and Publish
+description: Install macOS build SDKs, build Atlas, publish artifacts, and publish the zimg wheel.
 inputs:
   qt-version:
     description: Qt version to install
@@ -7,25 +7,9 @@ inputs:
   vulkan-version:
     description: Vulkan SDK version to install/validate
     required: true
-  enable-cache:
-    description: Enable actions/cache restore/save for build-time SDKs.
-    required: false
-    default: "true"
-  cache-test-data:
-    description: Restore/save atlas_test_data through GitHub cache before build_and_deploy_atlas.py.
-    required: false
-    default: "false"
 runs:
   using: composite
   steps:
-    - name: Cache Vulkan SDK (installed)
-      if: ${{ inputs.enable-cache == 'true' }}
-      uses: actions/cache@v5
-      with:
-        path: |
-          ~/VulkanSDK/${{ inputs.vulkan-version }}
-        key: ${{ runner.os }}-vulkan-${{ inputs.vulkan-version }}
-
     - name: Install Vulkan SDK (LunarG macOS CLI)
       shell: bash -l {0}
       env:
@@ -80,24 +64,12 @@ runs:
 
         ls -R "${INSTALL_ROOT}" || true
 
-    - name: Cache Qt (installed)
-      if: ${{ inputs.enable-cache == 'true' }}
-      uses: actions/cache@v5
-      with:
-        path: |
-          ~/Qt/${{ inputs.qt-version }}
-          ~/Qt/Tools/QtInstallerFramework
-        key: ${{ runner.os }}-qt-${{ inputs.qt-version }}
-
     - name: Install Qt 6 (aqt)
       shell: bash -l {0}
       env:
         QT_VERSION: ${{ inputs.qt-version }}
       run: |
         set -euo pipefail
-        eval "$(conda shell.bash hook)"
-        conda activate atlas-ci
-        python -m pip install --no-cache-dir aqtinstall
         mkdir -p "$HOME/Qt"
         if [ -d "$HOME/Qt/${QT_VERSION}/macos" ]; then
           echo "Qt already cached"
@@ -111,23 +83,10 @@ runs:
         fi
         ls -la "$HOME/Qt" || true
 
-    - name: Cache atlas test data
-      if: ${{ inputs.cache-test-data == 'true' }}
-      uses: actions/cache@v5
-      with:
-        enableCrossOsArchive: true
-        path: |
-          atlas_test_data
-        key: ${{ format('testdata-{0}', hashFiles('util/atlas_test_data_filelist.py')) }}
-        restore-keys: |
-          testdata-
-
     - name: Build and deploy Atlas
       shell: bash -l {0}
       run: |
         set -euo pipefail
-        eval "$(conda shell.bash hook)"
-        conda activate atlas-ci
         cd "$GITHUB_WORKSPACE"
         signingDir="${TMPDIR:-/tmp}/atlas-macos-signing-${GITHUB_RUN_ID:-local}-${GITHUB_RUN_ATTEMPT:-0}-${GITHUB_JOB:-job}"
         python util/macos_ci_signing.py run \
@@ -201,8 +160,6 @@ runs:
     - name: Publish artifacts to R2
       shell: bash -l {0}
       run: |
-        eval "$(conda shell.bash hook)"
-        conda activate atlas-ci
         set -euo pipefail
         cd "$GITHUB_WORKSPACE"
         python util/publish_r2.py publish-ifw --os macOS
@@ -210,30 +167,20 @@ runs:
     - name: Deploy artifacts (SSH)
       shell: bash -l {0}
       run: |
-        eval "$(conda shell.bash hook)"
-        conda activate atlas-ci
         set -euo pipefail
         cd "$GITHUB_WORKSPACE"
         python util/deploy_artifacts_ssh.py --os macOS
 
-    - name: Publish zimg (PyPI + conda)
+    - name: Publish zimg wheel (PyPI)
       shell: bash -l {0}
       run: |
-        eval "$(conda shell.bash hook)"
-        conda activate atlas-ci
         set -euo pipefail
         cd "$GITHUB_WORKSPACE"
-        python -m pip install --upgrade pip
-        # Ensure build backend is available (redundant if conda tooling already installed)
-        python -m pip install --no-cache-dir build twine
-        if [ -n "${ANACONDA_API_TOKEN:-}" ]; then
-          conda config --set anaconda_upload yes
-        fi
         signingDir="${TMPDIR:-/tmp}/atlas-macos-signing-${GITHUB_RUN_ID:-local}-${GITHUB_RUN_ATTEMPT:-0}-${GITHUB_JOB:-job}"
         python util/macos_ci_signing.py run \
           --work-dir "${signingDir}" \
           -- \
-          python util/publish_zimg.py
+          python util/publish_zimg.py --phase wheel
         ls -R python/zimg/dist
 
     - name: Cleanup macOS signing assets
@@ -241,8 +188,6 @@ runs:
       shell: bash -l {0}
       run: |
         set -euo pipefail
-        eval "$(conda shell.bash hook)"
-        conda activate atlas-ci
         cd "$GITHUB_WORKSPACE"
         signingDir="${TMPDIR:-/tmp}/atlas-macos-signing-${GITHUB_RUN_ID:-local}-${GITHUB_RUN_ATTEMPT:-0}-${GITHUB_JOB:-job}"
         python util/macos_ci_signing.py cleanup --work-dir "${signingDir}"

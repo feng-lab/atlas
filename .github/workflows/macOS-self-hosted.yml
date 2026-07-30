@@ -1,0 +1,182 @@
+name: macOS (self-hosted)
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+env:
+  VULKAN_SDK_VERSION: 1.4.350.1
+  QT_VERSION: "6.9.3"
+  # uv installs or reuses this managed interpreter, then creates a fresh per-run virtual environment.
+  CI_PYTHON_VERSION: "3.14"
+  # Python used only after the stock-Python work, for the Conda package publication phase.
+  PYTHON_VERSION_MIN: "3.12"
+  HOMEBREW_NO_AUTO_UPDATE: "1"
+
+jobs:
+  build:
+    runs-on: self-hosted
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event_name == 'create' && github.event.ref || github.ref }}
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Load CI env (masked)
+        uses: ./.github/actions/load-dotenv
+        with:
+          dotenv: ${{ secrets.ATLAS_ENV_LOCAL }}
+
+      - name: Prepare isolated stock Python
+        shell: bash -l {0}
+        run: |
+          set -euo pipefail
+          : "${RUNNER_TEMP:?RUNNER_TEMP must be set by the Actions runner}"
+          : "${GITHUB_PATH:?GITHUB_PATH must be set by the Actions runner}"
+
+          if ! command -v uv >/dev/null 2>&1; then
+            echo "Error: uv is required on the self-hosted runner." >&2
+            exit 1
+          fi
+
+          ciVenv="${RUNNER_TEMP%/}/atlas-python-${CI_PYTHON_VERSION}"
+          uv venv \
+            --clear \
+            --seed \
+            --managed-python \
+            --python "${CI_PYTHON_VERSION}" \
+            "${ciVenv}"
+
+          echo "${ciVenv}/bin" >> "${GITHUB_PATH}"
+          "${ciVenv}/bin/python" --version
+
+      - name: Install stock-Python build and publishing tools
+        shell: bash -l {0}
+        run: |
+          set -euo pipefail
+          python --version
+          python -m pip install --upgrade pip
+          python -m pip install --no-cache-dir aqtinstall requests packaging build twine boto3
+
+      - name: Install base packages
+        shell: bash -l {0}
+        run: |
+          set -euo pipefail
+          brew install p7zip git golang autoconf || true
+
+      - name: Restore local 3rdparty build cache
+        id: cache-extlibs
+        shell: bash -l {0}
+        env:
+          CACHE_KEY: ${{ runner.os }}-ext-${{ hashFiles('util/atlas_deps_filelist.py') }}
+          CACHE_PATH_REL: src/3rdparty/build
+        run: |
+          set -euo pipefail
+
+          cacheRoot="$HOME/Library/Caches/atlas/gha-cache"
+          if [ -n "${GITHUB_REPOSITORY:-}" ]; then
+            cacheRoot="${cacheRoot}/${GITHUB_REPOSITORY}"
+          fi
+
+          archive="${cacheRoot}/${CACHE_KEY}.tar.gz"
+
+          mkdir -p "${cacheRoot}"
+
+          if [ -f "${archive}" ]; then
+            echo "Restoring local extlibs cache for '${CACHE_PATH_REL}' from: ${archive}"
+            rm -rf -- "${GITHUB_WORKSPACE%/}/${CACHE_PATH_REL}" 2>/dev/null || true
+            if tar -C "${GITHUB_WORKSPACE%/}" -xzf "${archive}"; then
+              echo "cache-hit=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "Warning: failed to restore local extlibs cache archive; rebuilding and re-packaging." >&2
+              rm -f -- "${archive}" 2>/dev/null || true
+              echo "cache-hit=false" >> "$GITHUB_OUTPUT"
+            fi
+          else
+            echo "Local extlibs cache miss for key: ${CACHE_KEY}"
+            echo "cache-hit=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build external libraries
+        if: ${{ steps.cache-extlibs.outputs.cache-hit != 'true' }}
+        shell: bash -l {0}
+        run: |
+          set -euo pipefail
+
+          cd "$GITHUB_WORKSPACE"
+          python util/build_ext_libs.py all
+
+      - name: Save local 3rdparty build cache
+        if: ${{ success() && steps.cache-extlibs.outputs.cache-hit != 'true' }}
+        shell: bash -l {0}
+        env:
+          CACHE_KEY: ${{ runner.os }}-ext-${{ hashFiles('util/atlas_deps_filelist.py') }}
+          CACHE_PATH_REL: src/3rdparty/build
+        run: |
+          set -euo pipefail
+
+          src="${GITHUB_WORKSPACE%/}/${CACHE_PATH_REL}"
+          if [ ! -d "${src}" ]; then
+            echo "Error: expected external deps output directory does not exist: ${src}" >&2
+            exit 1
+          fi
+
+          cacheRoot="$HOME/Library/Caches/atlas/gha-cache"
+          if [ -n "${GITHUB_REPOSITORY:-}" ]; then
+            cacheRoot="${cacheRoot}/${GITHUB_REPOSITORY}"
+          fi
+          mkdir -p "${cacheRoot}"
+
+          archive="${cacheRoot}/${CACHE_KEY}.tar.gz"
+          tmpArchive="${archive}.tmp.$$"
+
+          echo "Saving local extlibs cache archive: ${archive}"
+          tar -C "${GITHUB_WORKSPACE%/}" -czf "${tmpArchive}" "${CACHE_PATH_REL}"
+          mv -f "${tmpArchive}" "${archive}"
+
+      - name: Ensure GitHub CLI
+        if: ${{ github.event_name == 'create' && github.ref_type == 'tag' && startsWith(github.event.ref, 'v') }}
+        shell: bash -l {0}
+        run: |
+          if ! command -v gh >/dev/null 2>&1; then
+            if command -v brew >/dev/null 2>&1; then
+              brew install gh
+            else
+              echo "Error: gh CLI is required but Homebrew is not available on this self-hosted runner." >&2
+              echo "Please install GitHub CLI from https://cli.github.com/ and ensure it is on PATH." >&2
+              exit 1
+            fi
+          fi
+
+      - name: Build and publish with stock Python
+        uses: ./.github/actions/macos-build-common
+        with:
+          qt-version: ${{ env.QT_VERSION }}
+          vulkan-version: ${{ env.VULKAN_SDK_VERSION }}
+
+      - name: Publish zimg Conda package
+        if: ${{ github.event_name != 'create' }}
+        shell: bash -l {0}
+        run: |
+          set -euo pipefail
+          if ! command -v conda >/dev/null 2>&1; then
+            echo "Error: a preinstalled Conda executable is required on the self-hosted runner." >&2
+            exit 1
+          fi
+
+          eval "$(conda shell.bash hook)"
+          conda info
+          conda env remove -n atlas-ci -y || true
+          conda create -n atlas-ci -y "python=${PYTHON_VERSION_MIN}"
+          conda install -n atlas-ci -y anaconda-client conda-build
+          conda activate atlas-ci
+          python --version
+          if [ -n "${ANACONDA_API_TOKEN:-}" ]; then
+            conda config --env --set anaconda_upload yes
+          fi
+          python util/publish_zimg.py --phase conda

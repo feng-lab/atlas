@@ -508,7 +508,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { Write-Error "Conda Python version check failed"; exit $LASTEXITCODE }
 
           if ($env:ANACONDA_API_TOKEN) {
-            conda config --set anaconda_upload yes
+            conda config --env --set anaconda_upload yes
             if ($LASTEXITCODE -ne 0) { Write-Error "conda config failed"; exit $LASTEXITCODE }
           }
           python util/publish_zimg.py --phase conda

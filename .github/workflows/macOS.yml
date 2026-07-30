@@ -24,16 +24,7 @@ permissions:
   contents: read
 
 env:
-  # Pin a Vulkan SDK version for the ~/VulkanSDK layout
-  VULKAN_SDK_VERSION: 1.4.350.1
-  # Centralize Qt version to keep parity with Linux/Windows CI
-  QT_VERSION: "6.9.3"
-  # Minimum Python version used by CI build environments
-  PYTHON_VERSION_MIN: "3.12"
-  # CI stability: disable Homebrew auto-update (avoids transient network failures during `brew install`).
-  HOMEBREW_NO_AUTO_UPDATE: "1"
-  # Pipeline mode: "github" (split build-env/build) or "self-hosted" (combined).
-  # Set this value to switch behavior for all triggers, including manual workflow_dispatch.
+  # Central switch for all triggers: "github" or "self-hosted".
   MACOS_PIPELINE_MODE: github
 
 jobs:
@@ -44,6 +35,7 @@ jobs:
       mode: ${{ steps.set-mode.outputs.mode }}
     steps:
       - id: set-mode
+        shell: bash
         run: |
           mode="${MACOS_PIPELINE_MODE}"
           if [ -z "$mode" ]; then
@@ -51,134 +43,18 @@ jobs:
           fi
           echo "mode=$mode" >> "$GITHUB_OUTPUT"
 
-  selfhosted-combined:
+  github-hosted:
     needs: determine-mode
-    if: ${{ (github.event_name != 'create' || github.ref_type == 'tag') && needs.determine-mode.outputs.mode == 'self-hosted' }}
-    runs-on: self-hosted
+    if: ${{ needs.determine-mode.outputs.mode == 'github' }}
     permissions:
       contents: write
-    steps:
-      - uses: actions/checkout@v5
-        with:
-          ref: ${{ github.event_name == 'create' && github.event.ref || github.ref }}
-          fetch-depth: 0
-          submodules: recursive
+    uses: ./.github/workflows/macOS-hosted.yml
+    secrets: inherit
 
-      - name: Load CI env (masked)
-        uses: ./.github/actions/load-dotenv
-        with:
-          dotenv: ${{ secrets.ATLAS_ENV_LOCAL }}
-
-      - name: Prepare macOS environment
-        uses: ./.github/actions/macos-env
-        with:
-          mode: combined
-          enable-cache: "false"
-          python-version: ${{ env.PYTHON_VERSION_MIN }}
-
-      - name: Ensure GitHub CLI
-        if: github.event_name == 'create' && github.ref_type == 'tag' && startsWith(github.event.ref, 'v')
-        shell: bash -l {0}
-        run: |
-          if ! command -v gh >/dev/null 2>&1; then
-            if command -v brew >/dev/null 2>&1; then
-              brew install gh
-            else
-              echo "Error: gh CLI is required but Homebrew is not available on this self-hosted runner." >&2
-              echo "Please install GitHub CLI from https://cli.github.com/ and ensure it is on PATH." >&2
-              exit 1
-            fi
-          fi
-
-      - name: Build and publish
-        uses: ./.github/actions/macos-build
-        with:
-          qt-version: ${{ env.QT_VERSION }}
-          vulkan-version: ${{ env.VULKAN_SDK_VERSION }}
-          enable-cache: "false"
-
-  ext-cache-probe:
+  self-hosted:
     needs: determine-mode
-    if: ${{ (github.event_name != 'create' || github.ref_type == 'tag') && needs.determine-mode.outputs.mode == 'github' }}
-    runs-on: macos-15
-    outputs:
-      hit: ${{ steps.cache-extlibs-probe.outputs.cache-hit }}
-    steps:
-      - uses: actions/checkout@v5
-        with:
-          ref: ${{ github.event_name == 'create' && github.event.ref || github.ref }}
-          fetch-depth: 1
-          sparse-checkout: |
-            util/atlas_deps_filelist.py
-          sparse-checkout-cone-mode: false
-
-      - name: Probe 3rdparty build cache
-        id: cache-extlibs-probe
-        uses: actions/cache/restore@v5
-        with:
-          path: |
-            src/3rdparty/build
-          key: ${{ runner.os }}-ext-${{ hashFiles('util/atlas_deps_filelist.py') }}
-          lookup-only: true
-
-  build-env:
-    needs:
-      - determine-mode
-      - ext-cache-probe
-    if: ${{ (github.event_name != 'create' || github.ref_type == 'tag') && needs.determine-mode.outputs.mode == 'github' && needs.ext-cache-probe.outputs.hit != 'true' }}
-    runs-on: macos-15
-    steps:
-      - uses: actions/checkout@v5
-        with:
-          ref: ${{ github.event_name == 'create' && github.event.ref || github.ref }}
-          fetch-depth: 1
-          submodules: recursive
-
-      - name: Load CI env (masked)
-        uses: ./.github/actions/load-dotenv
-        with:
-          dotenv: ${{ secrets.ATLAS_ENV_LOCAL }}
-
-      - name: Prepare macOS environment
-        uses: ./.github/actions/macos-env
-        with:
-          mode: extlibs
-          enable-cache: "true"
-          python-version: ${{ env.PYTHON_VERSION_MIN }}
-
-  build:
-    needs:
-      - determine-mode
-      - ext-cache-probe
-      - build-env
-    if: ${{ always() && (github.event_name != 'create' || github.ref_type == 'tag') && needs.determine-mode.outputs.mode == 'github' && needs.ext-cache-probe.result == 'success' && (needs.build-env.result == 'success' || needs.build-env.result == 'skipped') }}
-    runs-on: macos-15
+    if: ${{ needs.determine-mode.outputs.mode == 'self-hosted' }}
     permissions:
       contents: write
-    steps:
-      - uses: actions/checkout@v5
-        with:
-          # Fetch full history and tags so git_describe works
-          ref: ${{ github.event_name == 'create' && github.event.ref || github.ref }}
-          fetch-depth: 0
-          submodules: recursive
-
-      - name: Load CI env (masked)
-        uses: ./.github/actions/load-dotenv
-        with:
-          dotenv: ${{ secrets.ATLAS_ENV_LOCAL }}
-
-      - name: Prepare macOS environment
-        uses: ./.github/actions/macos-env
-        with:
-          mode: build
-          enable-cache: "true"
-          python-version: ${{ env.PYTHON_VERSION_MIN }}
-
-      - name: Build and publish
-        uses: ./.github/actions/macos-build
-        with:
-          qt-version: ${{ env.QT_VERSION }}
-          vulkan-version: ${{ env.VULKAN_SDK_VERSION }}
-          enable-cache: "true"
-          cache-test-data: "true"
+    uses: ./.github/workflows/macOS-self-hosted.yml
+    secrets: inherit
