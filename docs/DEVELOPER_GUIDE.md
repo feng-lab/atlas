@@ -33,6 +33,7 @@ ROI Mask Import
 Key References
 
 - Image Paging & Progressive Rendering: [Atlas_Image_Paging_and_Progressive_Rendering.md](Atlas_Image_Paging_and_Progressive_Rendering.md)
+- Vulkan Multi-GPU Tile Rendering Design: [VULKAN_MULTI_GPU_DESIGN.md](VULKAN_MULTI_GPU_DESIGN.md)
 - Agents Overview and Tools: [AGENTS_GUIDE.md](AGENTS_GUIDE.md)
 
 Volume Ray Setup
@@ -443,6 +444,7 @@ Lookup Tables (LUTs)
   - Vulkan scratch reuse policy: completed scratch slots are reusable slot inventory. The first-order goal is reuse parity with OpenGL: Vulkan should reuse compatible free scratch slots before allocating new ones, including reusing larger BlockID attachment sets when the request needs fewer attachments. If no free slot is visible but a compatible slot has a deferred release pending, acquisition pumps the completion safe point and rescans before growing.
   - Vulkan scratch residency: scratch leases keep stable `ZVulkanTexture` object identity, but their backing `VkImage` allocations are demand-resident. Acquisition may return non-resident logical textures; `ZVulkanLinearScript` extracts the next submission's draw-pass image working set from attachments, external image uses, and shader-hook sampled images, then asks the scratch pool to make that hot set resident before descriptor priming/recording. Backend texture operations such as readback and texture clear/copy prepare and pin their own command textures internally, so compositor/renderer call sites do not carry residency metadata. Under explicit strict residency budgets, existing script node/pass boundaries become residency safe points: Atlas waits there when needed so cold scratch backings can be host-backed and evicted between passes. Strict mode does not split draw payloads or rewrite the render plan; if one existing pass hot set cannot fit, it fails with diagnostics. Default uncapped rendering keeps the existing coalesced path.
   - Cold scratch eviction is content-preserving when the slot is still logically leased: after the previous submission fence completes, the pool copies resident attachment contents to host memory, releases the `VkImage` backing, and restores the image from that host backup when a later pass declares that contents are required. Clear/dont-care attachment writes may restore only backing memory because prior contents are not required. If a later pass requires contents and no host/source backup exists, Atlas fails loudly instead of drawing stale data.
+  - Linear-script attachment use must describe the first semantic use, not just eventual reads. A target that will be loaded or sampled later in a submission needs either valid preserved contents or an earlier declared writer. In particular, when an empty scene has no visible background and no renderable geometry, the Vulkan compositor records a real color/depth clear command with `contentsRequired=false`; an empty `script.raster(...)` callback is not sufficient because raster nodes without batches are skipped. This applies only to the geometry-capable base-scene call. Background-only OIT staging does not pay for the extra clear because its resolve pass owns target initialization.
   - Non-progressive capture/export does not wait between Vulkan filters just to trim scratch. Persistent filter outputs remain leased for the compositor, and reusable scratch texture objects are preserved. If memory pressure or a strict budget requires it, residency recovery evicts cold leased backing memory only at submission safe points while preserving scratch slot and `ZVulkanTexture` identity.
   - When persistent Vulkan compositor targets are resized (output targets, picking target, DDP/WA/WB transparency targets), the compositor waits for the released old target to reach the completion safe point before acquiring the replacement. This prevents old and new large render targets from coexisting during tiled export edge/full-tile size changes.
   - Tiled export also calls the Vulkan scratch reclaim path at tile boundaries. This waits for in-flight tile work to reach completion safe points so released scratch slots can be reused across tiles; active/current-tile resources remain protected.
@@ -1144,6 +1146,7 @@ Invalidation & Progressive Rendering
   - Global camera/viewport changes and engine output-size changes
   - Per-filter `updateSize(targetSize)` calls (size handling, then invalidates all results)
 - Image filters request cancellation on invalidate and defer renderer resets to the next `process()` to avoid mutating state mid-pass.
+- A render attempt that throws does not inherit completion from the preceding frame: the engine resets its internal progress to a non-complete value, reports the rendering error, and does not emit benchmark completion markers for that attempt. The UI still receives its terminal progress-indicator value so an error does not leave the progress controls open.
 
 Debug reason plumbing (debug builds only)
 
@@ -1484,6 +1487,10 @@ Additional Architecture Notes
 
 Vulkan device selection
 
+- Each `Z3DRenderingEngine` currently creates exactly one logical Vulkan device. The proposed direct-single-device,
+  tile-only in-process Vulkan multi-device architecture for both interactive rendering and export is documented in
+  [VULKAN_MULTI_GPU_DESIGN.md](VULKAN_MULTI_GPU_DESIGN.md). Components and command-line controls described as proposed or
+  future work there are not yet implemented.
 - On initialization, all physical devices are enumerated and logged. Devices are sorted by preference: discrete > integrated
   > virtual > CPU, then larger device-local memory capacity, then higher API version. Otherwise equal-ranked devices use
   their immutable Vulkan device UUID as the final ascending tie-break, so independently launched export workers resolve the

@@ -6169,6 +6169,25 @@ void Z3DRendererVulkanBackend::clearColorTextureToShaderReadOnly(ZVulkanTexture&
   texture.setDescriptorLayout(vk::ImageLayout::eShaderReadOnlyOptimal);
 }
 
+void Z3DRendererVulkanBackend::clearDepthTextureToReadOnly(ZVulkanTexture& texture,
+                                                           const vk::ClearDepthStencilValue& clear,
+                                                           const vk::ImageSubresourceRange& range,
+                                                           std::string_view debugLabel)
+{
+  CHECK(range.aspectMask == vk::ImageAspectFlagBits::eDepth)
+    << "Vulkan depth-only clear requires exactly the depth aspect";
+  prepareTextureForCommandUse(texture, TextureCommandUse::DiscardAndWrite, debugLabel);
+
+  auto& cmd = commandBuffer();
+  texture.transitionLayout(cmd, texture.layout(), vk::ImageLayout::eTransferDstOptimal, range.aspectMask);
+  cmd.clearDepthStencilImage(texture.image(), vk::ImageLayout::eTransferDstOptimal, clear, range);
+  texture.transitionLayout(cmd,
+                           vk::ImageLayout::eTransferDstOptimal,
+                           vk::ImageLayout::eDepthReadOnlyOptimal,
+                           range.aspectMask);
+  texture.setDescriptorLayout(vk::ImageLayout::eDepthReadOnlyOptimal);
+}
+
 bool Z3DRendererVulkanBackend::pinExternalResidencyResourceForActiveSubmission(const void* key,
                                                                                std::function<void()> release)
 {

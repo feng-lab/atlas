@@ -3308,9 +3308,11 @@ void Z3DCompositor::recordSceneSegmentsVulkan(const std::vector<Z3DBoundedFilter
   const glm::uvec2 targetSize = sceneOutLease.descriptor.size;
 
   ZVulkanLinearScript::SegmentHandle segLast{};
+  const bool backgroundDrawn = drawBackground && m_showBackground.get();
+  const bool haveGeometry = !opaqueFilters.empty() || !transparentFilters.empty();
 
   // Background first (mirrors GL: draw background, then blend geometry over it).
-  if (drawBackground && m_showBackground.get()) {
+  if (backgroundDrawn) {
     vlogVulkanLease("background", sceneOutLease);
     segLast = script.raster("background", {}, [&]() {
       // Set initial surface with optional clear at start. This determines load/store
@@ -3322,20 +3324,70 @@ void Z3DCompositor::recordSceneSegmentsVulkan(const std::vector<Z3DBoundedFilter
                                                    StoreOp::Store);
       m_rendererBase.renderVulkan(eye, m_backgroundRenderer);
     });
+  } else if (clearAtStart && includeGeometry && !haveGeometry) {
+    // GL always clears an empty scene target. Vulkan must record a real command
+    // here: a raster callback with no batches is skipped by the linear script and
+    // therefore cannot initialize a cold/recreated ping-pong target.
+    CHECK_GT(sceneOutLease.attachments, 0u) << "Empty Vulkan scene target requires a color attachment";
+
+    std::vector<ZVulkanTexture*> colorTextures;
+    colorTextures.reserve(sceneOutLease.attachments);
+    std::vector<Z3DScratchResourcePool::VulkanScratchTextureUse> scratchWrites;
+    scratchWrites.reserve(static_cast<size_t>(sceneOutLease.attachments) + 1u);
+    for (uint32_t attachment = 0; attachment < sceneOutLease.attachments; ++attachment) {
+      auto* colorTexture = sceneOutLease.colorAttachment(attachment);
+      CHECK(colorTexture != nullptr) << "Empty Vulkan scene target is missing color attachment " << attachment;
+      colorTextures.push_back(colorTexture);
+      scratchWrites.push_back(
+        Z3DScratchResourcePool::VulkanScratchTextureUse{.texture = colorTexture, .contentsRequired = false});
+    }
+
+    auto* depthTexture = sceneOutLease.depthAttachmentTexture();
+    CHECK(depthTexture != nullptr) << "Empty Vulkan scene target requires a depth attachment";
+    scratchWrites.push_back(
+      Z3DScratchResourcePool::VulkanScratchTextureUse{.texture = depthTexture, .contentsRequired = false});
+
+    auto clearEmptyScene = [colorTextures = std::move(colorTextures), depthTexture](Z3DRendererVulkanBackend& backend) {
+      const vk::ClearColorValue clearColor = vk::ClearColorValue(std::array<float, 4>{0.f, 0.f, 0.f, 0.f});
+      for (auto* colorTexture : colorTextures) {
+        CHECK(colorTexture != nullptr);
+        const auto colorRange = vk::ImageSubresourceRange{vk::ImageAspectFlagBits::eColor,
+                                                          0u,
+                                                          colorTexture->mipLevels(),
+                                                          0u,
+                                                          colorTexture->arrayLayers()};
+        backend.clearColorTextureToShaderReadOnly(*colorTexture, clearColor, colorRange, "scene_empty_clear");
+      }
+
+      CHECK(depthTexture != nullptr);
+      const auto depthRange = vk::ImageSubresourceRange{vk::ImageAspectFlagBits::eDepth,
+                                                        0u,
+                                                        depthTexture->mipLevels(),
+                                                        0u,
+                                                        depthTexture->arrayLayers()};
+      backend.clearDepthTextureToReadOnly(*depthTexture,
+                                          vk::ClearDepthStencilValue(1.0f, 0u),
+                                          depthRange,
+                                          "scene_empty_clear");
+    };
+
+    segLast = script.commandsInSubmissionWithScratchUses(
+      "scene_empty_clear",
+      {},
+      std::span<const Z3DScratchResourcePool::VulkanScratchTextureUse>(scratchWrites.data(), scratchWrites.size()),
+      clearEmptyScene);
   }
 
   if (!includeGeometry) {
     return;
   }
 
-  const bool haveGeometry = (!opaqueFilters.empty() || !transparentFilters.empty());
   if (!haveGeometry) {
     return;
   }
 
   // Geometry should always clear depth, and should clear color only when the
   // caller asked for it and we did not already draw the background.
-  const bool backgroundDrawn = (drawBackground && m_showBackground.get());
   const LoadOp geomColorLoad = (clearAtStart && !backgroundDrawn) ? LoadOp::Clear : LoadOp::Load;
   vlogVulkanLease("geometry", sceneOutLease);
 

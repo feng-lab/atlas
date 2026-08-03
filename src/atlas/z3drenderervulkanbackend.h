@@ -739,6 +739,10 @@ public:
                                          const vk::ClearColorValue& clear,
                                          const vk::ImageSubresourceRange& range,
                                          std::string_view debugLabel = {});
+  void clearDepthTextureToReadOnly(class ZVulkanTexture& texture,
+                                   const vk::ClearDepthStencilValue& clear,
+                                   const vk::ImageSubresourceRange& range,
+                                   std::string_view debugLabel = {});
   void notifyPipelineCreated();
   void notifyPipelineBound(vk::Pipeline pipeline);
 

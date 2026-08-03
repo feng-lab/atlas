@@ -2224,7 +2224,15 @@ void Z3DRenderingEngine::renderFast(bool stereo)
     return;
   }
   catch (const ZException& e) {
-    LOG(INFO) << e.what();
+    m_progress = 0.0;
+    const auto error = fmt::format("3D rendering failed: {}", e.what());
+    LOG(ERROR) << error;
+    reportRenderingError(error);
+    // progressChanged(100) terminates the UI progress indicator; m_progress
+    // remains non-complete and no benchmark completion marker is emitted.
+    Q_EMIT progressChanged(100);
+    maybeStartVulkanCompletionPolling();
+    return;
   }
 
   if (absl::GetFlag(FLAGS_atlas_log_benchmark_render_timings)) {
@@ -2253,6 +2261,7 @@ void Z3DRenderingEngine::render(bool stereo)
 {
   const auto benchmarkStart = std::chrono::steady_clock::now();
   CHECK(!Z3DRenderGlobalState::instance().hasCancellationSource());
+  bool renderFailed = false;
 
   VLOG(1) << "render";
   auto completionPollGuard = folly::makeGuard([this]() {
@@ -2283,16 +2292,20 @@ void Z3DRenderingEngine::render(bool stereo)
     QCoreApplication::postEvent(this, new QEvent(QEvent::UpdateRequest), Qt::LowEventPriority);
   }
   catch (const ZException& e) {
-    LOG(INFO) << e.what();
+    m_progress = 0.0;
+    const auto error = fmt::format("3D rendering failed: {}", e.what());
+    LOG(ERROR) << error;
+    reportRenderingError(error);
+    renderFailed = true;
   }
-  if (absl::GetFlag(FLAGS_atlas_log_benchmark_render_timings) && m_progress >= 1.0) {
+  if (!renderFailed && absl::GetFlag(FLAGS_atlas_log_benchmark_render_timings) && m_progress >= 1.0) {
     const double elapsedMs =
       std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - benchmarkStart).count();
     LOG(INFO) << "ATLAS_BENCHMARK_RENDER_FINISHED"
               << " elapsed_ms=" << elapsedMs << " progress=" << m_progress << " source=render";
   }
   Q_EMIT progressChanged(100);
-  if (startedDeferredErrorFrame && m_progress >= 1.0) {
+  if (!renderFailed && startedDeferredErrorFrame && m_progress >= 1.0) {
     reportDeferredRenderingErrorsIfAny();
   }
   Z3DRenderGlobalState::instance().resetCancellationSource();
