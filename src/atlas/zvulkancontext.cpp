@@ -394,7 +394,16 @@ VKAPI_ATTR VkBool32 VKAPI_CALL debugUtilsMessengerCallback(vk::DebugUtilsMessage
 
 // ZVulkanContext implementation
 ZVulkanContext::ZVulkanContext()
+  : ZVulkanContext(std::optional<DeviceSelection>{})
+{}
+
+ZVulkanContext::ZVulkanContext(DeviceSelection selection)
+  : ZVulkanContext(std::optional<DeviceSelection>{std::move(selection)})
+{}
+
+ZVulkanContext::ZVulkanContext(std::optional<DeviceSelection> exactSelection)
   : m_frameSlotCount(configuredFrameSlotCount())
+  , m_exactSelection(std::move(exactSelection))
 {
   try {
     // Initialize Vulkan context
@@ -871,23 +880,34 @@ void ZVulkanContext::pickPhysicalDevice()
   // Move sorted devices into member vector
   m_physicalDevices.clear();
   m_deviceSupports.clear();
+  m_deviceSelections.clear();
   m_physicalDevices.reserve(infos.size());
   m_deviceSupports.reserve(infos.size());
+  m_deviceSelections.reserve(infos.size());
   for (auto& di : infos) {
+    const size_t preferenceIndex = m_physicalDevices.size();
     m_physicalDevices.emplace_back(std::move(di.device));
     m_deviceSupports.emplace_back(std::move(di.support));
+    m_deviceSelections.push_back({.preferenceIndex = preferenceIndex, .expectedDeviceUuid = di.preference.deviceUuid});
   }
+  CHECK_EQ(m_physicalDevices.size(), m_deviceSupports.size());
+  CHECK_EQ(m_deviceSupports.size(), m_deviceSelections.size());
 
-  // The explicit index is a preference. If it cannot be honored, select the
-  // first fully compatible device and make the fallback visible in the log.
-  const int32_t preferredDeviceIndex = absl::GetFlag(FLAGS_atlas_vk_device_index);
-  const std::optional<size_t> requestedIndex =
-    preferredDeviceIndex >= 0 ? std::optional<size_t>(static_cast<size_t>(preferredDeviceIndex)) : std::nullopt;
-  if (preferredDeviceIndex < -1) {
-    LOG(WARNING) << fmt::format("Preferred Vulkan device index {} is invalid; using automatic device selection",
-                                preferredDeviceIndex);
+  ZVulkanDeviceSupport::Selection selection;
+  if (m_exactSelection.has_value()) {
+    selection = ZVulkanDeviceSupport::selectExact(m_deviceSupports, m_deviceSelections, *m_exactSelection);
+  } else {
+    // The command-line index is a preference. If it cannot be honored, select
+    // the first fully compatible device and make the fallback visible in the log.
+    const int32_t preferredDeviceIndex = absl::GetFlag(FLAGS_atlas_vk_device_index);
+    const std::optional<size_t> requestedIndex =
+      preferredDeviceIndex >= 0 ? std::optional<size_t>(static_cast<size_t>(preferredDeviceIndex)) : std::nullopt;
+    if (preferredDeviceIndex < -1) {
+      LOG(WARNING) << fmt::format("Preferred Vulkan device index {} is invalid; using automatic device selection",
+                                  preferredDeviceIndex);
+    }
+    selection = ZVulkanDeviceSupport::select(m_deviceSupports, requestedIndex);
   }
-  auto selection = ZVulkanDeviceSupport::select(m_deviceSupports, requestedIndex);
   if (!selection.warning.empty()) {
     LOG(WARNING) << selection.warning;
   }

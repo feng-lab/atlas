@@ -560,12 +560,6 @@ void Z3DRenderingEngine::ProfileFilterWrapper::afterNetworkProcess()
   STOP_AND_LOG(m_benchTimer)
 }
 
-void Z3DRenderingEngine::ScratchPoolDeleter::operator()(Z3DScratchResourcePool* pool) const
-{
-  Z3DRenderGlobalState::instance().resetScratchPool();
-  delete pool;
-}
-
 Z3DRenderingEngine::Z3DRenderingEngine(ZDoc& doc, QObject* parent)
   : QObject(parent)
   , m_doc(doc)
@@ -1252,8 +1246,7 @@ void Z3DRenderingEngine::init()
   // Scratch pool must be configured for the selected startup backend before any
   // filters are constructed (compositor allocates persistent output targets).
   if (!m_scratchPool) {
-    m_scratchPool.reset(new Z3DScratchResourcePool(startupBackend));
-    Z3DRenderGlobalState::instance().setScratchPool(m_scratchPool.get());
+    m_scratchPool = std::make_unique<Z3DScratchResourcePool>(startupBackend);
   } else {
     m_scratchPool->setDefaultBackend(startupBackend);
   }
@@ -1332,7 +1325,7 @@ void Z3DRenderingEngine::init()
     });
   }
 
-  m_globalParas = std::make_unique<Z3DGlobalParameters>(startupBackend);
+  m_globalParas = std::make_unique<Z3DGlobalParameters>(*m_scratchPool, startupBackend);
 
   connect(&m_globalParas->renderBackend, &ZParameter::valueChanged, this, [this]() {
     handleRenderBackendChanged();
@@ -2445,8 +2438,7 @@ void Z3DRenderingEngine::takeFixedSizeScreenShotWithoutResetCanvasSizePrivate(
           // Tiled export varies scratch sizes between full and edge tiles. Once
           // tile pixels are copied to CPU memory, drain completed Vulkan leases
           // so old edge/full-size scratch slots can be reused across tiles.
-          Z3DRenderGlobalState::instance().scratchPool().reclaimVulkanScratchMemory(
-            Z3DScratchResourcePool::VulkanScratchReclaimMode::WaitForIdle);
+          m_scratchPool->reclaimVulkanScratchMemory(Z3DScratchResourcePool::VulkanScratchReclaimMode::WaitForIdle);
         }
       }
     }
@@ -2582,8 +2574,7 @@ void Z3DRenderingEngine::takeFixedSizeScreenShotWithoutResetCanvasSizeByTilePriv
     // writes one tile to disk. Release fence-completed Vulkan scratch now so a
     // long tiled sequence can reuse free scratch slots without destroying
     // bindless identities.
-    Z3DRenderGlobalState::instance().scratchPool().reclaimVulkanScratchMemory(
-      Z3DScratchResourcePool::VulkanScratchReclaimMode::WaitForIdle);
+    m_scratchPool->reclaimVulkanScratchMemory(Z3DScratchResourcePool::VulkanScratchReclaimMode::WaitForIdle);
   }
 
   if (startedDeferredErrorFrame) {
@@ -2727,7 +2718,7 @@ void Z3DRenderingEngine::applyBackendSwitch()
   });
 
   const auto backend = static_cast<RenderBackend>(m_globalParas->renderBackend.associatedData());
-  std::scoped_lock lock(targetSwitchMutex());
+  std::unique_lock lock(targetSwitchMutex());
   const RenderBackend sourceBackend = m_compositor->rendererBase().activeBackend();
   CHECK(backend == RenderBackend::OpenGL || backend == RenderBackend::Vulkan);
   CHECK(sourceBackend == RenderBackend::OpenGL || sourceBackend == RenderBackend::Vulkan);
@@ -2843,7 +2834,7 @@ void Z3DRenderingEngine::applyBackendSwitch()
 
   // Switch renderer backends for compositor + connected filters (this will idle Vulkan via preBackendSwitch)
   VLOG(1) << "Switching compositor and pipeline filters to new backend";
-  m_compositor->switchBackend(backend);
+  m_compositor->switchBackend(backend, lock);
 
   // Propagate backend change to all filters in the current pipeline. The
   // compositor is already switched above, so skip it here.

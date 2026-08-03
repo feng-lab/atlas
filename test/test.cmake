@@ -130,6 +130,7 @@ add_gtest_executable(ztupleliketest)
 # Atlas-side tests
 
 add_atlas_gtest_executable(zcurlruntimetest)
+add_atlas_gtest_executable(z3dfiltertest)
 
 # Vulkan RAII pipeline recorder debug checks (debug-only assertions in code)
 # This test only exercises header + a few .cpp symbols; there is no GPU work.

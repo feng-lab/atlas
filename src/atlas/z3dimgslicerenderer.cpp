@@ -155,7 +155,7 @@ std::vector<ImgSlicePayload> Z3DImgSliceRenderer::buildVulkanStagePayloads(Z3DEy
   }
   CHECK(m_outputSize.x > 0u && m_outputSize.y > 0u) << "Vulkan img slice output size is zero.";
 
-  auto& scratchPool = Z3DRenderGlobalState::instance().scratchPool();
+  auto& scratchPool = m_rendererBase.scratchPool();
 
   ImgSlicePayload common;
   common.streamKey = static_cast<uint64_t>(reinterpret_cast<uintptr_t>(this));
@@ -182,18 +182,6 @@ std::vector<ImgSlicePayload> Z3DImgSliceRenderer::buildVulkanStagePayloads(Z3DEy
 
   const uint32_t channelCount = static_cast<uint32_t>(m_img->numChannels());
   if (channelCount > 1u) {
-    // Helper to create a non-owning shared_ptr "view" of a persistent lease to avoid double-release.
-    auto shareLease = [](Z3DScratchResourcePool::RenderTargetLease& src) {
-      auto view = std::make_shared<Z3DScratchResourcePool::RenderTargetLease>();
-      view->descriptor = src.descriptor;
-      view->backend = src.backend;
-      view->renderTarget = src.renderTarget;
-      view->vulkanImage = src.vulkanImage;
-      view->attachments = src.attachments;
-      // Leave view->releaser empty (no-op): the owning member lease controls lifetime.
-      return view;
-    };
-
     if (usePaging) {
       // Keep the layer array persistent across progressive rounds so we can
       // refine channels incrementally (preview -> full-res).
@@ -208,7 +196,7 @@ std::vector<ImgSlicePayload> Z3DImgSliceRenderer::buildVulkanStagePayloads(Z3DEy
                                                           ScratchFormat::Depth32F,
                                                           std::optional<RenderBackend>(RenderBackend::Vulkan));
       }
-      common.layerLease = shareLease(lease);
+      common.layerLease = std::make_shared<Z3DScratchResourcePool::RenderTargetLease>(lease.borrowedView());
     } else {
       // Fast path: allocate a temporary layer array for this frame only.
       auto lease = scratchPool.acquireLayerArrayRenderTarget(m_outputSize,
@@ -707,8 +695,7 @@ Z3DTexture* Z3DImgSliceRenderer::colormapTextureGL(const ZColorMap& cm, uint32_t
   const uint64_t gen = cm.generation();
   auto itMeta = m_colormapCache.meta.find(&cm);
   auto itTex = m_colormapCache.textures.find(&cm);
-  const bool needCreate = itMeta == m_colormapCache.meta.end() ||
-                          itTex == m_colormapCache.textures.end() ||
+  const bool needCreate = itMeta == m_colormapCache.meta.end() || itTex == m_colormapCache.textures.end() ||
                           itMeta->second.first != gen || itMeta->second.second != width;
   if (needCreate) {
     std::vector<uint8_t> lut;
@@ -716,7 +703,8 @@ Z3DTexture* Z3DImgSliceRenderer::colormapTextureGL(const ZColorMap& cm, uint32_t
     if (lut.empty()) {
       return nullptr;
     }
-    auto tex = std::make_unique<Z3DTexture>(GLint(GL_RGBA8), glm::uvec3(width, 1, 1), GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV);
+    auto tex =
+      std::make_unique<Z3DTexture>(GLint(GL_RGBA8), glm::uvec3(width, 1, 1), GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV);
     tex->updateImage(lut.data());
     m_colormapCache.textures[&cm] = std::move(tex);
     m_colormapCache.meta[&cm] = std::make_pair(gen, width);
@@ -827,7 +815,7 @@ double Z3DImgSliceRenderer::renderSlice(Z3DEye eye, bool progressive)
   const auto& monoEyeState = viewState.eyes[MonoEye];
   auto cancellationToken = Z3DRenderGlobalState::instance().currentCancellationToken();
   const float devicePixelRatio = sceneState.devicePixelRatio;
-  auto& scratchPool = Z3DRenderGlobalState::instance().scratchPool();
+  auto& scratchPool = m_rendererBase.scratchPool();
 
   float n = viewState.nearClip;
   glm::vec2 pixelEyeSpaceSize = monoEyeState.frustumNearPlaneSize / glm::vec2(m_outputSize);
@@ -859,7 +847,7 @@ double Z3DImgSliceRenderer::renderSlice(Z3DEye eye, bool progressive)
       });
 
       m_image3DSliceWithColorMapBlockIDsShader->setUniform("ze_to_screen_pixel_voxel_size",
-                                                          ze_to_screen_pixel_voxel_size);
+                                                           ze_to_screen_pixel_voxel_size);
       m_image3DSliceWithColorMapBlockIDsShader->setProjectionViewMatrixUniform(eyeState.projectionViewMatrix);
       m_image3DSliceWithColorMapBlockIDsShader->setViewMatrixUniform(eyeState.viewMatrix);
 
@@ -969,7 +957,7 @@ double Z3DImgSliceRenderer::renderSlice(Z3DEye eye, bool progressive)
 
 void Z3DImgSliceRenderer::renderSliceFast(Z3DEye eye)
 {
-  auto& scratchPool = Z3DRenderGlobalState::instance().scratchPool();
+  auto& scratchPool = m_rendererBase.scratchPool();
 
   m_scVolumeSliceShader->bind();
   m_rendererBase.setGlobalShaderParameters(*m_scVolumeSliceShader, eye);
@@ -1024,17 +1012,13 @@ void Z3DImgSliceRenderer::createResources(RenderBackend backend)
   m_scVolumeSliceShader->loadFromSourceFile("transform_with_3dtexture.vert",
                                             "volume_slice_with_colormap_single_channel.frag",
                                             header);
-  m_mergeChannelShader->loadFromSourceFile("pass.vert",
-                                           "image2d_array_compositor.frag",
-                                           header);
-  m_image3DSliceWithColorMapBlockIDsShader->loadFromSourceFile(
-    "transform_with_3dtexture_and_eye_coordinate.vert",
-    "image3d_slice_with_transfun_blockID.frag",
-    header);
-  m_image3DSliceWithColorMapShader->loadFromSourceFile(
-    "transform_with_3dtexture_and_eye_coordinate.vert",
-    "image3d_slice_with_colormap.frag",
-    header);
+  m_mergeChannelShader->loadFromSourceFile("pass.vert", "image2d_array_compositor.frag", header);
+  m_image3DSliceWithColorMapBlockIDsShader->loadFromSourceFile("transform_with_3dtexture_and_eye_coordinate.vert",
+                                                               "image3d_slice_with_transfun_blockID.frag",
+                                                               header);
+  m_image3DSliceWithColorMapShader->loadFromSourceFile("transform_with_3dtexture_and_eye_coordinate.vert",
+                                                       "image3d_slice_with_colormap.frag",
+                                                       header);
   CHECK_GL_ERROR;
 
   m_VAO = std::make_unique<Z3DVertexArrayObject>(1);

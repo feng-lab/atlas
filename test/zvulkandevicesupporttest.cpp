@@ -30,6 +30,13 @@ ZVulkanDeviceSupport incompatibleSupport(std::string detail)
   return support;
 }
 
+ZVulkanContext::DeviceSelection deviceSelection(size_t preferenceIndex, uint8_t uuidSuffix)
+{
+  ZVulkanContext::DeviceSelection selection{.preferenceIndex = preferenceIndex};
+  selection.expectedDeviceUuid.back() = uuidSuffix;
+  return selection;
+}
+
 bool vulkanSmokeEnabled()
 {
   const char* enabled = std::getenv("ATLAS_ENABLE_VULKAN_SMOKE_TEST");
@@ -126,6 +133,59 @@ TEST(ZVulkanDeviceSupportTest, RejectedPreferredDevicePreservesWarningWhenNoFall
   EXPECT_NE(selection.warning.find("no compatible Vulkan fallback device"), std::string::npos);
   EXPECT_NE(selection.error.find("preferred device reason"), std::string::npos);
   EXPECT_NE(selection.error.find("other device reason"), std::string::npos);
+}
+
+TEST(ZVulkanDeviceSupportTest, ExactSelectionRequiresMatchingIndexAndUuid)
+{
+  const std::vector<ZVulkanDeviceSupport> devices{ZVulkanDeviceSupport{}, ZVulkanDeviceSupport{}};
+  const std::vector<ZVulkanContext::DeviceSelection> available{deviceSelection(0u, 11u), deviceSelection(1u, 22u)};
+
+  const auto selection = ZVulkanDeviceSupport::selectExact(devices, available, deviceSelection(1u, 22u));
+
+  ASSERT_TRUE(selection.index.has_value());
+  EXPECT_EQ(*selection.index, 1u);
+  EXPECT_TRUE(selection.warning.empty());
+  EXPECT_TRUE(selection.error.empty());
+}
+
+TEST(ZVulkanDeviceSupportTest, ExactSelectionRejectsChangedUuidWithoutFallback)
+{
+  const std::vector<ZVulkanDeviceSupport> devices{ZVulkanDeviceSupport{}, ZVulkanDeviceSupport{}};
+  const std::vector<ZVulkanContext::DeviceSelection> available{deviceSelection(0u, 11u), deviceSelection(1u, 22u)};
+
+  const auto selection = ZVulkanDeviceSupport::selectExact(devices, available, deviceSelection(1u, 23u));
+
+  EXPECT_FALSE(selection.index.has_value());
+  EXPECT_TRUE(selection.warning.empty());
+  EXPECT_NE(selection.error.find("index 1"), std::string::npos);
+  EXPECT_NE(selection.error.find("UUID"), std::string::npos);
+}
+
+TEST(ZVulkanDeviceSupportTest, ExactSelectionRejectsOutOfRangeIndexWithoutFallback)
+{
+  const std::vector<ZVulkanDeviceSupport> devices{ZVulkanDeviceSupport{}};
+  const std::vector<ZVulkanContext::DeviceSelection> available{deviceSelection(0u, 11u)};
+
+  const auto selection = ZVulkanDeviceSupport::selectExact(devices, available, deviceSelection(4u, 11u));
+
+  EXPECT_FALSE(selection.index.has_value());
+  EXPECT_TRUE(selection.warning.empty());
+  EXPECT_NE(selection.error.find("index 4"), std::string::npos);
+  EXPECT_NE(selection.error.find("out of range"), std::string::npos);
+}
+
+TEST(ZVulkanDeviceSupportTest, ExactSelectionRejectsIncompatibleDeviceWithoutFallback)
+{
+  const std::vector<ZVulkanDeviceSupport> devices{ZVulkanDeviceSupport{},
+                                                  incompatibleSupport("dynamic rendering unavailable")};
+  const std::vector<ZVulkanContext::DeviceSelection> available{deviceSelection(0u, 11u), deviceSelection(1u, 22u)};
+
+  const auto selection = ZVulkanDeviceSupport::selectExact(devices, available, deviceSelection(1u, 22u));
+
+  EXPECT_FALSE(selection.index.has_value());
+  EXPECT_TRUE(selection.warning.empty());
+  EXPECT_NE(selection.error.find("index 1"), std::string::npos);
+  EXPECT_NE(selection.error.find("dynamic rendering unavailable"), std::string::npos);
 }
 
 TEST(ZVulkanDeviceSupportTest, PhysicalDevicePreferenceOrdersByPowerThenUuid)
@@ -383,6 +443,17 @@ TEST(ZVulkanDeviceSupportTest, VulkanIcdStartupSmoke)
   EXPECT_GT(context.deviceCount(), 0u);
   EXPECT_LT(context.selectedDeviceIndex(), context.deviceCount());
   EXPECT_TRUE(context.selectedDeviceSupport().compatible());
+  const auto exactSelection = context.selectedDeviceSelection();
+  EXPECT_EQ(exactSelection.preferenceIndex, context.selectedDeviceIndex());
+  EXPECT_EQ(context.deviceSelection(exactSelection.preferenceIndex), exactSelection);
+
+  // A second independently enumerated context must resolve the captured
+  // preference index to the same UUID before creating its logical device.
+  {
+    ZVulkanContext exactContext(exactSelection);
+    EXPECT_EQ(exactContext.selectedDeviceSelection(), exactSelection);
+    EXPECT_TRUE(exactContext.selectedDeviceSupport().compatible());
+  }
 
   auto device = context.createDevice();
   ASSERT_NE(device, nullptr);

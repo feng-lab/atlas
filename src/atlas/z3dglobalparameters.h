@@ -3,12 +3,13 @@
 #include "zbbox.h"
 #include "znumericparameter.h"
 #include "z3dcameraparameter.h"
-#include "z3drenderglobalstate.h"
+#include "z3drendererstates.h"
 #include "z3dpickingmanager.h"
 #include "z3dtypes.h"
 #include "zoptionparameter.h"
 #include "zcutspanparameter.h"
 #include "z3dinteractionhandler.h"
+#include "zfolly.h"
 #include <vector>
 #include <mutex>
 #include <functional>
@@ -18,6 +19,7 @@ namespace nim {
 class ZWidgetsGroup;
 
 class Z3DRenderingEngine;
+class Z3DScratchResourcePool;
 
 struct Z3DLocalColorBuffer
 {
@@ -34,8 +36,47 @@ class Z3DGlobalParameters : public QObject
 {
   Q_OBJECT
 
+private:
+  Z3DScratchResourcePool& m_scratchPool;
+  RendererViewState m_rendererViewState;
+  RendererSceneState m_rendererSceneState;
+  bool m_rendererViewStateDirty = true;
+  bool m_rendererSceneStateDirty = true;
+
 public:
-  explicit Z3DGlobalParameters(RenderBackend backend = RenderBackend::OpenGL);
+  explicit Z3DGlobalParameters(Z3DScratchResourcePool& scratchPool, RenderBackend backend = RenderBackend::OpenGL);
+
+  [[nodiscard]] Z3DScratchResourcePool& scratchPool()
+  {
+    return m_scratchPool;
+  }
+
+  [[nodiscard]] const Z3DScratchResourcePool& scratchPool() const
+  {
+    return m_scratchPool;
+  }
+
+  [[nodiscard]] RendererViewState& rendererViewState()
+  {
+    return m_rendererViewState;
+  }
+
+  [[nodiscard]] const RendererViewState& rendererViewState() const
+  {
+    return m_rendererViewState;
+  }
+
+  [[nodiscard]] RendererSceneState& rendererSceneState()
+  {
+    return m_rendererSceneState;
+  }
+
+  [[nodiscard]] const RendererSceneState& rendererSceneState() const
+  {
+    return m_rendererSceneState;
+  }
+
+  void ensureRendererState();
 
   void setDevicePixelRatio(float f);
 
@@ -73,12 +114,12 @@ private:
 
   void markGlobalSceneStateDirty()
   {
-    Z3DRenderGlobalState::instance().markSceneStateDirty();
+    m_rendererSceneStateDirty = true;
   }
 
   void markGlobalViewStateDirty()
   {
-    Z3DRenderGlobalState::instance().markViewStateDirty();
+    m_rendererViewStateDirty = true;
   }
 
   void addParameter(ZParameter& para)

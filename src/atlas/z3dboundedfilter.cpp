@@ -1,6 +1,5 @@
 #include "z3dboundedfilter.h"
 #include "z3dgl.h"
-#include "z3drenderglobalstate.h"
 #include "zexception.h"
 #include "zlog.h"
 #include <cmath>
@@ -77,8 +76,9 @@ Z3DBoundedFilter::Z3DBoundedFilter(Z3DGlobalParameters& globalPara, QObject* par
   , m_globalParameters(globalPara)
   , m_rendererBase(m_rendererParameterState,
                    m_rendererFrameState,
-                   Z3DRenderGlobalState::instance().rendererState().viewState,
-                   Z3DRenderGlobalState::instance().rendererState().sceneState,
+                   globalPara.rendererViewState(),
+                   globalPara.rendererSceneState(),
+                   globalPara.scratchPool(),
                    static_cast<RenderBackend>(globalPara.renderBackend.associatedData()))
   , m_baseBoundBoxRenderer(m_rendererBase)
   , m_selectionBoundBoxRenderer(m_rendererBase)
@@ -719,9 +719,7 @@ void Z3DBoundedFilter::syncRendererState()
 {
   updateClipPlanesIfDirty();
 
-  auto& globalState = Z3DRenderGlobalState::instance();
-  globalState.ensureSceneState(m_globalParameters);
-  globalState.ensureViewState(m_globalParameters.camera.get());
+  m_globalParameters.ensureRendererState();
 }
 
 void Z3DBoundedFilter::markClipPlanesDirty()

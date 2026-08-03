@@ -16,6 +16,7 @@
 #include "zvulkantexture.h"
 #include "z3drenderervulkanbackend.h"
 #include "zvulkanlinearscript.h"
+#include "zvulkanfinalreadbackcompletion_p.h"
 #include "zrenderthreadexecutor_tls.h"
 #include <algorithm>
 #include <array>
@@ -30,6 +31,7 @@
 #include <span>
 #include <unordered_set>
 #include <optional>
+#include <QPointer>
 
 ABSL_FLAG(bool, atlas_vk_copy_yflip_in_shader, true, "Use y-flip in Vulkan final copy shader instead of UI flip");
 ABSL_DECLARE_FLAG(bool, atlas_vk_ddp_indirect_count);
@@ -351,6 +353,26 @@ static void captureTransparentFilterBatchesToUnifiedList(Z3DRendererBase& compos
     out);
 }
 
+template<typename Publisher>
+folly::coro::Task<void> consumeVulkanFinalReadback(Z3DRendererVulkanBackend& backend,
+                                                   Z3DRendererVulkanBackend::ActiveSubmissionFenceAwaiter fence,
+                                                   ZVulkanFinalReadbackCompletion completion,
+                                                   Publisher publisher,
+                                                   bool collectPerf,
+                                                   std::chrono::steady_clock::time_point perfFrameStart)
+{
+  co_await Z3DRendererVulkanBackend::waitActiveSubmissionFence(std::move(fence));
+  CHECK(completion.mapped != nullptr) << "Vulkan final readback completed without mapped data";
+  publisher(std::move(completion));
+
+  if (collectPerf) {
+    const double allMs =
+      std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - perfFrameStart).count();
+    backend.recordAllMsForCompletionSafePoint(allMs);
+  }
+  co_return;
+}
+
 } // namespace
 
 namespace nim {
@@ -594,7 +616,43 @@ Z3DCompositor::Z3DCompositor(Z3DGlobalParameters& globalParas, QObject* parent)
 
 Z3DCompositor::~Z3DCompositor()
 {
+  advanceVulkanFinalReadbackOwnerRevision();
+  releaseVulkanFinalReadbackMappings();
+  m_rendererBase.flushVulkanWorkForTeardown("Z3DCompositor::~Z3DCompositor");
   resetVulkanSceneBatchCaches();
+}
+
+void Z3DCompositor::advanceVulkanFinalReadbackOwnerRevision()
+{
+  CHECK_LT(m_vulkanFinalReadbackOwnerRevision, std::numeric_limits<uint64_t>::max())
+    << "Vulkan final-readback owner revision overflow";
+  ++m_vulkanFinalReadbackOwnerRevision;
+}
+
+void Z3DCompositor::releaseVulkanFinalReadbackMappings()
+{
+  const std::scoped_lock lock(m_globalParameters.targetSwitchMutex);
+  releaseVulkanFinalReadbackMappingsLocked();
+}
+
+void Z3DCompositor::releaseVulkanFinalReadbackMappingsLocked()
+{
+  auto releaseMapping = [](Z3DLocalColorBuffer& buffer) {
+    auto retirement = std::move(buffer.externalRelease);
+    buffer.externalRelease = {};
+    buffer.external = nullptr;
+    buffer.externalStride = 0u;
+    if (retirement) {
+      retirement();
+    }
+  };
+
+  // Mono and right-eye pointer roles alias these two physical buffers. Retire
+  // each physical owner once instead of walking the role pointers.
+  releaseMapping(m_localColorBuffer1);
+  releaseMapping(m_localColorBuffer2);
+  releaseMapping(m_leftLocalColorBuffer1);
+  releaseMapping(m_leftLocalColorBuffer2);
 }
 
 void Z3DCompositor::resetVulkanSceneBatchCaches()
@@ -817,6 +875,7 @@ void Z3DCompositor::invalidate(State inv)
 {
   // VLOG(1) << "1";
   CHECK(inv != State::Valid);
+  Q_EMIT renderInputChanged();
   if (isFlagSet(m_state, inv)) {
     return;
   }
@@ -919,8 +978,7 @@ double Z3DCompositor::processGL(Z3DEye eye)
   Z3DScratchResourcePool::RenderTargetLease* currentOutLease = nullptr;
   Z3DRenderTarget* currentOutPtr = nullptr;
   if (!showHandleFilters.empty()) {
-    overlayLease = Z3DRenderGlobalState::instance().scratchPool().acquireTempRenderTarget2D(
-      m_monoCurrentTarget->renderTarget->size());
+    overlayLease = m_rendererBase.scratchPool().acquireTempRenderTarget2D(m_monoCurrentTarget->renderTarget->size());
     // VLOG(1) << "lease acquired";
     currentOutLease = &overlayLease;
     currentOutPtr = overlayLease.renderTarget;
@@ -1007,9 +1065,8 @@ double Z3DCompositor::processGL(Z3DEye eye)
     if (!anyVolumeReady) { // no volume, only geometrys to render
       if (numNormalFilters == 0 || numOnTopFilters == 0) {
         // Acquire temp for geometry-only path (optionally twice the size)
-        Z3DScratchResourcePool::RenderTargetLease temp1Lease =
-          Z3DRenderGlobalState::instance().scratchPool().acquireTempRenderTarget2D(
-            supersample2x2 ? (currentOutRenderTarget.size() * 2_u32) : currentOutRenderTarget.size());
+        Z3DScratchResourcePool::RenderTargetLease temp1Lease = m_rendererBase.scratchPool().acquireTempRenderTarget2D(
+          supersample2x2 ? (currentOutRenderTarget.size() * 2_u32) : currentOutRenderTarget.size());
         // VLOG(1) << "lease acquired";
 
         if (numOnTopFilters == 0) {
@@ -1042,15 +1099,15 @@ double Z3DCompositor::processGL(Z3DEye eye)
       } else {
         auto tempSize = supersample2x2 ? (currentOutRenderTarget.size() * 2_u32) : currentOutRenderTarget.size();
         Z3DScratchResourcePool::RenderTargetLease temp1Lease =
-          Z3DRenderGlobalState::instance().scratchPool().acquireTempRenderTarget2D(tempSize);
+          m_rendererBase.scratchPool().acquireTempRenderTarget2D(tempSize);
         // VLOG(1) << "lease acquired";
         Z3DScratchResourcePool::RenderTargetLease temp2Lease =
-          Z3DRenderGlobalState::instance().scratchPool().acquireTempRenderTarget2D(tempSize);
+          m_rendererBase.scratchPool().acquireTempRenderTarget2D(tempSize);
         // VLOG(1) << "lease acquired";
         Z3DScratchResourcePool::RenderTargetLease tempCompositeLease;
         Z3DRenderTarget* blendTarget = &currentOutRenderTarget;
         if (supersample2x2) {
-          tempCompositeLease = Z3DRenderGlobalState::instance().scratchPool().acquireTempRenderTarget2D(tempSize);
+          tempCompositeLease = m_rendererBase.scratchPool().acquireTempRenderTarget2D(tempSize);
           blendTarget = tempCompositeLease.renderTarget;
         }
 
@@ -1133,9 +1190,8 @@ double Z3DCompositor::processGL(Z3DEye eye)
         currentOutRenderTarget.release();
       } else if (numNormalFilters == 0 ||
                  numOnTopFilters == 0) { // render geometries into one temp port then blend with volume
-        Z3DScratchResourcePool::RenderTargetLease tempGeoLease =
-          Z3DRenderGlobalState::instance().scratchPool().acquireTempRenderTarget2D(
-            supersample2x2 ? (currentOutRenderTarget.size() * 2_u32) : currentOutRenderTarget.size());
+        Z3DScratchResourcePool::RenderTargetLease tempGeoLease = m_rendererBase.scratchPool().acquireTempRenderTarget2D(
+          supersample2x2 ? (currentOutRenderTarget.size() * 2_u32) : currentOutRenderTarget.size());
         // VLOG(1) << "lease acquired";
 
         // render geometries into one temp port
@@ -1185,15 +1241,15 @@ double Z3DCompositor::processGL(Z3DEye eye)
         // blend into out
         auto tempSize2 = supersample2x2 ? (currentOutRenderTarget.size() * 2_u32) : currentOutRenderTarget.size();
         Z3DScratchResourcePool::RenderTargetLease temp1LeaseA =
-          Z3DRenderGlobalState::instance().scratchPool().acquireTempRenderTarget2D(tempSize2);
+          m_rendererBase.scratchPool().acquireTempRenderTarget2D(tempSize2);
         // VLOG(1) << "lease acquired";
         Z3DScratchResourcePool::RenderTargetLease temp2LeaseA =
-          Z3DRenderGlobalState::instance().scratchPool().acquireTempRenderTarget2D(tempSize2);
+          m_rendererBase.scratchPool().acquireTempRenderTarget2D(tempSize2);
         // VLOG(1) << "lease acquired";
         Z3DScratchResourcePool::RenderTargetLease tempCompositeLeaseA;
         Z3DRenderTarget* blendTargetA = &currentOutRenderTarget;
         if (supersample2x2) {
-          tempCompositeLeaseA = Z3DRenderGlobalState::instance().scratchPool().acquireTempRenderTarget2D(tempSize2);
+          tempCompositeLeaseA = m_rendererBase.scratchPool().acquireTempRenderTarget2D(tempSize2);
           blendTargetA = tempCompositeLeaseA.renderTarget;
         }
 
@@ -1271,9 +1327,8 @@ double Z3DCompositor::processGL(Z3DEye eye)
     // individually in renderGeomsOIT for correct per-layer composition.
     numNormalFilters = normalOpaqueFilters.size() + normalTransparentFilters.size() + vFilters.size();
     if (numNormalFilters == 0 || numOnTopFilters == 0) {
-      Z3DScratchResourcePool::RenderTargetLease temp1Lease =
-        Z3DRenderGlobalState::instance().scratchPool().acquireTempRenderTarget2D(
-          supersample2x2 ? (currentOutRenderTarget.size() * 2_u32) : currentOutRenderTarget.size());
+      Z3DScratchResourcePool::RenderTargetLease temp1Lease = m_rendererBase.scratchPool().acquireTempRenderTarget2D(
+        supersample2x2 ? (currentOutRenderTarget.size() * 2_u32) : currentOutRenderTarget.size());
       // VLOG(1) << "lease acquired";
 
       if (numOnTopFilters == 0) {
@@ -1306,15 +1361,15 @@ double Z3DCompositor::processGL(Z3DEye eye)
     } else {
       auto tempSize = supersample2x2 ? (currentOutRenderTarget.size() * 2_u32) : currentOutRenderTarget.size();
       Z3DScratchResourcePool::RenderTargetLease temp1Lease2 =
-        Z3DRenderGlobalState::instance().scratchPool().acquireTempRenderTarget2D(tempSize);
+        m_rendererBase.scratchPool().acquireTempRenderTarget2D(tempSize);
       // VLOG(1) << "lease acquired";
       Z3DScratchResourcePool::RenderTargetLease temp2Lease2 =
-        Z3DRenderGlobalState::instance().scratchPool().acquireTempRenderTarget2D(tempSize);
+        m_rendererBase.scratchPool().acquireTempRenderTarget2D(tempSize);
       // VLOG(1) << "lease acquired";
       Z3DScratchResourcePool::RenderTargetLease tempCompositeLease2;
       Z3DRenderTarget* blendTarget = &currentOutRenderTarget;
       if (supersample2x2) {
-        tempCompositeLease2 = Z3DRenderGlobalState::instance().scratchPool().acquireTempRenderTarget2D(tempSize);
+        tempCompositeLease2 = m_rendererBase.scratchPool().acquireTempRenderTarget2D(tempSize);
         blendTarget = tempCompositeLease2.renderTarget;
       }
 
@@ -1375,7 +1430,7 @@ double Z3DCompositor::processGL(Z3DEye eye)
                                              : m_rightCurrentTarget;
     auto& finalOutRenderTarget = *finalOutLease->renderTarget;
     Z3DScratchResourcePool::RenderTargetLease handleLease =
-      Z3DRenderGlobalState::instance().scratchPool().acquireTempRenderTarget2D(finalOutRenderTarget.size());
+      m_rendererBase.scratchPool().acquireTempRenderTarget2D(finalOutRenderTarget.size());
     // VLOG(1) << "lease acquired";
 
     handleLease.renderTarget->bind();
@@ -1471,9 +1526,9 @@ double Z3DCompositor::processGL(Z3DEye eye)
     pickingManager().releaseTarget();
   } else if (!filters.empty() && !showHandleFilters.empty()) {
     auto pickSize = pickingManager().renderTarget().size();
-    auto leaseHandles = Z3DRenderGlobalState::instance().scratchPool().acquireTempRenderTarget2D(pickSize);
+    auto leaseHandles = m_rendererBase.scratchPool().acquireTempRenderTarget2D(pickSize);
     // VLOG(1) << "lease acquired";
-    auto leaseGeoms = Z3DRenderGlobalState::instance().scratchPool().acquireTempRenderTarget2D(pickSize);
+    auto leaseGeoms = m_rendererBase.scratchPool().acquireTempRenderTarget2D(pickSize);
     // VLOG(1) << "lease acquired";
 
     leaseHandles.renderTarget->bind();
@@ -1533,7 +1588,7 @@ double Z3DCompositor::processGL(Z3DEye eye)
                            m_progressiveRendering ? "progressive rendering" : "rendering",
                            (void*)m_monoReadyLocalBuffer);
     // Log scratch pool memory usage after the mono render completes
-    const auto& pool = Z3DRenderGlobalState::instance().scratchPool();
+    const auto& pool = m_rendererBase.scratchPool();
     static uint64_t s_lastCreate = 0;
     static uint64_t s_lastChange = 0;
     static uint64_t s_lastReuse = 0;
@@ -1675,7 +1730,7 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
   const bool supersample2x2 = (m_rendererBase.sceneState().geometryAAMode == GeometryAAMode::Supersample2x2);
   const glm::uvec4 prevViewport = m_rendererBase.frameState().viewport;
 
-  auto& pool = Z3DRenderGlobalState::instance().scratchPool();
+  auto& pool = m_rendererBase.scratchPool();
   Z3DScratchResourcePool::RenderTargetLease sceneLease;
   Z3DScratchResourcePool::RenderTargetLease* sceneOutLease = outLease;
   if (supersample2x2) {
@@ -2974,14 +3029,49 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
     ZVulkanTexture* finalColor = outLease->colorAttachment(0);
     auto* scratchPool = &pool;
 
-    auto installFinalColorReadback = [this, scratchPool](Z3DLocalColorBuffer* localPtr,
-                                                         Z3DScratchResourcePool::RenderTargetLease* targetPtr,
-                                                         Z3DEye eyeCopy,
-                                                         uint64_t renderFrameToken,
-                                                         const void* mapped,
-                                                         const glm::uvec2& size,
-                                                         std::function<void()> releaseSlot,
-                                                         bool noCopy) {
+    auto publishFinalColorReadback = [scratchPool](ZVulkanFinalReadbackCompletion completion) {
+      Z3DCompositor* owner = completion.owner.data();
+      const uint64_t currentOwnerRevision = owner ? owner->m_vulkanFinalReadbackOwnerRevision : 0u;
+      const glm::uvec2 currentOutputSize = owner ? owner->m_outputSize : glm::uvec2{0u, 0u};
+      const RenderBackend currentBackend = owner ? owner->m_rendererBase.activeBackend() : RenderBackend::OpenGL;
+      const auto ownerDecision = ZVulkanFinalReadbackCompletion::publicationDecision(owner != nullptr,
+                                                                                     completion.ownerRevision,
+                                                                                     currentOwnerRevision,
+                                                                                     completion.outputSize,
+                                                                                     completion.readbackSize,
+                                                                                     currentOutputSize,
+                                                                                     currentBackend,
+                                                                                     completion.renderFrameToken,
+                                                                                     0u);
+      if (ownerDecision == ZVulkanFinalReadbackCompletion::PublicationDecision::OwnerUnavailable) {
+        VLOG(1) << "VK final readback drop: compositor owner was destroyed";
+        return;
+      }
+
+      if (ownerDecision != ZVulkanFinalReadbackCompletion::PublicationDecision::Accept) {
+        VLOG(1) << fmt::format(
+          "VK final readback drop: reason={} owner_revision={}/{} expected_size={}x{} actual_size={}x{} "
+          "current_size={}x{} backend={}",
+          enumOrUnderlying(ownerDecision),
+          completion.ownerRevision,
+          currentOwnerRevision,
+          completion.outputSize.x,
+          completion.outputSize.y,
+          completion.readbackSize.x,
+          completion.readbackSize.y,
+          currentOutputSize.x,
+          currentOutputSize.y,
+          enumOrUnderlying(currentBackend));
+        return;
+      }
+
+      Z3DLocalColorBuffer* localPtr = completion.localBuffer;
+      Z3DScratchResourcePool::RenderTargetLease* targetPtr = completion.target;
+      const Z3DEye eyeCopy = completion.eye;
+      const uint64_t renderFrameToken = completion.renderFrameToken;
+      const bool noCopy = completion.noCopy;
+      const void* mapped = completion.mapped;
+      const glm::uvec2 size = completion.readbackSize;
       CHECK(localPtr != nullptr) << "VK final readback install requires a valid local color buffer";
       CHECK(targetPtr != nullptr) << "VK final readback install requires a valid output target lease";
 
@@ -2995,43 +3085,54 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
                              static_cast<int>(eyeCopy));
 
       const size_t eyeIndex = static_cast<size_t>(eyeCopy);
-      CHECK_LT(eyeIndex, m_lastPublishedRenderFrameToken.size())
+      CHECK_LT(eyeIndex, owner->m_lastPublishedRenderFrameToken.size())
         << "VK final readback eye index out of range: eye=" << static_cast<int>(eyeCopy);
 
-      bool dropStale = false;
+      auto rejectionDecision = ZVulkanFinalReadbackCompletion::PublicationDecision::Accept;
       uint64_t lastPublishedToken = 0;
       bool emitFinished = false;
       const char* finishedLabel = nullptr;
       Z3DLocalColorBuffer* readyBufferForLog = nullptr;
 
       {
-        const std::scoped_lock lock(m_globalParameters.targetSwitchMutex);
+        const std::scoped_lock lock(owner->m_globalParameters.targetSwitchMutex);
 
-        lastPublishedToken = m_lastPublishedRenderFrameToken[eyeIndex];
-        if (renderFrameToken != 0 && lastPublishedToken != 0 && renderFrameToken < lastPublishedToken) {
-          dropStale = true;
-        } else if (renderFrameToken != 0) {
-          m_lastPublishedRenderFrameToken[eyeIndex] = renderFrameToken;
+        lastPublishedToken = owner->m_lastPublishedRenderFrameToken[eyeIndex];
+        const auto lockedDecision =
+          ZVulkanFinalReadbackCompletion::publicationDecision(true,
+                                                              completion.ownerRevision,
+                                                              owner->m_vulkanFinalReadbackOwnerRevision,
+                                                              completion.outputSize,
+                                                              completion.readbackSize,
+                                                              owner->m_outputSize,
+                                                              owner->m_rendererBase.activeBackend(),
+                                                              renderFrameToken,
+                                                              lastPublishedToken);
+        if (lockedDecision != ZVulkanFinalReadbackCompletion::PublicationDecision::Accept) {
+          rejectionDecision = lockedDecision;
+        } else {
+          owner->m_lastPublishedRenderFrameToken[eyeIndex] = renderFrameToken;
         }
 
-        if (!dropStale) {
+        if (rejectionDecision == ZVulkanFinalReadbackCompletion::PublicationDecision::Accept) {
           // Replace the external mapping for the destination local buffer. This must
           // happen under targetSwitchMutex so the UI never observes a half-updated
           // ready buffer.
           if (localPtr->externalRelease) {
-            localPtr->externalRelease();
+            auto previousRetirement = std::move(localPtr->externalRelease);
             localPtr->externalRelease = {};
+            previousRetirement();
           }
           localPtr->external = static_cast<const uint8_t*>(mapped);
           localPtr->externalStride = static_cast<size_t>(size.x) * 4u;
-          localPtr->externalRelease = std::move(releaseSlot);
+          completion.transferRetirementTo(localPtr->externalRelease);
           localPtr->width = size.x;
           localPtr->height = size.y;
 
           if (eyeCopy == MonoEye) {
-            CHECK(localPtr == &m_localColorBuffer1 || localPtr == &m_localColorBuffer2)
+            CHECK(localPtr == &owner->m_localColorBuffer1 || localPtr == &owner->m_localColorBuffer2)
               << "VK mono install targeted unexpected local buffer pointer";
-            CHECK(targetPtr == &m_outRenderTarget1 || targetPtr == &m_outRenderTarget2)
+            CHECK(targetPtr == &owner->m_outRenderTarget1 || targetPtr == &owner->m_outRenderTarget2)
               << "VK mono install targeted unexpected output lease pointer";
 
             // Publish the buffer/target that actually received this completed frame.
@@ -3040,56 +3141,59 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
             // swaps here makes the ready pointers depend on the *parity* of
             // completions (and can bounce between old/new frames). Publish the
             // completed destinations directly to make presentation monotonic.
-            m_monoReadyLocalBuffer = localPtr;
-            m_monoReadyTarget = targetPtr;
-            m_monoCurrentLocalBuffer = (localPtr == &m_localColorBuffer1) ? &m_localColorBuffer2 : &m_localColorBuffer1;
-            m_monoCurrentTarget = (targetPtr == &m_outRenderTarget1) ? &m_outRenderTarget2 : &m_outRenderTarget1;
+            owner->m_monoReadyLocalBuffer = localPtr;
+            owner->m_monoReadyTarget = targetPtr;
+            owner->m_monoCurrentLocalBuffer =
+              (localPtr == &owner->m_localColorBuffer1) ? &owner->m_localColorBuffer2 : &owner->m_localColorBuffer1;
+            owner->m_monoCurrentTarget =
+              (targetPtr == &owner->m_outRenderTarget1) ? &owner->m_outRenderTarget2 : &owner->m_outRenderTarget1;
             emitFinished = true;
             finishedLabel = noCopy ? "(mono, no copy)" : "(mono)";
-            readyBufferForLog = m_monoReadyLocalBuffer;
+            readyBufferForLog = owner->m_monoReadyLocalBuffer;
           } else if (eyeCopy == LeftEye) {
-            CHECK(localPtr == &m_leftLocalColorBuffer1 || localPtr == &m_leftLocalColorBuffer2)
+            CHECK(localPtr == &owner->m_leftLocalColorBuffer1 || localPtr == &owner->m_leftLocalColorBuffer2)
               << "VK left-eye install targeted unexpected local buffer pointer";
-            CHECK(targetPtr == &m_leftEyeOutRenderTarget1 || targetPtr == &m_leftEyeOutRenderTarget2)
+            CHECK(targetPtr == &owner->m_leftEyeOutRenderTarget1 || targetPtr == &owner->m_leftEyeOutRenderTarget2)
               << "VK left-eye install targeted unexpected output lease pointer";
 
-            m_leftReadyLocalBuffer = localPtr;
-            m_leftReadyTarget = targetPtr;
-            m_leftCurrentLocalBuffer =
-              (localPtr == &m_leftLocalColorBuffer1) ? &m_leftLocalColorBuffer2 : &m_leftLocalColorBuffer1;
-            m_leftCurrentTarget =
-              (targetPtr == &m_leftEyeOutRenderTarget1) ? &m_leftEyeOutRenderTarget2 : &m_leftEyeOutRenderTarget1;
+            owner->m_leftReadyLocalBuffer = localPtr;
+            owner->m_leftReadyTarget = targetPtr;
+            owner->m_leftCurrentLocalBuffer = (localPtr == &owner->m_leftLocalColorBuffer1)
+                                                ? &owner->m_leftLocalColorBuffer2
+                                                : &owner->m_leftLocalColorBuffer1;
+            owner->m_leftCurrentTarget = (targetPtr == &owner->m_leftEyeOutRenderTarget1)
+                                           ? &owner->m_leftEyeOutRenderTarget2
+                                           : &owner->m_leftEyeOutRenderTarget1;
           } else {
-            CHECK(localPtr == &m_localColorBuffer1 || localPtr == &m_localColorBuffer2)
+            CHECK(localPtr == &owner->m_localColorBuffer1 || localPtr == &owner->m_localColorBuffer2)
               << "VK right-eye install targeted unexpected local buffer pointer";
-            CHECK(targetPtr == &m_outRenderTarget1 || targetPtr == &m_outRenderTarget2)
+            CHECK(targetPtr == &owner->m_outRenderTarget1 || targetPtr == &owner->m_outRenderTarget2)
               << "VK right-eye install targeted unexpected output lease pointer";
 
-            m_rightReadyLocalBuffer = localPtr;
-            m_rightReadyTarget = targetPtr;
-            m_rightCurrentLocalBuffer =
-              (localPtr == &m_localColorBuffer1) ? &m_localColorBuffer2 : &m_localColorBuffer1;
-            m_rightCurrentTarget = (targetPtr == &m_outRenderTarget1) ? &m_outRenderTarget2 : &m_outRenderTarget1;
+            owner->m_rightReadyLocalBuffer = localPtr;
+            owner->m_rightReadyTarget = targetPtr;
+            owner->m_rightCurrentLocalBuffer =
+              (localPtr == &owner->m_localColorBuffer1) ? &owner->m_localColorBuffer2 : &owner->m_localColorBuffer1;
+            owner->m_rightCurrentTarget =
+              (targetPtr == &owner->m_outRenderTarget1) ? &owner->m_outRenderTarget2 : &owner->m_outRenderTarget1;
             emitFinished = true;
             finishedLabel = noCopy ? "(right, no copy)" : "(right)";
           }
         }
       }
 
-      if (dropStale) {
-        VLOG(1) << fmt::format("VK final readback drop stale frame#{} < last#{} eye={}",
+      if (rejectionDecision != ZVulkanFinalReadbackCompletion::PublicationDecision::Accept) {
+        VLOG(1) << fmt::format("VK final readback drop reason={} frame#{} last#{} eye={}",
+                               enumOrUnderlying(rejectionDecision),
                                renderFrameToken,
                                lastPublishedToken,
                                static_cast<int>(eyeCopy));
-        if (releaseSlot) {
-          releaseSlot();
-        }
         return;
       }
 
       // Mono/right-eye publish complete. Emit update signal (left eye waits for right).
       if (emitFinished) {
-        m_globalParameters.hasNewRendering = true;
+        owner->m_globalParameters.hasNewRendering = true;
       }
 
       if (eyeCopy == MonoEye) {
@@ -3108,77 +3212,81 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
         }
         CHECK(finishedLabel != nullptr) << "VK mono publish expected a finished label";
         VLOG(1) << fmt::format("VK renderingFinished {} readyBuffer={}", finishedLabel, (void*)readyBufferForLog);
-        Q_EMIT renderingFinished();
+        Q_EMIT owner->renderingFinished();
       } else if (eyeCopy == RightEye) {
         CHECK(finishedLabel != nullptr) << "VK right-eye publish expected a finished label";
         VLOG(1) << fmt::format("VK renderingFinished {}", finishedLabel);
-        Q_EMIT renderingFinished();
+        Q_EMIT owner->renderingFinished();
       }
     };
 
-    auto enqueueFinalReadbackInActiveFrame =
-      [installFinalColorReadback](Z3DRendererVulkanBackend& backend,
-                                  ZVulkanTexture& tex,
-                                  Z3DLocalColorBuffer* localPtr,
-                                  Z3DScratchResourcePool::RenderTargetLease* targetPtr,
-                                  Z3DEye eyeCopy,
-                                  std::string_view ticketLabel,
-                                  std::string_view consumeLabel,
-                                  bool noCopy) {
-        CHECK(localPtr != nullptr) << "VK enqueue final readback requires local color buffer";
-        CHECK(targetPtr != nullptr) << "VK enqueue final readback requires output target lease";
-        const char* suffix = noCopy ? " (no copy)" : "";
-        VLOG(1) << fmt::format("VK enqueue final readback{} tex=0x{:x} size={}x{} eye={}",
-                               suffix,
-                               reinterpret_cast<uint64_t>(&tex),
-                               tex.width(),
-                               tex.height(),
-                               static_cast<int>(eyeCopy));
-        // Measure end-to-end latency from the engine's perf-frame start (Network
-        // wrapper "Since Start") until the result is published/host-ready and
-        // renderingFinished is emitted. This matches OpenGL's synchronous UX
-        // timing better than measuring only enqueue→ready latency in Vulkan.
-        const bool collectPerf = Z3DPerfCollector::enabled();
-        auto perfFrameStartTs = collectPerf ? Z3DRenderGlobalState::instance().currentPerfFrameStartTime()
-                                            : std::chrono::steady_clock::time_point{};
-        if (collectPerf && perfFrameStartTs.time_since_epoch().count() == 0) {
-          // Perf timing should never be missing, but do not crash on a logging
-          // metric. Fall back to "now" so the value is still bounded.
-          perfFrameStartTs = std::chrono::steady_clock::now();
-        }
-        // Presentation ordering is a correctness contract, not instrumentation:
-        // retain the render-frame identity when performance collection is off.
-        const uint64_t renderFrameToken = Z3DRenderGlobalState::instance().currentRenderFrameToken();
-        auto ticket = backend.requestEndOfFrameColorReadbackTicket(tex, eyeCopy, ticketLabel);
-        backend.registerAfterCurrentFrameCompletionHook(
-          currentRenderThreadExecutorKeepAlive(consumeLabel),
-          [installFinalColorReadback,
-           localPtr,
-           targetPtr,
-           eyeCopy,
-           collectPerf,
-           perfFrameStartTs,
-           renderFrameToken,
-           ticket = std::move(ticket),
-           noCopy](Z3DRendererVulkanBackend& backend) mutable -> folly::coro::Task<void> {
-            co_await Z3DRendererVulkanBackend::waitActiveSubmissionFence(ticket.fence);
-            installFinalColorReadback(localPtr,
-                                      targetPtr,
-                                      eyeCopy,
-                                      renderFrameToken,
-                                      ticket.mapped,
-                                      ticket.size,
-                                      std::move(ticket.releaseSlot),
-                                      noCopy);
-            if (collectPerf) {
-              const double allMs =
-                std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - perfFrameStartTs).count();
-              backend.recordAllMsForCompletionSafePoint(allMs);
-            }
-            co_return;
-          },
-          consumeLabel);
-      };
+    const QPointer<Z3DCompositor> readbackOwner(this);
+    const uint64_t readbackOwnerRevision = m_vulkanFinalReadbackOwnerRevision;
+    const glm::uvec2 readbackOutputSize = m_outputSize;
+    auto enqueueFinalReadbackInActiveFrame = [publishFinalColorReadback,
+                                              readbackOwner,
+                                              readbackOwnerRevision,
+                                              readbackOutputSize](Z3DRendererVulkanBackend& backend,
+                                                                  ZVulkanTexture& tex,
+                                                                  Z3DLocalColorBuffer* localPtr,
+                                                                  Z3DScratchResourcePool::RenderTargetLease* targetPtr,
+                                                                  Z3DEye eyeCopy,
+                                                                  std::string_view ticketLabel,
+                                                                  std::string_view consumeLabel,
+                                                                  bool noCopy) {
+      CHECK(localPtr != nullptr) << "VK enqueue final readback requires local color buffer";
+      CHECK(targetPtr != nullptr) << "VK enqueue final readback requires output target lease";
+      const char* suffix = noCopy ? " (no copy)" : "";
+      VLOG(1) << fmt::format("VK enqueue final readback{} tex=0x{:x} size={}x{} eye={}",
+                             suffix,
+                             reinterpret_cast<uint64_t>(&tex),
+                             tex.width(),
+                             tex.height(),
+                             static_cast<int>(eyeCopy));
+      // Measure end-to-end latency from the engine's perf-frame start (Network
+      // wrapper "Since Start") until the result is published/host-ready and
+      // renderingFinished is emitted. This matches OpenGL's synchronous UX
+      // timing better than measuring only enqueue→ready latency in Vulkan.
+      const bool collectPerf = Z3DPerfCollector::enabled();
+      auto perfFrameStartTs = collectPerf ? Z3DRenderGlobalState::instance().currentPerfFrameStartTime()
+                                          : std::chrono::steady_clock::time_point{};
+      if (collectPerf && perfFrameStartTs.time_since_epoch().count() == 0) {
+        // Perf timing should never be missing, but do not crash on a logging
+        // metric. Fall back to "now" so the value is still bounded.
+        perfFrameStartTs = std::chrono::steady_clock::now();
+      }
+      // Presentation ordering is a correctness contract, not instrumentation:
+      // retain the render-frame identity when performance collection is off.
+      const uint64_t renderFrameToken = Z3DRenderGlobalState::instance().currentRenderFrameToken();
+      CHECK_GT(renderFrameToken, 0u) << "Vulkan final readback requires an immutable render-frame identity";
+      auto ticket = backend.requestEndOfFrameColorReadbackTicket(tex, eyeCopy, ticketLabel);
+      ZVulkanFinalReadbackCompletion completion(readbackOwner,
+                                                readbackOwnerRevision,
+                                                renderFrameToken,
+                                                readbackOutputSize,
+                                                ticket.size,
+                                                ticket.mapped,
+                                                eyeCopy,
+                                                localPtr,
+                                                targetPtr,
+                                                noCopy,
+                                                std::move(ticket.releaseSlot));
+      backend.registerAfterCurrentFrameCompletionHook(
+        currentRenderThreadExecutorKeepAlive(consumeLabel),
+        [publisher = publishFinalColorReadback,
+         fence = std::move(ticket.fence),
+         completion = std::move(completion),
+         collectPerf,
+         perfFrameStartTs](Z3DRendererVulkanBackend& backend) mutable {
+          return consumeVulkanFinalReadback(backend,
+                                            std::move(fence),
+                                            std::move(completion),
+                                            std::move(publisher),
+                                            collectPerf,
+                                            perfFrameStartTs);
+        },
+        consumeLabel);
+    };
 
     // Request readback while a Vulkan frame is active so backend can insert the copy before endRender.
     // If final color is not RGBA8, first render a copy to an RGBA8 scratch surface, then enqueue the readback inside
@@ -3287,6 +3395,7 @@ void Z3DCompositor::updateSize(const glm::uvec2& targetSize)
   CHECK_GT(targetSize.x, 0u);
   CHECK_GT(targetSize.y, 0u);
 
+  advanceVulkanFinalReadbackOwnerRevision();
   m_outputSize = targetSize;
   ensureOutputTargets(m_outputSize);
   invalidate(State::AllResultInvalid);
@@ -3435,7 +3544,7 @@ void Z3DCompositor::recordSceneSegmentsVulkan(const std::vector<Z3DBoundedFilter
       return;
     }
 
-    auto& pool = Z3DRenderGlobalState::instance().scratchPool();
+    auto& pool = m_rendererBase.scratchPool();
     ZVulkanLinearScript::SegmentHandle deps = depsScene;
 
     for (auto* filter : filters) {
@@ -3673,7 +3782,7 @@ void Z3DCompositor::ensureOutputTargets(const glm::uvec2& size)
     if (missingResource || backendMismatch || sizeMismatch) {
       lease.release();
       if (activeBackend == RenderBackend::Vulkan) {
-        Z3DRenderGlobalState::instance().scratchPool().reclaimVulkanScratchMemory(
+        m_rendererBase.scratchPool().reclaimVulkanScratchMemory(
           Z3DScratchResourcePool::VulkanScratchReclaimMode::WaitForIdle);
       }
       m_rendererBase.acquirePersistentTempRenderTarget2D(lease, size);
@@ -3698,12 +3807,17 @@ void Z3DCompositor::ensureOutputTargets(const glm::uvec2& size)
   m_rendererBase.frameState().updateViewportData(size);
 }
 
-void Z3DCompositor::switchBackend(RenderBackend backendRequest)
+void Z3DCompositor::switchBackend(RenderBackend backendRequest, const std::unique_lock<std::mutex>& targetSwitchLock)
 {
+  CHECK(targetSwitchLock.owns_lock()) << "Compositor backend switch requires the engine target-switch lock";
+  CHECK(targetSwitchLock.mutex() == &m_globalParameters.targetSwitchMutex)
+    << "Compositor backend switch received a lock for the wrong mutex";
+
   const RenderBackend previousBackend = m_rendererBase.activeBackend();
   VLOG(1) << fmt::format("Compositor switching backend to {}", enumToString(backendRequest));
 
   if (previousBackend != backendRequest) {
+    advanceVulkanFinalReadbackOwnerRevision();
     VLOG(1) << "Resetting picking manager render target for backend change";
     m_globalParameters.pickingManager.resetRenderTarget();
   }
@@ -3712,23 +3826,10 @@ void Z3DCompositor::switchBackend(RenderBackend backendRequest)
   // backend is still alive; the release lambdas close over the backend instance.
   if (previousBackend == RenderBackend::Vulkan && backendRequest == RenderBackend::OpenGL) {
     VLOG(1) << "Releasing outstanding Vulkan readback leases before backend switch";
-    auto clearExternal = [](Z3DLocalColorBuffer* buf) {
-      if (!buf) {
-        return;
-      }
-      if (buf->externalRelease) {
-        buf->externalRelease();
-        buf->externalRelease = {};
-      }
-      buf->external = nullptr;
-      buf->externalStride = 0;
-    };
-    clearExternal(m_monoCurrentLocalBuffer);
-    clearExternal(m_monoReadyLocalBuffer);
-    clearExternal(m_leftCurrentLocalBuffer);
-    clearExternal(m_leftReadyLocalBuffer);
-    clearExternal(m_rightCurrentLocalBuffer);
-    clearExternal(m_rightReadyLocalBuffer);
+    // The lock contract above keeps the complete physical backend transition
+    // atomic for the canvas. Do not recursively lock the non-recursive mutex
+    // while retiring the old Vulkan mappings.
+    releaseVulkanFinalReadbackMappingsLocked();
   }
 
   Z3DBoundedFilter::switchRendererBackend(backendRequest);
@@ -3805,7 +3906,7 @@ void Z3DCompositor::renderTransparentFilter(Z3DBoundedFilter* filter,
       glDepthMask(GL_TRUE);
     }
     // 1) render filter geometry to pooled glow temp target 1
-    auto glowLease1 = Z3DRenderGlobalState::instance().scratchPool().acquireTempRenderTarget2D(targetSize);
+    auto glowLease1 = m_rendererBase.scratchPool().acquireTempRenderTarget2D(targetSize);
     glowLease1.renderTarget->bind();
     glowLease1.renderTarget->clear();
     filter->setViewport(glowLease1.renderTarget->size());
@@ -3826,7 +3927,7 @@ void Z3DCompositor::renderTransparentFilter(Z3DBoundedFilter* filter,
       m_glowRenderer.setBlurStrength(strength->get());
     }
 
-    auto glowLease2 = Z3DRenderGlobalState::instance().scratchPool().acquireTempRenderTarget2D(targetSize);
+    auto glowLease2 = m_rendererBase.scratchPool().acquireTempRenderTarget2D(targetSize);
     glowLease2.renderTarget->bind();
     glowLease2.renderTarget->clear();
     setViewport(glowLease2.renderTarget->size());
@@ -3961,7 +4062,7 @@ void Z3DCompositor::renderGeomsOIT(const std::vector<Z3DBoundedFilter*>& opaqueF
       }
 
       // Geometry prepass (use pooled temp)
-      auto glowGeomLease = Z3DRenderGlobalState::instance().scratchPool().acquireTempRenderTarget2D(targetSize);
+      auto glowGeomLease = m_rendererBase.scratchPool().acquireTempRenderTarget2D(targetSize);
       // VLOG(1) << "lease acquired";
       glowGeomLease.renderTarget->bind();
       glowGeomLease.renderTarget->clear();
@@ -3970,8 +4071,7 @@ void Z3DCompositor::renderGeomsOIT(const std::vector<Z3DBoundedFilter*>& opaqueF
       glowGeomLease.renderTarget->release();
 
       // Glow blur/composition for this object directly into a pooled layer RT
-      glowLayerLeases.emplace_back(
-        Z3DRenderGlobalState::instance().scratchPool().acquireTempRenderTarget2D(targetSize));
+      glowLayerLeases.emplace_back(m_rendererBase.scratchPool().acquireTempRenderTarget2D(targetSize));
       // VLOG(1) << "lease acquired";
       auto* layerRT = glowLayerLeases.back().renderTarget;
       layerRT->bind();
@@ -4044,11 +4144,11 @@ void Z3DCompositor::renderGeomsOIT(const std::vector<Z3DBoundedFilter*>& opaqueF
   else if (opaqueFilters.empty()) {
     dispatchTransparent(targetLease, nullptr);
   } else {
-    auto leaseOpaque = Z3DRenderGlobalState::instance().scratchPool().acquireTempRenderTarget2D(targetSize);
+    auto leaseOpaque = m_rendererBase.scratchPool().acquireTempRenderTarget2D(targetSize);
     // VLOG(1) << "lease acquired";
     renderOpaqueFilters(opaqueFilters, leaseOpaque, eye);
 
-    auto leaseTrans = Z3DRenderGlobalState::instance().scratchPool().acquireTempRenderTarget2D(targetSize);
+    auto leaseTrans = m_rendererBase.scratchPool().acquireTempRenderTarget2D(targetSize);
     // VLOG(1) << "lease acquired";
     dispatchTransparent(leaseTrans, leaseOpaque.renderTarget->depthTexture());
 
@@ -4556,7 +4656,7 @@ void Z3DCompositor::ensurePickingTargetVulkan(const glm::uvec2& size)
                            m_pickingTargetLease.backend != RenderBackend::Vulkan;
   if (needAcquire) {
     m_pickingTargetLease.release();
-    Z3DRenderGlobalState::instance().scratchPool().reclaimVulkanScratchMemory(
+    m_rendererBase.scratchPool().reclaimVulkanScratchMemory(
       Z3DScratchResourcePool::VulkanScratchReclaimMode::WaitForIdle);
     m_rendererBase.acquirePersistentTempRenderTarget2D(m_pickingTargetLease,
                                                        size,
@@ -4581,7 +4681,7 @@ Z3DScratchResourcePool::RenderTargetLease& Z3DCompositor::ensureDDPRenderTarget(
   if (needAcquire) {
     m_ddpRTLease.release();
     if (wantVulkan) {
-      Z3DRenderGlobalState::instance().scratchPool().reclaimVulkanScratchMemory(
+      m_rendererBase.scratchPool().reclaimVulkanScratchMemory(
         Z3DScratchResourcePool::VulkanScratchReclaimMode::WaitForIdle);
     }
     m_rendererBase.acquirePersistentDualDepthPeelRenderTarget(m_ddpRTLease, size);
@@ -4605,7 +4705,7 @@ Z3DScratchResourcePool::RenderTargetLease& Z3DCompositor::ensureWARenderTarget(c
   if (needAcquire) {
     m_waRTLease.release();
     if (wantVulkan) {
-      Z3DRenderGlobalState::instance().scratchPool().reclaimVulkanScratchMemory(
+      m_rendererBase.scratchPool().reclaimVulkanScratchMemory(
         Z3DScratchResourcePool::VulkanScratchReclaimMode::WaitForIdle);
     }
     m_rendererBase.acquirePersistentWeightedAverageRenderTarget(m_waRTLease, size);
@@ -4629,7 +4729,7 @@ Z3DScratchResourcePool::RenderTargetLease& Z3DCompositor::ensureWBRenderTarget(c
   if (needAcquire) {
     m_wbRTLease.release();
     if (wantVulkan) {
-      Z3DRenderGlobalState::instance().scratchPool().reclaimVulkanScratchMemory(
+      m_rendererBase.scratchPool().reclaimVulkanScratchMemory(
         Z3DScratchResourcePool::VulkanScratchReclaimMode::WaitForIdle);
     }
     m_rendererBase.acquirePersistentWeightedBlendedRenderTarget(m_wbRTLease, size);
@@ -6053,8 +6153,8 @@ bool Z3DCompositor::mergeImageLayers(const std::vector<Z3DCompositorImageLayer>&
     return true;
   }
 
-  auto imgLease1 = Z3DRenderGlobalState::instance().scratchPool().acquireTempRenderTarget2D(targetSize);
-  auto imgLease2 = Z3DRenderGlobalState::instance().scratchPool().acquireTempRenderTarget2D(targetSize);
+  auto imgLease1 = m_rendererBase.scratchPool().acquireTempRenderTarget2D(targetSize);
+  auto imgLease2 = m_rendererBase.scratchPool().acquireTempRenderTarget2D(targetSize);
 
   // Blend first two layers into imgLease1
   imgLease1.renderTarget->bind();

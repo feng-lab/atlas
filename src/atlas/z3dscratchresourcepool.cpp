@@ -440,9 +440,10 @@ accumulateCategory(const char* label, const Slots& slots, bool detailed, std::st
 }
 
 template<typename Slot>
-Z3DScratchResourcePool::RenderTargetLease makeLeaseFromSlot(Slot* slot, uint32_t attachments, RenderBackend backend)
+Z3DScratchResourcePool::RenderTargetLease
+makeLeaseFromSlot(Z3DScratchResourcePool& pool, Slot* slot, uint32_t attachments, RenderBackend backend)
 {
-  Z3DScratchResourcePool::RenderTargetLease lease;
+  Z3DScratchResourcePool::RenderTargetLease lease(pool);
   lease.descriptor = slot->descriptor;
   lease.backend = backend;
   lease.renderTarget = slot->fbo.get();
@@ -1634,7 +1635,7 @@ Z3DScratchResourcePool::acquireBlockIdRenderTarget(const glm::uvec2& viewport,
   if (usableAttachments != slot->attachments) {
     leaseDescriptor.attachments = makeColorAttachments(usableAttachments, ScratchFormat::RGBA32UI);
   }
-  auto lease = makeLeaseFromSlot(slot, usableAttachments, RenderBackend::OpenGL);
+  auto lease = makeLeaseFromSlot(*this, slot, usableAttachments, RenderBackend::OpenGL);
   lease.descriptor = std::move(leaseDescriptor);
   const ScratchAcquireKind acquireKind =
     createdSlot
@@ -2465,7 +2466,7 @@ Z3DScratchResourcePool::acquireEntryExitRenderTarget(const glm::uvec2& size,
     acquireKind = ScratchAcquireKind::NewSlot;
   }
 
-  auto lease = makeLeaseFromSlot(slot, 1, RenderBackend::OpenGL);
+  auto lease = makeLeaseFromSlot(*this, slot, 1, RenderBackend::OpenGL);
   recordScratchAcquire(RenderBackend::OpenGL, lease.descriptor, acquireKind, false);
   maybeTrimAfterAcquire();
   return lease;
@@ -2531,7 +2532,7 @@ Z3DScratchResourcePool::acquireLayerArrayRenderTarget(const glm::uvec2& size,
     acquireKind = ScratchAcquireKind::NewSlot;
   }
 
-  auto lease = makeLeaseFromSlot(slot, 1, RenderBackend::OpenGL);
+  auto lease = makeLeaseFromSlot(*this, slot, 1, RenderBackend::OpenGL);
   recordScratchAcquire(RenderBackend::OpenGL, lease.descriptor, acquireKind, false);
   maybeTrimAfterAcquire();
   return lease;
@@ -2586,7 +2587,7 @@ Z3DScratchResourcePool::acquireRaycastAccumulatorRenderTarget(const glm::uvec2& 
     acquireKind = ScratchAcquireKind::NewSlot;
   }
 
-  auto lease = makeLeaseFromSlot(slot, 2, RenderBackend::OpenGL);
+  auto lease = makeLeaseFromSlot(*this, slot, 2, RenderBackend::OpenGL);
   recordScratchAcquire(RenderBackend::OpenGL, lease.descriptor, acquireKind, false);
   maybeTrimAfterAcquire();
   return lease;
@@ -2646,7 +2647,7 @@ Z3DScratchResourcePool::acquireTempRenderTarget2D(const glm::uvec2& size,
     acquireKind = ScratchAcquireKind::NewSlot;
   }
 
-  auto lease = makeLeaseFromSlot(slot, 1, RenderBackend::OpenGL);
+  auto lease = makeLeaseFromSlot(*this, slot, 1, RenderBackend::OpenGL);
   recordScratchAcquire(RenderBackend::OpenGL, lease.descriptor, acquireKind, false);
   maybeTrimAfterAcquire();
   return lease;
@@ -2688,7 +2689,7 @@ Z3DScratchResourcePool::acquireDualDepthPeelRenderTarget(const glm::uvec2& size,
     acquireKind = ScratchAcquireKind::NewSlot;
   }
 
-  auto lease = makeLeaseFromSlot(slot, 8, RenderBackend::OpenGL);
+  auto lease = makeLeaseFromSlot(*this, slot, 8, RenderBackend::OpenGL);
   recordScratchAcquire(RenderBackend::OpenGL, lease.descriptor, acquireKind, false);
   maybeTrimAfterAcquire();
   return lease;
@@ -2730,7 +2731,7 @@ Z3DScratchResourcePool::acquireWeightedAverageRenderTarget(const glm::uvec2& siz
     acquireKind = ScratchAcquireKind::NewSlot;
   }
 
-  auto lease = makeLeaseFromSlot(slot, 2, RenderBackend::OpenGL);
+  auto lease = makeLeaseFromSlot(*this, slot, 2, RenderBackend::OpenGL);
   recordScratchAcquire(RenderBackend::OpenGL, lease.descriptor, acquireKind, false);
   maybeTrimAfterAcquire();
   return lease;
@@ -2772,7 +2773,7 @@ Z3DScratchResourcePool::acquireWeightedBlendedRenderTarget(const glm::uvec2& siz
     acquireKind = ScratchAcquireKind::NewSlot;
   }
 
-  auto lease = makeLeaseFromSlot(slot, 2, RenderBackend::OpenGL);
+  auto lease = makeLeaseFromSlot(*this, slot, 2, RenderBackend::OpenGL);
   recordScratchAcquire(RenderBackend::OpenGL, lease.descriptor, acquireKind, false);
   maybeTrimAfterAcquire();
   return lease;
@@ -2913,8 +2914,8 @@ Z3DScratchResourcePool::acquireVulkanScratchImage(const ScratchImageDescriptor& 
       const auto& candDesc = candidate->descriptor;
       const uint64_t candidatePixels =
         static_cast<uint64_t>(candDesc.size.x) * candDesc.size.y * std::max<uint32_t>(1u, candDesc.layers);
-      const uint64_t delta = desiredPixels > candidatePixels ? desiredPixels - candidatePixels
-                                                             : candidatePixels - desiredPixels;
+      const uint64_t delta =
+        desiredPixels > candidatePixels ? desiredPixels - candidatePixels : candidatePixels - desiredPixels;
       if (!reusable || delta < bestDelta) {
         reusable = candidate.get();
         bestDelta = delta;
@@ -2998,7 +2999,7 @@ Z3DScratchResourcePool::acquireVulkanScratchImage(const ScratchImageDescriptor& 
   }
   const bool residentRecreated = false;
   markSlotAcquired(*slot);
-  auto lease = RenderTargetLease{};
+  auto lease = RenderTargetLease{*this};
   lease.descriptor = (descriptor.usage == ScratchImageUsage::BlockId) ? descriptor : slot->descriptor;
   lease.backend = RenderBackend::Vulkan;
   lease.vulkanImage = slot->image.get();
@@ -3014,6 +3015,31 @@ Z3DScratchResourcePool::acquireVulkanScratchImage(const ScratchImageDescriptor& 
 ZVulkanDevice* Z3DScratchResourcePool::vulkanDevice()
 {
   return m_externalVkDevice;
+}
+
+void Z3DScratchResourcePool::setVulkanDevice(/*nullable*/ ZVulkanDevice* device)
+{
+  if (device == m_externalVkDevice) {
+    return;
+  }
+
+  CHECK(m_externalVkDevice == nullptr || device == nullptr)
+    << "A Vulkan scratch pool must be explicitly unbound before selecting a different device";
+
+  // Changing physical-device ownership is a pipeline reconstruction boundary,
+  // never a retarget operation. Callers must first destroy every backend,
+  // clear its callbacks, and reset all device-local scratch identities.
+  for (const auto& slots : m_vulkanSlots) {
+    CHECK(slots.empty()) << "Cannot rebind a scratch pool while Vulkan scratch slots still exist";
+  }
+  CHECK(m_vulkanResidencyProtectedTextures.empty())
+    << "Cannot rebind a scratch pool while Vulkan scratch textures are protected";
+  CHECK(!m_vulkanReleaseScheduler)
+    << "Cannot rebind a scratch pool while a Vulkan backend release scheduler is installed";
+  CHECK(!m_vulkanMemoryPressureHandler)
+    << "Cannot rebind a scratch pool while a Vulkan backend memory-pressure handler is installed";
+
+  m_externalVkDevice = device;
 }
 
 ZVulkanDevice& Z3DScratchResourcePool::ensureVulkanDevice()

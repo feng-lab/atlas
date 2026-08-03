@@ -1,6 +1,5 @@
 #pragma once
 
-#include "z3drendererstates.h"
 #include "zfolly.h"
 
 #include <chrono>
@@ -10,21 +9,10 @@
 
 namespace nim {
 
-class Z3DScratchResourcePool;
-class Z3DCamera;
-class Z3DGlobalParameters;
-
 class Z3DRenderGlobalState
 {
 public:
   static Z3DRenderGlobalState& instance();
-
-  Z3DScratchResourcePool& scratchPool();
-  void trimScratchPool();
-
-  bool hasScratchPool() const;
-  void setScratchPool(Z3DScratchResourcePool* pool);
-  void resetScratchPool();
 
   bool hasCancellationSource() const;
   std::shared_ptr<folly::CancellationSource> ensureCancellationSource();
@@ -34,30 +22,6 @@ public:
   void resetCaptureCancellationSource();
   void requestCaptureCancellation();
   folly::CancellationToken currentCancellationToken() const;
-
-  struct RendererSharedState
-  {
-    RendererViewState viewState;
-    RendererSceneState sceneState;
-    bool viewDirty = true;
-    bool sceneDirty = true;
-  };
-
-  RendererSharedState& rendererState()
-  {
-    return m_rendererState;
-  }
-
-  const RendererSharedState& rendererState() const
-  {
-    return m_rendererState;
-  }
-
-  void markViewStateDirty();
-  void markSceneStateDirty();
-
-  void ensureViewState(const Z3DCamera& camera);
-  void ensureSceneState(const Z3DGlobalParameters& params);
 
   // ---------------------------------------------------------------------------
   // Performance aggregation helpers
@@ -98,15 +62,11 @@ public:
 private:
   Z3DRenderGlobalState();
 
-  Z3DScratchResourcePool& accessScratchPool() const;
-
   // Cancellation requests may come from other threads (e.g. UI-driven object removal) while the render thread is
   // mid-frame. Guard access to the source pointer to avoid data races.
   mutable std::mutex m_cancellationMutex;
   std::shared_ptr<folly::CancellationSource> m_cancellationSource;
   std::shared_ptr<folly::CancellationSource> m_captureCancellationSource;
-  Z3DScratchResourcePool* m_scratchPool = nullptr;
-  RendererSharedState m_rendererState;
 
   // Monotonically increasing render-frame identity. Performance aggregation
   // consumes this identity but does not own its lifetime.

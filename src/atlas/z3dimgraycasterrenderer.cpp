@@ -436,19 +436,7 @@ std::vector<ImgRaycasterPayload> Z3DImgRaycasterRenderer::buildVulkanStagePayloa
   // For fast-only rendering, render every frame.
   const bool entryExitThisFrame = needsEntryExit && (common.fastPathOnly || common.channelIndexRaw < 0);
 
-  auto& pool = Z3DRenderGlobalState::instance().scratchPool();
-  // Provide a persistent entry/exit lease across progressive frames (GL parity).
-  // Create a non-owning view so the underlying slot is not double-released.
-  auto shareLease = [](Z3DScratchResourcePool::RenderTargetLease& src) {
-    auto view = std::make_shared<Z3DScratchResourcePool::RenderTargetLease>();
-    view->descriptor = src.descriptor;
-    view->backend = src.backend;
-    view->renderTarget = src.renderTarget;
-    view->vulkanImage = src.vulkanImage;
-    view->attachments = src.attachments;
-    // leave view->releaser empty (no-op) to avoid double release
-    return view;
-  };
+  auto& pool = m_rendererBase.scratchPool();
 
   if (needsEntryExit) {
     if (common.fastPathOnly) {
@@ -470,7 +458,8 @@ std::vector<ImgRaycasterPayload> Z3DImgRaycasterRenderer::buildVulkanStagePayloa
                                                              ScratchFormat::RGBA32F,
                                                              std::optional<RenderBackend>(RenderBackend::Vulkan));
       }
-      common.entryExitLease = shareLease(m_entryExitLease);
+      common.entryExitLease =
+        std::make_shared<Z3DScratchResourcePool::RenderTargetLease>(m_entryExitLease.borrowedView());
     }
   }
 
@@ -480,8 +469,10 @@ std::vector<ImgRaycasterPayload> Z3DImgRaycasterRenderer::buildVulkanStagePayloa
 
       CHECK(m_lastRaycastAccum[eye]) << "Vulkan progressive raycaster missing last accum lease.";
       CHECK(m_currentRaycastAccum[eye]) << "Vulkan progressive raycaster missing current accum lease.";
-      common.lastAccumLease = shareLease(m_lastRaycastAccum[eye]);
-      common.currentAccumLease = shareLease(m_currentRaycastAccum[eye]);
+      common.lastAccumLease =
+        std::make_shared<Z3DScratchResourcePool::RenderTargetLease>(m_lastRaycastAccum[eye].borrowedView());
+      common.currentAccumLease =
+        std::make_shared<Z3DScratchResourcePool::RenderTargetLease>(m_currentRaycastAccum[eye].borrowedView());
     }
 
     // Persistent per-eye layer array used for preview + progressive merges.
@@ -499,7 +490,7 @@ std::vector<ImgRaycasterPayload> Z3DImgRaycasterRenderer::buildVulkanStagePayloa
                                                       ScratchFormat::Depth32F,
                                                       std::optional<RenderBackend>(RenderBackend::Vulkan));
     }
-    common.channelLayerLease = shareLease(layerLease);
+    common.channelLayerLease = std::make_shared<Z3DScratchResourcePool::RenderTargetLease>(layerLease.borrowedView());
 
   } else if (visibleChannels.size() > 1u) {
     // Fast multi-channel rendering (volume or planar): render per-channel results into a temporary
@@ -1132,7 +1123,7 @@ void Z3DImgRaycasterRenderer::ensureRaycastAccumulators(Z3DEye eye)
   CHECK_GT(m_outputSize.y, 0u);
 
   if (m_rendererBase.activeBackend() == RenderBackend::Vulkan) {
-    auto& pool = Z3DRenderGlobalState::instance().scratchPool();
+    auto& pool = m_rendererBase.scratchPool();
     auto ensureLease = [&](Z3DScratchResourcePool::RenderTargetLease& lease) {
       const bool sizeMismatch = lease.descriptor.size != m_outputSize;
       if (!lease.hasVulkanImage() || sizeMismatch) {
@@ -1800,7 +1791,7 @@ void Z3DImgRaycasterRenderer::finalizePagingStatsIfDone(Z3DEye eye)
 
 void Z3DImgRaycasterRenderer::render2DImage(Z3DEye eye, const std::vector<size_t>& visibleIdxs)
 {
-  auto& scratchPool = Z3DRenderGlobalState::instance().scratchPool();
+  auto& scratchPool = m_rendererBase.scratchPool();
 
   m_sc2dImageShader->bind();
   m_rendererBase.setGlobalShaderParameters(*m_sc2dImageShader, eye);
@@ -1859,7 +1850,7 @@ Z3DImgRaycasterRenderer::render2DSliceOf3DImage(Z3DEye eye, const std::vector<si
   const auto& monoEyeState = viewState.eyes[MonoEye];
   auto cancellationToken = Z3DRenderGlobalState::instance().currentCancellationToken();
   const float devicePixelRatio = sceneState.devicePixelRatio;
-  auto& scratchPool = Z3DRenderGlobalState::instance().scratchPool();
+  auto& scratchPool = m_rendererBase.scratchPool();
 
   float n = viewState.nearClip;
   glm::vec2 pixelEyeSpaceSize = monoEyeState.frustumNearPlaneSize / glm::vec2(m_outputSize);
@@ -2000,9 +1991,8 @@ void Z3DImgRaycasterRenderer::render2DSliceOf3DImageFast(Z3DEye eye, const std::
       renderTriangleList(*m_VAO, *m_scVolumeSliceWithTransferfunShader, quad);
     }
   } else {
-    layerLease = Z3DRenderGlobalState::instance().scratchPool().acquireLayerArrayRenderTarget(
-      m_outputSize,
-      static_cast<uint32_t>(visibleIdxs.size()));
+    layerLease = m_rendererBase.scratchPool().acquireLayerArrayRenderTarget(m_outputSize,
+                                                                            static_cast<uint32_t>(visibleIdxs.size()));
     // VLOG(1) << "lease acquired";
     for (size_t j = 0; j < visibleIdxs.size(); ++j) {
       layerLease.renderTarget->attachSlice(j);
@@ -2259,9 +2249,8 @@ double Z3DImgRaycasterRenderer::render3DImage(Z3DEye eye, const std::vector<size
     }
 
     ensureRaycastAccumulators(eye);
-    layerLease = Z3DRenderGlobalState::instance().scratchPool().acquireLayerArrayRenderTarget(
-      m_outputSize,
-      static_cast<uint32_t>(visibleIdxs.size()));
+    layerLease = m_rendererBase.scratchPool().acquireLayerArrayRenderTarget(m_outputSize,
+                                                                            static_cast<uint32_t>(visibleIdxs.size()));
     // VLOG(1) << "lease acquired";
     for (size_t channelIdx = 0; channelIdx < visibleIdxs.size(); ++channelIdx) {
       auto c = visibleIdxs[channelIdx];
@@ -2388,7 +2377,7 @@ bool Z3DImgRaycasterRenderer::render3DImageForOneRound(Z3DEye eye,
                                                        RaycastExportMode exportMode)
 {
   auto cancellationToken = Z3DRenderGlobalState::instance().currentCancellationToken();
-  auto& scratchPool = Z3DRenderGlobalState::instance().scratchPool();
+  auto& scratchPool = m_rendererBase.scratchPool();
   const bool firstProgressiveRound = progressive && round == 0 && c == 0;
   auto maybeCancelFirstProgressiveRound = [&]() {
     // Once the fast preview is already on screen, the first full-res round is
@@ -2558,7 +2547,8 @@ bool Z3DImgRaycasterRenderer::render3DImageForOneRound(Z3DEye eye,
     maybeCancelFirstProgressiveRound();
     maybeCancel(cancellationToken);
 
-    lastRound = m_img->updateAndUploadPageDirectoryCaches(missingBlockIDs, c, cancellationToken, bt, round) && lastRound;
+    lastRound =
+      m_img->updateAndUploadPageDirectoryCaches(missingBlockIDs, c, cancellationToken, bt, round) && lastRound;
 
     maybeCancelFirstProgressiveRound();
     maybeCancel(cancellationToken);
@@ -2698,9 +2688,8 @@ void Z3DImgRaycasterRenderer::render3DImageFast(Z3DEye /*eye*/, const std::vecto
     renderScreenQuad(*m_VAO, *m_scRaycasterShader);
   } else {
     CHECK(visibleIdxs.size() > 1);
-    layerLease = Z3DRenderGlobalState::instance().scratchPool().acquireLayerArrayRenderTarget(
-      m_outputSize,
-      static_cast<uint32_t>(visibleIdxs.size()));
+    layerLease = m_rendererBase.scratchPool().acquireLayerArrayRenderTarget(m_outputSize,
+                                                                            static_cast<uint32_t>(visibleIdxs.size()));
     // VLOG(1) << "lease acquired";
     for (size_t i = 0; i < visibleIdxs.size(); ++i) {
       layerLease.renderTarget->attachSlice(i);
@@ -2747,7 +2736,7 @@ bool Z3DImgRaycasterRenderer::render3DImageFastRawMIP(Z3DEye /*eye*/,
     return false;
   }
 
-  auto& scratchPool = Z3DRenderGlobalState::instance().scratchPool();
+  auto& scratchPool = m_rendererBase.scratchPool();
   auto exportLease =
     scratchPool.acquireTempRenderTarget2D(m_outputSize, ScratchFormat::RGBA32F, ScratchFormat::Depth32F);
   CHECK(exportLease.renderTarget != nullptr);
@@ -2852,7 +2841,7 @@ bool Z3DImgRaycasterRenderer::render3DImageFastScreenSpaceAudit(Z3DEye /*eye*/,
     error = "screen-space audit requires prepared ray setup";
     return false;
   }
-  auto& scratchPool = Z3DRenderGlobalState::instance().scratchPool();
+  auto& scratchPool = m_rendererBase.scratchPool();
   auto exportLease =
     scratchPool.acquireTempRenderTarget2D(m_outputSize, ScratchFormat::RGBA32F, ScratchFormat::Depth32F);
   CHECK(exportLease.renderTarget != nullptr);

@@ -21,6 +21,7 @@
 #include <array>
 #include <cstdint>
 #include <memory>
+#include <mutex>
 
 namespace nim {
 
@@ -100,7 +101,20 @@ public:
 
   void setProgressiveRenderingMode(bool v) override;
 
-  void switchBackend(RenderBackend backend);
+  // Render quality and readback completion are independent. Direct rendering
+  // keeps FollowRenderQuality; an isolated final-quality attempt can select
+  // ReturnAfterSubmit without changing filter evaluation quality.
+  void setReadbackCompletionPolicy(ReadbackCompletionPolicy policy)
+  {
+    m_rendererBase.setReadbackCompletionPolicy(policy);
+  }
+
+  [[nodiscard]] ReadbackCompletionPolicy readbackCompletionPolicy() const
+  {
+    return m_rendererBase.readbackCompletionPolicy();
+  }
+
+  void switchBackend(RenderBackend backend, const std::unique_lock<std::mutex>& targetSwitchLock);
 
 Q_SIGNALS:
   void sceneParaUpdated();
@@ -375,6 +389,14 @@ private:
   std::array<std::shared_ptr<RendererCPUState>, 3> m_vkSceneBgGeomCache{};
 
   void resetVulkanSceneBatchCaches();
+  void advanceVulkanFinalReadbackOwnerRevision();
+  void releaseVulkanFinalReadbackMappings();
+  void releaseVulkanFinalReadbackMappingsLocked();
+
+  // Completion callbacks snapshot this value. Resizes, backend changes, and
+  // destruction advance it so an old callback can retire its staging slot but
+  // cannot publish through a stale compositor destination.
+  uint64_t m_vulkanFinalReadbackOwnerRevision = 1u;
 
   // Z3DVertexBufferObject m_PBO;
 };

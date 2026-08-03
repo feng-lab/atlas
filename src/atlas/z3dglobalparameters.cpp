@@ -3,15 +3,105 @@
 #include "zwidgetsgroup.h"
 #include "z3dgpuinfo.h"
 #include "z3dcameracontrolwidget.h"
-#include "z3drendererstates.h"
+#include "z3dscratchresourcepool.h"
 #include <QThread>
 #include <algorithm>
 #include <utility>
 
 namespace nim {
 
-Z3DGlobalParameters::Z3DGlobalParameters(RenderBackend backend)
-  : renderBackend("Render Backend")
+namespace {
+
+RendererSceneState::LightingState buildLightingState(const Z3DGlobalParameters& params)
+{
+  RendererSceneState::LightingState lighting;
+
+  const auto configuredCount = params.lightCount.get();
+  const auto maxCount = static_cast<int>(params.lightPositions.size());
+  constexpr int kMaxLights = 5;
+  const auto clampedCount = std::clamp(configuredCount, 1, std::min(maxCount, kMaxLights));
+  lighting.lightCount = clampedCount;
+
+  const auto fill = [clampedCount](auto& destination, const auto& sources) {
+    destination.resize(static_cast<size_t>(clampedCount));
+    for (int i = 0; i < clampedCount; ++i) {
+      destination[static_cast<size_t>(i)] = sources[static_cast<size_t>(i)]->get();
+    }
+  };
+
+  fill(lighting.positions, params.lightPositions);
+  fill(lighting.ambient, params.lightAmbients);
+  fill(lighting.diffuse, params.lightDiffuses);
+  fill(lighting.specular, params.lightSpeculars);
+  fill(lighting.attenuation, params.lightAttenuations);
+  fill(lighting.spotCutoff, params.lightSpotCutoff);
+  fill(lighting.spotExponent, params.lightSpotExponent);
+  fill(lighting.spotDirection, params.lightSpotDirection);
+
+  return lighting;
+}
+
+RendererSceneState buildSceneState(const Z3DGlobalParameters& params)
+{
+  RendererSceneState state;
+  state.sceneAmbient = params.sceneAmbient.get();
+  state.weightedBlendedDepthScale = params.weightedBlendedDepthScale.get();
+  state.devicePixelRatio = params.devicePixelRatio.get();
+  TransparencyMode transparency = static_cast<TransparencyMode>(params.transparencyMethod.associatedData());
+  const RenderBackend backend = static_cast<RenderBackend>(params.renderBackend.associatedData());
+  if (backend == RenderBackend::OpenGL && transparency == TransparencyMode::PerPixelFragmentList) {
+    // PPLL is Vulkan-only; preserve the existing OpenGL parity fallback even
+    // if a serialized or coalesced backend transition temporarily retains it.
+    transparency = TransparencyMode::DualDepthPeeling;
+  }
+  state.transparency = transparency;
+  state.geometryAAMode = static_cast<GeometryAAMode>(params.geometriesAAMode.associatedData());
+  state.lighting = buildLightingState(params);
+
+  state.fog.mode = static_cast<FogMode>(params.fogMode.associatedData());
+  state.fog.topColor = params.fogTopColor.get();
+  state.fog.bottomColor = params.fogBottomColor.get();
+  const glm::ivec2 fogRange = params.fogRange.get();
+  state.fog.range = glm::vec2(fogRange);
+  state.fog.density = params.fogDensity.get();
+
+  return state;
+}
+
+RendererViewState buildViewState(const Z3DCamera& camera)
+{
+  RendererViewState state;
+  state.nearClip = camera.nearDist();
+  state.farClip = camera.farDist();
+
+  const auto eyePosition = camera.eye();
+  const auto isPerspective = camera.isPerspectiveProjection();
+  const auto frustumNearPlaneSize = camera.frustumNearPlaneSize();
+  const auto fieldOfView = camera.fieldOfView();
+
+  for (int eyeValue = LeftEye; eyeValue <= RightEye; ++eyeValue) {
+    auto eye = static_cast<Z3DEye>(eyeValue);
+    auto& eyeState = state.eyes[static_cast<size_t>(eye)];
+    eyeState.viewMatrix = camera.viewMatrix(eye);
+    eyeState.projectionMatrix = camera.projectionMatrix(eye);
+    eyeState.projectionViewMatrix = camera.projectionViewMatrix(eye);
+    eyeState.inverseViewMatrix = camera.inverseViewMatrix(eye);
+    eyeState.inverseProjectionMatrix = camera.inverseProjectionMatrix(eye);
+    eyeState.normalMatrix = camera.normalMatrix(eye);
+    eyeState.eyePosition = eyePosition;
+    eyeState.isPerspective = isPerspective;
+    eyeState.frustumNearPlaneSize = frustumNearPlaneSize;
+    eyeState.fieldOfView = fieldOfView;
+  }
+
+  return state;
+}
+
+} // namespace
+
+Z3DGlobalParameters::Z3DGlobalParameters(Z3DScratchResourcePool& scratchPool, RenderBackend backend)
+  : m_scratchPool(scratchPool)
+  , renderBackend("Render Backend")
   , geometriesAAMode("Anti-Aliasing")
   , transparencyMethod("Transparency")
   , weightedBlendedDepthScale("Weighted Blended Depth Scale", 1.f, 1e-3f, 1e3f)
@@ -331,6 +421,18 @@ Z3DGlobalParameters::Z3DGlobalParameters(RenderBackend backend)
     QStringLiteral("Detected display scale (read-only); used to auto-tune anti-aliasing."));
 
   pickingManager.setDevicePixelRatio(devicePixelRatio.get());
+}
+
+void Z3DGlobalParameters::ensureRendererState()
+{
+  if (m_rendererSceneStateDirty) {
+    m_rendererSceneState = buildSceneState(*this);
+    m_rendererSceneStateDirty = false;
+  }
+  if (m_rendererViewStateDirty) {
+    m_rendererViewState = buildViewState(camera.get());
+    m_rendererViewStateDirty = false;
+  }
 }
 
 void Z3DGlobalParameters::updateTransparencyOptionsForBackend(RenderBackend backend)

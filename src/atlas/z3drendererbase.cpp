@@ -8,7 +8,6 @@
 #include "zvulkanuniforms.h"
 #include "z3dscratchresourcepool.h"
 #include "z3dcamera.h"
-#include "z3drenderglobalstate.h"
 #include "zexception.h"
 #include "zlog.h"
 #include <folly/ScopeGuard.h>
@@ -22,11 +21,13 @@ Z3DRendererBase::Z3DRendererBase(RendererParameterState& parameterState,
                                  RendererFrameState& frameState,
                                  RendererViewState& viewState,
                                  RendererSceneState& sceneState,
+                                 Z3DScratchResourcePool& scratchPool,
                                  RenderBackend initialBackend)
   : m_parameters(parameterState)
   , m_frameState(frameState)
   , m_viewState(viewState)
   , m_sceneState(sceneState)
+  , m_scratchPool(scratchPool)
   , m_clipEnabled(true)
   , m_shaderHookType(ShaderHookType::Normal)
   , m_activeBackend(initialBackend)
@@ -249,8 +250,7 @@ Z3DRendererBase::acquirePersistentTempRenderTarget2D(Z3DScratchResourcePool::Ren
                                                      ScratchFormat depthFormat)
 {
   registerPersistentLease(lease);
-  auto& pool = Z3DRenderGlobalState::instance().scratchPool();
-  lease = pool.acquireTempRenderTarget2D(size, colorFormat, depthFormat);
+  lease = m_scratchPool.acquireTempRenderTarget2D(size, colorFormat, depthFormat);
   return lease;
 }
 
@@ -259,12 +259,11 @@ Z3DRendererBase::acquirePersistentDualDepthPeelRenderTarget(Z3DScratchResourcePo
                                                             const glm::uvec2& size)
 {
   registerPersistentLease(lease);
-  auto& pool = Z3DRenderGlobalState::instance().scratchPool();
   std::optional<RenderBackend> backend;
   if (m_activeBackend == RenderBackend::Vulkan) {
     backend = RenderBackend::Vulkan;
   }
-  lease = pool.acquireDualDepthPeelRenderTarget(size, backend);
+  lease = m_scratchPool.acquireDualDepthPeelRenderTarget(size, backend);
   return lease;
 }
 
@@ -273,12 +272,11 @@ Z3DRendererBase::acquirePersistentWeightedAverageRenderTarget(Z3DScratchResource
                                                               const glm::uvec2& size)
 {
   registerPersistentLease(lease);
-  auto& pool = Z3DRenderGlobalState::instance().scratchPool();
   std::optional<RenderBackend> backend;
   if (m_activeBackend == RenderBackend::Vulkan) {
     backend = RenderBackend::Vulkan;
   }
-  lease = pool.acquireWeightedAverageRenderTarget(size, backend);
+  lease = m_scratchPool.acquireWeightedAverageRenderTarget(size, backend);
   return lease;
 }
 
@@ -287,12 +285,11 @@ Z3DRendererBase::acquirePersistentWeightedBlendedRenderTarget(Z3DScratchResource
                                                               const glm::uvec2& size)
 {
   registerPersistentLease(lease);
-  auto& pool = Z3DRenderGlobalState::instance().scratchPool();
   std::optional<RenderBackend> backend;
   if (m_activeBackend == RenderBackend::Vulkan) {
     backend = RenderBackend::Vulkan;
   }
-  lease = pool.acquireWeightedBlendedRenderTarget(size, backend);
+  lease = m_scratchPool.acquireWeightedBlendedRenderTarget(size, backend);
   return lease;
 }
 
@@ -301,8 +298,7 @@ Z3DRendererBase::acquirePersistentRaycastAccumulatorRenderTarget(Z3DScratchResou
                                                                  const glm::uvec2& size)
 {
   registerPersistentLease(lease);
-  auto& pool = Z3DRenderGlobalState::instance().scratchPool();
-  lease = pool.acquireRaycastAccumulatorRenderTarget(size);
+  lease = m_scratchPool.acquireRaycastAccumulatorRenderTarget(size);
   return lease;
 }
 
@@ -314,12 +310,11 @@ Z3DRendererBase::acquirePersistentLayerArrayRenderTarget(Z3DScratchResourcePool:
                                                          ScratchFormat depthFormat)
 {
   registerPersistentLease(lease);
-  auto& pool = Z3DRenderGlobalState::instance().scratchPool();
   std::optional<RenderBackend> backend;
   if (m_activeBackend == RenderBackend::Vulkan) {
     backend = RenderBackend::Vulkan;
   }
-  lease = pool.acquireLayerArrayRenderTarget(size, layers, colorFormat, depthFormat, backend);
+  lease = m_scratchPool.acquireLayerArrayRenderTarget(size, layers, colorFormat, depthFormat, backend);
   return lease;
 }
 
@@ -330,8 +325,7 @@ Z3DRendererBase::acquirePersistentEntryExitRenderTarget(Z3DScratchResourcePool::
                                                         ScratchFormat colorFormat)
 {
   registerPersistentLease(lease);
-  auto& pool = Z3DRenderGlobalState::instance().scratchPool();
-  lease = pool.acquireEntryExitRenderTarget(size, layers, colorFormat);
+  lease = m_scratchPool.acquireEntryExitRenderTarget(size, layers, colorFormat);
   return lease;
 }
 
@@ -342,8 +336,7 @@ Z3DRendererBase::acquirePersistentBlockIdRenderTarget(Z3DScratchResourcePool::Re
                                                       double scale)
 {
   registerPersistentLease(lease);
-  auto& pool = Z3DRenderGlobalState::instance().scratchPool();
-  lease = pool.acquireBlockIdRenderTarget(viewport, requestedAttachments, scale);
+  lease = m_scratchPool.acquireBlockIdRenderTarget(viewport, requestedAttachments, scale);
   return lease;
 }
 
@@ -351,6 +344,10 @@ RendererFrameState::ActiveSurface
 Z3DRendererBase::describeSurface(const Z3DScratchResourcePool::RenderTargetLease& lease)
 {
   CHECK(m_backend != nullptr) << "Renderer backend not set";
+  if (lease) {
+    CHECK(lease.ownerPool() == &m_scratchPool)
+      << "Scratch render-target lease belongs to a different physical pipeline";
+  }
   return m_backend->describeSurfaceFromLease(lease);
 }
 
@@ -415,9 +412,10 @@ void Z3DRendererBase::endVulkanFrame()
 
 void Z3DRendererBase::flushVulkanWorkForTeardown(std::string_view reason)
 {
-  if (m_activeBackend != RenderBackend::Vulkan || m_backend == nullptr) {
+  if (m_activeBackend != RenderBackend::Vulkan) {
     return;
   }
+  CHECK(m_backend != nullptr) << "Vulkan teardown flush requires an active renderer backend";
 
   // Do not flush with a frame left open; end it first so submissions (and their
   // corresponding post-fence callbacks) have a well-defined lifetime.
@@ -425,11 +423,7 @@ void Z3DRendererBase::flushVulkanWorkForTeardown(std::string_view reason)
     endVulkanFrame();
   }
 
-  auto* vkBackend = dynamic_cast<Z3DRendererVulkanBackend*>(m_backend.get());
-  if (vkBackend == nullptr) {
-    return;
-  }
-  vkBackend->flushForTeardown(reason);
+  m_backend->flushForTeardown(reason);
 }
 
 void Z3DRendererBase::recordVulkanBatchesInActiveFrame(const std::function<void()>& recordBatches,
@@ -640,9 +634,11 @@ void Z3DRendererBase::setBackend(RenderBackend backendType)
       case RenderBackend::OpenGL:
         newBackend = createGLRendererBackend();
         break;
-      case RenderBackend::Vulkan:
-        newBackend = createVulkanRendererBackend();
-        break;
+      case RenderBackend::Vulkan: {
+        auto* device = m_scratchPool.vulkanDevice();
+        CHECK(device != nullptr) << "Vulkan renderer backend requires an engine-owned device";
+        newBackend = createVulkanRendererBackend(m_scratchPool, *device);
+      } break;
     }
   }
   catch (const ZException& e) {

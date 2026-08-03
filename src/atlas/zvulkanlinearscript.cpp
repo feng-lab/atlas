@@ -3,7 +3,6 @@
 
 #include "z3drendererbase.h"
 #include "z3drenderervulkanbackend.h"
-#include "z3drenderglobalstate.h"
 #include "z3dperfcollector.h"
 #include "z3dscratchresourcepool.h"
 #include "z3dimg.h"
@@ -505,6 +504,9 @@ ZVulkanLinearScript::ZVulkanLinearScript(Z3DRendererBase& renderer,
 {
   CHECK(m_renderer.backend() != nullptr) << "ZVulkanLinearScript requires a renderer backend";
   CHECK(m_renderer.activeBackend() == RenderBackend::Vulkan) << "ZVulkanLinearScript requires Vulkan renderer";
+  CHECK(m_renderer.backend() == &m_backend) << "ZVulkanLinearScript backend does not belong to its renderer";
+  CHECK(&m_renderer.scratchPool() == &m_backend.scratchPool())
+    << "ZVulkanLinearScript renderer/backend scratch affinity mismatch";
   CHECK(!m_renderer.isVulkanFrameActive())
     << "ZVulkanLinearScript requires no active Vulkan frame (script must own submission boundaries)";
   CHECK(currentRenderThreadExecutorOrNull() != nullptr) << "ZVulkanLinearScript must run on the rendering thread";
@@ -821,8 +823,7 @@ bool ZVulkanLinearScript::shouldFlushForResidencyBeforeIndependentWork(std::stri
 
   const auto pendingNodeSpan = std::span<const Node>(m_nodes.data(), m_nodes.size());
   const auto scratchUses = collectScratchTextureUsesForNodes(pendingNodeSpan);
-  const auto scratchEstimate =
-    Z3DRenderGlobalState::instance().scratchPool().estimateVulkanScratchTexturesForPass(scratchUses);
+  const auto scratchEstimate = m_backend.scratchPool().estimateVulkanScratchTexturesForPass(scratchUses);
   const auto pressure = residency.allocationPressureFor(scratchEstimate.missingBytes);
   const bool shouldFlush = pressure.needsReclaim();
   VLOG(2) << fmt::format(
@@ -1779,9 +1780,8 @@ void ZVulkanLinearScript::flushNodes(std::string_view reason,
       scratchNode.fn = [uses = std::move(sharedUses),
                         protection = scratchHotProtection](Z3DRendererVulkanBackend& backend,
                                                            Z3DRendererBase& renderer) {
-        (void)backend;
         (void)renderer;
-        auto& scratchPool = Z3DRenderGlobalState::instance().scratchPool();
+        auto& scratchPool = backend.scratchPool();
         scratchPool.prepareVulkanScratchTexturesForPass(
           std::span<const Z3DScratchResourcePool::VulkanScratchTextureUse>(uses->data(), uses->size()),
           "linear_script");

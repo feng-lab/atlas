@@ -312,8 +312,10 @@ float computeSphereBoxCorrection(float fovyDegrees)
 
 thread_local Z3DRendererVulkanBackend* Z3DRendererVulkanBackend::s_currentBackend = nullptr;
 
-Z3DRendererVulkanBackend::Z3DRendererVulkanBackend()
-  : m_lineContext(std::make_unique<ZVulkanLinePipelineContext>(*this))
+Z3DRendererVulkanBackend::Z3DRendererVulkanBackend(Z3DScratchResourcePool& scratchPool, ZVulkanDevice& device)
+  : m_scratchPool(scratchPool)
+  , m_boundDevice(device)
+  , m_lineContext(std::make_unique<ZVulkanLinePipelineContext>(*this))
   , m_meshContext(std::make_unique<ZVulkanMeshPipelineContext>(*this))
   , m_ellipsoidContext(std::make_unique<ZVulkanEllipsoidPipelineContext>(*this))
   , m_sphereContext(std::make_unique<ZVulkanSpherePipelineContext>(*this))
@@ -329,7 +331,10 @@ Z3DRendererVulkanBackend::Z3DRendererVulkanBackend()
   , m_imgSliceContext(std::make_unique<ZVulkanImgSlicePipelineContext>(*this))
   , m_imgRaycasterContext(std::make_unique<ZVulkanImgRaycasterPipelineContext>(*this))
   , m_fontContext(std::make_unique<ZVulkanFontPipelineContext>(*this))
-{}
+{
+  CHECK(m_scratchPool.vulkanDevice() == &m_boundDevice)
+    << "Vulkan backend requires its scratch pool to be bound to the injected device";
+}
 
 Z3DRendererVulkanBackend::~Z3DRendererVulkanBackend()
 {
@@ -348,8 +353,8 @@ Z3DRendererVulkanBackend::~Z3DRendererVulkanBackend()
   // engine is tearing down. Do not leave a scheduler closure capturing this
   // backend beyond its lifetime.
   uninstallMemoryBrokerProviders();
-  Z3DRenderGlobalState::instance().scratchPool().setVulkanReleaseScheduler({});
-  Z3DRenderGlobalState::instance().scratchPool().setVulkanMemoryPressureHandler({});
+  m_scratchPool.setVulkanReleaseScheduler({});
+  m_scratchPool.setVulkanMemoryPressureHandler({});
 }
 
 Z3DRendererVulkanBackend* Z3DRendererVulkanBackend::current()
@@ -371,8 +376,8 @@ void Z3DRendererVulkanBackend::preBackendSwitch()
   m_imageBlockUploader.reset();
   m_imageBlockUploaderDevice = nullptr;
   uninstallMemoryBrokerProviders();
-  Z3DRenderGlobalState::instance().scratchPool().setVulkanReleaseScheduler({});
-  Z3DRenderGlobalState::instance().scratchPool().setVulkanMemoryPressureHandler({});
+  m_scratchPool.setVulkanReleaseScheduler({});
+  m_scratchPool.setVulkanMemoryPressureHandler({});
 
   // Drop backend-local descriptor resources; device-owned bindless resources
   // are released with ZVulkanDevice after every backend has drained.
@@ -931,6 +936,7 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
   // Capture the frame name from the renderer (if provided)
   frameResources.frameName = std::string(renderer.currentFrameLabel());
   frameResources.progressivePassHint = renderer.currentRenderPassIsProgressive();
+  frameResources.readbackCompletionPolicy = renderer.readbackCompletionPolicy();
   frameResources.perfCollectionEnabled = perfCollectionEnabled;
   frameResources.realFrameToken = Z3DRenderGlobalState::instance().currentRenderFrameToken();
   CHECK_GT(frameResources.realFrameToken, 0u) << "Vulkan submission requires an active render-frame token";
@@ -1089,7 +1095,7 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
   // Install scratch-pool deferred release scheduler for this backend.
   // (Used by RenderTargetLease to delay Vulkan slot reuse until the frame-slot
   // reaches the completion safe point.)
-  auto& pool = Z3DRenderGlobalState::instance().scratchPool();
+  auto& pool = m_scratchPool;
   pool.setVulkanMemoryPressureHandler([this](Z3DScratchResourcePool::VulkanScratchReclaimMode mode) {
     reclaimTransientResourcesForMemoryPressure(mode, "scratch_pool");
   });
@@ -1328,11 +1334,12 @@ void Z3DRendererVulkanBackend::endRender(Z3DRendererBase& renderer)
   const bool hasReadbacks = (m_activeFrame && (!m_activeFrame->pendingColorReadbacks.empty() ||
                                                !m_activeFrame->pendingBufferReadbacks.empty()));
   const bool progressivePassHint = frame.progressivePassHint;
-  const bool waitForReadbacksPolicy = !progressivePassHint;
+  const ReadbackCompletionPolicy readbackCompletionPolicy = frame.readbackCompletionPolicy;
+  const bool waitForReadbacksPolicy = readbackCompletionRequiresWait(readbackCompletionPolicy, progressivePassHint);
   const bool needFenceWait = frame.forceFenceWaitForCompletionSafePoint || (hasReadbacks && waitForReadbacksPolicy);
   if (VLOG_IS_ON(1)) {
     VLOG(1) << fmt::format(
-      "VK queueSubmit: frame='{}' token={} submit#{} cmd=0x{:x} fence=0x{:x} has_readback={} progressive_pass_hint={} wait_for_readbacks_policy={} force_safe_point_wait={} will_wait={} pending_color_readbacks={} pending_buffer_readbacks={}",
+      "VK queueSubmit: frame='{}' token={} submit#{} cmd=0x{:x} fence=0x{:x} has_readback={} progressive_pass_hint={} readback_completion_policy={} wait_for_readbacks_policy={} force_safe_point_wait={} will_wait={} pending_color_readbacks={} pending_buffer_readbacks={}",
       frame.frameName.empty() ? std::string("<unlabeled-frame>") : frame.frameName,
       frame.realFrameToken,
       frame.submissionId,
@@ -1340,6 +1347,7 @@ void Z3DRendererVulkanBackend::endRender(Z3DRendererBase& renderer)
       static_cast<uint64_t>(reinterpret_cast<uintptr_t>(static_cast<VkFence>(*frameHandle.fence()))),
       hasReadbacks,
       progressivePassHint,
+      enumOrUnderlying(readbackCompletionPolicy),
       waitForReadbacksPolicy,
       frame.forceFenceWaitForCompletionSafePoint,
       needFenceWait,
@@ -2543,31 +2551,32 @@ Z3DRendererVulkanBackend::describeSurfaceFromLease(const Z3DScratchResourcePool:
     return surface;
   }
 
-  if (lease.backend != RenderBackend::Vulkan || !lease.hasVulkanImage()) {
-    return surface;
-  }
+  CHECK(lease.backend == RenderBackend::Vulkan && lease.hasVulkanImage())
+    << "Vulkan backend received a non-Vulkan scratch lease";
 
   const auto& descriptor = lease.descriptor;
 
   for (const auto& attachment : descriptor.attachments) {
     if (attachment.kind == ScratchAttachmentKind::Color) {
-      if (auto* texture = lease.colorAttachment(attachment.index)) {
-        AttachmentDesc desc;
-        desc.handle.backend = RenderBackend::Vulkan;
-        desc.handle.id = reinterpret_cast<uint64_t>(texture);
-        desc.handle.index = attachment.index;
-        desc.finalUse = AttachmentFinalUse::RenderTarget;
-        surface.colorAttachments.push_back(desc);
-      }
+      auto* texture = lease.colorAttachment(attachment.index);
+      CHECK(texture != nullptr) << "Vulkan scratch descriptor is missing a declared color attachment";
+      CHECK(&texture->ownerDevice() == &m_boundDevice) << "Vulkan color attachment belongs to a different device";
+      AttachmentDesc desc;
+      desc.handle.backend = RenderBackend::Vulkan;
+      desc.handle.id = reinterpret_cast<uint64_t>(texture);
+      desc.handle.index = attachment.index;
+      desc.finalUse = AttachmentFinalUse::RenderTarget;
+      surface.colorAttachments.push_back(desc);
     } else if (attachment.kind == ScratchAttachmentKind::Depth) {
-      if (auto* texture = lease.depthAttachmentTexture()) {
-        AttachmentDesc desc;
-        desc.handle.backend = RenderBackend::Vulkan;
-        desc.handle.id = reinterpret_cast<uint64_t>(texture);
-        desc.handle.index = attachment.index;
-        desc.finalUse = AttachmentFinalUse::RenderTarget;
-        surface.depthAttachment = desc;
-      }
+      auto* texture = lease.depthAttachmentTexture();
+      CHECK(texture != nullptr) << "Vulkan scratch descriptor is missing its declared depth attachment";
+      CHECK(&texture->ownerDevice() == &m_boundDevice) << "Vulkan depth attachment belongs to a different device";
+      AttachmentDesc desc;
+      desc.handle.backend = RenderBackend::Vulkan;
+      desc.handle.id = reinterpret_cast<uint64_t>(texture);
+      desc.handle.index = attachment.index;
+      desc.finalUse = AttachmentFinalUse::RenderTarget;
+      surface.depthAttachment = desc;
     }
   }
 
@@ -2577,14 +2586,14 @@ Z3DRendererVulkanBackend::describeSurfaceFromLease(const Z3DScratchResourcePool:
 ZVulkanDevice& Z3DRendererVulkanBackend::device()
 {
   ensureDevice();
-  CHECK(m_sharedDevice != nullptr);
-  return *m_sharedDevice;
+  return m_boundDevice;
 }
 
 const ZVulkanDevice& Z3DRendererVulkanBackend::device() const
 {
-  CHECK(m_sharedDevice != nullptr);
-  return *m_sharedDevice;
+  CHECK(m_scratchPool.vulkanDevice() == &m_boundDevice)
+    << "Vulkan backend scratch pool was rebound to a different device";
+  return m_boundDevice;
 }
 
 ZVulkanImageBlockUploader& Z3DRendererVulkanBackend::sharedImageBlockUploader()
@@ -4572,11 +4581,10 @@ size_t Z3DRendererVulkanBackend::uniformAlignment() const
 
   // uniformAlignment is used in a few debug-only validation sites that run
   // under the "current backend" thread-local pointer. Be robust to call order:
-  // if ensureDevice() has not yet cached m_sharedDevice, query the shared
-  // device directly from the scratch pool.
+  // Device affinity is immutable for the backend lifetime.
   auto* dev = m_sharedDevice;
   if (!dev) {
-    dev = Z3DRenderGlobalState::instance().scratchPool().vulkanDevice();
+    dev = &m_boundDevice;
   }
   CHECK(dev != nullptr) << "Shared Vulkan device missing in uniformAlignment";
   auto limits = dev->context().physicalDevice().getProperties().limits;
@@ -5288,31 +5296,29 @@ void Z3DRendererVulkanBackend::installMemoryBrokerProviders()
       },
   });
 
-  auto& scratchPool = Z3DRenderGlobalState::instance().scratchPool();
+  auto& scratchPool = m_scratchPool;
   registerProvider(ZVulkanResidencyManager::ResourceProvider{
     .resourceClass = ZVulkanResidencyManager::ResourceClass::ScratchBacking,
     .priority = kBrokerPriorityScratchBacking,
     .owner = &scratchPool,
     .label = "scratch_pool_backing",
     .reclaim =
-      [](const ZVulkanResidencyManager::ReclaimRequest& request) {
+      [pool = &scratchPool](const ZVulkanResidencyManager::ReclaimRequest& request) {
         if (currentRenderThreadExecutorOrNull() == nullptr) {
           return ZVulkanResidencyManager::ReclaimStats{};
         }
-        auto& pool = Z3DRenderGlobalState::instance().scratchPool();
-        auto stats = pool.reclaimFreeVulkanScratchBacking(request.reason, request.requestedBytes);
+        auto stats = pool->reclaimFreeVulkanScratchBacking(request.reason, request.requestedBytes);
         return ZVulkanResidencyManager::ReclaimStats{.resourcesReleased = stats.slotsEvicted,
                                                      .bytesReleased = stats.bytesReleased};
       },
     .collectCandidates =
-      [](const ZVulkanResidencyManager::ReclaimRequest& request) {
+      [pool = &scratchPool](const ZVulkanResidencyManager::ReclaimRequest& request) {
         std::vector<ZVulkanResidencyManager::EvictionCandidate> out;
         if (currentRenderThreadExecutorOrNull() == nullptr) {
           return out;
         }
-        auto& pool = Z3DRenderGlobalState::instance().scratchPool();
         const bool includeLeasedScratchBacking = request.force;
-        const auto scratchCandidates = pool.vulkanScratchBackingCandidates(includeLeasedScratchBacking);
+        const auto scratchCandidates = pool->vulkanScratchBackingCandidates(includeLeasedScratchBacking);
         out.reserve(scratchCandidates.size());
         for (const auto& candidate : scratchCandidates) {
           out.push_back(ZVulkanResidencyManager::EvictionCandidate{
@@ -5329,8 +5335,8 @@ void Z3DRendererVulkanBackend::installMemoryBrokerProviders()
         return out;
       },
     .evictCandidate =
-      [](const ZVulkanResidencyManager::EvictionCandidate& candidate,
-         const ZVulkanResidencyManager::ReclaimRequest& request) {
+      [pool = &scratchPool](const ZVulkanResidencyManager::EvictionCandidate& candidate,
+                            const ZVulkanResidencyManager::ReclaimRequest& request) {
         if (currentRenderThreadExecutorOrNull() == nullptr) {
           return ZVulkanResidencyManager::ReclaimStats{};
         }
@@ -5338,10 +5344,9 @@ void Z3DRendererVulkanBackend::installMemoryBrokerProviders()
         if (usageIndex >= kScratchUsageCount || candidate.userKey1 > std::numeric_limits<size_t>::max()) {
           return ZVulkanResidencyManager::ReclaimStats{};
         }
-        auto& pool = Z3DRenderGlobalState::instance().scratchPool();
-        const auto stats = pool.reclaimVulkanScratchBackingCandidate(static_cast<ScratchImageUsage>(usageIndex),
-                                                                     static_cast<size_t>(candidate.userKey1),
-                                                                     request.reason);
+        const auto stats = pool->reclaimVulkanScratchBackingCandidate(static_cast<ScratchImageUsage>(usageIndex),
+                                                                      static_cast<size_t>(candidate.userKey1),
+                                                                      request.reason);
         return ZVulkanResidencyManager::ReclaimStats{.resourcesReleased = stats.slotsEvicted,
                                                      .bytesReleased = stats.bytesReleased};
       },
@@ -5353,7 +5358,7 @@ void Z3DRendererVulkanBackend::installMemoryBrokerProviders()
         if (currentRenderThreadExecutorOrNull() == nullptr) {
           return report;
         }
-        const auto scratchReport = Z3DRenderGlobalState::instance().scratchPool().vulkanScratchBackingReport();
+        const auto scratchReport = m_scratchPool.vulkanScratchBackingReport();
         const bool inFlight = m_sharedDevice != nullptr && m_sharedDevice->frameExecutor().inFlightCount() != 0u;
         report.residentObjects = scratchReport.residentSlots;
         report.pinnedObjects =
@@ -5684,7 +5689,7 @@ ZVulkanResidencyManager::ResourceReport Z3DRendererVulkanBackend::scratchBacking
   if (currentRenderThreadExecutorOrNull() == nullptr) {
     return report;
   }
-  const auto scratchReport = Z3DRenderGlobalState::instance().scratchPool().vulkanScratchBackingReport();
+  const auto scratchReport = m_scratchPool.vulkanScratchBackingReport();
   const bool inFlight = m_sharedDevice != nullptr && m_sharedDevice->frameExecutor().inFlightCount() != 0u;
   report.residentObjects = scratchReport.residentSlots;
   report.pinnedObjects =
@@ -5973,11 +5978,11 @@ uint32_t Z3DRendererVulkanBackend::maxFramesInFlight() const
 size_t Z3DRendererVulkanBackend::maxMonolithicGeometryStreamBytes() const
 {
   // Mesh/geometry segmentation can query this before beginRender() has latched
-  // m_sharedDevice on the backend instance. Fall back to the shared scratch-pool
-  // device so the hard guard still reflects the real Vulkan limit.
+  // m_sharedDevice on the backend instance. The constructor-bound device is
+  // always available before the first frame.
   auto* dev = m_sharedDevice;
   if (dev == nullptr) {
-    dev = Z3DRenderGlobalState::instance().scratchPool().vulkanDevice();
+    dev = &m_boundDevice;
   }
   CHECK(dev != nullptr) << "Shared Vulkan device missing in maxMonolithicGeometryStreamBytes";
 
@@ -6118,6 +6123,8 @@ void Z3DRendererVulkanBackend::prepareTextureForCommandUse(ZVulkanTexture& textu
   CHECK(m_activeFrame && m_activeFrameHandle && m_activeFrameHandle->valid())
     << "prepareTextureForCommandUse requires an active frame";
   CHECK(m_frameRecording) << "prepareTextureForCommandUse requires command-buffer recording";
+  CHECK(&texture.ownerDevice() == &m_boundDevice)
+    << "prepareTextureForCommandUse received a texture from a different Vulkan device";
 
   const std::string_view reason = debugLabel.empty() ? std::string_view("command_texture_use") : debugLabel;
   const bool contentsRequired = use == TextureCommandUse::ReadExistingContents;
@@ -6127,7 +6134,7 @@ void Z3DRendererVulkanBackend::prepareTextureForCommandUse(ZVulkanTexture& textu
     pinTextureForActiveSubmission(&texture);
   }
 
-  auto& scratchPool = Z3DRenderGlobalState::instance().scratchPool();
+  auto& scratchPool = m_scratchPool;
   const std::array scratchUses{
     Z3DScratchResourcePool::VulkanScratchTextureUse{.texture = &texture, .contentsRequired = contentsRequired}
   };
@@ -6223,13 +6230,12 @@ ZVulkanBuffer& Z3DRendererVulkanBackend::fullscreenQuadVertexBuffer()
 
 void Z3DRendererVulkanBackend::ensureDevice()
 {
-  auto& pool = Z3DRenderGlobalState::instance().scratchPool();
-  auto* dev = pool.vulkanDevice();
-  CHECK(dev != nullptr) << "Shared Vulkan device not injected into scratch pool";
-  if (m_sharedDevice != dev) {
+  CHECK(m_scratchPool.vulkanDevice() == &m_boundDevice)
+    << "Vulkan backend scratch pool was rebound to a different device";
+  if (m_sharedDevice == nullptr) {
     uninstallMemoryBrokerProviders();
     m_sharedDescriptorLayouts = {};
-    m_sharedDevice = dev;
+    m_sharedDevice = &m_boundDevice;
     m_deviceRevision++;
     m_cachedUniformAlignment = 0;
     resetFrameResources();
@@ -6264,6 +6270,7 @@ void Z3DRendererVulkanBackend::ensureDevice()
     }
     installMemoryBrokerProviders();
   }
+  CHECK(m_sharedDevice == &m_boundDevice) << "Vulkan backend device affinity changed after construction";
   installMemoryBrokerProviders();
   // Keep local ring sizes aligned with the device executor setting.
   m_maxFramesInFlight = m_sharedDevice->frameExecutor().maxFramesInFlight();
@@ -6911,24 +6918,31 @@ Z3DRendererVulkanBackend::requestEndOfFrameImageReadbackTicket(ZVulkanTexture& s
   pr.slotIndex = slotIndex;
   m_activeFrame->pendingColorReadbacks.emplace_back(std::move(pr));
 
-  // Release must be safe from arbitrary threads. Route it back to the render
-  // thread and guard backend lifetime (backend switches destroy/recreate the
-  // Vulkan backend).
+  // Release must be safe from arbitrary threads. Retire immediately when the
+  // owner is already on the rendering thread (notably compositor teardown);
+  // otherwise route it back and guard backend lifetime.
   const std::weak_ptr<bool> alive = m_aliveFlag;
+  ZQtExecutor* releaseExecutor = currentRenderThreadExecutorOrNull();
+  CHECK(releaseExecutor != nullptr) << "Vulkan readback release requires its owner render executor";
   auto releaseEx = currentRenderThreadExecutorKeepAlive("vk_readback_release");
-  std::function<void()> releaseSlot = [alive, releaseEx = std::move(releaseEx), backend = this, slotIndex]() mutable {
-    auto aliveStrong = alive.lock();
-    if (!aliveStrong || !*aliveStrong) {
-      return;
-    }
-    releaseEx->add([alive, backend, slotIndex]() mutable {
-      auto aliveStrong2 = alive.lock();
-      if (!aliveStrong2 || !*aliveStrong2) {
+  std::function<void()> releaseSlot =
+    [alive, releaseExecutor, releaseEx = std::move(releaseEx), backend = this, slotIndex]() mutable {
+      auto aliveStrong = alive.lock();
+      if (!aliveStrong || !*aliveStrong) {
         return;
       }
-      backend->releaseReadbackSlot(slotIndex);
-    });
-  };
+      if (currentRenderThreadExecutorOrNull() == releaseExecutor) {
+        backend->releaseReadbackSlot(slotIndex);
+        return;
+      }
+      releaseEx->add([alive, backend, slotIndex]() mutable {
+        auto aliveStrong2 = alive.lock();
+        if (!aliveStrong2 || !*aliveStrong2) {
+          return;
+        }
+        backend->releaseReadbackSlot(slotIndex);
+      });
+    };
 
   EndOfFrameColorReadbackTicket ticket{};
   ticket.fence = awaitActiveSubmissionFence(debugLabel.empty() ? "vk_image_readback" : debugLabel);
@@ -7000,6 +7014,7 @@ Z3DRendererVulkanBackend::requestEndOfFrameBufferReadbackTicket(ZVulkanBuffer& s
     << (debugLabel.empty() ? "" : " (") << (debugLabel.empty() ? "" : debugLabel) << (debugLabel.empty() ? "" : ")");
   CHECK(m_activeFrame && m_activeFrameHandle && m_activeFrameHandle->valid())
     << "VK buffer readback requested outside of an active frame";
+  CHECK(&src.ownerDevice() == &m_boundDevice) << "VK buffer readback source belongs to a different Vulkan device";
   CHECK_GT(bytes, 0u) << "VK buffer readback requested with 0 bytes";
   const size_t offset = static_cast<size_t>(srcOffset);
   CHECK_LE(offset + bytes, src.size()) << "VK buffer readback range out of bounds";
@@ -7029,20 +7044,27 @@ Z3DRendererVulkanBackend::requestEndOfFrameBufferReadbackTicket(ZVulkanBuffer& s
   m_activeFrame->pendingBufferReadbacks.emplace_back(std::move(pr));
 
   const std::weak_ptr<bool> alive = m_aliveFlag;
+  ZQtExecutor* releaseExecutor = currentRenderThreadExecutorOrNull();
+  CHECK(releaseExecutor != nullptr) << "Vulkan buffer readback release requires its owner render executor";
   auto releaseEx = currentRenderThreadExecutorKeepAlive("vk_buffer_readback_release");
-  std::function<void()> releaseSlot = [alive, releaseEx = std::move(releaseEx), backend = this, slotIndex]() mutable {
-    auto aliveStrong = alive.lock();
-    if (!aliveStrong || !*aliveStrong) {
-      return;
-    }
-    releaseEx->add([alive, backend, slotIndex]() mutable {
-      auto aliveStrong2 = alive.lock();
-      if (!aliveStrong2 || !*aliveStrong2) {
+  std::function<void()> releaseSlot =
+    [alive, releaseExecutor, releaseEx = std::move(releaseEx), backend = this, slotIndex]() mutable {
+      auto aliveStrong = alive.lock();
+      if (!aliveStrong || !*aliveStrong) {
         return;
       }
-      backend->releaseReadbackSlot(slotIndex);
-    });
-  };
+      if (currentRenderThreadExecutorOrNull() == releaseExecutor) {
+        backend->releaseReadbackSlot(slotIndex);
+        return;
+      }
+      releaseEx->add([alive, backend, slotIndex]() mutable {
+        auto aliveStrong2 = alive.lock();
+        if (!aliveStrong2 || !*aliveStrong2) {
+          return;
+        }
+        backend->releaseReadbackSlot(slotIndex);
+      });
+    };
 
   EndOfFrameBufferReadbackTicket ticket{};
   ticket.m_fence = awaitActiveSubmissionFence(debugLabel.empty() ? "vk_buffer_readback" : debugLabel);
@@ -7060,6 +7082,8 @@ std::vector<uint8_t> Z3DRendererVulkanBackend::readBufferRangeAfterCompletion(ZV
   CHECK(currentRenderThreadExecutorOrNull() != nullptr)
     << "readBufferRangeAfterCompletion must be called on the rendering thread" << (debugLabel.empty() ? "" : " (")
     << (debugLabel.empty() ? "" : debugLabel) << (debugLabel.empty() ? "" : ")");
+  CHECK(&src.ownerDevice() == &m_boundDevice)
+    << "readBufferRangeAfterCompletion source belongs to a different Vulkan device";
   CHECK_GT(bytes, 0u) << "readBufferRangeAfterCompletion requires bytes > 0";
   const size_t offset = static_cast<size_t>(srcOffset);
   CHECK_LE(offset, src.size()) << "readBufferRangeAfterCompletion offset out of bounds";
@@ -7680,9 +7704,10 @@ void Z3DRendererVulkanBackend::recordCpuScope(std::string_view label, double mil
   m_activeFrame->cpuScopes.push_back(CpuScopeRecord{std::string(label), milliseconds});
 }
 
-std::unique_ptr<Z3DRendererBackend> createVulkanRendererBackend()
+std::unique_ptr<Z3DRendererBackend> createVulkanRendererBackend(Z3DScratchResourcePool& scratchPool,
+                                                                ZVulkanDevice& device)
 {
-  return std::unique_ptr<Z3DRendererBackend>(std::make_unique<Z3DRendererVulkanBackend>().release());
+  return std::make_unique<Z3DRendererVulkanBackend>(scratchPool, device);
 }
 
 } // namespace nim

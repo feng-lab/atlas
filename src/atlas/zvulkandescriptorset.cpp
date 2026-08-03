@@ -17,6 +17,8 @@ ZVulkanDescriptorSet::ZVulkanDescriptorSet(ZVulkanDevice& device, vk::Descriptor
 
 void ZVulkanDescriptorSet::updateUniformBuffer(uint32_t binding, ZVulkanBuffer& buffer)
 {
+  CHECK(&buffer.ownerDevice() == &m_device)
+    << "Uniform-buffer descriptor references a buffer from a different Vulkan device";
   if (auto* backend = Z3DRendererVulkanBackend::current(); backend && backend->isRecording()) {
     const bool alreadyInit = (m_initializedMask & (1ull << binding)) != 0ull;
     backend->notifyDescriptorWriteWhileRecording(/*rewriteAttempt*/ alreadyInit);
@@ -55,10 +57,10 @@ void ZVulkanDescriptorSet::updateUniformBuffer(uint32_t binding, ZVulkanBuffer& 
   VLOG(3) << "Updated uniform buffer descriptor at binding " << binding;
 }
 
-void ZVulkanDescriptorSet::updateUniformBufferDynamic(uint32_t binding,
-                                                      ZVulkanBuffer& buffer,
-                                                      vk::DeviceSize range)
+void ZVulkanDescriptorSet::updateUniformBufferDynamic(uint32_t binding, ZVulkanBuffer& buffer, vk::DeviceSize range)
 {
+  CHECK(&buffer.ownerDevice() == &m_device)
+    << "Dynamic uniform-buffer descriptor references a buffer from a different Vulkan device";
   if (auto* backend = Z3DRendererVulkanBackend::current(); backend && backend->isRecording()) {
     const bool alreadyInit = (m_initializedMask & (1ull << binding)) != 0ull;
     backend->notifyDescriptorWriteWhileRecording(/*rewriteAttempt*/ alreadyInit);
@@ -109,9 +111,7 @@ bool ZVulkanDescriptorSet::writeUniformBufferOnce(uint32_t binding, ZVulkanBuffe
 
 // Removed two-parameter writeUniformBufferDynamicOnce; use the range-aware overload.
 
-bool ZVulkanDescriptorSet::writeUniformBufferDynamicOnce(uint32_t binding,
-                                                         ZVulkanBuffer& buffer,
-                                                         vk::DeviceSize range)
+bool ZVulkanDescriptorSet::writeUniformBufferDynamicOnce(uint32_t binding, ZVulkanBuffer& buffer, vk::DeviceSize range)
 {
   if ((m_initializedMask & (1ull << binding)) != 0ull) {
     return false;
@@ -131,6 +131,8 @@ bool ZVulkanDescriptorSet::writeStorageBufferOnce(uint32_t binding, ZVulkanBuffe
 
 void ZVulkanDescriptorSet::updateStorageBuffer(uint32_t binding, ZVulkanBuffer& buffer)
 {
+  CHECK(&buffer.ownerDevice() == &m_device)
+    << "Storage-buffer descriptor references a buffer from a different Vulkan device";
   if (auto* backend = Z3DRendererVulkanBackend::current(); backend && backend->isRecording()) {
     const bool alreadyInit = (m_initializedMask & (1ull << binding)) != 0ull;
     backend->notifyDescriptorWriteWhileRecording(/*rewriteAttempt*/ alreadyInit);
@@ -177,6 +179,8 @@ void ZVulkanDescriptorSet::updateStorageImage(uint32_t binding,
                                               vk::ImageLayout layoutOverride,
                                               vk::ImageAspectFlags aspectOverride)
 {
+  CHECK(&texture.ownerDevice() == &m_device)
+    << "Storage-image descriptor references a texture from a different Vulkan device";
   if (auto* backend = Z3DRendererVulkanBackend::current(); backend && backend->isRecording()) {
     const bool alreadyInit = (m_initializedMask & (1ull << binding)) != 0ull;
     backend->notifyDescriptorWriteWhileRecording(/*rewriteAttempt*/ alreadyInit);

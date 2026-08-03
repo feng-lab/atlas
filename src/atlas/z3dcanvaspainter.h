@@ -4,6 +4,7 @@
 
 #include "z3dtexturecopyrenderer.h"
 #include "z3drendererbase.h"
+#include "z3dscratchresourcepool.h"
 
 namespace nim {
 
@@ -32,6 +33,7 @@ private:
   RendererFrameState m_frameState{};
   RendererViewState m_viewState{};
   RendererSceneState m_sceneState{};
+  Z3DScratchResourcePool m_scratchPool;
   Z3DRendererBase m_rendererBase;
   Z3DTextureCopyRenderer m_textureCopyRenderer;
   Z3DCanvas& m_canvas;

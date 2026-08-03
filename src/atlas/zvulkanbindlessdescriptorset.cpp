@@ -279,6 +279,8 @@ ZVulkanBindlessDescriptorSet::debugEntryState(const RegisterRequest& request) co
   if (request.texture == nullptr) {
     return out;
   }
+  CHECK(&request.texture->ownerDevice() == &m_device)
+    << "Bindless descriptor inspection references a texture from a different Vulkan device";
 
   const Table& table = tableForKind(request.kind);
   const auto idxOpt = lookupInTable(table, request);
@@ -305,6 +307,9 @@ uint32_t ZVulkanBindlessDescriptorSet::registerInTable(Table& table, const Regis
   CHECK(static_cast<VkDescriptorSet>(m_descriptorSet) != VK_NULL_HANDLE) << "Bindless descriptor set missing";
 
   ZVulkanTexture& texture = *request.texture;
+  CHECK(&texture.ownerDevice() == &m_device)
+    << "Bindless descriptor registration references a texture from a different Vulkan device"
+    << (request.debugLabel.empty() ? "" : " (") << request.debugLabel << (request.debugLabel.empty() ? "" : ")");
   CHECK(texture.resident()) << "Attempting to register a non-resident Vulkan texture in bindless table"
                             << (request.debugLabel.empty() ? "" : " (") << request.debugLabel
                             << (request.debugLabel.empty() ? "" : ")");

@@ -75,6 +75,7 @@ public:
                   RendererFrameState& frameState,
                   RendererViewState& viewState,
                   RendererSceneState& sceneState,
+                  Z3DScratchResourcePool& scratchPool,
                   RenderBackend initialBackend);
 
   // need valid camera and viewport
@@ -268,6 +269,16 @@ public:
   [[nodiscard]] const Z3DRendererBackend* backend() const
   {
     return m_backend.get();
+  }
+
+  [[nodiscard]] Z3DScratchResourcePool& scratchPool()
+  {
+    return m_scratchPool;
+  }
+
+  [[nodiscard]] const Z3DScratchResourcePool& scratchPool() const
+  {
+    return m_scratchPool;
   }
 
   static RendererViewState buildViewStateFromCamera(const Z3DCamera& camera);
@@ -490,6 +501,7 @@ protected:
   RendererFrameState& m_frameState;
   RendererViewState& m_viewState;
   RendererSceneState& m_sceneState;
+  Z3DScratchResourcePool& m_scratchPool;
   // renderers
   std::set<Z3DPrimitiveRenderer*> m_renderers;
 
@@ -525,6 +537,9 @@ private:
   // backend can snapshot it into per-submission state for correct behavior with
   // multiple frames-in-flight.
   bool m_currentRenderPassIsProgressive = true;
+  // Orthogonal to render quality. The default preserves the existing direct
+  // path: progressive readbacks return after submit and final readbacks wait.
+  ReadbackCompletionPolicy m_readbackCompletionPolicy = ReadbackCompletionPolicy::FollowRenderQuality;
 
 public:
   // Expose current pass label for backend diagnostics/logging
@@ -540,9 +555,9 @@ public:
   }
 
   // Render-pass hint: whether the current filter-pipeline evaluation is running
-  // in progressive mode. Vulkan backend uses this to decide the default
-  // end-of-frame readback wait policy (async for progressive, sync for non-progressive
-  // capture/export passes) without requiring call sites to toggle backend flags.
+  // in progressive mode. When completion policy follows quality, Vulkan maps
+  // progressive passes to async readback and final passes to synchronous
+  // readback without requiring call sites to toggle backend flags.
   void setCurrentRenderPassIsProgressive(bool progressive)
   {
     m_currentRenderPassIsProgressive = progressive;
@@ -551,6 +566,16 @@ public:
   [[nodiscard]] bool currentRenderPassIsProgressive() const
   {
     return m_currentRenderPassIsProgressive;
+  }
+
+  void setReadbackCompletionPolicy(ReadbackCompletionPolicy policy)
+  {
+    m_readbackCompletionPolicy = policy;
+  }
+
+  [[nodiscard]] ReadbackCompletionPolicy readbackCompletionPolicy() const
+  {
+    return m_readbackCompletionPolicy;
   }
 
   std::vector<Z3DScratchResourcePool::RenderTargetLease*> m_persistentLeases;

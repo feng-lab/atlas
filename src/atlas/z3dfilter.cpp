@@ -27,6 +27,7 @@ void Z3DFilter::invalidate(State inv)
 {
   // VLOG(1) << className() << " 1";
   CHECK(inv != State::Valid);
+  Q_EMIT renderInputChanged();
   if (isFlagSet(m_state, inv)) {
     return;
   }

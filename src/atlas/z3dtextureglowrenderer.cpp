@@ -3,7 +3,6 @@
 #include "z3dtexture.h"
 #include "z3drendertarget.h"
 #include "z3dscratchresourcepool.h"
-#include "z3drenderglobalstate.h"
 #include "zlog.h"
 #include <algorithm>
 
@@ -55,7 +54,7 @@ void Z3DTextureGlowRenderer::render(Z3DEye eye)
 
   glm::uvec2 size = m_colorTexture->dimension().xy();
 
-  auto& scratchPool = Z3DRenderGlobalState::instance().scratchPool();
+  auto& scratchPool = m_rendererBase.scratchPool();
 
   // Acquire temporary targets from the scratch pool for blur passes
   auto blurXLease = scratchPool.acquireTempRenderTarget2D(size);

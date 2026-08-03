@@ -19,8 +19,10 @@ class ZVulkanContext
 {
 public:
   using BindlessSampledImageCapacities = ZVulkanDeviceSupport::BindlessSampledImageCapacities;
+  using DeviceSelection = ZVulkanDeviceSupport::DeviceSelection;
 
   ZVulkanContext();
+  explicit ZVulkanContext(DeviceSelection selection);
   ~ZVulkanContext();
 
   vk::raii::Context& context()
@@ -55,6 +57,18 @@ public:
   size_t selectedDeviceIndex() const
   {
     return m_selectedDeviceIndex;
+  }
+
+  [[nodiscard]] DeviceSelection deviceSelection(size_t index) const
+  {
+    CHECK(index < m_deviceSelections.size());
+    CHECK(m_deviceSelections[index].preferenceIndex == index);
+    return m_deviceSelections[index];
+  }
+
+  [[nodiscard]] DeviceSelection selectedDeviceSelection() const
+  {
+    return deviceSelection(m_selectedDeviceIndex);
   }
 
   // Immutable topology captured before physical-device evaluation. Descriptor
@@ -120,8 +134,13 @@ public:
 
   [[nodiscard]] const ZVulkanDeviceSupport& selectedDeviceSupport() const
   {
-    CHECK(m_selectedDeviceIndex < m_deviceSupports.size());
-    return m_deviceSupports[m_selectedDeviceIndex];
+    return deviceSupport(m_selectedDeviceIndex);
+  }
+
+  [[nodiscard]] const ZVulkanDeviceSupport& deviceSupport(size_t index) const
+  {
+    CHECK(index < m_deviceSupports.size());
+    return m_deviceSupports[index];
   }
 
   // Bindless sampled-image table capacity policy:
@@ -172,6 +191,8 @@ public:
   void logGpuInfo() const;
 
 private:
+  explicit ZVulkanContext(std::optional<DeviceSelection> exactSelection);
+
   // Vulkan initialization steps
   void createInstance();
   void setupDebugMessenger();
@@ -186,11 +207,13 @@ private:
 
   // Vulkan RAII objects
   const uint32_t m_frameSlotCount;
+  const std::optional<DeviceSelection> m_exactSelection;
   std::optional<vk::raii::Context> m_context;
   std::optional<vk::raii::Instance> m_instance;
   std::optional<vk::raii::DebugUtilsMessengerEXT> m_debugMessenger;
   std::vector<vk::raii::PhysicalDevice> m_physicalDevices;
   std::vector<ZVulkanDeviceSupport> m_deviceSupports;
+  std::vector<DeviceSelection> m_deviceSelections;
   size_t m_selectedDeviceIndex = 0; // index into m_physicalDevices
   std::optional<vk::raii::Device> m_device;
   std::optional<vk::raii::Queue> m_graphicsQueue;

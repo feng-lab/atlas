@@ -637,6 +637,7 @@ set(SOURCES
     z3danimationview.h z3danimationview.cpp
     z3danimationfilter.h z3danimationfilter.cpp
     z3dcompositor.h z3dcompositor.cpp
+    zvulkanfinalreadbackcompletion_p.h
     z3dgeometryfilter.h z3dgeometryfilter.cpp
     z3dboundedfilter.h z3dboundedfilter.cpp
     z3dmeshrenderer.h z3dmeshrenderer.cpp

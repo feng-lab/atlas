@@ -131,6 +131,18 @@ struct ZVulkanDeviceSupport
     }
   };
 
+  // Exact physical-device identity used when a caller must construct a
+  // context for one already-enumerated adapter. The preference-sorted index is
+  // convenient for deterministic ordering, while the UUID prevents a changed
+  // enumeration from silently selecting a different physical device.
+  struct DeviceSelection
+  {
+    size_t preferenceIndex = 0u;
+    std::array<uint8_t, VK_UUID_SIZE> expectedDeviceUuid{};
+
+    bool operator==(const DeviceSelection&) const = default;
+  };
+
   // Fixed descriptor/output resources that coexist with Atlas' bindless
   // sampled-image tables in the largest graphics and compute pipeline layouts.
   // Capacity evaluation reserves these before clamping the user-configurable
@@ -306,6 +318,47 @@ struct ZVulkanDeviceSupport
       error.append(devices[i].rejectionSummary());
     }
     return {.index = std::nullopt, .warning = std::move(preferenceRejection), .error = std::move(error)};
+  }
+
+  // Resolve a previously captured index/UUID pair without fallback. This is
+  // deliberately separate from select(): the command-line device index is a
+  // best-effort preference, whereas secondary-device construction must never
+  // substitute another adapter silently.
+  [[nodiscard]] static Selection selectExact(std::span<const ZVulkanDeviceSupport> devices,
+                                             std::span<const DeviceSelection> availableSelections,
+                                             const DeviceSelection& requested)
+  {
+    if (devices.size() != availableSelections.size()) {
+      return {.index = std::nullopt,
+              .warning = {},
+              .error = "Vulkan device support and identity lists have different sizes"};
+    }
+    if (requested.preferenceIndex >= devices.size()) {
+      return {.index = std::nullopt,
+              .warning = {},
+              .error = "Explicit Vulkan device selection index " + std::to_string(requested.preferenceIndex) +
+                       " is out of range for " + std::to_string(devices.size()) + " enumerated device(s)"};
+    }
+
+    const auto& available = availableSelections[requested.preferenceIndex];
+    if (available.preferenceIndex != requested.preferenceIndex) {
+      return {.index = std::nullopt,
+              .warning = {},
+              .error = "Vulkan device identity list is not in canonical preference-sorted order"};
+    }
+    if (available.expectedDeviceUuid != requested.expectedDeviceUuid) {
+      return {.index = std::nullopt,
+              .warning = {},
+              .error = "Explicit Vulkan device selection index " + std::to_string(requested.preferenceIndex) +
+                       " no longer resolves to the expected physical-device UUID"};
+    }
+    if (!devices[requested.preferenceIndex].compatible()) {
+      return {.index = std::nullopt,
+              .warning = {},
+              .error = "Explicit Vulkan device selection index " + std::to_string(requested.preferenceIndex) +
+                       " is incompatible: " + devices[requested.preferenceIndex].rejectionSummary()};
+    }
+    return {.index = requested.preferenceIndex, .warning = {}, .error = {}};
   }
 };
 

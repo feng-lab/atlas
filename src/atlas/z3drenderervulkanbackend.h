@@ -207,10 +207,10 @@ inline size_t estimateAdditionalUniformArenaBytesForBatch(const RenderBatch& bat
 
 } // namespace vulkan
 
-// Vulkan renderer backend borrows the shared ZVulkanDevice injected through the scratch pool.
+// Vulkan renderer backend has immutable affinity to one injected device and scratch pool.
 // Lifetime notes:
 //  * Z3DRenderingEngine owns the Vulkan context/device and calls setVulkanDevice() on the pool
-//    prior to rendering. The backend simply caches the latest pointer and never destroys it.
+//    before creating the backend. The backend borrows that exact pair and never rebinds it.
 //  * Scratch pool leases own all VkImage-backed render targets; pipeline contexts must treat
 //    ZVulkanTexture* obtained through AttachmentHandle as transient and valid only for the lease.
 //  * Frames rotate through a small pool of command buffers guarded by fences. Each frame is
@@ -221,7 +221,7 @@ public:
   // Current backend bound to the rendering thread (TLS)
   static Z3DRendererVulkanBackend* current();
 
-  Z3DRendererVulkanBackend();
+  Z3DRendererVulkanBackend(Z3DScratchResourcePool& scratchPool, ZVulkanDevice& device);
   ~Z3DRendererVulkanBackend() override;
 
   void setGlobalShaderParameters(Z3DRendererBase& renderer, Z3DShaderProgram& shader, Z3DEye eye) override;
@@ -457,6 +457,16 @@ public:
   ZVulkanDevice& device();
 
   const ZVulkanDevice& device() const;
+
+  [[nodiscard]] Z3DScratchResourcePool& scratchPool()
+  {
+    return m_scratchPool;
+  }
+
+  [[nodiscard]] const Z3DScratchResourcePool& scratchPool() const
+  {
+    return m_scratchPool;
+  }
 
   ZVulkanImageBlockUploader& sharedImageBlockUploader();
 
@@ -1047,8 +1057,11 @@ private:
     std::vector<CpuScopeRecord> cpuScopes;
     std::string frameName; // optional: name of this frame for logs
     // Snapshot of Z3DRendererBase::currentRenderPassIsProgressive() at beginRender().
-    // Used to derive the default end-of-frame readback wait policy for this submission.
+    // Used only when readbackCompletionPolicy follows render quality.
     bool progressivePassHint = true;
+    // Snapshot the explicit completion choice with the rest of the submission
+    // state so later renderer mutations cannot change an in-flight frame.
+    ReadbackCompletionPolicy readbackCompletionPolicy = ReadbackCompletionPolicy::FollowRenderQuality;
     uint32_t nextQuery = 0;
 
     std::chrono::steady_clock::time_point cpuStart;
@@ -1509,7 +1522,10 @@ public:
     }
   }
 
-  ZVulkanDevice* m_sharedDevice = nullptr; // non-owning; provided by engine/scratch-pool
+  Z3DScratchResourcePool& m_scratchPool;
+  ZVulkanDevice& m_boundDevice;
+  // Lazy initialization cache only; physical affinity is fixed by m_boundDevice.
+  ZVulkanDevice* m_sharedDevice = nullptr;
   uint64_t m_deviceRevision = 0;
   ZVulkanDevice* m_frameDevice = nullptr; // tracked to rebuild frame resources on device changes
   std::vector<FrameResources> m_frames;
@@ -1840,6 +1856,7 @@ public:
   std::unordered_map<uint64_t, ExternalBufferUseState> m_externalBufferUseStates;
 };
 
-std::unique_ptr<Z3DRendererBackend> createVulkanRendererBackend();
+std::unique_ptr<Z3DRendererBackend> createVulkanRendererBackend(Z3DScratchResourcePool& scratchPool,
+                                                                ZVulkanDevice& device);
 
 } // namespace nim

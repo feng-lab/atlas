@@ -456,11 +456,6 @@ private:
   void finishMeshFiltersForExport();
 
 private:
-  struct ScratchPoolDeleter
-  {
-    void operator()(Z3DScratchResourcePool* pool) const;
-  };
-
   // Track widget groups we've already connected to avoid duplicate connects. Must outlive compositor.
   std::unordered_set<const ZWidgetsGroup*> m_observedWGs;
 
@@ -484,8 +479,10 @@ private:
   bool m_seedTraceInProgress = false;
   std::optional<size_t> m_seedTraceSourceImgObjId;
   size_t m_seedTraceSourceChannel = 0;
+  // The per-engine scratch pool owns GPU resources and therefore outlives the
+  // global parameters and every filter/backend that borrows it.
+  std::unique_ptr<Z3DScratchResourcePool> m_scratchPool;
   std::unique_ptr<Z3DGlobalParameters> m_globalParas;
-  std::unique_ptr<Z3DScratchResourcePool, ScratchPoolDeleter> m_scratchPool;
   std::unique_ptr<Z3DCompositor> m_compositor;
   std::vector<std::unique_ptr<Z3DObjView>> m_3dObjViews;
   // Vulkan compositor bridge deferred

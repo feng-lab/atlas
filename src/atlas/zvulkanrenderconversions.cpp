@@ -1,6 +1,5 @@
 #include "zvulkanrenderconversions.h"
 
-#include "zexception.h"
 #include "zlog.h"
 #include "zvulkandevice.h"
 #include "zvulkanbuffer.h"
@@ -119,50 +118,37 @@ vk::BlendOp toVkBlendOp(BlendOp op)
 ZVulkanTexture&
 textureFromHandle(const AttachmentHandle& handle, ZVulkanDevice& device, std::string_view usageDescription)
 {
-  if (!handle.valid() || handle.backend != RenderBackend::Vulkan) {
-    throw ZException(fmt::format("{} requires a Vulkan attachment handle", usageDescription));
-  }
+  CHECK(handle.valid()) << usageDescription << " requires a valid attachment handle";
+  CHECK(handle.backend == RenderBackend::Vulkan) << usageDescription << " requires a Vulkan attachment handle";
 
   auto* texture = reinterpret_cast<ZVulkanTexture*>(handle.id);
-  if (!texture) {
-    throw ZException(fmt::format("{} provided a null Vulkan texture handle", usageDescription));
-  }
-  if (&texture->ownerDevice() != &device) {
-    throw ZException(fmt::format("{} references a texture from a different Vulkan device", usageDescription));
-  }
+  CHECK(texture != nullptr) << usageDescription << " provided a null Vulkan texture handle";
+  CHECK(&texture->ownerDevice() == &device)
+    << usageDescription << " references a texture from a different Vulkan device";
   return *texture;
 }
 
 ZVulkanTexture&
 textureFromHandle(const SampledImageHandle& handle, ZVulkanDevice& device, std::string_view usageDescription)
 {
-  if (!handle.valid() || handle.backend != RenderBackend::Vulkan) {
-    throw ZException(fmt::format("{} requires a Vulkan sampled image handle", usageDescription));
-  }
+  CHECK(handle.valid()) << usageDescription << " requires a valid sampled-image handle";
+  CHECK(handle.backend == RenderBackend::Vulkan) << usageDescription << " requires a Vulkan sampled-image handle";
 
   auto* texture = reinterpret_cast<ZVulkanTexture*>(handle.id);
-  if (!texture) {
-    throw ZException(fmt::format("{} provided a null Vulkan texture handle", usageDescription));
-  }
-  if (&texture->ownerDevice() != &device) {
-    throw ZException(fmt::format("{} references a texture from a different Vulkan device", usageDescription));
-  }
+  CHECK(texture != nullptr) << usageDescription << " provided a null Vulkan texture handle";
+  CHECK(&texture->ownerDevice() == &device)
+    << usageDescription << " references a texture from a different Vulkan device";
   return *texture;
 }
 
 ZVulkanBuffer& bufferFromHandle(const BufferHandle& handle, ZVulkanDevice& device, std::string_view usageDescription)
 {
-  if (!handle.valid() || handle.backend != RenderBackend::Vulkan) {
-    throw ZException(fmt::format("{} requires a Vulkan buffer handle", usageDescription));
-  }
+  CHECK(handle.valid()) << usageDescription << " requires a valid buffer handle";
+  CHECK(handle.backend == RenderBackend::Vulkan) << usageDescription << " requires a Vulkan buffer handle";
 
   auto* buffer = reinterpret_cast<ZVulkanBuffer*>(handle.id);
-  if (!buffer) {
-    throw ZException(fmt::format("{} provided a null Vulkan buffer handle", usageDescription));
-  }
-  if (&buffer->ownerDevice() != &device) {
-    throw ZException(fmt::format("{} references a buffer from a different Vulkan device", usageDescription));
-  }
+  CHECK(buffer != nullptr) << usageDescription << " provided a null Vulkan buffer handle";
+  CHECK(&buffer->ownerDevice() == &device) << usageDescription << " references a buffer from a different Vulkan device";
   return *buffer;
 }
 

@@ -17,6 +17,31 @@ class Z3DRendererBase;
 class Z3DPrimitiveRenderer;
 class Z3DShaderProgram;
 class Z3DScratchResourcePool;
+class ZVulkanDevice;
+
+// Controls whether a backend that queues host readback waits for that readback
+// before returning from the render submission. Render quality is an independent
+// choice: ReturnAfterSubmit can therefore be paired with a final-quality pass.
+enum class ReadbackCompletionPolicy : uint8_t
+{
+  FollowRenderQuality,
+  WaitForCompletion,
+  ReturnAfterSubmit,
+};
+
+[[nodiscard]] inline bool readbackCompletionRequiresWait(ReadbackCompletionPolicy policy, bool progressiveRenderQuality)
+{
+  switch (policy) {
+    case ReadbackCompletionPolicy::FollowRenderQuality:
+      return !progressiveRenderQuality;
+    case ReadbackCompletionPolicy::WaitForCompletion:
+      return true;
+    case ReadbackCompletionPolicy::ReturnAfterSubmit:
+      return false;
+  }
+  CHECK(false) << "Unhandled ReadbackCompletionPolicy";
+  return false;
+}
 
 class Z3DRendererBackend
 {
@@ -36,8 +61,7 @@ public:
   // Transitional hook: renderers can describe batches via RendererCPUState;
   // backends that support the command list façade can override this to
   // translate and execute the batches. Legacy backends can ignore it.
-  virtual void processBatches(Z3DRendererBase& /*renderer*/, const RendererCPUState& /*state*/)
-  {}
+  virtual void processBatches(Z3DRendererBase& /*renderer*/, const RendererCPUState& /*state*/) {}
 
   [[nodiscard]] virtual bool supportsCommandLists() const
   {
@@ -97,6 +121,7 @@ public:
 };
 
 std::unique_ptr<Z3DRendererBackend> createGLRendererBackend();
-std::unique_ptr<Z3DRendererBackend> createVulkanRendererBackend();
+std::unique_ptr<Z3DRendererBackend> createVulkanRendererBackend(Z3DScratchResourcePool& scratchPool,
+                                                                ZVulkanDevice& device);
 
 } // namespace nim

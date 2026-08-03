@@ -178,6 +178,10 @@ public:
     RenderTargetLease()
       : backend(RenderBackend::OpenGL)
     {}
+    explicit RenderTargetLease(Z3DScratchResourcePool& ownerPool)
+      : backend(RenderBackend::OpenGL)
+      , m_ownerPool(&ownerPool)
+    {}
     RenderTargetLease(const RenderTargetLease&) = delete;
     RenderTargetLease& operator=(const RenderTargetLease&) = delete;
     RenderTargetLease(RenderTargetLease&& other) noexcept
@@ -187,12 +191,14 @@ public:
       , vulkanImage(other.vulkanImage)
       , attachments(other.attachments)
       , releaser(std::move(other.releaser))
+      , m_ownerPool(other.m_ownerPool)
     {
       other.backend = RenderBackend::OpenGL;
       other.renderTarget = nullptr;
       other.vulkanImage = nullptr;
       other.attachments = 0;
       other.releaser.reset();
+      other.m_ownerPool = nullptr;
     }
     RenderTargetLease& operator=(RenderTargetLease&& other) noexcept
     {
@@ -204,11 +210,13 @@ public:
         vulkanImage = other.vulkanImage;
         attachments = other.attachments;
         releaser = std::move(other.releaser);
+        m_ownerPool = other.m_ownerPool;
         other.backend = RenderBackend::OpenGL;
         other.renderTarget = nullptr;
         other.vulkanImage = nullptr;
         other.attachments = 0;
         other.releaser.reset();
+        other.m_ownerPool = nullptr;
       }
       return *this;
     }
@@ -223,6 +231,7 @@ public:
       renderTarget = nullptr;
       vulkanImage = nullptr;
       attachments = 0;
+      m_ownerPool = nullptr;
     }
     ~RenderTargetLease()
     {
@@ -260,6 +269,29 @@ public:
 
     [[nodiscard]] ZVulkanTexture* depthAttachmentTexture() const;
 
+    [[nodiscard]] const Z3DScratchResourcePool* ownerPool() const
+    {
+      return m_ownerPool;
+    }
+
+    // Create a metadata-complete non-owning view of this lease. The source
+    // lease must outlive the view; only the source retains the slot releaser.
+    [[nodiscard]] RenderTargetLease borrowedView() const
+    {
+      CHECK(!static_cast<bool>(*this) || m_ownerPool != nullptr)
+        << "Cannot borrow a populated scratch lease without an owning pool";
+      RenderTargetLease view;
+      view.descriptor = descriptor;
+      view.backend = backend;
+      view.renderTarget = renderTarget;
+      view.vulkanImage = vulkanImage;
+      view.attachments = attachments;
+      view.m_ownerPool = m_ownerPool;
+      return view;
+    }
+
+  private:
+    Z3DScratchResourcePool* m_ownerPool = nullptr;
   };
 
   // Acquire a Block ID FBO sized to viewport*scale with the requested number
@@ -467,11 +499,10 @@ public:
   void scheduleDeferredRelease(VulkanScratchSlot* slot);
 
   // Inject a shared Vulkan device owned by the rendering engine. When set, the
-  // pool will use this device and will not create its own context/device.
-  void setVulkanDevice(ZVulkanDevice* device)
-  {
-    m_externalVkDevice = device;
-  }
+  // pool will use this device and will not create its own context/device. A
+  // different non-null device requires an explicit null unbind after every
+  // backend, callback, protection, and Vulkan scratch slot has been removed.
+  void setVulkanDevice(/*nullable*/ ZVulkanDevice* device);
 
   // Describe current memory usage for logging/diagnostics.
   // detailed=false: single-line total; detailed=true: breakdown per slot/category.

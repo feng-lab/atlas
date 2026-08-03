@@ -1,6 +1,8 @@
 #include "zvulkanpipelinecontext_raii.h"
 
 #include "zcommandlineflags.h"
+#include "z3drendererbackend.h"
+#include "zvulkanfinalreadbackcompletion_p.h"
 #include <gtest/gtest.h>
 
 ABSL_DECLARE_FLAG(bool, atlas_vk_enforce_pipeline_context);
@@ -30,6 +32,159 @@ private:
 
 } // namespace
 
+TEST(ReadbackCompletionPolicyTest, SeparatesCompletionFromRenderQuality)
+{
+  using nim::ReadbackCompletionPolicy;
+  using nim::readbackCompletionRequiresWait;
+
+  EXPECT_FALSE(readbackCompletionRequiresWait(ReadbackCompletionPolicy::FollowRenderQuality,
+                                              /*progressiveRenderQuality=*/true));
+  EXPECT_TRUE(readbackCompletionRequiresWait(ReadbackCompletionPolicy::FollowRenderQuality,
+                                             /*progressiveRenderQuality=*/false));
+
+  EXPECT_TRUE(readbackCompletionRequiresWait(ReadbackCompletionPolicy::WaitForCompletion,
+                                             /*progressiveRenderQuality=*/true));
+  EXPECT_TRUE(readbackCompletionRequiresWait(ReadbackCompletionPolicy::WaitForCompletion,
+                                             /*progressiveRenderQuality=*/false));
+
+  EXPECT_FALSE(readbackCompletionRequiresWait(ReadbackCompletionPolicy::ReturnAfterSubmit,
+                                              /*progressiveRenderQuality=*/true));
+  EXPECT_FALSE(readbackCompletionRequiresWait(ReadbackCompletionPolicy::ReturnAfterSubmit,
+                                              /*progressiveRenderQuality=*/false));
+}
+
+TEST(VulkanFinalReadbackCompletionTest, RejectsInvalidPublicationIdentity)
+{
+  using Completion = nim::ZVulkanFinalReadbackCompletion;
+  using Decision = Completion::PublicationDecision;
+
+  const glm::uvec2 extent{64u, 48u};
+  auto decide = [&](bool ownerAvailable,
+                    uint64_t expectedRevision,
+                    uint64_t currentRevision,
+                    const glm::uvec2& readbackExtent,
+                    const glm::uvec2& currentExtent,
+                    nim::RenderBackend backend,
+                    uint64_t renderFrameToken,
+                    uint64_t lastPublishedToken) {
+    return Completion::publicationDecision(ownerAvailable,
+                                           expectedRevision,
+                                           currentRevision,
+                                           extent,
+                                           readbackExtent,
+                                           currentExtent,
+                                           backend,
+                                           renderFrameToken,
+                                           lastPublishedToken);
+  };
+
+  EXPECT_EQ(decide(true, 7u, 7u, extent, extent, nim::RenderBackend::Vulkan, 12u, 11u), Decision::Accept);
+  EXPECT_EQ(decide(false, 7u, 7u, extent, extent, nim::RenderBackend::Vulkan, 12u, 11u), Decision::OwnerUnavailable);
+  EXPECT_EQ(decide(true, 7u, 8u, extent, extent, nim::RenderBackend::Vulkan, 12u, 11u),
+            Decision::OwnerRevisionMismatch);
+  EXPECT_EQ(decide(true, 7u, 7u, {63u, 48u}, extent, nim::RenderBackend::Vulkan, 12u, 11u), Decision::ExtentMismatch);
+  EXPECT_EQ(decide(true, 7u, 7u, extent, {64u, 47u}, nim::RenderBackend::Vulkan, 12u, 11u), Decision::ExtentMismatch);
+  EXPECT_EQ(decide(true, 7u, 7u, extent, extent, nim::RenderBackend::OpenGL, 12u, 11u), Decision::BackendMismatch);
+  EXPECT_EQ(decide(true, 7u, 7u, extent, extent, nim::RenderBackend::Vulkan, 10u, 11u), Decision::RenderFrameStale);
+}
+
+TEST(VulkanFinalReadbackCompletionTest, RetiresExactlyOnceOrTransfersOwnership)
+{
+  const glm::uvec2 extent{8u, 8u};
+  int retirementCount = 0;
+  nim::Z3DLocalColorBuffer localBuffer{};
+  nim::Z3DScratchResourcePool::RenderTargetLease target;
+
+  {
+    nim::ZVulkanFinalReadbackCompletion completion(QPointer<nim::Z3DCompositor>{},
+                                                   1u,
+                                                   1u,
+                                                   extent,
+                                                   extent,
+                                                   &retirementCount,
+                                                   nim::MonoEye,
+                                                   &localBuffer,
+                                                   &target,
+                                                   false,
+                                                   [&retirementCount]() {
+                                                     ++retirementCount;
+                                                   });
+    nim::ZVulkanFinalReadbackCompletion moved(std::move(completion));
+    EXPECT_EQ(moved.renderFrameToken, 1u);
+  }
+  EXPECT_EQ(retirementCount, 1);
+
+  std::function<void()> externalRetirement;
+  {
+    nim::ZVulkanFinalReadbackCompletion completion(QPointer<nim::Z3DCompositor>{},
+                                                   1u,
+                                                   2u,
+                                                   extent,
+                                                   extent,
+                                                   &retirementCount,
+                                                   nim::MonoEye,
+                                                   &localBuffer,
+                                                   &target,
+                                                   false,
+                                                   [&retirementCount]() {
+                                                     ++retirementCount;
+                                                   });
+    completion.transferRetirementTo(externalRetirement);
+  }
+  EXPECT_EQ(retirementCount, 1);
+  ASSERT_TRUE(externalRetirement);
+  externalRetirement();
+  externalRetirement = {};
+  EXPECT_EQ(retirementCount, 2);
+}
+
+TEST(VulkanFinalReadbackCompletionTest, SupportsMultipleLiveAttemptCompletions)
+{
+  const glm::uvec2 extent{8u, 8u};
+  int firstRetirementCount = 0;
+  int secondRetirementCount = 0;
+  nim::Z3DLocalColorBuffer firstLocalBuffer{};
+  nim::Z3DLocalColorBuffer secondLocalBuffer{};
+  nim::Z3DScratchResourcePool::RenderTargetLease firstTarget;
+  nim::Z3DScratchResourcePool::RenderTargetLease secondTarget;
+
+  {
+    nim::ZVulkanFinalReadbackCompletion first(QPointer<nim::Z3DCompositor>{},
+                                              3u,
+                                              41u,
+                                              extent,
+                                              extent,
+                                              &firstRetirementCount,
+                                              nim::MonoEye,
+                                              &firstLocalBuffer,
+                                              &firstTarget,
+                                              false,
+                                              [&firstRetirementCount]() {
+                                                ++firstRetirementCount;
+                                              });
+    nim::ZVulkanFinalReadbackCompletion second(QPointer<nim::Z3DCompositor>{},
+                                               3u,
+                                               42u,
+                                               extent,
+                                               extent,
+                                               &secondRetirementCount,
+                                               nim::MonoEye,
+                                               &secondLocalBuffer,
+                                               &secondTarget,
+                                               false,
+                                               [&secondRetirementCount]() {
+                                                 ++secondRetirementCount;
+                                               });
+
+    EXPECT_NE(first.renderFrameToken, second.renderFrameToken);
+    EXPECT_EQ(firstRetirementCount, 0);
+    EXPECT_EQ(secondRetirementCount, 0);
+  }
+
+  EXPECT_EQ(firstRetirementCount, 1);
+  EXPECT_EQ(secondRetirementCount, 1);
+}
+
 #ifndef NDEBUG
 
 TEST_F(VulkanPipelineDebugTest, MissingScissorTriggersCheck)
@@ -39,7 +194,10 @@ TEST_F(VulkanPipelineDebugTest, MissingScissorTriggersCheck)
   spec.pipeline = reinterpret_cast<const vk::raii::Pipeline*>(0x1);
   spec.pipelineLayout = reinterpret_cast<const vk::raii::PipelineLayout*>(0x1);
   spec.viewports.emplace_back(0.0f, 0.0f, 16.0f, 16.0f, 0.0f, 1.0f);
-  spec.scissors.emplace_back(vk::Rect2D{{0, 0}, {16u, 16u}});
+  spec.scissors.emplace_back(vk::Rect2D{
+    {0,   0  },
+    {16u, 16u}
+  });
 
   tracker.reset(spec);
   tracker.markViewport();
@@ -54,7 +212,10 @@ TEST_F(VulkanPipelineDebugTest, DescriptorCoverageEnforced)
   spec.pipeline = reinterpret_cast<const vk::raii::Pipeline*>(0x1);
   spec.pipelineLayout = reinterpret_cast<const vk::raii::PipelineLayout*>(0x1);
   spec.viewports.emplace_back(0.0f, 0.0f, 8.0f, 8.0f, 0.0f, 1.0f);
-  spec.scissors.emplace_back(vk::Rect2D{{0, 0}, {8u, 8u}});
+  spec.scissors.emplace_back(vk::Rect2D{
+    {0,  0 },
+    {8u, 8u}
+  });
   spec.expectedDescriptorSetCount = 2;
 
   tracker.reset(spec);
@@ -109,7 +270,10 @@ TEST_F(VulkanPipelineDebugTest, CompleteGraphicsStatePasses)
   spec.pipeline = reinterpret_cast<const vk::raii::Pipeline*>(0x1);
   spec.pipelineLayout = reinterpret_cast<const vk::raii::PipelineLayout*>(0x1);
   spec.viewports.emplace_back(0.0f, 0.0f, 32.0f, 32.0f, 0.0f, 1.0f);
-  spec.scissors.emplace_back(vk::Rect2D{{0, 0}, {32u, 32u}});
+  spec.scissors.emplace_back(vk::Rect2D{
+    {0,   0  },
+    {32u, 32u}
+  });
   spec.lineWidth = 2.0f;
   spec.depthBiasEnable = VK_TRUE;
   spec.blendConstants = std::array<float, 4>{0.0f, 0.0f, 0.0f, 0.0f};
@@ -160,7 +324,10 @@ TEST_F(VulkanPipelineDebugTest, TrackerResetsBetweenPasses)
     spec.pipeline = reinterpret_cast<const vk::raii::Pipeline*>(0x1);
     spec.pipelineLayout = reinterpret_cast<const vk::raii::PipelineLayout*>(0x1);
     spec.viewports.emplace_back(0.0f, 0.0f, 16.0f, 16.0f, 0.0f, 1.0f);
-    spec.scissors.emplace_back(vk::Rect2D{{0, 0}, {16u, 16u}});
+    spec.scissors.emplace_back(vk::Rect2D{
+      {0,   0  },
+      {16u, 16u}
+    });
     tracker.reset(spec);
     tracker.markViewport();
     tracker.markScissor();
@@ -173,7 +340,10 @@ TEST_F(VulkanPipelineDebugTest, TrackerResetsBetweenPasses)
     spec.pipeline = reinterpret_cast<const vk::raii::Pipeline*>(0x1);
     spec.pipelineLayout = reinterpret_cast<const vk::raii::PipelineLayout*>(0x1);
     spec.viewports.emplace_back(0.0f, 0.0f, 16.0f, 16.0f, 0.0f, 1.0f);
-    spec.scissors.emplace_back(vk::Rect2D{{0, 0}, {16u, 16u}});
+    spec.scissors.emplace_back(vk::Rect2D{
+      {0,   0  },
+      {16u, 16u}
+    });
     tracker.reset(spec);
     tracker.markViewport();
     EXPECT_DEATH(tracker.assertGraphicsPreDraw(spec), "Scissor must be set");
