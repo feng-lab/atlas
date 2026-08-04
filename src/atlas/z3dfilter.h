@@ -121,14 +121,7 @@ public:
 Q_SIGNALS:
   void renderingError(const QString& error) const;
 
-  // Emitted for every render-affecting invalidation request, including when
-  // this filter's live output is already invalid. Multi-device scheduling uses
-  // this logical notification to supersede stale work without pretending that
-  // the idle direct pipeline has produced a valid physical output.
-  void renderInputChanged();
-
-  // Emitted when this filter's outputs become invalid for any reason.
-  // This remains edge-triggered for direct-pipeline validity propagation.
+  // Emitted on the edge where this filter's physical output becomes invalid.
   void invalidated();
 
 protected:

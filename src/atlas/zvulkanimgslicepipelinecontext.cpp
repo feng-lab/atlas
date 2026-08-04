@@ -19,7 +19,6 @@
 #include "zvulkanpipelinecontext_raii.h"
 #include "zvulkanimageblockuploader.h"
 #include "z3drenderglobalstate.h"
-#include "zcancellation.h"
 #include "zbenchtimer.h"
 #include "zmesh.h"
 #include "zrenderthreadexecutor_tls.h"
@@ -408,8 +407,9 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
                                             const vk::Rect2D& scissor,
                                             vk::raii::CommandBuffer& cmd)
 {
-  auto cancellationToken = Z3DRenderGlobalState::instance().currentCancellationToken();
-  maybeCancel(cancellationToken);
+  // Snapshot the token for deferred post-frame paging work. Do not throw from
+  // this command-recording scope; ZVulkanLinearScript polls before opening it.
+  const auto cancellationToken = Z3DRenderGlobalState::instance().currentCancellationToken();
 
   if (!payload.image || payload.slices.empty()) {
     return;
@@ -1206,7 +1206,6 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
   mergeDraw.vertexCount = static_cast<uint32_t>(m_quadVertexCount);
   mergeDraw.instanceCount = 1;
   recorder.recordGraphicsDraw(mergeDraw);
-  maybeCancel(cancellationToken);
 
   if (absl::GetFlag(FLAGS_atlas_debug_save_slice_layers)) {
     auto leaseRef = payload.layerLease;
@@ -1266,7 +1265,9 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
           folly::getGlobalCPUExecutor(),
           folly::coro::co_invoke([jobs = std::move(jobs)]() mutable -> folly::coro::Task<void> {
             for (auto& job : jobs) {
-              co_await job.ticket.awaitReady();
+              if (!(co_await job.ticket.awaitReady())) {
+                co_return;
+              }
 
               if (!ZVulkanTexture::saveReadbackToImage(job.filename,
                                                        job.ticket.format,
@@ -1361,7 +1362,9 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
                                      co_return;
                                    }
                                    for (auto& job : jobs) {
-                                     co_await job.ticket.awaitReady();
+                                     if (!(co_await job.ticket.awaitReady())) {
+                                       co_return;
+                                     }
 
                                      if (!ZVulkanTexture::saveReadbackToImage(job.filename,
                                                                               job.ticket.format,

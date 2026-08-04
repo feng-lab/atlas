@@ -97,6 +97,11 @@ public:
     return m_rightReadyLocalBuffer;
   }
 
+  // Identity of the most recent Vulkan readback accepted for an eye. A
+  // synchronous tile attempt uses this to prove that a same-sized ready buffer
+  // belongs to the current render frame rather than an earlier submission.
+  [[nodiscard]] uint64_t lastPublishedRenderFrameToken(Z3DEye eye) const;
+
   void invalidate(State inv) override;
 
   void setProgressiveRenderingMode(bool v) override;

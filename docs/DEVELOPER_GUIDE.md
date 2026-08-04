@@ -351,6 +351,11 @@ Testing (Linking Atlas Code)
   or CPU software ICD. The tests verify context, logical-device, VMA startup, and device-owned bindless slot/retirement
   lifetimes. This is an explicit local correctness check; normal platform CI remains limited to its existing build and
   packaging workflow. Do not put performance assertions in this smoke test.
+- `zvulkanmultidevicetilecoordinatortest` enables its synthetic PPLL rendering case only when
+  `ATLAS_ENABLE_VULKAN_SMOKE_TEST=1`. The gate is checked before constructing `QApplication`, a rendering engine, or a
+  `ZVulkanContext`. With the variable unset, descriptor, selection, retirement, and publication tests construct no Vulkan
+  context or logical device and require no usable ICD or GPU at runtime. This runtime gate does not remove Atlas's Vulkan
+  SDK and shader-compiler build prerequisites.
 - Neuroglancer precomputed E2E tests:
   - `test/zneuroglancerprecomputede2etest.cpp` is a networked smoke test (public GCS URLs) gated by `ATLAS_ENABLE_NETWORK_TESTS=1`.
   - The same test file exercises both HTTP backends. Atlas test binaries use the test main rather than the app main, so backend selection is set inside the test with Abseil flags instead of relying on application flagfile setup.
@@ -402,7 +407,14 @@ Architecture Overview
 
 - Main window (`ZMainWindow`) — 2D UI; hosts object manager, docks, menus.
 - 3D window (`Z3DMainWindow`) — spawns a rendering thread and owns a `Z3DRenderingEngine` (moved to the rendering thread), and a `Z3DCanvas` on the UI thread.
-- Rendering engine (`Z3DRenderingEngine`) — owns the offscreen GL context, global parameters, compositor, network evaluator, and per-object 3D views.
+- Rendering engine (`Z3DRenderingEngine`) — owns one complete GL or Vulkan rendering pipeline, including its context or
+  device, scratch pool, global parameters, compositor, network evaluator, and per-object 3D views. Each active Vulkan
+  pipeline uses one logical device; a Vulkan tile worker has immutable backend and exact-device-selection affinity.
+- `ZVulkanMultiDeviceTileCoordinator` is an explicit synchronous tile API above complete single-device engines. It creates
+  one worker on the canonical engine's selected adapter, reapplies canonical rendering state before each tile, and
+  destroys the worker if synchronization or rendering throws. Atlas application entry points do not construct the
+  coordinator, so interactive rendering and export continue through their direct engine paths. See
+  [VULKAN_MULTI_GPU_DESIGN.md](VULKAN_MULTI_GPU_DESIGN.md).
 - Parameter system (`ZParameter` + subclasses) — typed, QObject-based, with signals/slots and JSON (de)serialization.
   - Each parameter can now describe its own value JSON Schema via `ZParameter::valueSchema()`.
     - Default is permissive (any JSON). Subclasses override for precision (numeric scalars/vectors/spans, options, transforms, camera).
@@ -491,6 +503,8 @@ Threading Model
     - `Z3DRenderingEngine::renderThreadExecutor()` provides a `ZQtExecutor` (a `folly::Executor`) that schedules onto the engine thread via Qt event posting.
     - Pipeline contexts and Vulkan backend code should use `currentRenderThreadExecutorKeepAlive(...)` at call sites that need a keep-alive token for `co_withExecutor(...)`.
     - Teardown: `Z3DRenderingEngine::drainVulkanFrameExecutorForTeardown()` must run on the engine thread before quitting it so fence-gated continuations can complete deterministically.
+    - `ZVulkanMultiDeviceTileCoordinator` and its worker run on the canonical rendering thread. The worker borrows the
+      canonical engine's render-thread executor; the coordinator creates no worker CPU threads.
   - UI-thread coroutine continuations should use a UI-owned executor:
     - `ZDoc::uiThreadExecutor()` / `uiThreadExecutorKeepAlive(...)` provide a `ZQtExecutor` pinned to the document’s UI-thread affinity for one-shot view/doc continuations.
     - Awaiting `co_withExecutor(doc.uiThreadExecutorKeepAlive(...), ...)` from a tracked background task is only safe when shutdown will not cancel-and-join that task from the UI thread. If the UI thread drains the task scope during close, a task that must resume on the UI thread before it can finish can deadlock shutdown.
@@ -624,6 +638,10 @@ Compositor and Rendering
 - `Z3DRenderingEngine` owns the scratch pool before constructing global parameters or filters. Its member lifetime order
   guarantees that filters, the compositor, and global parameters are destroyed before the pool. Renderer code receives
   this concrete pool by reference; it must not rediscover a mutable process-global pool while rendering.
+- A headless Vulkan tile worker is an ordinary complete engine with its own compositor, scratch pool, object views,
+  filters, progressive state, engine/filter-local caches, and native Vulkan resources. Canonical and worker engines refer
+  to the same document-owned objects and packs and borrow the same render-thread `ZQtExecutor`; each logical device owns a
+  separate `ZVulkanFrameExecutor`. They do not share live filter QObjects or native Vulkan resources.
 
 Global Cut Mode (Binding)
 
@@ -657,10 +675,10 @@ Vulkan Notes
   destroy the old backend and construct a new one instead of retargeting an existing backend.
 - A non-empty scratch lease records its creating pool. Converting a lease to a Vulkan surface checks pool ownership, and
   native texture/buffer realization checks the creating device. Keep these checks at acquisition/realization or cache-change
-  boundaries; do not add device routing or owner checks to unchanged per-draw hot paths.
+  boundaries. Per-draw hot paths contain no device routing or ownership lookup.
 - `ReadbackCompletionPolicy` is independent of progressive/final render quality. The direct path keeps
-  `FollowRenderQuality`, which preserves asynchronous progressive readback and completion-waiting final readback. An isolated
-  final-quality tile attempt may later select `ReturnAfterSubmit` without weakening its render quality.
+  `FollowRenderQuality`, which preserves asynchronous progressive readback and completion-waiting final readback. A worker
+  tile sets `WaitForCompletion` so its final, owned pixels are available before `renderTile()` returns.
 - Geometry cut planes: Vulkan geometry draw shaders export active local/global clip distances through both `gl_ClipDistance` (up to the fixed-function budget) and an ordinary fragment-stage varying; fragment shaders must apply the clip helper so drivers cannot silently ignore the fixed-function path.
 - Attachment end-of-pass usage must be explicit for Vulkan:
   - `AttachmentDesc::finalUse` is the backend-neutral signal describing how a produced attachment will be used after the pass (`RenderTarget`, `Sampled`, `TransferSrc`, `General`). `Unspecified` is a hard `CHECK` in Vulkan to avoid implicit layout assumptions.
@@ -1444,7 +1462,11 @@ Transparency Methods
 Stereo and Screenshots
 
 - Stereo: left/right eyes rendered separately; compositor holds per-eye ready/current targets.
-- Screenshots: single shot uses current canvas size; tiled output computes normalized left/right/bottom/top and sets tile frustum on `Z3DCameraParameter` and compositor region, then composites tiles to an image (mono or stereo).
+- Screenshots: a single shot uses the current canvas size. `makeZ3DTileDescriptors()` produces the validated descriptors
+  used by tiled still and animation export. Each descriptor stores the full output extent, a bottom-left-origin valid
+  output rectangle, and guard width, and derives attachment geometry, normalized frustum bounds, and top-left assembly
+  origin. Guard regions may extend outside the full output; assembly copies only the valid rectangle. Descriptors are
+  traversed bottom-row-first in serpentine order. Direct export and worker rendering use the same descriptor geometry.
 - Top-level capture entry points emit coarse progress updates through the existing `progressChanged(int)` path so users can see screenshot/export preload / render / save progress without introducing a separate progress UI contract.
 
 OpenGL Context and Shaders
@@ -1455,11 +1477,8 @@ OpenGL Context and Shaders
 Filter Wiring and Parameters
 
 - Pipeline: `Z3DRenderingEngine` owns a linear pipeline of filters and a single `Z3DCompositor` at the end; it also tracks the current geometry and volume filters and exposes them to the compositor.
-- Invalidation has two distinct signals. `Z3DFilter::renderInputChanged()` is unconditional for every render-affecting
-  request, even while output is already physically invalid; a future tile runtime uses it to supersede logical generations.
-  `Z3DFilter::invalidated()` remains edge-triggered and represents the direct pipeline's physical valid-to-invalid
-  transition. 3D views connect the latter directly to `Z3DCompositor::invalidateResult()` so only the compositor is
-  invalidated. Do not replace one contract with the other.
+- `Z3DFilter::invalidated()` is edge-triggered and represents the direct pipeline's physical valid-to-invalid transition.
+  3D views connect it directly to `Z3DCompositor::invalidateResult()` so only the compositor is invalidated.
 - Parameters: `ZParameter` subclasses emit `valueChanged`; `Z3DFilter::addParameter` wires them to `invalidateResult()` by default.
 - WidgetsGroup: `ZWidgetsGroup` trees drive UI construction and change notifications; engine watches these groups to emit view-setting change signals.
 
@@ -1480,6 +1499,10 @@ Additional Architecture Notes
 - Object/Pack/View separation
   - Documents own object lifecycles and actions; packs back data; views/filters encapsulate render logic and parameters.
   - Aliases share packs only; everything above the pack (parameters, transforms, selections) is per-ID.
+  - Complete Vulkan worker engines share document-owned objects and packs but own independent views, parameters, filters,
+    progressive state, scratch resources, and device resources. Standard document-to-view connections maintain worker data
+    and removal lifetimes. Before each synchronous `renderTile()` call, the coordinator reapplies serialized object and
+    global state, device pixel ratio, and the complete camera state.
 
 - Frame orchestration
   - Rendering thread drives a loop of: size propagation → invalidation → progressive processing → compositor blend.
@@ -1499,14 +1522,16 @@ Additional Architecture Notes
     limits (max 2D/3D texture size, array layers, anisotropy, GPU memory capacity) come from the selected Vulkan
     physical device. Paged-image cache sizing additionally uses the effective Vulkan residency budget when it is smaller
     than physical VRAM. OpenGL-specific strings and flags in that log are only meaningful under the OpenGL backend.
+    `Z3DGpuInfo` is the process-wide capability view published by the canonical engine; headless worker initialization does
+    not overwrite it. Each worker evaluates support through its own Vulkan context.
   - For Vulkan-specific details (device name, driver, limits, features, and extensions), call `ZVulkanContext::logGpuInfo()`.
     This logs a concise summary at INFO and full feature/extension detail at `--v=1`.
 
 Vulkan device selection
 
-- Each `Z3DRenderingEngine` still executes rendering on exactly one logical Vulkan device. Phase 1 ownership and selection
-  primitives are present, but the optional multi-device tile runtime, secondary domains, tile replicas, and multi-device
-  command-line controls are not. The tile-only architecture for both interactive rendering and export is documented in
+- Each `Z3DRenderingEngine` executes rendering on exactly one logical Vulkan device.
+  `ZVulkanMultiDeviceTileCoordinator` owns one same-adapter synchronous worker and does not schedule across devices. The
+  tile-worker architecture is documented in
   [VULKAN_MULTI_GPU_DESIGN.md](VULKAN_MULTI_GPU_DESIGN.md).
 - On initialization, all physical devices are enumerated and logged. Devices are sorted by preference: discrete > integrated
   > virtual > CPU, then larger device-local memory capacity, then higher API version. Otherwise equal-ranked devices use
@@ -1528,13 +1553,14 @@ Vulkan device selection
   `maxPerStageUpdateAfterBindResources`; bindless pool construction reuses the evaluated effective capacities.
 - `ZVulkanContext::physicalDevice()` returns the currently selected device. `deviceCount()` and `physicalDevice(index)` can be
   used for explicit per-device introspection. The selected index is exposed via `selectedDeviceIndex()`.
-- `ZVulkanContext::DeviceSelection` captures a preference-sorted index plus the expected physical-device UUID.
-  `ZVulkanContext(DeviceSelection)` is the strict construction path intended for a future secondary domain: independent
-  enumeration must resolve both values to the same compatible adapter or initialization fails without fallback.
+- `ZVulkanContext::DeviceSelection` contains a preference-sorted index and expected physical-device UUID. Worker construction
+  requires both to resolve to the same compatible adapter and does not fall back. Worker initialization is Vulkan-only,
+  creates no GL surface, publishes no process-global GPU caps, borrows the canonical rendering-thread executor, and
+  propagates reported filter or view construction failures to coordinator construction.
 - Prefer a Vulkan device at startup via `--atlas_vk_device_index=N` (sorted order), or use `-1` for automatic selection.
   A compatible preferred device is selected exactly. An invalid, out-of-range, or incompatible preference logs a warning
-  with the reason and falls back to the first fully compatible Vulkan device in preference order. This best-effort CLI
-  behavior is intentionally unchanged and is separate from strict `DeviceSelection` construction.
+  with the reason and falls back to the first fully compatible Vulkan device in preference order. CLI selection is
+  best-effort; strict `DeviceSelection` construction does not fall back.
 - Linux headless export maps `--use_gpu_devices` according to the requested backend. OpenGL values select EGL devices;
   Vulkan values select indices from this preference-sorted list. Multi-process animation workers receive a corresponding
   `--atlas_vk_device_index` preference. A rejected worker preference logs a warning and uses automatic selection, so export
@@ -1553,8 +1579,18 @@ Vulkan async readback (offscreen only)
 - The compositor requests an end-of-frame GPU copy of the final color attachment into a host-visible staging buffer. The CPU reads the mapped memory after the frame fence signals (default 1-frame latency) and updates the BGRA8 local buffer for UI consumption.
 - Completion callbacks capture an immutable owner revision, render-frame token, output extent, eye, and destination identity.
   Resize, backend switch, and destruction invalidate the owner revision. A destroyed/stale/wrong-extent/wrong-backend
-  completion must retire its staging slot without publishing; an accepted mapping transfers that retirement callback to
-  the local color buffer exactly once.
+  completion signals consumer completion without publishing; an accepted mapping transfers that same action to the local
+  color buffer. The staging slot becomes reusable only after its submission fence is safe and its consumer has finished,
+  in either order. A definitive pre-submit abort marks it safe and producer-finished before abort-aware fence waiters
+  resume; a live consumer still retains the slot.
+- Vulkan logical frames are transactional at the recording/submission boundary. Submission-owned completion callbacks,
+  descriptor reset, and performance bookkeeping are armed before `queue.submit()`; after ownership transfers, the backend
+  performs only noexcept ownership commits before observing completion. Recording exceptions explicitly abort and
+  quarantine the logical device instead of submitting a partial command prefix. Early `beginRender()` setup rolls back an
+  unpublished acquisition or performs the same definitive-unsubmitted cleanup after submission resources have been
+  attached. Immediate submissions use the same sticky failure check for pre-submit recording failures. Queue-submit and
+  fence-observation failures remain fatal because ownership is uncertain; Atlas does not implement graceful
+  physical-device-loss recovery.
 - Flags:
 - VLOG(1) includes `readback_bytes_copied` and `readback_slots_in_flight` to track throughput.
 

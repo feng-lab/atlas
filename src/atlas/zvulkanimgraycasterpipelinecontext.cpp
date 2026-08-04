@@ -26,7 +26,6 @@
 #include "zvulkanpipelinecontext_raii.h"
 #include "z3drenderervulkanbackend.h"
 #include "zvulkanimageblockuploader.h"
-#include "zcancellation.h"
 #include "zrenderthreadexecutor_tls.h"
 #include "zvulkanresidencymanager.h"
 
@@ -687,11 +686,6 @@ void ZVulkanImgRaycasterPipelineContext::record(Z3DRendererBase& renderer,
                                                 const vk::Rect2D& scissor,
                                                 vk::raii::CommandBuffer& cmd)
 {
-  // Cooperative cancellation: mirror GL by polling UI events and
-  // throwing when a cancel is requested.
-  auto cancellationToken = Z3DRenderGlobalState::instance().currentCancellationToken();
-  maybeCancel(cancellationToken);
-
   CHECK(payload.stage != ImgRaycasterPayload::Stage::Unspecified) << "Raycaster payload missing stage";
 
   switch (payload.stage) {
@@ -1388,7 +1382,9 @@ void ZVulkanImgRaycasterPipelineContext::recordStageEntryExit(Z3DRendererBase& r
           folly::getGlobalCPUExecutor(),
           folly::coro::co_invoke([jobs = std::move(jobs)]() mutable -> folly::coro::Task<void> {
             for (auto& job : jobs) {
-              co_await job.ticket.awaitReady();
+              if (!(co_await job.ticket.awaitReady())) {
+                co_return;
+              }
 
               if (!ZVulkanTexture::saveReadbackToImage(job.filename,
                                                        job.ticket.format,
@@ -3109,8 +3105,9 @@ void ZVulkanImgRaycasterPipelineContext::recordBlockIdCompaction(Z3DRendererBase
                                                                  vk::raii::CommandBuffer& cmd)
 {
   (void)renderer;
-  const folly::CancellationToken cancellationToken = Z3DRenderGlobalState::instance().currentCancellationToken();
-  maybeCancel(cancellationToken);
+  // The completion callback uses this token after submission. Merely snapshot
+  // it here; cancellation must not throw while the command buffer is active.
+  const auto cancellationToken = Z3DRenderGlobalState::instance().currentCancellationToken();
   (void)batch;
   if (!payload.blockIdLease || !payload.blockIdLease->hasVulkanImage()) {
     return;
@@ -3251,7 +3248,6 @@ void ZVulkanImgRaycasterPipelineContext::recordBlockIdCompaction(Z3DRendererBase
 
     auto gpuScope = m_backend.beginGpuScope(fmt::format("block_id_compact_{}", blockIdCompactionMethodName(method)));
     for (uint32_t att = 0; att < effectiveAttachmentCount; ++att) {
-      maybeCancel(cancellationToken);
       ZVulkanTexture* blockTex = payload.blockIdLease->colorAttachment(att);
       if (!blockTex) {
         continue;

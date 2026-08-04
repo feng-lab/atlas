@@ -872,17 +872,24 @@ def main() -> int:
             ("measured", index) for index in range(1, args.measured_runs + 1)
         )
 
+        # _prepare_scene() has already applied and waited for open_camera. Reapplying
+        # that identical state before the first run is intentionally a no-op in Atlas,
+        # so there is no new preview/final marker to wait for. Every later run still
+        # resets the camera after the preceding injected drag and waits for both markers.
+        prepared_camera_is_current = True
         for kind, run_index in run_plan:
             run_dir = output_root / kind / f"run{run_index:02d}"
             run_dir.mkdir(parents=True, exist_ok=True)
 
-            _wait_for_camera_settle(
-                client=client,
-                camera_payload=open_camera,
-                log_follower=log_follower,
-                preview_timeout_seconds=args.preview_timeout_seconds,
-                final_timeout_seconds=args.final_timeout_seconds,
-            )
+            if not prepared_camera_is_current:
+                _wait_for_camera_settle(
+                    client=client,
+                    camera_payload=open_camera,
+                    log_follower=log_follower,
+                    preview_timeout_seconds=args.preview_timeout_seconds,
+                    final_timeout_seconds=args.final_timeout_seconds,
+                )
+            prepared_camera_is_current = False
             _move_atlas_window_with_system_events(x=args.window_x, y=args.window_y)
             _wait_for_window_bounds(
                 "Atlas",
@@ -898,6 +905,16 @@ def main() -> int:
                 args=args,
             )
             gui_summary_path = _summarize_run(run_dir)
+            rotate_metrics = _load_rotate_metrics(gui_summary_path)
+            changed_sample_count = rotate_metrics.get("changed_sample_count")
+            if (
+                not isinstance(changed_sample_count, int | float)
+                or changed_sample_count <= 0
+            ):
+                raise RuntimeError(
+                    "Atlas GUI rotate produced no visible pixel changes; refusing to "
+                    f"record an empty or non-interactive 3D view ({run_dir})"
+                )
             artifacts.append(
                 RunArtifacts(
                     kind=kind,

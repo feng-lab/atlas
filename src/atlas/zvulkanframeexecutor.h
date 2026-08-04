@@ -1,6 +1,7 @@
 #pragma once
 
 #include "zvulkan.h"
+#include <exception>
 #include <functional>
 #include <string_view>
 #include <vector>
@@ -78,7 +79,9 @@ public:
   // still be submitted. Call after waitForAllInFlight() before mutating shared
   // descriptor state across every frame slot.
   [[nodiscard]] bool allFrameSlotsDescriptorMutationSafe() const;
-  void markSubmitted(ActiveFrame& frame);
+  // Queue ownership has already transferred when this is called; therefore
+  // this commit performs only validated scalar state changes.
+  void markSubmitted(ActiveFrame& frame) noexcept;
   // Schedule a callback to run once the frame's submission fence signals.
   // Callbacks are executed on the caller thread when the executor observes
   // fence completion (waitForCompletion, acquireFrame reuse, or waitForAllInFlight).
@@ -128,7 +131,9 @@ private:
 
   Frame& acquireFrame();
   void releaseFrameLease(ActiveFrame& frame) noexcept;
-  void runCompletionCallbacks(Frame& frame);
+  [[nodiscard]] bool observeFenceCompletion(Frame& frame, bool wait);
+  [[nodiscard]] std::exception_ptr runCompletionCallbacks(Frame& frame) noexcept;
+  void discardCompletionCallbacks(Frame& frame) noexcept;
   void ensureFrames();
   void createFrames();
   void checkOwnerThread(std::string_view operation) const;

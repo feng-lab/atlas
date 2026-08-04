@@ -76,10 +76,10 @@ public:
   // of resources referenced by in-flight work.
   virtual void preBackendSwitch() {}
 
-  // Teardown helper: backends that schedule fence-gated work (e.g. Vulkan safe-point
-  // hooks, async readbacks) can override this to synchronously drain in-flight work
-  // and execute any completion callbacks before dependent resources are destroyed.
-  // Default no-op for immediate backends (e.g. OpenGL).
+  // Teardown helper: backends that schedule fence-gated work can override this
+  // to synchronously drain submitted work and its completion callbacks. The
+  // backend remains open so this is also usable at resource-replacement
+  // boundaries. Immediate backends keep the default no-op.
   virtual void flushForTeardown(std::string_view /*reason*/ = {}) {}
 
   // Optional pass-scope hooks (no-op by default). Vulkan backend uses these

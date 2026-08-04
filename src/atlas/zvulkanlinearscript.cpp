@@ -3,6 +3,7 @@
 
 #include "z3drendererbase.h"
 #include "z3drenderervulkanbackend.h"
+#include "z3drenderglobalstate.h"
 #include "z3dperfcollector.h"
 #include "z3dscratchresourcepool.h"
 #include "z3dimg.h"
@@ -1033,6 +1034,11 @@ void ZVulkanLinearScript::flushNodes(std::string_view reason,
     return;
   }
 
+  // This is the last cancellation boundary before persistent one-shot backend
+  // hints are populated and command-buffer setup can begin. Recording callbacks
+  // do not poll cancellation.
+  maybeCancel(Z3DRenderGlobalState::instance().currentCancellationToken());
+
   std::string firstLabelStorage;
   if (!m_nodes.empty()) {
     const auto& first = m_nodes.front();
@@ -1940,67 +1946,79 @@ void ZVulkanLinearScript::flushNodes(std::string_view reason,
     (void)managedHotProtection;
     openFrame(firstLabel);
   }
-  auto frameGuard = folly::makeGuard([&]() {
-    if (!m_frameOpen) {
-      return;
+  try {
+    executeNodes(std::span<Node>(nodes.data(), nodes.size()));
+
+    // Recording is finished. Drop lease keep-alives before registering readback
+    // completion hooks so scratch release hooks are ordered first at the frame
+    // completion safe point.
+    m_keepAlives.clear();
+
+    if (readback != nullptr) {
+      ZVulkanBuffer* src = readback->src;
+      if (readback->srcSlot.has_value()) {
+        src = readback->srcSlot->get();
+      }
+      CHECK(src != nullptr) << "ZVulkanLinearScript readback missing source buffer";
+      CHECK(readback->dst != nullptr) << "ZVulkanLinearScript readback missing destination pointer";
+      CHECK_GT(readback->bytes, 0u) << "ZVulkanLinearScript readback requires bytes > 0";
+
+      // Readback is a CPU control-flow boundary: force the backend to wait for the
+      // active submission fence and run completion safe-point hooks before
+      // returning to the caller.
+      m_backend.requireCompletionSafePointWaitForActiveSubmission(readback->label);
+
+      auto ticket =
+        m_backend.requestEndOfFrameBufferReadbackTicket(*src, readback->srcOffset, readback->bytes, readback->label);
+
+      m_backend.registerAfterCurrentFrameCompletionHook(
+        currentRenderThreadExecutorKeepAlive("vulkan_script_readback_consume"),
+        [dst = readback->dst, bytes = readback->bytes, ticket = std::move(ticket)](
+          Z3DRendererVulkanBackend&) mutable -> folly::coro::Task<void> {
+          co_await ticket.awaitCopyTo(dst, bytes);
+          co_return;
+        },
+        readback->label);
     }
-    // Best-effort close on exceptional exits; do not mask the original error.
+
+    // These CPU-side protections only guard pre-record/resource-assembly work.
+    // Submitted command buffers are protected by managed texture pins, Vulkan
+    // scratch lease lifetimes, and the frame fence. Release before closeFrame()
+    // reaches completion hooks so post-fence readback/staging work can reclaim
+    // resources from the just-finished submission.
     scratchHotProtection->reset();
-    try {
-      closeFrame("flush_abort");
+
+    if (readback == nullptr && (waitForCompletion || strictResidencyFlushEachNode())) {
+      m_backend.requireCompletionSafePointWaitForActiveSubmission(waitForCompletion ? reason : "strict_residency_node");
     }
-    catch (...) {
-    }
-  });
 
-  executeNodes(std::span<Node>(nodes.data(), nodes.size()));
-
-  // Recording is finished. Drop lease keep-alives before registering readback
-  // completion hooks so scratch release hooks are ordered first at the frame
-  // completion safe point.
-  m_keepAlives.clear();
-
-  if (readback != nullptr) {
-    ZVulkanBuffer* src = readback->src;
-    if (readback->srcSlot.has_value()) {
-      src = readback->srcSlot->get();
-    }
-    CHECK(src != nullptr) << "ZVulkanLinearScript readback missing source buffer";
-    CHECK(readback->dst != nullptr) << "ZVulkanLinearScript readback missing destination pointer";
-    CHECK_GT(readback->bytes, 0u) << "ZVulkanLinearScript readback requires bytes > 0";
-
-    // Readback is a CPU control-flow boundary: force the backend to wait for the
-    // active submission fence and run completion safe-point hooks before
-    // returning to the caller.
-    m_backend.requireCompletionSafePointWaitForActiveSubmission(readback->label);
-
-    auto ticket =
-      m_backend.requestEndOfFrameBufferReadbackTicket(*src, readback->srcOffset, readback->bytes, readback->label);
-
-    m_backend.registerAfterCurrentFrameCompletionHook(
-      currentRenderThreadExecutorKeepAlive("vulkan_script_readback_consume"),
-      [dst = readback->dst, bytes = readback->bytes, ticket = std::move(ticket)](
-        Z3DRendererVulkanBackend&) mutable -> folly::coro::Task<void> {
-        co_await ticket.awaitCopyTo(dst, bytes);
-        co_return;
-      },
-      readback->label);
+    closeFrame(reason);
+    m_pendingSubmissionHasGpuNodes = false;
   }
-
-  // These CPU-side protections only guard pre-record/resource-assembly work.
-  // Submitted command buffers are protected by managed texture pins, Vulkan
-  // scratch lease lifetimes, and the frame fence. Release before closeFrame()
-  // reaches completion hooks so post-fence readback/staging work can reclaim
-  // resources from the just-finished submission.
-  scratchHotProtection->reset();
-
-  if (readback == nullptr && (waitForCompletion || strictResidencyFlushEachNode())) {
-    m_backend.requireCompletionSafePointWaitForActiveSubmission(waitForCompletion ? reason : "strict_residency_node");
+  catch (const std::exception& e) {
+    // A partially recorded logical frame is not a valid fallback submission:
+    // layout/cache tracking may already reflect commands that never reached the
+    // queue. Release CPU protections, then abort explicitly outside a scope
+    // guard so the typed failure never escapes a destructor during unwinding.
+    m_keepAlives.clear();
+    scratchHotProtection->reset();
+    m_pendingSubmissionHasGpuNodes = false;
+    if (m_frameOpen) {
+      m_frameOpen = false;
+      m_renderer.abortVulkanFrame(e.what());
+    }
+    throw;
   }
-
-  closeFrame(reason);
-  frameGuard.dismiss();
-  m_pendingSubmissionHasGpuNodes = false;
+  catch (...) {
+    m_keepAlives.clear();
+    scratchHotProtection->reset();
+    m_pendingSubmissionHasGpuNodes = false;
+    if (m_frameOpen) {
+      m_frameOpen = false;
+      m_renderer.abortVulkanFrame("non-standard linear-script recording exception");
+    }
+    throw;
+  }
 }
 
 void ZVulkanLinearScript::executeNodes(std::span<Node> nodes)

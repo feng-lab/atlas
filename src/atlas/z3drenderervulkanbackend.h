@@ -12,6 +12,7 @@
 // Attachment format helpers
 #include "zvulkanrenderconversions.h"
 #include "zvulkanresidencymanager.h"
+#include "zvulkanreadbackretirement_p.h"
 #include "zvulkansubmissionrequirements.h"
 #include "z3dtypes.h"
 #include "zvulkanuniforms.h"
@@ -22,6 +23,7 @@
 #include <chrono>
 #include <atomic>
 #include <cstdint>
+#include <exception>
 #include <functional>
 #include <memory>
 #include <mutex>
@@ -233,6 +235,11 @@ public:
   void beginRender(Z3DRendererBase& renderer) override;
 
   void endRender(Z3DRendererBase& renderer) override;
+
+  // Terminate a recording that cannot be submitted as a complete logical
+  // frame. This records a sticky failure on the shared logical device and
+  // always throws after abort-safe cleanup.
+  [[noreturn]] void abortActiveFrame(std::string_view message);
 
   void processBatches(Z3DRendererBase& renderer, const RendererCPUState& state) override;
 
@@ -597,7 +604,7 @@ public:
   // Inserts a barrier making the data visible to the appropriate pipeline stage.
   void stageCopy(vk::Buffer dst, vk::DeviceSize dstOffset, const UploadSlice& src, bool isIndexBuffer);
 
-  // Stage 2: Per-frame descriptor arena API
+  // Per-frame descriptor arena API.
   // Allocate a descriptor set from the current frame's arena. Returns null when
   // no active frame exists (e.g., zero-sized viewport), and logs at VLOG(1).
   std::unique_ptr<ZVulkanDescriptorSet> allocateFrameDescriptorSet(vk::DescriptorSetLayout layout);
@@ -620,6 +627,12 @@ public:
   //   all in-flight submissions to complete (teardown safety).
   //
   // Must be created on the rendering thread.
+  enum class ActiveSubmissionOutcome : uint8_t
+  {
+    Completed,
+    Unavailable,
+  };
+
   class ActiveSubmissionFenceAwaiter final
   {
   public:
@@ -633,12 +646,62 @@ public:
     }
 
   private:
+    enum class StateOutcome : uint8_t
+    {
+      Pending,
+      Completed,
+      Unavailable,
+    };
+
     struct State
     {
-      explicit State(bool signalled) noexcept
-        : baton(signalled)
+      explicit State(StateOutcome initialOutcome) noexcept
+        : baton(initialOutcome != StateOutcome::Pending)
+        , outcome(initialOutcome)
       {}
+
+      void signal(StateOutcome newOutcome)
+      {
+        CHECK(newOutcome != StateOutcome::Pending);
+        StateOutcome expected = StateOutcome::Pending;
+        CHECK(outcome.compare_exchange_strong(expected, newOutcome, std::memory_order_acq_rel))
+          << "Vulkan active-submission completion was signalled more than once";
+        baton.post();
+      }
+
       folly::coro::Baton baton;
+      std::atomic<StateOutcome> outcome;
+    };
+
+    // The frame executor owns this registration only while an acquisition can
+    // still be submitted. Destruction without complete() is the structured
+    // signal that the definitely-unsubmitted acquisition was abandoned.
+    class CompletionRegistration final
+    {
+    public:
+      explicit CompletionRegistration(std::shared_ptr<State> state)
+        : m_state(std::move(state))
+      {
+        CHECK(m_state != nullptr);
+      }
+
+      ~CompletionRegistration()
+      {
+        if (!m_completed) {
+          m_state->signal(StateOutcome::Unavailable);
+        }
+      }
+
+      void complete()
+      {
+        CHECK(!m_completed);
+        m_completed = true;
+        m_state->signal(StateOutcome::Completed);
+      }
+
+    private:
+      std::shared_ptr<State> m_state;
+      bool m_completed = false;
     };
 
     explicit ActiveSubmissionFenceAwaiter(std::shared_ptr<State> state)
@@ -659,7 +722,8 @@ public:
   //
   // This helper restores executor affinity by re-hopping to the coroutine's
   // current executor after the baton is released.
-  [[nodiscard]] static folly::coro::Task<void> waitActiveSubmissionFence(ActiveSubmissionFenceAwaiter fence);
+  [[nodiscard]] static folly::coro::Task<ActiveSubmissionOutcome>
+  waitActiveSubmissionFence(ActiveSubmissionFenceAwaiter fence);
 
 private:
   enum class FrameHookSpot
@@ -672,8 +736,7 @@ private:
   // This is used for post-fence work that should NOT block the render thread
   // via the frame completion safe-point barrier, but still needs teardown safety
   // (backend switching / renderer destruction).
-  folly::coro::AsyncScope m_detachedTaskScope;
-  bool m_detachedTaskScopeJoined = false;
+  std::unique_ptr<folly::coro::AsyncScope> m_detachedTaskScope = std::make_unique<folly::coro::AsyncScope>();
 
 public:
   using AfterFrameCompletionHook = folly::Function<folly::coro::Task<void>(Z3DRendererVulkanBackend&)>;
@@ -693,14 +756,14 @@ public:
   // - Registration during the completion safe point is forbidden (CHECK) to
   //   avoid re-entrant "safe-point scheduling" that is easy to reason about
   //   incorrectly. If post-frame work is needed, register it during recording.
-  // - Does not silently block-wait; teardown code must explicitly call
-  //   flushForTeardown()/engine drain helpers.
+  // - Does not silently block-wait; teardown code must explicitly use the
+  //   backend/engine drain helpers.
   void registerAfterCurrentFrameCompletionHook(folly::Executor::KeepAlive<> ex,
                                                AfterFrameCompletionHook hook,
                                                std::string_view debugLabel = {});
 
-  // Start a fire-and-forget coroutine task, tracked so flushForTeardown() waits
-  // for completion.
+  // Start a fire-and-forget coroutine task tracked by the backend's reusable
+  // drain.
   //
   // Unlike registerAfterCurrentFrameCompletionHook(), this does NOT execute at
   // the frame completion safe point and does NOT block frame-slot reuse.
@@ -732,10 +795,7 @@ public:
     spawnDetachedTask(folly::getKeepAliveToken(ex), std::move(task), debugLabel);
   }
 
-  // Teardown helper: wait for all in-flight frame submissions and flush any
-  // fence-gated callbacks (notably residency unpins).
-  // This is intended to run before destroying resources that may still be pinned
-  // by an earlier submission.
+  // Normal drains leave the backend reusable.
   void flushForTeardown(std::string_view reason = {}) override;
 
   // Pin a texture in the device residency manager for the lifetime of the
@@ -843,12 +903,19 @@ public:
   [[nodiscard]] uint32_t maxFramesInFlight() const override;
   [[nodiscard]] size_t maxMonolithicGeometryStreamBytes() const override;
 
-  // Stage 4: Async Readback API (offscreen)
+  // Asynchronous offscreen readback API.
   // Enqueue end-of-frame GPU->CPU copies into a host-visible staging ring, then
   // hand out coroutine-friendly tickets for post-fence consumption.
 
   struct EndOfFrameColorReadbackTicket
   {
+    EndOfFrameColorReadbackTicket() = default;
+    EndOfFrameColorReadbackTicket(const EndOfFrameColorReadbackTicket&) = delete;
+    EndOfFrameColorReadbackTicket& operator=(const EndOfFrameColorReadbackTicket&) = delete;
+    EndOfFrameColorReadbackTicket(EndOfFrameColorReadbackTicket&&) noexcept = default;
+    EndOfFrameColorReadbackTicket& operator=(EndOfFrameColorReadbackTicket&&) = delete;
+    ~EndOfFrameColorReadbackTicket();
+
     ActiveSubmissionFenceAwaiter fence;
     const void* mapped = nullptr;
     size_t bytes = 0;
@@ -857,14 +924,16 @@ public:
     // Metadata describing the captured view.
     vk::ImageAspectFlags aspectMask = vk::ImageAspectFlagBits::eColor;
     uint32_t arrayLayer = 0;
-    std::function<void()> releaseSlot;
+    // Explicit mapped-data consumer ownership. The slot becomes reusable only
+    // after its producer and consumer have both finished.
+    std::shared_ptr<ZVulkanReadbackRetirement> retirement;
 
     // Await the submission fence, copy bytes into an owned vector, and release
     // the staging slot back to the backend.
     [[nodiscard]] folly::coro::Task<std::vector<uint8_t>> awaitOwnedBytes();
   };
 
-  // Stage 4b: Safe host-copy readback tickets (debug utilities)
+  // Host-copy readback tickets for debug utilities.
   //
   // Some debug utilities want to run CPU work (decoding, file I/O) on detached
   // background tasks, but must never touch backend-owned Vulkan staging buffers
@@ -880,13 +949,14 @@ public:
     EndOfFrameHostImageReadbackTicket(const EndOfFrameHostImageReadbackTicket&) = delete;
     EndOfFrameHostImageReadbackTicket& operator=(const EndOfFrameHostImageReadbackTicket&) = delete;
     EndOfFrameHostImageReadbackTicket(EndOfFrameHostImageReadbackTicket&&) noexcept = default;
-    EndOfFrameHostImageReadbackTicket& operator=(EndOfFrameHostImageReadbackTicket&&) noexcept = default;
+    EndOfFrameHostImageReadbackTicket& operator=(EndOfFrameHostImageReadbackTicket&&) = delete;
     ~EndOfFrameHostImageReadbackTicket() = default;
 
     // Await the submission fence, copy into hostBytes, and release the staging
-    // slot. After this resumes, data() and dataBytes() are ready to consume
-    // from any thread/executor.
-    [[nodiscard]] folly::coro::Task<void> awaitReady();
+    // slot. Returns false when the owning recording was definitely not
+    // submitted; otherwise data() and dataBytes() are ready to consume from any
+    // thread/executor.
+    [[nodiscard]] folly::coro::Task<bool> awaitReady();
 
     [[nodiscard]] const uint8_t* data() const
     {
@@ -903,6 +973,18 @@ public:
     uint32_t arrayLayer = 0u;
 
   private:
+    EndOfFrameHostImageReadbackTicket(std::shared_ptr<std::vector<uint8_t>> hostBytes,
+                                      std::shared_ptr<void> keepAlive,
+                                      EndOfFrameColorReadbackTicket stagingTicket)
+      : format(stagingTicket.format)
+      , size(stagingTicket.size)
+      , aspectMask(stagingTicket.aspectMask)
+      , arrayLayer(stagingTicket.arrayLayer)
+      , m_stagingTicket(std::move(stagingTicket))
+      , m_hostBytes(std::move(hostBytes))
+      , m_keepAlive(std::move(keepAlive))
+    {}
+
     EndOfFrameColorReadbackTicket m_stagingTicket;
     std::shared_ptr<std::vector<uint8_t>> m_hostBytes;
     std::shared_ptr<void> m_keepAlive;
@@ -915,9 +997,8 @@ public:
   // Contract:
   // - Must be called on the rendering thread with an active frame.
   // - The returned mapped pointer is valid only after co_await fence.
-  // - The returned mapped pointer remains valid until releaseSlot() is invoked.
-  // - releaseSlot may be invoked from any thread; it routes the actual slot
-  //   release back to the render thread.
+  // - The returned mapped pointer remains valid until the ticket is consumed
+  //   or destroyed.
   [[nodiscard]] EndOfFrameColorReadbackTicket
   requestEndOfFrameColorReadbackTicket(class ZVulkanTexture& src, Z3DEye eye, std::string_view debugLabel = {});
 
@@ -928,7 +1009,8 @@ public:
   // - Must be called on the rendering thread with an active frame.
   // - aspectMask must be compatible with src.format() (validated by transitionLayout()).
   // - The returned mapped pointer is valid only after co_await fence.
-  // - The returned mapped pointer remains valid until releaseSlot() is invoked.
+  // - The returned mapped pointer remains valid until the ticket is consumed
+  //   or destroyed.
   [[nodiscard]] EndOfFrameColorReadbackTicket requestEndOfFrameImageReadbackTicket(class ZVulkanTexture& src,
                                                                                    Z3DEye eye,
                                                                                    uint32_t arrayLayer,
@@ -965,8 +1047,8 @@ public:
     EndOfFrameBufferReadbackTicket(const EndOfFrameBufferReadbackTicket&) = delete;
     EndOfFrameBufferReadbackTicket& operator=(const EndOfFrameBufferReadbackTicket&) = delete;
     EndOfFrameBufferReadbackTicket(EndOfFrameBufferReadbackTicket&&) noexcept = default;
-    EndOfFrameBufferReadbackTicket& operator=(EndOfFrameBufferReadbackTicket&&) noexcept = default;
-    ~EndOfFrameBufferReadbackTicket() = default;
+    EndOfFrameBufferReadbackTicket& operator=(EndOfFrameBufferReadbackTicket&&) = delete;
+    ~EndOfFrameBufferReadbackTicket();
 
     // Await the submission fence, copy bytes into an owned vector, and release
     // the staging slot back to the backend.
@@ -985,7 +1067,7 @@ public:
     ActiveSubmissionFenceAwaiter m_fence;
     const void* m_mapped = nullptr;
     size_t m_bytes = 0;
-    std::function<void()> m_releaseSlot;
+    std::shared_ptr<ZVulkanReadbackRetirement> m_retirement;
     friend class Z3DRendererVulkanBackend;
   };
 
@@ -1128,7 +1210,7 @@ private:
     // to a call-site chosen executor (render thread, CPU pool, etc.).
     ZCoroSpotHooks<FrameHookSpot, Z3DRendererVulkanBackend> afterFrameCompletionHooks;
 
-    // Stage 3: instrumentation (per-frame)
+    // Per-frame instrumentation.
     uint32_t renderingSegmentsBegan = 0; // number of vkCmdBeginRendering calls
     uint32_t attachmentClears = 0; // number of attachments begun with Clear loadOp
     uint32_t attachmentLoads = 0; // number of attachments begun with Load loadOp
@@ -1183,7 +1265,7 @@ private:
     uint32_t descriptorWritesWhileRecording = 0; // attempted writes during recording
     uint32_t boundSetRewriteAttempts = 0; // attempted rewrites of persistent sets
 
-    // Stage 4: end-of-frame readback bookkeeping
+    // End-of-frame readback bookkeeping.
     struct PendingReadback
     {
       class ZVulkanTexture* src = nullptr;
@@ -1193,8 +1275,9 @@ private:
       vk::ImageAspectFlags aspectMask = vk::ImageAspectFlagBits::eColor;
       uint32_t arrayLayer = 0;
       // Assigned staging slot index in m_readbackSlots
-      int slotIndex = -1;
+      size_t slotIndex = 0u;
       size_t bytes = 0;
+      std::shared_ptr<ZVulkanReadbackRetirement> retirement;
     };
     std::vector<PendingReadback> pendingColorReadbacks;
 
@@ -1203,8 +1286,9 @@ private:
       class ZVulkanBuffer* src = nullptr;
       vk::DeviceSize srcOffset = 0;
       // Assigned staging slot index in m_readbackSlots
-      int slotIndex = -1;
+      size_t slotIndex = 0u;
       size_t bytes = 0;
+      std::shared_ptr<ZVulkanReadbackRetirement> retirement;
     };
     std::vector<PendingBufferReadback> pendingBufferReadbacks;
     // Force endRender() to synchronously wait for submission completion and
@@ -1317,6 +1401,14 @@ private:
     std::vector<ScheduledCopy> scheduledCopies;
   };
 
+  [[noreturn]] void abortUnsubmittedFrame(FrameResources& frame, std::string_view message);
+  [[nodiscard]] std::exception_ptr releaseSubmissionPins(FrameResources& frame) noexcept;
+  [[noreturn]] void abortPublishedFrame(std::string_view message);
+  void clearActiveRenderState();
+  void rollbackUnpublishedBeginRender();
+  void installScratchPoolCallbacksForActiveFrame();
+  void drainDetachedTasksForReuse();
+  static folly::coro::Task<void> runScratchReleaseHook(std::function<void()> release);
   void collectFrameTimings(FrameResources& frame);
   [[nodiscard]] bool timestampQueriesEnabled() const;
   void
@@ -1734,20 +1826,11 @@ public:
   void ensurePersistentArenaOnFrame(FrameResources& frame);
   void ensureBindlessSampledImagesOnFrame(FrameResources& frame);
   void applyPendingArenaReset(FrameResources& frame);
-  // Opportunistically enter the "frame completion safe point" for any frame
-  // slots whose fences have completed and whose completion callbacks have been
-  // executed by the frame executor (pollCompletions / waitForCompletion / etc).
-  //
-  // Historically, applyPendingArenaReset() (and thus safe-point hooks) would
-  // only run when a frame slot was reused (beginFrame) or after an explicit
-  // wait (endFrame). When no explicit wait occurs and frames-in-flight > 1,
-  // this can delay safe-point work by up to roughly "frames in flight".
-  //
-  // Pumping safe points after polling completions preserves the safe-point
-  // ordering guarantees (after fence-gated completion callbacks like residency
-  // unpins) while reducing latency for consumers such as paging compaction
-  // readbacks.
+  // Enter completion safe points for polled frame slots after the executor has
+  // run their fence callbacks. This preserves callback-before-safe-point
+  // ordering while promptly releasing paging and readback resources.
   void pumpFrameCompletionSafePoints(const std::vector<void*>& completedFrameKeys);
+  void pollCompletionsAndPumpSafePoints(std::vector<void*>& completedFrameKeys);
   void scheduleArenaReset(FrameResources& frame);
   void vlogFrameRecyclingStats(const FrameResources& frame) const;
 
@@ -1778,30 +1861,33 @@ public:
   bool m_supportsDrawIndirectCount = false;
   bool m_supportsFragStoresAndAtomics = false;
 
-  // Upload arena helpers moved to public API above
-
-  // Stage 4: Readback ring buffers
+  // Readback ring buffers.
   struct ReadbackSlot
   {
     std::unique_ptr<class ZVulkanBuffer> buffer;
     void* mapped = nullptr; // persistent mapping
     size_t capacity = 0; // bytes
-    bool inUse = false; // associated with an in-flight frame
+    // Stable across vector growth. Producer/consumer notifications may arrive
+    // from arbitrary completion/consumer threads.
+    std::shared_ptr<ZVulkanReadbackRetirement> retirement = std::make_shared<ZVulkanReadbackRetirement>();
     // Optional tag for debugging
     const char* tag = "color";
   };
   std::vector<ReadbackSlot> m_readbackSlots; // shared across frames
-  uint32_t m_readbackCursor = 0;
+  size_t m_readbackCursor = 0u;
   // Guards detached readback release callbacks that may outlive the backend
   // instance (backend switches destroy and recreate the Vulkan backend).
-  std::shared_ptr<bool> m_aliveFlag = std::make_shared<bool>(true);
+  std::shared_ptr<std::atomic_bool> m_aliveFlag = std::make_shared<std::atomic_bool>(true);
 
   // Ensure at least N slots exist and each has capacity >= minBytes
   void ensureReadbackSlots(size_t minBytes, uint32_t minSlots);
-  // Acquire a free slot; returns index or -1 if none available
-  int acquireReadbackSlot(size_t requiredBytes);
-  // Mark slot free (after fence and consumer copy)
-  void releaseReadbackSlot(int index);
+  struct ReadbackSlotAcquisition
+  {
+    size_t slotIndex;
+    std::shared_ptr<ZVulkanReadbackRetirement> retirement;
+  };
+  // Acquire a free slot, growing the ring when every existing slot is owned.
+  [[nodiscard]] ReadbackSlotAcquisition acquireReadbackSlot(size_t requiredBytes);
 
   // TLS current backend pointer
   static thread_local Z3DRendererVulkanBackend* s_currentBackend;

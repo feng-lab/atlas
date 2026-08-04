@@ -465,8 +465,6 @@ ZVulkanDevice::~ZVulkanDevice()
 {
   checkOwnerThread("destroy Vulkan device wrapper");
   CHECK(descriptorSetWritesAllowed()) << "Destroying Vulkan device while a backend is recording commands";
-  // Flush fence-gated callbacks, sanitize retired descriptors, and release
-  // their deferred GPU handles before tearing down the allocator.
   CHECK(waitForAllFramesAndDrainBindlessRetirements())
     << "Vulkan device teardown found an unsubmitted command buffer still recording";
 
@@ -667,6 +665,27 @@ void ZVulkanDevice::checkOwnerThread(std::string_view operation) const
 {
   CHECK(std::this_thread::get_id() == m_ownerThreadId)
     << "Vulkan device operation must run on its owning rendering thread: " << operation;
+}
+
+void ZVulkanDevice::ensureSubmissionUsable() const
+{
+  checkOwnerThread("validate Vulkan submission state");
+  if (!m_submissionFailure.has_value()) {
+    return;
+  }
+  throw ZException(fmt::format("Vulkan logical device must be recreated after an unsubmitted frame failure: "
+                               "token={} submission={}",
+                               m_submissionFailure->renderFrameToken,
+                               m_submissionFailure->submissionId));
+}
+
+void ZVulkanDevice::recordSubmissionFailure(uint64_t renderFrameToken, uint32_t submissionId) noexcept
+{
+  checkOwnerThread("record submission failure");
+  if (m_submissionFailure.has_value()) {
+    return;
+  }
+  m_submissionFailure = SubmissionFailure{.renderFrameToken = renderFrameToken, .submissionId = submissionId};
 }
 
 void ZVulkanDevice::reserveUpdateAfterBindDescriptors(uint64_t count, std::string_view label)

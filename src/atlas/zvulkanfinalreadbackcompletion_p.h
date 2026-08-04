@@ -2,17 +2,19 @@
 
 #include "z3dcompositor.h"
 #include "zlog.h"
+#include "zvulkanreadbackretirement_p.h"
 
 #include <QPointer>
 #include <cstdint>
 #include <functional>
+#include <memory>
 #include <utility>
 
 namespace nim {
 
-// Internal, move-only value carried from Vulkan submission through direct
-// compositor publication. Until retirement is transferred to a local color
-// buffer, destruction retires the staging slot exactly once.
+// Internal, move-only value carried from Vulkan submission through compositor
+// publication. Until consumer ownership is transferred to a local color
+// buffer, destruction releases that ownership exactly once.
 class ZVulkanFinalReadbackCompletion final
 {
 public:
@@ -36,7 +38,7 @@ public:
                                  Z3DLocalColorBuffer* localBuffer,
                                  Z3DScratchResourcePool::RenderTargetLease* target,
                                  bool noCopy,
-                                 std::function<void()> retirement)
+                                 std::shared_ptr<ZVulkanReadbackRetirement> retirement)
     : owner(std::move(owner))
     , ownerRevision(ownerRevision)
     , renderFrameToken(renderFrameToken)
@@ -52,7 +54,7 @@ public:
     CHECK(mapped != nullptr) << "Vulkan final readback completion requires mapped staging data";
     CHECK(localBuffer != nullptr) << "Vulkan final readback completion requires a destination local buffer";
     CHECK(target != nullptr) << "Vulkan final readback completion requires a destination target";
-    CHECK(m_retirement) << "Vulkan final readback completion requires staging-slot retirement";
+    CHECK(m_retirement != nullptr) << "Vulkan final readback completion requires staging-slot retirement";
   }
 
   ZVulkanFinalReadbackCompletion(const ZVulkanFinalReadbackCompletion&) = delete;
@@ -70,9 +72,7 @@ public:
     , target(other.target)
     , noCopy(other.noCopy)
     , m_retirement(std::move(other.m_retirement))
-  {
-    other.m_retirement = {};
-  }
+  {}
 
   ZVulkanFinalReadbackCompletion& operator=(ZVulkanFinalReadbackCompletion&&) = delete;
 
@@ -113,9 +113,16 @@ public:
   void transferRetirementTo(std::function<void()>& destination)
   {
     CHECK(!destination) << "Vulkan readback retirement destination must be empty";
-    CHECK(m_retirement) << "Vulkan readback retirement was already transferred";
-    destination = std::move(m_retirement);
-    m_retirement = {};
+    CHECK(m_retirement != nullptr) << "Vulkan readback retirement was already transferred";
+    // Build the potentially allocating callback before relinquishing this
+    // object's ownership. If allocation throws, this object still retires the
+    // consumer side during destruction.
+    auto retirement = m_retirement;
+    std::function<void()> transfer = [retirement = std::move(retirement)]() noexcept {
+      retirement->notifyConsumerFinished();
+    };
+    destination = std::move(transfer);
+    m_retirement.reset();
   }
 
   const QPointer<Z3DCompositor> owner;
@@ -136,11 +143,10 @@ private:
       return;
     }
     auto retirement = std::move(m_retirement);
-    m_retirement = {};
-    retirement();
+    retirement->notifyConsumerFinished();
   }
 
-  std::function<void()> m_retirement;
+  std::shared_ptr<ZVulkanReadbackRetirement> m_retirement;
 };
 
 } // namespace nim

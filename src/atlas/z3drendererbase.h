@@ -178,10 +178,11 @@ public:
   // Optionally name the frame for logging/telemetry
   void beginVulkanFrame(std::string_view frameLabel = {});
   void endVulkanFrame();
-  // Teardown helper: ensure all Vulkan submissions from this renderer base have
-  // completed and drain any fence-gated callbacks (residency unpins, deferred
-  // scratch releases). This should be called before destroying objects that may
-  // own pinned Vulkan resources (e.g. Z3DImg paging caches).
+  // Abort an active Vulkan recording that cannot be finalized as a complete
+  // logical frame. This always throws after backend cleanup.
+  [[noreturn]] void abortVulkanFrame(std::string_view message);
+  // Synchronously drain submitted work and completion tasks. No recording may
+  // be active, and the backend remains usable after the drain.
   void flushVulkanWorkForTeardown(std::string_view reason = {});
   // Keep a Vulkan frame open across multiple batch recordings.
   // When enabled, a frame begun inside executeVulkanBatches will not be

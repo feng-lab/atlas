@@ -320,10 +320,9 @@ struct ZVulkanDeviceSupport
     return {.index = std::nullopt, .warning = std::move(preferenceRejection), .error = std::move(error)};
   }
 
-  // Resolve a previously captured index/UUID pair without fallback. This is
-  // deliberately separate from select(): the command-line device index is a
-  // best-effort preference, whereas secondary-device construction must never
-  // substitute another adapter silently.
+  // Resolve a captured index/UUID pair without fallback. Unlike select(), which
+  // treats a command-line index as a best-effort preference, exact worker
+  // construction never substitutes another adapter.
   [[nodiscard]] static Selection selectExact(std::span<const ZVulkanDeviceSupport> devices,
                                              std::span<const DeviceSelection> availableSelections,
                                              const DeviceSelection& requested)

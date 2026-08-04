@@ -27,6 +27,12 @@ class ZVulkanResidencyManager;
 class ZVulkanDevice
 {
 public:
+  struct SubmissionFailure
+  {
+    uint64_t renderFrameToken = 0u;
+    uint32_t submissionId = 0u;
+  };
+
   struct DeviceLocalBudget
   {
     uint64_t budgetBytes = 0;
@@ -70,6 +76,15 @@ public:
   // mutable pool/device boundary rather than assuming their callers did so.
   void checkOwnerThread(std::string_view operation) const;
 
+  // Renderer backends on one engine share layout, descriptor, and cache state.
+  // A definitely-unsubmitted recording can leave that host state ahead of GPU
+  // state, so the first such failure is sticky.
+  // Uncertain queue/fence ownership failures are fatal and never enter this
+  // path. General physical-device-loss recovery is not implemented.
+  // Refuse later submissions until the logical device and its backends are
+  // recreated.
+  void ensureSubmissionUsable() const;
+  void recordSubmissionFailure(uint64_t renderFrameToken, uint32_t submissionId) noexcept;
   // Device-owned bindless descriptor state. The layout, immutable samplers,
   // placeholders, pool, and one table per frame-executor slot form one lifetime
   // domain and are shared by every Vulkan renderer backend on this device.
@@ -204,7 +219,7 @@ private:
   uint64_t m_updateAfterBindDescriptorsReserved = 0u;
   const void* m_descriptorSetRecordingOwner = nullptr;
   uint64_t m_nextTextureDescriptorIdentity = 1u;
-
+  std::optional<SubmissionFailure> m_submissionFailure;
   std::optional<vk::raii::Sampler> m_bindlessLinearClampSampler;
   std::optional<vk::raii::Sampler> m_bindlessNearestClampSampler;
   std::optional<vk::raii::Sampler> m_bindlessLinearBorderZero3DSampler;

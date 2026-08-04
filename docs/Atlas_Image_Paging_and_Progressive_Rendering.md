@@ -15,6 +15,9 @@ Scope
 
 - This document details the Atlas image paging and progressive volume rendering pipeline across OpenGL and Vulkan backends, from ingesting images to progressive full‑resolution rendering. It focuses on the filter/renderers, image cache layout and updates, the block‑ID discovery pass, and how progressive rounds converge to a full‑resolution result.
 - Relevant code: `src/atlas/` (filter, renderers, cache), `src/img/` and `src/atlas/zimgpack.*` (I/O and tile management), scratch resource pool, and shaders listed in `src/atlas/CMakeLists.txt`.
+- Each paged interactive or export renderer remains a one-device engine. These paths do not construct
+  `ZVulkanMultiDeviceTileCoordinator`; see
+  [VULKAN_MULTI_GPU_DESIGN.md](VULKAN_MULTI_GPU_DESIGN.md) for the tile-worker contract.
 
 Quick Reference — Addressable Max Size (cubic/isotropic estimate)
 

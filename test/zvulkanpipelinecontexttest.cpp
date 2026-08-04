@@ -91,29 +91,33 @@ TEST(VulkanFinalReadbackCompletionTest, RejectsInvalidPublicationIdentity)
 TEST(VulkanFinalReadbackCompletionTest, RetiresExactlyOnceOrTransfersOwnership)
 {
   const glm::uvec2 extent{8u, 8u};
-  int retirementCount = 0;
   nim::Z3DLocalColorBuffer localBuffer{};
   nim::Z3DScratchResourcePool::RenderTargetLease target;
 
+  auto retiredOnDestruction = std::make_shared<nim::ZVulkanReadbackRetirement>();
+  ASSERT_TRUE(retiredOnDestruction->tryAcquire());
+  retiredOnDestruction->notifyProducerFinished();
   {
     nim::ZVulkanFinalReadbackCompletion completion(QPointer<nim::Z3DCompositor>{},
                                                    1u,
                                                    1u,
                                                    extent,
                                                    extent,
-                                                   &retirementCount,
+                                                   &localBuffer,
                                                    nim::MonoEye,
                                                    &localBuffer,
                                                    &target,
                                                    false,
-                                                   [&retirementCount]() {
-                                                     ++retirementCount;
-                                                   });
+                                                   retiredOnDestruction);
     nim::ZVulkanFinalReadbackCompletion moved(std::move(completion));
     EXPECT_EQ(moved.renderFrameToken, 1u);
+    EXPECT_TRUE(retiredOnDestruction->occupied());
   }
-  EXPECT_EQ(retirementCount, 1);
+  EXPECT_FALSE(retiredOnDestruction->occupied());
 
+  auto transferredRetirement = std::make_shared<nim::ZVulkanReadbackRetirement>();
+  ASSERT_TRUE(transferredRetirement->tryAcquire());
+  transferredRetirement->notifyProducerFinished();
   std::function<void()> externalRetirement;
   {
     nim::ZVulkanFinalReadbackCompletion completion(QPointer<nim::Z3DCompositor>{},
@@ -121,32 +125,34 @@ TEST(VulkanFinalReadbackCompletionTest, RetiresExactlyOnceOrTransfersOwnership)
                                                    2u,
                                                    extent,
                                                    extent,
-                                                   &retirementCount,
+                                                   &localBuffer,
                                                    nim::MonoEye,
                                                    &localBuffer,
                                                    &target,
                                                    false,
-                                                   [&retirementCount]() {
-                                                     ++retirementCount;
-                                                   });
+                                                   transferredRetirement);
     completion.transferRetirementTo(externalRetirement);
   }
-  EXPECT_EQ(retirementCount, 1);
+  EXPECT_TRUE(transferredRetirement->occupied());
   ASSERT_TRUE(externalRetirement);
   externalRetirement();
   externalRetirement = {};
-  EXPECT_EQ(retirementCount, 2);
+  EXPECT_FALSE(transferredRetirement->occupied());
 }
 
 TEST(VulkanFinalReadbackCompletionTest, SupportsMultipleLiveAttemptCompletions)
 {
   const glm::uvec2 extent{8u, 8u};
-  int firstRetirementCount = 0;
-  int secondRetirementCount = 0;
   nim::Z3DLocalColorBuffer firstLocalBuffer{};
   nim::Z3DLocalColorBuffer secondLocalBuffer{};
   nim::Z3DScratchResourcePool::RenderTargetLease firstTarget;
   nim::Z3DScratchResourcePool::RenderTargetLease secondTarget;
+  auto firstRetirement = std::make_shared<nim::ZVulkanReadbackRetirement>();
+  auto secondRetirement = std::make_shared<nim::ZVulkanReadbackRetirement>();
+  ASSERT_TRUE(firstRetirement->tryAcquire());
+  ASSERT_TRUE(secondRetirement->tryAcquire());
+  firstRetirement->notifyProducerFinished();
+  secondRetirement->notifyProducerFinished();
 
   {
     nim::ZVulkanFinalReadbackCompletion first(QPointer<nim::Z3DCompositor>{},
@@ -154,35 +160,31 @@ TEST(VulkanFinalReadbackCompletionTest, SupportsMultipleLiveAttemptCompletions)
                                               41u,
                                               extent,
                                               extent,
-                                              &firstRetirementCount,
+                                              &firstLocalBuffer,
                                               nim::MonoEye,
                                               &firstLocalBuffer,
                                               &firstTarget,
                                               false,
-                                              [&firstRetirementCount]() {
-                                                ++firstRetirementCount;
-                                              });
+                                              firstRetirement);
     nim::ZVulkanFinalReadbackCompletion second(QPointer<nim::Z3DCompositor>{},
                                                3u,
                                                42u,
                                                extent,
                                                extent,
-                                               &secondRetirementCount,
+                                               &secondLocalBuffer,
                                                nim::MonoEye,
                                                &secondLocalBuffer,
                                                &secondTarget,
                                                false,
-                                               [&secondRetirementCount]() {
-                                                 ++secondRetirementCount;
-                                               });
+                                               secondRetirement);
 
     EXPECT_NE(first.renderFrameToken, second.renderFrameToken);
-    EXPECT_EQ(firstRetirementCount, 0);
-    EXPECT_EQ(secondRetirementCount, 0);
+    EXPECT_TRUE(firstRetirement->occupied());
+    EXPECT_TRUE(secondRetirement->occupied());
   }
 
-  EXPECT_EQ(firstRetirementCount, 1);
-  EXPECT_EQ(secondRetirementCount, 1);
+  EXPECT_FALSE(firstRetirement->occupied());
+  EXPECT_FALSE(secondRetirement->occupied());
 }
 
 #ifndef NDEBUG

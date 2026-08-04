@@ -158,6 +158,9 @@ protected:
 
   void onObjSelectedFromView(bool append) override
   {
+    if (!m_engine.permitsDocumentMutationFrom3DView()) {
+      return;
+    }
     if (FilterType* filter = qobject_cast<FilterType*>(sender())) {
       for (const auto& idFilter : m_idToFilter) {
         if (idFilter.second.get() == filter) {
@@ -191,6 +194,9 @@ protected:
 
   void onObjDeselectedFromView() override
   {
+    if (!m_engine.permitsDocumentMutationFrom3DView()) {
+      return;
+    }
     if (FilterType* filter = qobject_cast<FilterType*>(sender())) {
       for (const auto& idFilter : m_idToFilter) {
         if (idFilter.second.get() == filter) {
@@ -218,6 +224,9 @@ protected:
 
   void onObjVisibleChangedFromView(bool v) override
   {
+    if (!m_engine.permitsDocumentMutationFrom3DView()) {
+      return;
+    }
     if (FilterType* filter = qobject_cast<FilterType*>(sender())) {
       for (const auto& idFilter : m_idToFilter) {
         if (idFilter.second.get() == filter) {

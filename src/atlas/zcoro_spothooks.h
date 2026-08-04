@@ -134,6 +134,26 @@ public:
     co_return;
   }
 
+  // Remove hooks without invoking them. This is used when the event that made
+  // a hook safe/meaningful never occurred (for example, a Vulkan command
+  // buffer that was not submitted). Destruction happens outside the lock so
+  // captured RAII state can retire resources without re-entering this mutex.
+  size_t discard(Spot spot)
+  {
+    std::vector<Item> discarded;
+    {
+      std::scoped_lock g(_state->mu);
+      auto it = _state->hooks.find(spot);
+      if (it == _state->hooks.end()) {
+        return 0u;
+      }
+      discarded = std::move(it->second);
+      _state->hooks.erase(it);
+    }
+    const size_t count = discarded.size();
+    return count;
+  }
+
 private:
   struct Item
   {

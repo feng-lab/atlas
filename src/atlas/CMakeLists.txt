@@ -591,6 +591,9 @@ set(SOURCES
     zviewsettingwidget.h zviewsettingwidget.cpp
     z3dmainwindow.h z3dmainwindow.cpp
     z3drenderingengine.h z3drenderingengine.cpp
+    z3dtiledescriptor.h z3dtiledescriptor.cpp
+    z3drenderedtile.h
+    zvulkanmultidevicetilecoordinator.h zvulkanmultidevicetilecoordinator.cpp
     zqtexecutor.h zqtexecutor.cpp
     zrenderthreadexecutor_tls.h zrenderthreadexecutor_tls.cpp
     z3dobjview.h z3dobjview.cpp
@@ -638,6 +641,7 @@ set(SOURCES
     z3danimationfilter.h z3danimationfilter.cpp
     z3dcompositor.h z3dcompositor.cpp
     zvulkanfinalreadbackcompletion_p.h
+    zvulkanreadbackretirement_p.h zvulkanreadbackretirement.cpp
     z3dgeometryfilter.h z3dgeometryfilter.cpp
     z3dboundedfilter.h z3dboundedfilter.cpp
     z3dmeshrenderer.h z3dmeshrenderer.cpp

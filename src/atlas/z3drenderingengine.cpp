@@ -35,6 +35,7 @@
 #include "zcpuinfo.h"
 #include "zexception.h"
 #include "z3dperfcollector.h"
+#include "z3dtiledescriptor.h"
 #include "zabslflagtypes.h"
 #include "zqtexecutor.h"
 #include "zrenderthreadexecutor_tls.h"
@@ -45,8 +46,9 @@
 #include <folly/coro/Task.h>
 #include <glbinding/glbinding.h>
 #include <glbinding-aux/Meta.h>
-#include <QOffscreenSurface>
 #include <QCoreApplication>
+#include <QOffscreenSurface>
+#include <QStringList>
 
 ABSL_DECLARE_FLAG(bool, atlas_enable_benchmark_raw_mip_export);
 ABSL_DECLARE_FLAG(bool, atlas_enable_benchmark_screen_space_sufficiency_audit);
@@ -55,7 +57,9 @@ ABSL_DECLARE_FLAG(bool, atlas_enable_benchmark_screen_space_sufficiency_audit);
 #include <QThread>
 #include <array>
 #include <chrono>
+#include <cmath>
 #include <cstdint>
+#include <limits>
 #include <memory>
 #include <sstream>
 
@@ -259,6 +263,21 @@ bool shouldFlipYWhenSaving(RenderBackend backend)
   return false;
 }
 
+ZImgRegion validAttachmentRegion(const Z3DTileDescriptor& tile)
+{
+  const glm::uvec2 end = tile.validAttachmentEnd();
+  const glm::uvec2 origin = tile.validAttachmentOrigin();
+  return ZImgRegion(origin.x, end.x, origin.y, end.y);
+}
+
+glm::uvec2 saveAssemblyOrigin(const Z3DTileDescriptor& tile, bool flipYForSave)
+{
+  // If the complete host image will be flipped before saving, retain the
+  // descriptor's bottom-left row order. Otherwise paste the top-left-oriented
+  // tile directly at its explicitly converted top-left frame origin.
+  return flipYForSave ? tile.validOutputOrigin() : tile.topLeftAssemblyOrigin();
+}
+
 Z3DGpuInfo::GenericCaps genericCapsFromVulkanPhysicalDevice(vk::raii::PhysicalDevice& physicalDevice)
 {
   const auto props = physicalDevice.getProperties();
@@ -300,21 +319,21 @@ folly::coro::Task<void> composeAnimationFrameAsync(const QString& tempDirPath,
                                                    int frameIndex,
                                                    int width,
                                                    int height,
-                                                   int tileSize,
-                                                   int numCols,
-                                                   int numRows,
+                                                   std::shared_ptr<const std::vector<Z3DTileDescriptor>> tiles,
                                                    bool flipYForSave,
                                                    Z3DScreenShotType screenshotType,
                                                    folly::CancellationToken cancellationToken)
 {
+  CHECK(tiles);
+  CHECK(!tiles->empty());
   maybeCancel(cancellationToken);
 
   QDir tmpdir(tempDirPath);
   QString targetFilename = QString("%1%2.png").arg(namePrefix).arg(frameIndex, fieldWidth, 10, QChar('0'));
   const QString targetFilepath = tmpdir.filePath(targetFilename);
   std::vector<QString> tileFilesToDelete;
-  tileFilesToDelete.reserve(static_cast<size_t>(numCols) * static_cast<size_t>(numRows) *
-                            (screenshotType == Z3DScreenShotType::MonoView ? 1u : 2u));
+  CHECK_LE(tiles->size(), tileFilesToDelete.max_size() / (screenshotType == Z3DScreenShotType::MonoView ? 1u : 2u));
+  tileFilesToDelete.reserve(tiles->size() * (screenshotType == Z3DScreenShotType::MonoView ? 1u : 2u));
   auto removeComposedTiles = [&tileFilesToDelete]() {
     for (const QString& tileFilepath : tileFilesToDelete) {
       if (QFile::exists(tileFilepath) && !QFile::remove(tileFilepath)) {
@@ -332,53 +351,51 @@ folly::coro::Task<void> composeAnimationFrameAsync(const QString& tempDirPath,
     rightImg.infoRef().lastChannelIsAlphaChannel = true;
   }
 
-  for (int c = 0; c < numCols; ++c) {
-    for (int r = 0; r < numRows; ++r) {
-      maybeCancel(cancellationToken);
+  for (const Z3DTileDescriptor& tile : *tiles) {
+    maybeCancel(cancellationToken);
 
-      const int tileStartX = c * tileSize;
-      const int tileStartY = r * tileSize;
-      const int tileTop = std::min(tileStartY + tileSize, height);
-      const int pasteY = flipYForSave ? tileStartY : (height - tileTop);
+    const auto pasteOrigin = saveAssemblyOrigin(tile, flipYForSave);
+    const int tileStartX = static_cast<int>(tile.validOutputOrigin().x);
+    const int tileStartY = static_cast<int>(tile.validOutputOrigin().y);
+    const ZVoxelCoordinate pasteCoordinate(pasteOrigin.x, pasteOrigin.y);
 
-      if (screenshotType == Z3DScreenShotType::MonoView) {
-        const QString filepath = tmpdir.filePath(QString("_%1%2_%3_%4.png")
+    if (screenshotType == Z3DScreenShotType::MonoView) {
+      const QString filepath = tmpdir.filePath(QString("_%1%2_%3_%4.png")
+                                                 .arg(namePrefix)
+                                                 .arg(frameIndex, fieldWidth, 10, QChar('0'))
+                                                 .arg(tileStartX)
+                                                 .arg(tileStartY));
+      if (QFileInfo::exists(filepath)) {
+        img.pasteImg(ZImg::readImgPixelsOnly(filepath), pasteCoordinate);
+        tileFilesToDelete.push_back(filepath);
+      } else {
+        LOG(ERROR) << "Could not find file: " << filepath;
+      }
+      continue;
+    }
+
+    const QString leftFilepath = tmpdir.filePath(QString("_%1%2_%3_%4_left.png")
                                                    .arg(namePrefix)
                                                    .arg(frameIndex, fieldWidth, 10, QChar('0'))
                                                    .arg(tileStartX)
                                                    .arg(tileStartY));
-        if (QFileInfo::exists(filepath)) {
-          img.pasteImg(ZImg::readImgPixelsOnly(filepath), ZVoxelCoordinate(tileStartX, pasteY));
-          tileFilesToDelete.push_back(filepath);
-        } else {
-          LOG(ERROR) << "Could not find file: " << filepath;
-        }
-        continue;
-      }
+    if (QFileInfo::exists(leftFilepath)) {
+      img.pasteImg(ZImg::readImgPixelsOnly(leftFilepath), pasteCoordinate);
+      tileFilesToDelete.push_back(leftFilepath);
+    } else {
+      LOG(ERROR) << "Could not find left file: " << leftFilepath;
+    }
 
-      const QString leftFilepath = tmpdir.filePath(QString("_%1%2_%3_%4_left.png")
-                                                     .arg(namePrefix)
-                                                     .arg(frameIndex, fieldWidth, 10, QChar('0'))
-                                                     .arg(tileStartX)
-                                                     .arg(tileStartY));
-      if (QFileInfo::exists(leftFilepath)) {
-        img.pasteImg(ZImg::readImgPixelsOnly(leftFilepath), ZVoxelCoordinate(tileStartX, pasteY));
-        tileFilesToDelete.push_back(leftFilepath);
-      } else {
-        LOG(ERROR) << "Could not find left file: " << leftFilepath;
-      }
-
-      const QString rightFilepath = tmpdir.filePath(QString("_%1%2_%3_%4_right.png")
-                                                      .arg(namePrefix)
-                                                      .arg(frameIndex, fieldWidth, 10, QChar('0'))
-                                                      .arg(tileStartX)
-                                                      .arg(tileStartY));
-      if (QFileInfo::exists(rightFilepath)) {
-        rightImg.pasteImg(ZImg::readImgPixelsOnly(rightFilepath), ZVoxelCoordinate(tileStartX, pasteY));
-        tileFilesToDelete.push_back(rightFilepath);
-      } else {
-        LOG(ERROR) << "Could not find right file: " << rightFilepath;
-      }
+    const QString rightFilepath = tmpdir.filePath(QString("_%1%2_%3_%4_right.png")
+                                                    .arg(namePrefix)
+                                                    .arg(frameIndex, fieldWidth, 10, QChar('0'))
+                                                    .arg(tileStartX)
+                                                    .arg(tileStartY));
+    if (QFileInfo::exists(rightFilepath)) {
+      rightImg.pasteImg(ZImg::readImgPixelsOnly(rightFilepath), pasteCoordinate);
+      tileFilesToDelete.push_back(rightFilepath);
+    } else {
+      LOG(ERROR) << "Could not find right file: " << rightFilepath;
     }
   }
 
@@ -561,10 +578,34 @@ void Z3DRenderingEngine::ProfileFilterWrapper::afterNetworkProcess()
 }
 
 Z3DRenderingEngine::Z3DRenderingEngine(ZDoc& doc, QObject* parent)
+  : Z3DRenderingEngine(doc, Role::Canonical, std::nullopt, nullptr, parent)
+{}
+
+Z3DRenderingEngine::Z3DRenderingEngine(ZDoc& doc,
+                                       Role role,
+                                       std::optional<ZVulkanDeviceSupport::DeviceSelection> exactVulkanSelection,
+                                       ZQtExecutor* sharedRenderThreadExecutor,
+                                       QObject* parent)
   : QObject(parent)
+  , m_role(role)
+  , m_exactVulkanSelection(std::move(exactVulkanSelection))
+  , m_ownedRenderThreadExecutor(role == Role::Canonical ? std::make_unique<ZQtExecutor>(this, "Z3DRenderingEngine")
+                                                        : nullptr)
+  , m_renderThreadExecutor(role == Role::Canonical ? m_ownedRenderThreadExecutor.get() : sharedRenderThreadExecutor)
   , m_doc(doc)
   , m_numObjsBefore(m_doc.numObjs())
 {
+  CHECK(m_renderThreadExecutor != nullptr);
+  CHECK_EQ(m_role == Role::VulkanTileWorker, m_exactVulkanSelection.has_value());
+  if (m_role == Role::VulkanTileWorker) {
+    CHECK(sharedRenderThreadExecutor != nullptr);
+    CHECK(sharedRenderThreadExecutor->target() != nullptr);
+    CHECK(QThread::currentThread() == sharedRenderThreadExecutor->target()->thread())
+      << "Vulkan tile workers must be constructed on the shared rendering thread";
+  } else {
+    CHECK(sharedRenderThreadExecutor == nullptr);
+  }
+
   m_eventTypes = boost::unordered_flat_set<QEvent::Type>{QEvent::ContextMenu,
                                                          QEvent::MouseButtonPress,
                                                          QEvent::MouseButtonRelease,
@@ -576,9 +617,10 @@ Z3DRenderingEngine::Z3DRenderingEngine(ZDoc& doc, QObject* parent)
                                                          QEvent::UpdateRequest,
                                                          QEvent::LayoutRequest};
 
-  // Render-thread executor: provides a dedicated folly executor bound to this
-  // engine's thread for linear async flows (instead of ad-hoc callback chains).
-  m_renderThreadExecutor = std::make_unique<ZQtExecutor>(this, "Z3DRenderingEngine");
+  if (m_role == Role::VulkanTileWorker) {
+    // A Vulkan-only worker never creates GL resources or a canvas surface.
+    return;
+  }
 
 #if defined(__linux__)
   if (absl::GetFlag(FLAGS___use_EGL)) {
@@ -595,34 +637,74 @@ Z3DRenderingEngine::Z3DRenderingEngine(ZDoc& doc, QObject* parent)
   }
 }
 
+std::unique_ptr<Z3DRenderingEngine> Z3DRenderingEngine::createVulkanTileWorker()
+{
+  CHECK(m_role == Role::Canonical) << "Only a canonical rendering engine can create tile workers";
+  CHECK(m_initialized);
+  CHECK(static_cast<RenderBackend>(m_globalParas->renderBackend.associatedData()) == RenderBackend::Vulkan);
+  CHECK(m_compositor->rendererBase().activeBackend() == RenderBackend::Vulkan);
+  CHECK(m_renderThreadExecutor->target() != nullptr);
+  CHECK(QThread::currentThread() == m_renderThreadExecutor->target()->thread())
+    << "Vulkan tile workers must be created on the shared rendering thread";
+  CHECK(currentRenderThreadExecutorOrNull() == m_renderThreadExecutor)
+    << "The shared rendering-thread executor must be installed before worker creation";
+  CHECK(m_vkContext != nullptr);
+  const auto deviceSelection = m_vkContext->selectedDeviceSelection();
+
+  auto worker = std::unique_ptr<Z3DRenderingEngine>(
+    new Z3DRenderingEngine(m_doc, Role::VulkanTileWorker, deviceSelection, m_renderThreadExecutor, nullptr));
+
+  QStringList initializationErrors;
+  const QMetaObject::Connection initializationErrorConnection = connect(
+    worker.get(),
+    &Z3DRenderingEngine::renderingError,
+    worker.get(),
+    [&initializationErrors](const QString& error) {
+      initializationErrors.push_back(error);
+    },
+    Qt::DirectConnection);
+  auto disconnectGuard = folly::makeGuard([initializationErrorConnection]() {
+    QObject::disconnect(initializationErrorConnection);
+  });
+  worker->init();
+  if (!initializationErrors.empty()) {
+    throw ZException(
+      fmt::format("Vulkan tile worker initialization failed: {}", initializationErrors.join("; ").toStdString()));
+  }
+  return worker;
+}
+
 Z3DRenderingEngine::~Z3DRenderingEngine()
 {
   VLOG(1) << "in engine destructor";
+  CHECK(QThread::currentThread() == this->thread()) << "Z3DRenderingEngine must be destroyed on its owning thread";
   m_shuttingDown = true;
   stopVulkanCompletionPolling();
-  setCurrentRenderThreadExecutor(nullptr);
+  drainVulkanFrameExecutorForTeardown();
   detachCanvas();
   VLOG(1) << "canvas detached";
-  getGLFocus();
 
-  // Proactively release any cached GL shaders while GL context is current,
-  // to avoid deleting them later when no GL context is available.
-  Z3DShaderManager::instance().clear();
-
-  // Safe cleanup for Vulkan: ensure GPU idle and release scratch resources
-  try {
-    if (m_vkDevice) {
-      m_vkDevice->context().device().waitIdle();
-    }
+  if (m_context) {
+    getGLFocus();
+    // Proactively release cached shaders only for an engine that actually owns
+    // a live GL context. A Vulkan-only worker must not disturb another engine's
+    // process-wide GL shader cache.
+    Z3DShaderManager::instance().clear();
   }
-  catch (const std::exception& e) {
-    LOG(ERROR) << "Vulkan waitIdle during engine shutdown failed: " << e.what();
+
+  if (m_ownedRenderThreadExecutor && currentRenderThreadExecutorOrNull() == m_renderThreadExecutor) {
+    setCurrentRenderThreadExecutor(nullptr);
   }
 }
 
 const ZDoc& Z3DRenderingEngine::doc() const
 {
   return m_doc;
+}
+
+bool Z3DRenderingEngine::permitsDocumentMutationFrom3DView() const
+{
+  return m_role == Role::Canonical;
 }
 
 ZQtExecutor& Z3DRenderingEngine::renderThreadExecutor()
@@ -701,10 +783,12 @@ void Z3DRenderingEngine::updateBoundBox()
     m_boundBox.setMaxCorner(glm::dvec3(.01));
   }
   m_boundBox.setMaxCorner(glm::max(m_boundBox.maxCorner, m_boundBox.minCorner + .01));
-  if (m_numObjsBefore == 0 && m_doc.numObjs() > 0) {
-    resetCamera();
-  } else {
-    resetCameraClippingRange();
+  if (m_role == Role::Canonical) {
+    if (m_numObjsBefore == 0 && m_doc.numObjs() > 0) {
+      resetCamera();
+    } else {
+      resetCameraClippingRange();
+    }
   }
   m_numObjsBefore = m_doc.numObjs();
 
@@ -748,6 +832,10 @@ void Z3DRenderingEngine::read(const json::object& json)
   if (json.contains("Global") && json.at("Global").is_object()) {
     m_globalParas->read(json.at("Global").as_object());
   }
+  if (m_role == Role::VulkanTileWorker) {
+    CHECK(static_cast<RenderBackend>(m_globalParas->renderBackend.associatedData()) == RenderBackend::Vulkan)
+      << "A Vulkan tile worker cannot consume non-Vulkan engine state";
+  }
 }
 
 void Z3DRenderingEngine::write(json::object& json) const
@@ -786,6 +874,12 @@ void Z3DRenderingEngine::resetCameraCenter()
 void Z3DRenderingEngine::resetCameraClippingRange()
 {
   // VLOG(1) << "resetCameraClippingRange";
+  if (m_role == Role::VulkanTileWorker) {
+    // Worker bounds can change while per-object state is synchronized. The
+    // worker consumes the canonical full-frame clipping range instead of
+    // deriving a different projection from its independently updated views.
+    return;
+  }
   if (!m_mutex.try_lock()) {
     return;
   }
@@ -835,6 +929,107 @@ void Z3DRenderingEngine::takeFixedSizeScreenShot(const QString& filename,
     LOG(ERROR) << errorMsg;
     reportRenderingError(errorMsg);
   }
+}
+
+Z3DRenderedTile Z3DRenderingEngine::renderVulkanTile(const Z3DTileDescriptor& tile,
+                                                     bool renderStereoPair,
+                                                     folly::CancellationToken cancellationToken)
+{
+  CHECK(m_role == Role::VulkanTileWorker) << "Only a headless Vulkan tile worker may execute a worker tile";
+  CHECK(QThread::currentThread() == thread()) << "A Vulkan worker tile must execute on its engine thread";
+  CHECK(currentRenderThreadExecutorOrNull() == m_renderThreadExecutor)
+    << "A Vulkan worker tile requires its borrowed rendering-thread executor";
+  CHECK(m_initialized);
+  CHECK(m_compositor != nullptr);
+  CHECK(m_compositor->rendererBase().activeBackend() == RenderBackend::Vulkan);
+  const glm::uvec2 fullOutputExtent = tile.fullOutputExtent();
+  const glm::uvec2 validOutputExtent = tile.validOutputExtent();
+  const glm::uvec2 attachmentExtent = tile.attachmentExtent();
+  const double normalizedLeft = tile.normalizedLeft();
+  const double normalizedRight = tile.normalizedRight();
+  const double normalizedBottom = tile.normalizedBottom();
+  const double normalizedTop = tile.normalizedTop();
+
+  const bool startedDeferredErrorFrame = beginDeferredRenderingErrorFrame();
+  CHECK(startedDeferredErrorFrame) << "A worker tile cannot be nested inside another rendering-error frame";
+  auto deferredErrorFrameGuard = folly::makeGuard([this, startedDeferredErrorFrame]() {
+    endDeferredRenderingErrorFrame(startedDeferredErrorFrame);
+  });
+
+  m_compositor->setReadbackCompletionPolicy(ReadbackCompletionPolicy::WaitForCompletion);
+
+  // A failed/cancelled attempt must not leave a tile projection active for the
+  // next assignment. Output extent is intentionally replaced by each attempt.
+  auto tileRegionGuard = folly::makeGuard([this]() {
+    m_globalParas->camera.setTileFrustum();
+    m_compositor->setRenderingRegion();
+  });
+
+  CHECK(m_vkDevice != nullptr);
+  CHECK(m_scratchPool->vulkanDevice() == m_vkDevice.get())
+    << "A Vulkan tile worker must observe failures on its own scratch-pool device";
+  m_vkDevice->ensureSubmissionUsable();
+
+  maybeCancel(cancellationToken);
+  const ZImgRegion validRegion = validAttachmentRegion(tile);
+  setOutputSize(attachmentExtent);
+  m_globalParas->camera.viewportChanged(fullOutputExtent);
+  m_globalParas->camera.setTileFrustum(normalizedLeft, normalizedRight, normalizedBottom, normalizedTop);
+  m_compositor->setRenderingRegion(normalizedLeft, normalizedRight, normalizedBottom, normalizedTop);
+
+  const FrameProcessResult frameResult = processFrameWithIdentity(renderStereoPair, false, cancellationToken);
+  maybeCancel(cancellationToken);
+  if (!m_deferredRenderingErrors.empty()) {
+    throw ZException(
+      fmt::format("Vulkan worker tile rendering failed: {}", takeDeferredRenderingErrors().toStdString()));
+  }
+  CHECK_GT(frameResult.renderFrameToken, 0u);
+  if (renderStereoPair) {
+    CHECK_EQ(m_compositor->lastPublishedRenderFrameToken(LeftEye), frameResult.renderFrameToken)
+      << "Vulkan worker left-eye ready buffer was not published by the current tile attempt";
+    CHECK_EQ(m_compositor->lastPublishedRenderFrameToken(RightEye), frameResult.renderFrameToken)
+      << "Vulkan worker right-eye ready buffer was not published by the current tile attempt";
+  } else {
+    CHECK_EQ(m_compositor->lastPublishedRenderFrameToken(MonoEye), frameResult.renderFrameToken)
+      << "Vulkan worker mono ready buffer was not published by the current tile attempt";
+  }
+
+  Z3DRenderedTile result;
+  if (renderStereoPair) {
+    const Z3DLocalColorBuffer* const leftBuffer = m_compositor->leftReadyLocalBuffer();
+    const Z3DLocalColorBuffer* const rightBuffer = m_compositor->rightReadyLocalBuffer();
+    CHECK(leftBuffer != nullptr);
+    CHECK(rightBuffer != nullptr);
+    CHECK_EQ(leftBuffer->width, attachmentExtent.x);
+    CHECK_EQ(leftBuffer->height, attachmentExtent.y);
+    CHECK_EQ(rightBuffer->width, attachmentExtent.x);
+    CHECK_EQ(rightBuffer->height, attachmentExtent.y);
+    result.primaryColor = localColorBufferToRGBAImg(*leftBuffer).crop(validRegion);
+    result.rightColor = localColorBufferToRGBAImg(*rightBuffer).crop(validRegion);
+  } else {
+    const Z3DLocalColorBuffer* const monoBuffer = m_compositor->monoReadyLocalBuffer();
+    CHECK(monoBuffer != nullptr);
+    CHECK_EQ(monoBuffer->width, attachmentExtent.x);
+    CHECK_EQ(monoBuffer->height, attachmentExtent.y);
+    result.primaryColor = localColorBufferToRGBAImg(*monoBuffer).crop(validRegion);
+  }
+
+  CHECK_EQ(result.primaryColor.width(), validOutputExtent.x);
+  CHECK_EQ(result.primaryColor.height(), validOutputExtent.y);
+  CHECK_EQ(result.rightColor.has_value(), renderStereoPair);
+  if (result.rightColor.has_value()) {
+    CHECK_EQ(result.rightColor->width(), validOutputExtent.x);
+    CHECK_EQ(result.rightColor->height(), validOutputExtent.y);
+  }
+
+  if (shouldFlipYWhenSaving(RenderBackend::Vulkan)) {
+    result.primaryColor.flip(Dimension::Y);
+    if (result.rightColor.has_value()) {
+      result.rightColor->flip(Dimension::Y);
+    }
+  }
+
+  return result;
 }
 
 void Z3DRenderingEngine::takeScreenShot(const QString& filename, Z3DScreenShotType sst)
@@ -1015,68 +1210,62 @@ void Z3DRenderingEngine::exportFixedSize3DAnimation(const ZAnimation* animation,
                                                              tileBorder);
       }
     } else {
-      int numCols = (width + tileSize - 1) / tileSize;
-      int numRows = (height + tileSize - 1) / tileSize;
+      constexpr int kAnimationMinimumTileBorder = 16;
+      const int resolvedTileBorder = std::max(tileBorder, kAnimationMinimumTileBorder);
+      auto tileDescriptors = std::make_shared<const std::vector<Z3DTileDescriptor>>(
+        makeZ3DTileDescriptors(glm::uvec2(width, height),
+                               glm::uvec2(tileSize),
+                               static_cast<uint32_t>(resolvedTileBorder)));
+      CHECK(!tileDescriptors->empty());
       constexpr int kTileRenderProgressMax = 98;
       constexpr int kTileComposeProgress = 99;
-      const int64_t totalTileFrames = int64_t(numFrame) * int64_t(numCols) * int64_t(numRows);
+      CHECK_LE(tileDescriptors->size(),
+               static_cast<size_t>(std::numeric_limits<int64_t>::max() / static_cast<int64_t>(numFrame)))
+        << "Animation tile-frame count overflow";
+      const int64_t totalTileFrames = static_cast<int64_t>(tileDescriptors->size()) * numFrame;
       CHECK(totalTileFrames > 0);
       int64_t completedTileFrames = 0;
       bool forwardFrame = false;
-      bool forwardCol = false;
-      for (int r = 0; r < numRows; ++r) {
+      for (const Z3DTileDescriptor& tile : *tileDescriptors) {
         maybeCancel(token);
-        auto tileStartY = r * tileSize;
-        forwardCol = !forwardCol;
-        for (int c = forwardCol ? 0 : (numCols - 1); forwardCol ? (c < numCols) : (c >= 0); forwardCol ? ++c : --c) {
+        const int tileStartX = static_cast<int>(tile.validOutputOrigin().x);
+        const int tileStartY = static_cast<int>(tile.validOutputOrigin().y);
+        forwardFrame = !forwardFrame;
+        for (int i = forwardFrame ? startFrame : (endFrame - 1); forwardFrame ? (i < endFrame) : (i >= startFrame);
+             forwardFrame ? ++i : --i) {
           maybeCancel(token);
-          auto tileStartX = c * tileSize;
-          forwardFrame = !forwardFrame;
-          for (int i = forwardFrame ? startFrame : (endFrame - 1); forwardFrame ? (i < endFrame) : (i >= startFrame);
-               forwardFrame ? ++i : --i) {
-            maybeCancel(token);
 
-            animation->setCurrentTime(static_cast<double>(i) / framePerSecond);
-            QString filename = QString("_%1%2_%3_%4.png")
-                                 .arg(namePrefix)
-                                 .arg(i, fieldWidth, 10, QChar('0'))
-                                 .arg(tileStartX)
-                                 .arg(tileStartY);
-            QString filepath = tmpdir.filePath(filename);
+          animation->setCurrentTime(static_cast<double>(i) / framePerSecond);
+          QString filename = QString("_%1%2_%3_%4.png")
+                               .arg(namePrefix)
+                               .arg(i, fieldWidth, 10, QChar('0'))
+                               .arg(tileStartX)
+                               .arg(tileStartY);
+          QString filepath = tmpdir.filePath(filename);
 
-            QString rightFilepath;
+          QString rightFilepath;
 
-            if (sst != Z3DScreenShotType::MonoView) {
-              filename = QString("_%1%2_%3_%4_left.png")
-                           .arg(namePrefix)
-                           .arg(i, fieldWidth, 10, QChar('0'))
-                           .arg(tileStartX)
-                           .arg(tileStartY);
-              filepath = tmpdir.filePath(filename);
-              filename = QString("_%1%2_%3_%4_right.png")
-                           .arg(namePrefix)
-                           .arg(i, fieldWidth, 10, QChar('0'))
-                           .arg(tileStartX)
-                           .arg(tileStartY);
-              rightFilepath = tmpdir.filePath(filename);
-            }
-
-            takeFixedSizeScreenShotWithoutResetCanvasSizeByTilePrivate(filepath,
-                                                                       rightFilepath,
-                                                                       width,
-                                                                       height,
-                                                                       sst,
-                                                                       tileSize,
-                                                                       tileBorder,
-                                                                       tileStartX,
-                                                                       tileStartY,
-                                                                       token);
-            ++completedTileFrames;
-            Q_EMIT progressChanged(std::clamp<int>(
-              std::floor(static_cast<double>(completedTileFrames) * kTileRenderProgressMax / totalTileFrames),
-              0,
-              kTileRenderProgressMax));
+          if (sst != Z3DScreenShotType::MonoView) {
+            filename = QString("_%1%2_%3_%4_left.png")
+                         .arg(namePrefix)
+                         .arg(i, fieldWidth, 10, QChar('0'))
+                         .arg(tileStartX)
+                         .arg(tileStartY);
+            filepath = tmpdir.filePath(filename);
+            filename = QString("_%1%2_%3_%4_right.png")
+                         .arg(namePrefix)
+                         .arg(i, fieldWidth, 10, QChar('0'))
+                         .arg(tileStartX)
+                         .arg(tileStartY);
+            rightFilepath = tmpdir.filePath(filename);
           }
+
+          takeFixedSizeScreenShotWithoutResetCanvasSizeByTilePrivate(filepath, rightFilepath, sst, tile, token);
+          ++completedTileFrames;
+          Q_EMIT progressChanged(std::clamp<int>(
+            std::floor(static_cast<double>(completedTileFrames) * kTileRenderProgressMax / totalTileFrames),
+            0,
+            kTileRenderProgressMax));
         }
       }
 
@@ -1106,9 +1295,7 @@ void Z3DRenderingEngine::exportFixedSize3DAnimation(const ZAnimation* animation,
                                                                                        i,
                                                                                        width,
                                                                                        height,
-                                                                                       tileSize,
-                                                                                       numCols,
-                                                                                       numRows,
+                                                                                       tileDescriptors,
                                                                                        flipYForSave,
                                                                                        sst,
                                                                                        token)));
@@ -1201,21 +1388,25 @@ void Z3DRenderingEngine::setYZView()
 
 void Z3DRenderingEngine::init()
 {
-  // All engine initialization must run on the engine's owning thread. In GUI
-  // mode this is the dedicated rendering thread; in headless/offscreen export
-  // paths the engine lives on the main thread.
+  CHECK(!m_initialized) << "Z3DRenderingEngine::init may only complete once";
+  // All initialization runs on the engine's owning thread. Canonical GUI
+  // engines and their tile workers use the rendering thread; standalone
+  // headless export may use the main thread.
   CHECK(QThread::currentThread() == this->thread()) << "Z3DRenderingEngine::init must run on engine thread";
 
-  // Ensure Vulkan/linear-script call sites can reliably detect the render thread
-  // even when we don't create a dedicated QThread (headless export).
-  //
-  // initAndAttachToCanvas() also sets this, but headless paths call init()
-  // directly, so set it here as well to keep the invariant consistent.
-  setCurrentRenderThreadExecutor(m_renderThreadExecutor.get());
+  // Install executor TLS for canonical engines that own it. Workers require the
+  // canonical executor to be installed already.
+  if (m_role == Role::Canonical) {
+    setCurrentRenderThreadExecutor(m_renderThreadExecutor);
+  } else {
+    CHECK(currentRenderThreadExecutorOrNull() == m_renderThreadExecutor)
+      << "Vulkan tile worker initialization requires its shared executor to remain installed";
+  }
 
   Q_EMIT progressChanged(10);
 
-  RenderBackend startupBackend = absl::GetFlag(FLAGS_atlas_default_render_backend);
+  RenderBackend startupBackend =
+    m_role == Role::VulkanTileWorker ? RenderBackend::Vulkan : absl::GetFlag(FLAGS_atlas_default_render_backend);
 
   // Vulkan startup must create and inject a Vulkan device before any Vulkan
   // scratch allocations (persistent output targets are acquired during
@@ -1223,14 +1414,25 @@ void Z3DRenderingEngine::init()
   if (startupBackend == RenderBackend::Vulkan) {
     VLOG(1) << "Initializing Vulkan backend for startup";
     try {
-      m_vkContext = std::make_unique<ZVulkanContext>();
+      m_vkContext = m_exactVulkanSelection ? std::make_unique<ZVulkanContext>(*m_exactVulkanSelection)
+                                           : std::make_unique<ZVulkanContext>();
       m_vkDevice = m_vkContext->createDevice();
 
-      updateGenericGpuInfoFromVulkanPhysicalDevice(m_vkContext->physicalDevice());
+      if (m_role == Role::Canonical) {
+        updateGenericGpuInfoFromVulkanPhysicalDevice(m_vkContext->physicalDevice());
+      } else {
+        CHECK(m_vkContext->selectedDeviceSelection() == *m_exactVulkanSelection)
+          << "Vulkan tile worker did not bind the exact requested adapter";
+      }
 
       m_vkContext->logGpuInfo();
     }
     catch (const std::exception& e) {
+      if (m_role == Role::VulkanTileWorker) {
+        m_vkDevice.reset();
+        m_vkContext.reset();
+        throw;
+      }
       const auto errorMsg =
         fmt::format("Failed to initialize Vulkan backend at startup: {}. Falling back to OpenGL.", e.what());
       LOG(ERROR) << errorMsg;
@@ -1327,13 +1529,19 @@ void Z3DRenderingEngine::init()
 
   m_globalParas = std::make_unique<Z3DGlobalParameters>(*m_scratchPool, startupBackend);
 
-  connect(&m_globalParas->renderBackend, &ZParameter::valueChanged, this, [this]() {
-    handleRenderBackendChanged();
-  });
+  if (m_role == Role::Canonical) {
+    connect(&m_globalParas->renderBackend, &ZParameter::valueChanged, this, [this]() {
+      handleRenderBackendChanged();
+    });
+  } else {
+    connect(&m_globalParas->renderBackend, &ZParameter::valueChanged, this, [this]() {
+      CHECK(static_cast<RenderBackend>(m_globalParas->renderBackend.associatedData()) == RenderBackend::Vulkan)
+        << "A Vulkan tile worker has immutable Vulkan backend affinity";
+    });
+  }
 
   // filters
   m_compositor = std::make_unique<Z3DCompositor>(*m_globalParas);
-  // Vulkan bridge deferred
   addEventListenerToBack(*m_compositor);
   connect(m_compositor.get(), &Z3DCompositor::sceneParaUpdated, this, &Z3DRenderingEngine::sceneParaUpdated);
   connect(m_compositor.get(), &Z3DCompositor::renderingFinished, this, &Z3DRenderingEngine::renderingFinished);
@@ -1392,12 +1600,18 @@ void Z3DRenderingEngine::init()
   // adjust camera
   resetCamera();
 
-  connect(&camera(), &Z3DCameraParameter::valueChanged, this, &Z3DRenderingEngine::resetCameraClippingRange);
+  if (m_role == Role::Canonical) {
+    // A worker receives the canonical camera, including non-serialized
+    // near/far distances. Re-deriving clipping from worker-local bounds would
+    // change its projection and can create visible seams between tiles.
+    connect(&camera(), &Z3DCameraParameter::valueChanged, this, &Z3DRenderingEngine::resetCameraClippingRange);
+  }
 
   LOG(INFO) << "3D Renderer Inited.";
 
   Q_EMIT progressChanged(100);
 
+  m_initialized = true;
   Q_EMIT initialized();
 
   // When object views become ready, apply any pending per-object View3D JSON
@@ -1423,8 +1637,9 @@ void Z3DRenderingEngine::init()
 
 void Z3DRenderingEngine::initAndAttachToCanvas(Z3DCanvas* canvas)
 {
+  CHECK(m_role == Role::Canonical) << "A Vulkan tile worker cannot attach to a canvas";
   CHECK(canvas);
-  setCurrentRenderThreadExecutor(m_renderThreadExecutor.get());
+  setCurrentRenderThreadExecutor(m_renderThreadExecutor);
   m_canvas = canvas;
   init();
 
@@ -1465,35 +1680,44 @@ void Z3DRenderingEngine::drainVulkanFrameExecutorForTeardown()
     return;
   }
 
-  // Prefer draining through the Vulkan backend so the backend's completion-safe-point
-  // hooks (readback consumers, descriptor-pool resets, deferred scratch releases, etc.)
-  // are executed while the compositor/backend objects are still alive.
-  if (m_globalParas && m_compositor &&
-      static_cast<RenderBackend>(m_globalParas->renderBackend.associatedData()) == RenderBackend::Vulkan) {
-    if (auto* backendImpl = m_compositor->rendererBase().backend()) {
-      try {
-        backendImpl->flushForTeardown("engine_teardown_drain");
-        if (backendImpl->supportsCommandLists()) {
-          return;
-        }
-      }
-      catch (const std::exception& e) {
-        LOG(ERROR) << "Backend flushForTeardown failed during engine teardown drain: " << e.what();
-      }
-      catch (...) {
-        LOG(ERROR) << "Backend flushForTeardown failed during engine teardown drain (unknown exception)";
+  bool drainedBackend = false;
+  auto drainRenderer = [&drainedBackend](Z3DRendererBase& renderer) {
+    if (renderer.activeBackend() != RenderBackend::Vulkan) {
+      return;
+    }
+    drainedBackend = true;
+    try {
+      renderer.flushVulkanWorkForTeardown("engine_teardown_drain");
+    }
+    catch (const std::exception& e) {
+      LOG(ERROR) << "Vulkan backend drain failed during engine teardown: " << e.what();
+    }
+    catch (...) {
+      LOG(ERROR) << "Vulkan backend drain failed during engine teardown with a non-standard exception";
+    }
+  };
+
+  if (m_compositor) {
+    drainRenderer(m_compositor->rendererBase());
+  }
+  // The linear pipeline is derived from view-owned filters and can be between
+  // rebuilds during teardown. Walk the owners so every live filter backend
+  // drains its own safe-point hooks and detached tasks.
+  for (const auto& objView : m_3dObjViews) {
+    if (!objView) {
+      continue;
+    }
+    for (auto* filter : objView->filters()) {
+      if (auto* bounded = dynamic_cast<Z3DBoundedFilter*>(filter)) {
+        drainRenderer(bounded->rendererBase());
       }
     }
   }
 
-  // Fallback: at least ensure the VkDevice is idle so nothing outlives it.
-  // Note: this does not execute backend safe-point hooks; it is a last resort
-  // when the backend cannot be reached during teardown.
-  try {
+  // This fallback handles a healthy device whose renderer backends were
+  // unavailable during teardown. Physical-device-loss recovery is unsupported.
+  if (!drainedBackend) {
     m_vkDevice->context().device().waitIdle();
-  }
-  catch (const std::exception& e) {
-    LOG(ERROR) << "Vulkan waitIdle failed during teardown: " << e.what();
   }
 }
 
@@ -1655,8 +1879,16 @@ void Z3DRenderingEngine::updateAllFilterSizes()
 double
 Z3DRenderingEngine::processFrame(bool stereo, bool progressiveRendering, folly::CancellationToken cancellationToken)
 {
+  return processFrameWithIdentity(stereo, progressiveRendering, std::move(cancellationToken)).progress;
+}
+
+Z3DRenderingEngine::FrameProcessResult
+Z3DRenderingEngine::processFrameWithIdentity(bool stereo,
+                                             bool progressiveRendering,
+                                             folly::CancellationToken cancellationToken)
+{
   if (m_pipeline.empty()) {
-    return 1.0;
+    return FrameProcessResult{.progress = 1.0, .renderFrameToken = 0u};
   }
 
   const auto backend = static_cast<RenderBackend>(m_globalParas->renderBackend.associatedData());
@@ -1762,7 +1994,8 @@ Z3DRenderingEngine::processFrame(bool stereo, bool progressiveRendering, folly::
   if (!progressiveRendering) {
     CHECK(currentProgress == totalProgress) << currentProgress << " " << totalProgress;
   }
-  return totalProgress > 0.0 ? currentProgress / totalProgress : 1.0;
+  return FrameProcessResult{.progress = totalProgress > 0.0 ? currentProgress / totalProgress : 1.0,
+                            .renderFrameToken = renderFrameToken};
 }
 
 bool Z3DRenderingEngine::beginDeferredRenderingErrorFrame()
@@ -1807,12 +2040,10 @@ void Z3DRenderingEngine::clearDeferredRenderingErrors()
   m_deferredRenderingErrors.clear();
 }
 
-void Z3DRenderingEngine::reportDeferredRenderingErrorsIfAny()
+QString Z3DRenderingEngine::takeDeferredRenderingErrors()
 {
-  CHECK(QThread::currentThread() == this->thread()) << "Deferred rendering errors must be reported on engine thread";
-  if (m_deferredRenderingErrors.empty()) {
-    return;
-  }
+  CHECK(QThread::currentThread() == this->thread()) << "Deferred rendering errors must be consumed on engine thread";
+  CHECK(!m_deferredRenderingErrors.empty());
 
   QString combined;
   for (size_t i = 0; i < m_deferredRenderingErrors.size(); ++i) {
@@ -1821,9 +2052,18 @@ void Z3DRenderingEngine::reportDeferredRenderingErrorsIfAny()
     }
     combined += m_deferredRenderingErrors[i];
   }
-
   clearDeferredRenderingErrors();
-  reportRenderingError(combined);
+  return combined;
+}
+
+void Z3DRenderingEngine::reportDeferredRenderingErrorsIfAny()
+{
+  CHECK(QThread::currentThread() == this->thread()) << "Deferred rendering errors must be reported on engine thread";
+  if (m_deferredRenderingErrors.empty()) {
+    return;
+  }
+
+  reportRenderingError(takeDeferredRenderingErrors());
 }
 
 ZImg Z3DRenderingEngine::localColorBufferToRGBAImg(const Z3DLocalColorBuffer& buffer)
@@ -2333,6 +2573,8 @@ void Z3DRenderingEngine::takeFixedSizeScreenShotWithoutResetCanvasSizePrivate(
   auto deferredErrorFrameGuard = folly::makeGuard([this, startedDeferredErrorFrame]() {
     endDeferredRenderingErrorFrame(startedDeferredErrorFrame);
   });
+  CHECK_GT(width, 0);
+  CHECK_GT(height, 0);
   CHECK(tileSize >= 0 && tileBorder >= 0);
   constexpr int kDefaultTileSize = 2048;
   constexpr int kDefaultTileBorder = 128;
@@ -2382,64 +2624,55 @@ void Z3DRenderingEngine::takeFixedSizeScreenShotWithoutResetCanvasSizePrivate(
       rightImg.infoRef().lastChannelIsAlphaChannel = true;
     }
 
-    int numCols = (width + resolvedTileSize - 1) / resolvedTileSize;
-    int numRows = (height + resolvedTileSize - 1) / resolvedTileSize;
-    const int totalTiles = numCols * numRows;
-    int completedTiles = 0;
-    bool forwardCol = false;
-    for (int r = 0; r < numRows; ++r) {
+    const auto tileDescriptors = makeZ3DTileDescriptors(glm::uvec2(width, height),
+                                                        glm::uvec2(resolvedTileSize),
+                                                        static_cast<uint32_t>(resolvedTileBorder));
+    CHECK(!tileDescriptors.empty());
+    uint64_t completedTiles = 0;
+    for (const Z3DTileDescriptor& tile : tileDescriptors) {
       maybeCancel(cancellationToken);
-      auto tileStartY = r * resolvedTileSize;
-      forwardCol = !forwardCol;
-      for (int c = forwardCol ? 0 : (numCols - 1); forwardCol ? (c < numCols) : (c >= 0); forwardCol ? ++c : --c) {
-        maybeCancel(cancellationToken);
-        auto tileStartX = c * resolvedTileSize;
 
-        int left = tileStartX;
-        int right = std::min(tileStartX + resolvedTileSize, width);
-        int bottom = tileStartY;
-        int top = std::min(tileStartY + resolvedTileSize, height);
-        double nLeft = static_cast<double>(left - resolvedTileBorder) / width;
-        double nRight = static_cast<double>(right + resolvedTileBorder) / width;
-        double nBottom = static_cast<double>(bottom - resolvedTileBorder) / height;
-        double nTop = static_cast<double>(top + resolvedTileBorder) / height;
-        ZImgRegion validRegion(resolvedTileBorder,
-                               resolvedTileBorder + right - left,
-                               resolvedTileBorder,
-                               resolvedTileBorder + top - bottom);
+      const ZImgRegion validRegion = validAttachmentRegion(tile);
+      setOutputSize(tile.attachmentExtent());
+      m_globalParas->camera.viewportChanged(tile.fullOutputExtent());
 
-        setOutputSize(glm::uvec2(right - left + resolvedTileBorder * 2, top - bottom + resolvedTileBorder * 2));
-        m_globalParas->camera.viewportChanged(glm::uvec2(width, height));
+      // The descriptor defines the tile projection and crop; the engine
+      // evaluates the tile through its direct filter pipeline.
+      m_globalParas->camera.setTileFrustum(tile.normalizedLeft(),
+                                           tile.normalizedRight(),
+                                           tile.normalizedBottom(),
+                                           tile.normalizedTop());
+      m_compositor->setRenderingRegion(tile.normalizedLeft(),
+                                       tile.normalizedRight(),
+                                       tile.normalizedBottom(),
+                                       tile.normalizedTop());
 
-        // set camera frustum
-        m_globalParas->camera.setTileFrustum(nLeft, nRight, nBottom, nTop);
-        m_compositor->setRenderingRegion(nLeft, nRight, nBottom, nTop);
+      processFrame(sst != Z3DScreenShotType::MonoView, false, cancellationToken);
 
-        // Evaluate the filter pipeline for this tile.
-        processFrame(sst != Z3DScreenShotType::MonoView, false, cancellationToken);
+      const glm::uvec2 pasteOrigin = saveAssemblyOrigin(tile, flipYForSave);
+      const ZVoxelCoordinate pasteCoordinate(pasteOrigin.x, pasteOrigin.y);
+      if (sst == Z3DScreenShotType::MonoView) {
+        img.pasteImg(localColorBufferToRGBAImg(*m_compositor->monoReadyLocalBuffer()).crop(validRegion),
+                     pasteCoordinate);
+      } else {
+        img.pasteImg(localColorBufferToRGBAImg(*m_compositor->leftReadyLocalBuffer()).crop(validRegion),
+                     pasteCoordinate);
+        rightImg.pasteImg(localColorBufferToRGBAImg(*m_compositor->rightReadyLocalBuffer()).crop(validRegion),
+                          pasteCoordinate);
+      }
 
-        const int pasteY = flipYForSave ? tileStartY : (height - top);
-        if (sst == Z3DScreenShotType::MonoView) {
-          img.pasteImg(localColorBufferToRGBAImg(*m_compositor->monoReadyLocalBuffer()).crop(validRegion),
-                       ZVoxelCoordinate(tileStartX, pasteY));
-        } else {
-          img.pasteImg(localColorBufferToRGBAImg(*m_compositor->leftReadyLocalBuffer()).crop(validRegion),
-                       ZVoxelCoordinate(tileStartX, pasteY));
-          rightImg.pasteImg(localColorBufferToRGBAImg(*m_compositor->rightReadyLocalBuffer()).crop(validRegion),
-                            ZVoxelCoordinate(tileStartX, pasteY));
-        }
+      ++completedTiles;
+      if (reportProgress) {
+        const auto tileProgress = static_cast<int>(
+          std::floor(static_cast<double>(completedTiles) * 70.0 / static_cast<double>(tileDescriptors.size())));
+        Q_EMIT progressChanged(20 + tileProgress);
+      }
 
-        ++completedTiles;
-        if (reportProgress) {
-          Q_EMIT progressChanged(20 + (completedTiles * 70) / std::max(1, totalTiles));
-        }
-
-        if (backend == RenderBackend::Vulkan) {
-          // Tiled export varies scratch sizes between full and edge tiles. Once
-          // tile pixels are copied to CPU memory, drain completed Vulkan leases
-          // so old edge/full-size scratch slots can be reused across tiles.
-          m_scratchPool->reclaimVulkanScratchMemory(Z3DScratchResourcePool::VulkanScratchReclaimMode::WaitForIdle);
-        }
+      if (backend == RenderBackend::Vulkan) {
+        // Tiled export varies scratch sizes between full and edge tiles. Once
+        // tile pixels are copied to CPU memory, drain completed Vulkan leases
+        // so old edge/full-size scratch slots can be reused across tiles.
+        m_scratchPool->reclaimVulkanScratchMemory(Z3DScratchResourcePool::VulkanScratchReclaimMode::WaitForIdle);
       }
     }
 
@@ -2484,13 +2717,8 @@ void Z3DRenderingEngine::takeFixedSizeScreenShotWithoutResetCanvasSizePrivate(
 void Z3DRenderingEngine::takeFixedSizeScreenShotWithoutResetCanvasSizeByTilePrivate(
   const QString& filename,
   const QString& rightFilename,
-  int width,
-  int height,
   Z3DScreenShotType sst,
-  int tileSize,
-  int tileBorder,
-  int tileStartX,
-  int tileStartY,
+  const Z3DTileDescriptor& tile,
   folly::CancellationToken cancellationToken)
 {
   const bool startedDeferredErrorFrame = beginDeferredRenderingErrorFrame();
@@ -2500,32 +2728,30 @@ void Z3DRenderingEngine::takeFixedSizeScreenShotWithoutResetCanvasSizeByTilePriv
 
   maybeCancel(cancellationToken);
 
-  CHECK(tileSize > 0);
-  CHECK(width > tileSize || height > tileSize);
-  tileBorder = std::max(tileBorder, 16);
+  const glm::uvec2 fullOutputExtent = tile.fullOutputExtent();
+  const glm::uvec2 validOutputOrigin = tile.validOutputOrigin();
+  const glm::uvec2 validOutputExtent = tile.validOutputExtent();
+  const glm::uvec2 attachmentExtent = tile.attachmentExtent();
 
-  m_globalParas->camera.viewportChanged(glm::uvec2(width, height));
-  prepareMeshFiltersForExport(glm::uvec2(width, height), cancellationToken);
+  m_globalParas->camera.viewportChanged(fullOutputExtent);
+  prepareMeshFiltersForExport(fullOutputExtent, cancellationToken);
   auto meshExportGuard = folly::makeGuard([this]() {
     finishMeshFiltersForExport();
   });
 
-  int left = tileStartX;
-  int right = std::min(tileStartX + tileSize, width);
-  int bottom = tileStartY;
-  int top = std::min(tileStartY + tileSize, height);
-  double nLeft = static_cast<double>(left - tileBorder) / width;
-  double nRight = static_cast<double>(right + tileBorder) / width;
-  double nBottom = static_cast<double>(bottom - tileBorder) / height;
-  double nTop = static_cast<double>(top + tileBorder) / height;
-  ZImgRegion validRegion(tileBorder, tileBorder + right - left, tileBorder, tileBorder + top - bottom);
-
-  setOutputSize(glm::uvec2(right - left + tileBorder * 2, top - bottom + tileBorder * 2));
-  m_globalParas->camera.viewportChanged(glm::uvec2(width, height));
+  const ZImgRegion validRegion = validAttachmentRegion(tile);
+  setOutputSize(attachmentExtent);
+  m_globalParas->camera.viewportChanged(fullOutputExtent);
 
   // set camera frustum
-  m_globalParas->camera.setTileFrustum(nLeft, nRight, nBottom, nTop);
-  m_compositor->setRenderingRegion(nLeft, nRight, nBottom, nTop);
+  m_globalParas->camera.setTileFrustum(tile.normalizedLeft(),
+                                       tile.normalizedRight(),
+                                       tile.normalizedBottom(),
+                                       tile.normalizedTop());
+  m_compositor->setRenderingRegion(tile.normalizedLeft(),
+                                   tile.normalizedRight(),
+                                   tile.normalizedBottom(),
+                                   tile.normalizedTop());
   auto regionGuard = folly::makeGuard([this]() {
     m_globalParas->camera.setTileFrustum();
     m_compositor->setRenderingRegion();
@@ -2537,34 +2763,38 @@ void Z3DRenderingEngine::takeFixedSizeScreenShotWithoutResetCanvasSizeByTilePriv
 
   if (sst == Z3DScreenShotType::MonoView) {
     localColorBufferToRGBAImg(*m_compositor->monoReadyLocalBuffer()).crop(validRegion).save(filename);
-    LOG(INFO) << fmt::format("Saved tiled rendering (total: {} x {}, tile: X {}, Y {}, size {}, border {}) to file: {}",
-                             width,
-                             height,
-                             tileStartX,
-                             tileStartY,
-                             tileSize,
-                             tileBorder,
+    LOG(INFO) << fmt::format("Saved tiled rendering (total: {} x {}, tile: X {}, Y {}, valid: {} x {}, border {}) "
+                             "to file: {}",
+                             fullOutputExtent.x,
+                             fullOutputExtent.y,
+                             validOutputOrigin.x,
+                             validOutputOrigin.y,
+                             validOutputExtent.x,
+                             validOutputExtent.y,
+                             tile.guardPixels(),
                              filename);
   } else {
     localColorBufferToRGBAImg(*m_compositor->leftReadyLocalBuffer()).crop(validRegion).save(filename);
     LOG(INFO) << fmt::format(
-      "Saved left tiled rendering (total: {} x {}, tile: X {}, Y {}, size {}, border {}) to file: {}",
-      width,
-      height,
-      tileStartX,
-      tileStartY,
-      tileSize,
-      tileBorder,
+      "Saved left tiled rendering (total: {} x {}, tile: X {}, Y {}, valid: {} x {}, border {}) to file: {}",
+      fullOutputExtent.x,
+      fullOutputExtent.y,
+      validOutputOrigin.x,
+      validOutputOrigin.y,
+      validOutputExtent.x,
+      validOutputExtent.y,
+      tile.guardPixels(),
       filename);
     localColorBufferToRGBAImg(*m_compositor->rightReadyLocalBuffer()).crop(validRegion).save(rightFilename);
     LOG(INFO) << fmt::format(
-      "Saved right tiled rendering (total: {} x {}, tile: X {}, Y {}, size {}, border {}) to file: {}",
-      width,
-      height,
-      tileStartX,
-      tileStartY,
-      tileSize,
-      tileBorder,
+      "Saved right tiled rendering (total: {} x {}, tile: X {}, Y {}, valid: {} x {}, border {}) to file: {}",
+      fullOutputExtent.x,
+      fullOutputExtent.y,
+      validOutputOrigin.x,
+      validOutputOrigin.y,
+      validOutputExtent.x,
+      validOutputExtent.y,
+      tile.guardPixels(),
       rightFilename);
   }
 
@@ -2673,6 +2903,7 @@ void Z3DRenderingEngine::resetOutputSizeToMatchCanvasSize()
 
 void Z3DRenderingEngine::handleRenderBackendChanged()
 {
+  CHECK(m_role == Role::Canonical) << "A Vulkan tile worker has immutable Vulkan backend affinity";
   VLOG(1) << "Render backend configuration changed";
   if (Z3DRenderGlobalState::instance().hasCancellationSource()) {
     Z3DRenderGlobalState::instance().requestCancellation();

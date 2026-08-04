@@ -31,6 +31,7 @@
 #include <span>
 #include <unordered_set>
 #include <optional>
+#include <utility>
 #include <QPointer>
 
 ABSL_FLAG(bool, atlas_vk_copy_yflip_in_shader, true, "Use y-flip in Vulkan final copy shader instead of UI flip");
@@ -361,7 +362,10 @@ folly::coro::Task<void> consumeVulkanFinalReadback(Z3DRendererVulkanBackend& bac
                                                    bool collectPerf,
                                                    std::chrono::steady_clock::time_point perfFrameStart)
 {
-  co_await Z3DRendererVulkanBackend::waitActiveSubmissionFence(std::move(fence));
+  const auto outcome = co_await Z3DRendererVulkanBackend::waitActiveSubmissionFence(std::move(fence));
+  if (outcome == Z3DRendererVulkanBackend::ActiveSubmissionOutcome::Unavailable) {
+    co_return;
+  }
   CHECK(completion.mapped != nullptr) << "Vulkan final readback completed without mapped data";
   publisher(std::move(completion));
 
@@ -871,11 +875,18 @@ void Z3DCompositor::setRenderingRegion(double left, double right, double bottom,
   m_region = glm::vec4(left, right - left, bottom, top - bottom);
 }
 
+uint64_t Z3DCompositor::lastPublishedRenderFrameToken(Z3DEye eye) const
+{
+  const std::scoped_lock lock(m_globalParameters.targetSwitchMutex);
+  const size_t eyeIndex = static_cast<size_t>(eye);
+  CHECK_LT(eyeIndex, m_lastPublishedRenderFrameToken.size());
+  return m_lastPublishedRenderFrameToken[eyeIndex];
+}
+
 void Z3DCompositor::invalidate(State inv)
 {
   // VLOG(1) << "1";
   CHECK(inv != State::Valid);
-  Q_EMIT renderInputChanged();
   if (isFlagSet(m_state, inv)) {
     return;
   }
@@ -3260,6 +3271,7 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
       const uint64_t renderFrameToken = Z3DRenderGlobalState::instance().currentRenderFrameToken();
       CHECK_GT(renderFrameToken, 0u) << "Vulkan final readback requires an immutable render-frame identity";
       auto ticket = backend.requestEndOfFrameColorReadbackTicket(tex, eyeCopy, ticketLabel);
+      auto retirement = std::move(ticket.retirement);
       ZVulkanFinalReadbackCompletion completion(readbackOwner,
                                                 readbackOwnerRevision,
                                                 renderFrameToken,
@@ -3270,7 +3282,7 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
                                                 localPtr,
                                                 targetPtr,
                                                 noCopy,
-                                                std::move(ticket.releaseSlot));
+                                                std::move(retirement));
       backend.registerAfterCurrentFrameCompletionHook(
         currentRenderThreadExecutorKeepAlive(consumeLabel),
         [publisher = publishFinalColorReadback,

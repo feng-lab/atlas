@@ -392,8 +392,18 @@ void Z3DRendererBase::beginVulkanFrame(std::string_view frameLabel)
 
   // Set frame label before notifying backend so it can capture it
   m_currentFrameLabel = std::string(frameLabel);
-  m_backend->beginRender(*this);
-  m_vulkanFrameActive = true;
+  try {
+    m_backend->beginRender(*this);
+    m_vulkanFrameActive = true;
+  }
+  catch (...) {
+    // beginRender() owns rollback of backend/device state. Keep the public
+    // renderer transaction closed so callers never try to abort or end a frame
+    // whose begin operation failed.
+    m_vulkanFrameActive = false;
+    m_currentFrameLabel.clear();
+    throw;
+  }
 }
 
 void Z3DRendererBase::endVulkanFrame()
@@ -410,19 +420,29 @@ void Z3DRendererBase::endVulkanFrame()
   m_backend->endRender(*this);
 }
 
+[[noreturn]] void Z3DRendererBase::abortVulkanFrame(std::string_view message)
+{
+  CHECK(m_vulkanFrameActive) << "abortVulkanFrame requires an active Vulkan frame";
+  CHECK(m_activeBackend == RenderBackend::Vulkan) << "abortVulkanFrame requires a Vulkan backend";
+  CHECK(m_backend != nullptr) << "Renderer backend not set";
+  auto* backend = dynamic_cast<Z3DRendererVulkanBackend*>(m_backend.get());
+  CHECK(backend != nullptr) << "Active Vulkan renderer has a non-Vulkan backend implementation";
+
+  auto clearGuard = folly::makeGuard([this]() {
+    m_vulkanFrameActive = false;
+    m_currentFrameLabel.clear();
+  });
+  backend->abortActiveFrame(message);
+}
+
 void Z3DRendererBase::flushVulkanWorkForTeardown(std::string_view reason)
 {
   if (m_activeBackend != RenderBackend::Vulkan) {
     return;
   }
   CHECK(m_backend != nullptr) << "Vulkan teardown flush requires an active renderer backend";
-
-  // Do not flush with a frame left open; end it first so submissions (and their
-  // corresponding post-fence callbacks) have a well-defined lifetime.
-  if (m_vulkanFrameActive) {
-    endVulkanFrame();
-  }
-
+  CHECK(!m_vulkanFrameActive && !m_recordingSessionOpen)
+    << "Normal Vulkan drain must not submit or finalize a partially recorded frame";
   m_backend->flushForTeardown(reason);
 }
 
@@ -520,7 +540,6 @@ void Z3DRendererBase::executeVulkanBatches(const std::function<void()>& recordBa
     beginVulkanFrame();
   }
 
-  // Delegate to the in-active-frame variant for session + submission handling
   recordVulkanBatchesInActiveFrame(recordBatches, label);
 
   if (startedFrame && !m_keepVulkanFrameOpen) {

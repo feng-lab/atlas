@@ -12,6 +12,13 @@ namespace nim {
 
 namespace {
 constexpr uint64_t kFenceTimeoutNs = std::numeric_limits<uint64_t>::max();
+
+void rememberFirstException(std::exception_ptr& firstException) noexcept
+{
+  if (!firstException) {
+    firstException = std::current_exception();
+  }
+}
 }
 
 ZVulkanFrameExecutor::ActiveFrame::ActiveFrame(Frame* frame, ZVulkanFrameExecutor* executor)
@@ -164,6 +171,7 @@ void ZVulkanFrameExecutor::checkOwnerThread(std::string_view operation) const
 ZVulkanFrameExecutor::ActiveFrame ZVulkanFrameExecutor::beginFrame()
 {
   checkOwnerThread("begin frame acquisition");
+  m_device.ensureSubmissionUsable();
   Frame& frame = acquireFrame();
   return ActiveFrame(&frame, this);
 }
@@ -194,7 +202,7 @@ bool ZVulkanFrameExecutor::allFrameSlotsDescriptorMutationSafe() const
   });
 }
 
-void ZVulkanFrameExecutor::markSubmitted(ActiveFrame& frame)
+void ZVulkanFrameExecutor::markSubmitted(ActiveFrame& frame) noexcept
 {
   checkOwnerThread("mark frame submitted");
   CHECK(owns(frame)) << "markSubmitted called with no current frame acquisition";
@@ -218,17 +226,19 @@ void ZVulkanFrameExecutor::scheduleAfterCompletion(ActiveFrame& frame, std::func
 void ZVulkanFrameExecutor::waitForCompletion(ActiveFrame& frame)
 {
   checkOwnerThread("wait for frame completion");
-  if (!frame.valid() || !frame.m_frame->inFlight) {
+  CHECK(owns(frame)) << "waitForCompletion called with no current frame acquisition";
+  if (!frame.m_frame->inFlight) {
+    CHECK(frame.m_frame->phase != Frame::Phase::Submitted)
+      << "Submitted Vulkan frame lost its in-flight ownership marker";
     return;
   }
 
-  auto& vkDevice = m_device.context().device();
-  const auto waitResult = vkDevice.waitForFences({*frame.fence()}, true, kFenceTimeoutNs);
-  CHECK(waitResult == vk::Result::eSuccess)
-    << "Frame executor waitForFences returned " << enumOrUnderlying(waitResult, 16);
+  CHECK(observeFenceCompletion(*frame.m_frame, true));
   frame.m_frame->inFlight = false;
   frame.m_frame->phase = Frame::Phase::FenceSafe;
-  runCompletionCallbacks(*frame.m_frame);
+  if (auto callbackFailure = runCompletionCallbacks(*frame.m_frame)) {
+    std::rethrow_exception(callbackFailure);
+  }
 }
 
 void ZVulkanFrameExecutor::waitForAllInFlight()
@@ -238,28 +248,29 @@ void ZVulkanFrameExecutor::waitForAllInFlight()
     return;
   }
 
-  auto& vkDevice = m_device.context().device();
+  std::exception_ptr firstException;
   for (auto& frame : m_frames) {
     if (!frame.inFlight) {
       continue;
     }
-    const auto waitResult = vkDevice.waitForFences({*frame.fence}, true, kFenceTimeoutNs);
-    CHECK(waitResult == vk::Result::eSuccess)
-      << "Frame executor waitForFences returned " << enumOrUnderlying(waitResult, 16);
+    CHECK(observeFenceCompletion(frame, true));
     frame.inFlight = false;
     frame.phase = Frame::Phase::FenceSafe;
-    runCompletionCallbacks(frame);
   }
 
-  // Teardown and backend-switch paths may abandon an acquisition that already
-  // scheduled callbacks. ActiveFrame release changes such a slot to FenceSafe,
-  // so those callbacks can be flushed. Acquired/Recording callbacks must remain
-  // pending: that unsubmitted command buffer is outside the fence wait and may
-  // still be submitted after this call returns.
+  // FenceSafe slots contain only callbacks from completed submissions.
+  // Releasing a definitely-unsubmitted ActiveFrame discards its callbacks
+  // immediately; a still-acquired/recording frame is a teardown invariant
+  // violation and remains outside this healthy drain.
   for (auto& frame : m_frames) {
     if (frame.phase == Frame::Phase::FenceSafe) {
-      runCompletionCallbacks(frame);
+      if (auto callbackFailure = runCompletionCallbacks(frame); callbackFailure && !firstException) {
+        firstException = std::move(callbackFailure);
+      }
     }
+  }
+  if (firstException) {
+    std::rethrow_exception(firstException);
   }
 }
 
@@ -293,23 +304,25 @@ void ZVulkanFrameExecutor::pollCompletions(std::vector<void*>* completedKeys)
     return;
   }
 
-  auto& vkDevice = m_device.context().device();
+  std::exception_ptr firstException;
   for (auto& frame : m_frames) {
     if (!frame.inFlight) {
       continue;
     }
-    const auto status = vkDevice.waitForFences({*frame.fence}, true, 0);
-    if (status == vk::Result::eTimeout) {
+    if (!observeFenceCompletion(frame, false)) {
       continue;
     }
-    CHECK(status == vk::Result::eSuccess)
-      << "Frame executor poll waitForFences returned " << enumOrUnderlying(status, 16);
     frame.inFlight = false;
     frame.phase = Frame::Phase::FenceSafe;
-    runCompletionCallbacks(frame);
+    if (auto callbackFailure = runCompletionCallbacks(frame); callbackFailure && !firstException) {
+      firstException = std::move(callbackFailure);
+    }
     if (completedKeys) {
       completedKeys->push_back(static_cast<void*>(&frame));
     }
+  }
+  if (firstException) {
+    std::rethrow_exception(firstException);
   }
 }
 
@@ -365,19 +378,12 @@ ZVulkanFrameExecutor::Frame& ZVulkanFrameExecutor::acquireFrame()
 
   const size_t slot = m_cursor;
   auto& frame = m_frames[slot];
-  m_cursor = (slot + 1) % m_frames.size();
   frame.waitedForReuse = false;
 
-  auto& vkDevice = m_device.context().device();
   if (frame.inFlight) {
-    const auto fenceStatus = frame.fence.getStatus();
-    CHECK(fenceStatus == vk::Result::eSuccess || fenceStatus == vk::Result::eNotReady)
-      << "Frame executor getFenceStatus returned " << enumOrUnderlying(fenceStatus, 16);
-    if (fenceStatus == vk::Result::eNotReady) {
+    if (!observeFenceCompletion(frame, false)) {
       frame.waitedForReuse = true;
-      const auto waitResult = vkDevice.waitForFences({*frame.fence}, true, kFenceTimeoutNs);
-      CHECK(waitResult == vk::Result::eSuccess)
-        << "Frame executor waitForFences returned " << enumOrUnderlying(waitResult, 16);
+      CHECK(observeFenceCompletion(frame, true));
       // Debug note: with frames_in_flight=1, acquiring this slot means the
       // previous submission finished (fence signaled) before we start
       // recording the next frame. This does NOT imply the next submit is done
@@ -387,23 +393,23 @@ ZVulkanFrameExecutor::Frame& ZVulkanFrameExecutor::acquireFrame()
     }
     frame.inFlight = false;
     frame.phase = Frame::Phase::FenceSafe;
-    runCompletionCallbacks(frame);
-  } else if (!frame.completionCallbacks.empty()) {
-    LOG(WARNING) << "VK executor: acquiring a frame slot with pending completion callbacks but no in-flight fence;"
-                 << " waiting for all in-flight frames and flushing callbacks before reuse.";
-    waitForAllInFlight();
-    runCompletionCallbacks(frame);
+    if (auto callbackFailure = runCompletionCallbacks(frame)) {
+      std::rethrow_exception(callbackFailure);
+    }
   }
+  CHECK(frame.completionCallbacks.empty()) << "Reusable Vulkan frame retained completion callbacks";
 
   CHECK(frame.phase == Frame::Phase::FenceSafe)
     << "Frame executor attempted to reuse a slot with a live unsubmitted acquisition";
 
+  auto& vkDevice = m_device.context().device();
   vkDevice.resetFences({*frame.fence});
   frame.commandBuffer.reset();
   CHECK_LT(m_nextAcquisitionSerial, std::numeric_limits<uint64_t>::max())
     << "Vulkan frame acquisition serial exhausted";
   frame.acquisitionSerial = m_nextAcquisitionSerial++;
   frame.phase = Frame::Phase::Acquired;
+  m_cursor = (slot + 1) % m_frames.size();
   return frame;
 }
 
@@ -411,26 +417,71 @@ void ZVulkanFrameExecutor::releaseFrameLease(ActiveFrame& frame) noexcept
 {
   checkOwnerThread("release active frame lease");
   CHECK_GT(m_activeLeaseCount, 0u) << "Vulkan active frame lease count underflow";
-  if (owns(frame) &&
-      (frame.m_frame->phase == Frame::Phase::Acquired || frame.m_frame->phase == Frame::Phase::Recording)) {
+  CHECK(owns(frame)) << "Releasing a stale or foreign Vulkan active frame lease";
+  if (frame.m_frame->phase == Frame::Phase::Acquired || frame.m_frame->phase == Frame::Phase::Recording) {
     // No queue submission owns this command buffer. Returning the lease makes
-    // the slot safe for reuse and for device-wide descriptor maintenance.
+    // its callbacks unavailable before making the slot reusable.
+    discardCompletionCallbacks(*frame.m_frame);
     frame.m_frame->phase = Frame::Phase::FenceSafe;
   }
   --m_activeLeaseCount;
 }
 
-void ZVulkanFrameExecutor::runCompletionCallbacks(Frame& frame)
+bool ZVulkanFrameExecutor::observeFenceCompletion(Frame& frame, bool wait)
 {
-  if (frame.completionCallbacks.empty()) {
-    return;
+  CHECK(frame.inFlight) << "Fence observation requires an in-flight Vulkan frame";
+  CHECK(frame.phase == Frame::Phase::Submitted) << "Fence observation requires a submitted Vulkan frame";
+
+  vk::Result result = vk::Result::eErrorUnknown;
+  try {
+    result = m_device.context().device().waitForFences({*frame.fence}, true, wait ? kFenceTimeoutNs : 0u);
   }
-  auto callbacks = std::move(frame.completionCallbacks);
-  frame.completionCallbacks.clear();
-  for (auto& fn : callbacks) {
-    if (fn) {
-      fn();
+  catch (const std::exception& e) {
+    LOG(FATAL) << "Vulkan fence observation failed; physical submission failures are fatal: " << e.what();
+  }
+  catch (...) {
+    LOG(FATAL)
+      << "Vulkan fence observation failed with a non-standard exception; physical submission failures are fatal";
+  }
+
+  if (result == vk::Result::eSuccess) {
+    return true;
+  }
+  if (!wait && result == vk::Result::eTimeout) {
+    return false;
+  }
+
+  LOG(FATAL) << "Vulkan fence observation returned " << enumOrUnderlying(result, 16)
+             << "; physical submission failures are fatal";
+}
+
+std::exception_ptr ZVulkanFrameExecutor::runCompletionCallbacks(Frame& frame) noexcept
+{
+  std::exception_ptr firstException;
+  while (!frame.completionCallbacks.empty()) {
+    auto callbacks = std::move(frame.completionCallbacks);
+    frame.completionCallbacks.clear();
+    for (auto& fn : callbacks) {
+      if (!fn) {
+        continue;
+      }
+      try {
+        fn();
+      }
+      catch (...) {
+        rememberFirstException(firstException);
+      }
     }
+  }
+  return firstException;
+}
+
+void ZVulkanFrameExecutor::discardCompletionCallbacks(Frame& frame) noexcept
+{
+  while (!frame.completionCallbacks.empty()) {
+    auto callbacks = std::move(frame.completionCallbacks);
+    frame.completionCallbacks.clear();
+    callbacks.clear();
   }
 }
 
@@ -441,6 +492,7 @@ void ZVulkanFrameExecutor::executeImmediate(const std::function<void(vk::raii::C
   if (!record) {
     return;
   }
+  m_device.ensureSubmissionUsable();
   const bool logTiming = VLOG_IS_ON(1);
   const auto beginTime = logTiming ? std::chrono::steady_clock::now() : std::chrono::steady_clock::time_point{};
 
@@ -454,28 +506,47 @@ void ZVulkanFrameExecutor::executeImmediate(const std::function<void(vk::raii::C
                                           .level = vk::CommandBufferLevel::ePrimary,
                                           .commandBufferCount = 1};
   vk::raii::CommandBuffers buffers(device, allocInfo);
+  CHECK_EQ(buffers.size(), 1u);
   vk::raii::CommandBuffer& cmd = buffers[0];
-
-  vk::FenceCreateInfo fenceInfo{};
-  vk::raii::Fence fence(device, fenceInfo);
+  vk::raii::Fence fence(device, vk::FenceCreateInfo{});
 
   vk::CommandBufferBeginInfo beginInfo{.flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit};
-  cmd.begin(beginInfo);
+  try {
+    cmd.begin(beginInfo);
 
-  auto* dispatcher = device.getDispatcher();
-  if (dispatcher && dispatcher->vkCmdBeginDebugUtilsLabelEXT && !debugLabel.empty()) {
-    vk::DebugUtilsLabelEXT labelInfo{};
-    labelInfo.pLabelName = debugLabel.data();
-    cmd.beginDebugUtilsLabelEXT(labelInfo);
+    auto* dispatcher = device.getDispatcher();
+    if (dispatcher && dispatcher->vkCmdBeginDebugUtilsLabelEXT && !debugLabel.empty()) {
+      vk::DebugUtilsLabelEXT labelInfo{};
+      labelInfo.pLabelName = debugLabel.data();
+      cmd.beginDebugUtilsLabelEXT(labelInfo);
+    }
+
+    record(cmd);
+
+    if (dispatcher && dispatcher->vkCmdEndDebugUtilsLabelEXT && !debugLabel.empty()) {
+      cmd.endDebugUtilsLabelEXT();
+    }
+  }
+  catch (const std::exception&) {
+    m_device.recordSubmissionFailure(0u, 0u);
+    throw;
+  }
+  catch (...) {
+    m_device.recordSubmissionFailure(0u, 0u);
+    throw ZException("Vulkan immediate command recording failed with a non-standard exception");
   }
 
-  record(cmd);
-
-  if (dispatcher && dispatcher->vkCmdEndDebugUtilsLabelEXT && !debugLabel.empty()) {
-    cmd.endDebugUtilsLabelEXT();
+  try {
+    cmd.end();
   }
-
-  cmd.end();
+  catch (const std::exception&) {
+    m_device.recordSubmissionFailure(0u, 0u);
+    throw;
+  }
+  catch (...) {
+    m_device.recordSubmissionFailure(0u, 0u);
+    throw ZException("Vulkan immediate command-buffer finalization failed with a non-standard exception");
+  }
 
   vk::CommandBuffer rawBuffer = *cmd;
   vk::SubmitInfo submitInfo{};
@@ -483,14 +554,32 @@ void ZVulkanFrameExecutor::executeImmediate(const std::function<void(vk::raii::C
   submitInfo.pCommandBuffers = &rawBuffer;
 
   auto& queue = context.graphicsQueue();
-  queue.submit(submitInfo, *fence);
+  try {
+    queue.submit(submitInfo, *fence);
+  }
+  catch (const std::exception& e) {
+    LOG(FATAL) << "Immediate Vulkan queue submission failed; submission ownership is uncertain: " << e.what();
+  }
+  catch (...) {
+    LOG(FATAL)
+      << "Immediate Vulkan queue submission failed with a non-standard exception; submission ownership is uncertain";
+  }
 
-  // Wait for completion to keep semantics identical to the previous
-  // executeImmediate behaviour.
+  // Immediate submissions are synchronous and return only after fence completion.
   const auto waitBeginTime = logTiming ? std::chrono::steady_clock::now() : std::chrono::steady_clock::time_point{};
-  const auto waitResult2 = device.waitForFences({*fence}, true, kFenceTimeoutNs);
+  vk::Result waitResult2 = vk::Result::eErrorUnknown;
+  try {
+    waitResult2 = device.waitForFences({*fence}, true, kFenceTimeoutNs);
+  }
+  catch (const std::exception& e) {
+    LOG(FATAL) << "Immediate Vulkan fence wait failed; physical submission failures are fatal: " << e.what();
+  }
+  catch (...) {
+    LOG(FATAL)
+      << "Immediate Vulkan fence wait failed with a non-standard exception; physical submission failures are fatal";
+  }
   CHECK(waitResult2 == vk::Result::eSuccess)
-    << "Immediate executor waitForFences returned " << enumOrUnderlying(waitResult2, 16);
+    << "Immediate Vulkan fence wait returned " << enumOrUnderlying(waitResult2, 16);
   if (logTiming) {
     const auto endTime = std::chrono::steady_clock::now();
     VLOG(1) << fmt::format("VK immediate submission: label='{}' submissions=1 waits=1 total_ms={:.3f} wait_ms={:.3f}",

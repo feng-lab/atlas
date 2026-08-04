@@ -2,10 +2,13 @@
 
 #include "z3dglobalparameters.h"
 #include "z3dcontext.h"
+#include "z3drenderedtile.h"
 #include "z3drenderglobalstate.h"
 #include "zviewsettinginterface.h"
+#include "zvulkandevicesupport.h"
 #include "zbbox.h"
 #include "zbenchtimer.h"
+#include <folly/CancellationToken.h>
 #include <QDir>
 #include <QObject>
 #include <QEvent>
@@ -23,10 +26,6 @@
 class QOffscreenSurface;
 class QTimer;
 class QString;
-
-namespace folly {
-class CancellationToken;
-}
 
 namespace nim {
 
@@ -49,9 +48,8 @@ class ZVulkanContext;
 class ZVulkanDevice;
 class ZQtExecutor;
 class ZSwcPack;
+class Z3DTileDescriptor;
 struct ScreenSpaceSufficiencyAudit;
-
-// Vulkan compositor forward decl removed (classification phase)
 
 class Z3DRenderingEngine
   : public QObject
@@ -62,9 +60,19 @@ class Z3DRenderingEngine
 public:
   explicit Z3DRenderingEngine(ZDoc& doc, QObject* parent = nullptr);
 
+  // Construct one complete, headless rendering engine on the canonical
+  // engine's exact Vulkan adapter. The worker borrows the canonical rendering-
+  // thread executor and never falls back to OpenGL.
+  [[nodiscard]] std::unique_ptr<Z3DRenderingEngine> createVulkanTileWorker();
+
   ~Z3DRenderingEngine() override;
 
   [[nodiscard]] const ZDoc& doc() const;
+
+  // Only the canonical engine may propagate view-originated selection and
+  // visibility changes into the shared document. Tile workers consume document
+  // and serialized engine state in one direction.
+  [[nodiscard]] bool permitsDocumentMutationFrom3DView() const;
 
   std::shared_ptr<ZWidgetsGroup> viewSettingWidgetsGroupOf(size_t id) override;
 
@@ -110,6 +118,12 @@ public:
                                Z3DScreenShotType sst = Z3DScreenShotType::MonoView,
                                int tileSize = 0,
                                int tileBorder = 0);
+
+  // Execute one complete tile on a headless Vulkan worker and return its valid,
+  // host-owned pixels. The caller owns mesh-export preparation and tile assembly.
+  [[nodiscard]] Z3DRenderedTile renderVulkanTile(const Z3DTileDescriptor& tile,
+                                                 bool renderStereoPair = false,
+                                                 folly::CancellationToken cancellationToken = {});
 
   void takeScreenShot(const QString& filename, Z3DScreenShotType sst);
 
@@ -362,6 +376,18 @@ protected:
   void getGLFocus();
 
 private:
+  enum class Role : uint8_t
+  {
+    Canonical,
+    VulkanTileWorker
+  };
+
+  Z3DRenderingEngine(ZDoc& doc,
+                     Role role,
+                     std::optional<ZVulkanDeviceSupport::DeviceSelection> exactVulkanSelection,
+                     ZQtExecutor* sharedRenderThreadExecutor,
+                     QObject* parent);
+
   void resetCameraCenter();
 
   void resetCameraClippingRange(); // Reset the camera clipping range to include this entire bounding box
@@ -387,7 +413,6 @@ private:
   void onCanvasResized(size_t w, size_t h);
 
   void ensureGLContext();
-  // Vulkan init deferred
   void recoverFromVulkanInitializationFailure(const QString& error);
 
   void rotateX();
@@ -414,13 +439,8 @@ private:
 
   void takeFixedSizeScreenShotWithoutResetCanvasSizeByTilePrivate(const QString& filename,
                                                                   const QString& rightFilename,
-                                                                  int width,
-                                                                  int height,
                                                                   Z3DScreenShotType sst,
-                                                                  int tileSize = 0,
-                                                                  int tileBorder = 0,
-                                                                  int tileStartX = 0,
-                                                                  int tileStartY = 0,
+                                                                  const Z3DTileDescriptor& tile,
                                                                   folly::CancellationToken cancellationToken = {});
 
   // private version will throw exception on error
@@ -442,11 +462,21 @@ private:
   [[nodiscard]] bool beginDeferredRenderingErrorFrame();
   void endDeferredRenderingErrorFrame(bool startedFrame);
   void clearDeferredRenderingErrors();
+  [[nodiscard]] QString takeDeferredRenderingErrors();
   void reportDeferredRenderingErrorsIfAny();
 
+  struct FrameProcessResult
+  {
+    double progress = 0.0;
+    uint64_t renderFrameToken = 0u;
+  };
+
   // Execute one pass over the current filter pipeline, polling
-  // cancellationToken between filters.
+  // cancellationToken between filters. Ordinary callers consume progress;
+  // synchronous tile rendering also validates the immutable frame identity.
   double processFrame(bool stereo, bool progressiveRendering, folly::CancellationToken cancellationToken = {});
+  [[nodiscard]] FrameProcessResult
+  processFrameWithIdentity(bool stereo, bool progressiveRendering, folly::CancellationToken cancellationToken = {});
 
   // Update sizes for all filters in the pipeline, walking from sinks back
   // towards sources, using the engine's output size as the global target.
@@ -456,6 +486,9 @@ private:
   void finishMeshFiltersForExport();
 
 private:
+  const Role m_role;
+  const std::optional<ZVulkanDeviceSupport::DeviceSelection> m_exactVulkanSelection;
+
   // Track widget groups we've already connected to avoid duplicate connects. Must outlive compositor.
   std::unordered_set<const ZWidgetsGroup*> m_observedWGs;
 
@@ -469,9 +502,10 @@ private:
   // Vulkan context/device owned at engine level (mirrors GL ownership)
   std::unique_ptr<ZVulkanContext> m_vkContext;
   std::unique_ptr<ZVulkanDevice> m_vkDevice;
-  std::unique_ptr<ZQtExecutor> m_renderThreadExecutor;
+  std::unique_ptr<ZQtExecutor> m_ownedRenderThreadExecutor;
+  ZQtExecutor* const m_renderThreadExecutor;
   QTimer* m_vkCompletionPollTimer = nullptr;
-
+  bool m_initialized = false;
   ZDoc& m_doc;
 
   QPointer<Z3DCanvas> m_canvas;
@@ -485,8 +519,6 @@ private:
   std::unique_ptr<Z3DGlobalParameters> m_globalParas;
   std::unique_ptr<Z3DCompositor> m_compositor;
   std::vector<std::unique_ptr<Z3DObjView>> m_3dObjViews;
-  // Vulkan compositor bridge deferred
-
   // Linearized filter execution order: all object filters, then compositor.
   std::vector<Z3DFilter*> m_pipeline;
   std::vector<Z3DMeshFilter*> m_exportPreparedMeshFilters;
