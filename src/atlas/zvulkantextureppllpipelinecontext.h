@@ -61,7 +61,7 @@ private:
     std::unique_ptr<ZVulkanPipeline> pipeline;
   };
 
-  // Matches layout(push_constant) PPLLResolvePC in Resources/shader/vulkan/ppll_resolve.frag.
+  // Used only by the bindless resolve variant in ppll_resolve.frag.
   struct PPLLResolvePushConstants
   {
     uint32_t opaqueDepthTexture = 0;
@@ -69,6 +69,9 @@ private:
 
   Z3DRendererVulkanBackend& m_backend;
 
+  // Declared before the cache so every pipeline layout is destroyed before
+  // the descriptor set layout it references.
+  std::optional<vk::raii::DescriptorSetLayout> m_opaqueDepthPushDescriptorSetLayout;
   std::map<PipelineKey, PipelineInstance> m_pipelineCache;
 
   vk::PipelineVertexInputStateCreateInfo makeVertexInputState() const;

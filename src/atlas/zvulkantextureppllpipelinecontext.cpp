@@ -4,6 +4,7 @@
 #include "z3drenderervulkanbackend.h"
 #include "zlog.h"
 #include "zvulkanbuffer.h"
+#include "zvulkancontext.h"
 #include "zvulkandevice.h"
 #include "zvulkanpipeline.h"
 #include "zvulkanrenderconversions.h"
@@ -15,6 +16,13 @@
 #include <vector>
 
 namespace nim {
+
+namespace {
+
+constexpr uint32_t kOpaqueDepthPushDescriptorSet = 1u;
+constexpr uint32_t kOpaqueDepthPushDescriptorBinding = 0u;
+
+} // namespace
 
 ZVulkanTexturePPLLPipelineContext::ZVulkanTexturePPLLPipelineContext(Z3DRendererVulkanBackend& backend)
   : m_backend(backend)
@@ -38,17 +46,20 @@ void ZVulkanTexturePPLLPipelineContext::record(Z3DRendererBase& renderer,
 
   // Opaque depth (or a constant-1.0 placeholder) so the resolve shader can drop
   // any stored fragments that lie behind already-rendered opaque geometry.
-  ZVulkanTexture* opaqueDepthTex = nullptr;
-  if (payload.opaqueDepthAttachment.valid() && payload.opaqueDepthAttachment.backend == RenderBackend::Vulkan) {
-    opaqueDepthTex =
-      &vulkan::textureFromHandle(payload.opaqueDepthAttachment, m_backend.device(), "PPLL opaque depth attachment");
-  } else {
-    // No opaque pass: treat all fragments as visible.
-    opaqueDepthTex = &m_backend.defaultPlaceholderTexture2D();
+  ZVulkanTexture& opaqueDepthTexture =
+    payload.opaqueDepthAttachment.valid() && payload.opaqueDepthAttachment.backend == RenderBackend::Vulkan
+      ? vulkan::textureFromHandle(payload.opaqueDepthAttachment, m_backend.device(), "PPLL opaque depth attachment")
+      : m_backend.defaultPlaceholderTexture2D();
+  CHECK_EQ(&opaqueDepthTexture.ownerDevice(), &m_backend.device());
+  CHECK(opaqueDepthTexture.resident()) << "PPLL resolve opaque depth texture is not resident";
+  CHECK(static_cast<bool>(opaqueDepthTexture.info().usage & vk::ImageUsageFlagBits::eSampled))
+    << "PPLL resolve opaque depth texture is not sampleable";
+
+  const bool usePushDescriptors = m_backend.device().context().supportsPushDescriptors();
+  uint32_t opaqueDepthIdx = 0u;
+  if (!usePushDescriptors) {
+    opaqueDepthIdx = m_backend.bindlessLookupSampledImageAutoOrCrash(opaqueDepthTexture, "ppll_resolve opaque_depth");
   }
-  CHECK(opaqueDepthTex != nullptr) << "PPLL resolve missing opaque depth texture (unexpected)";
-  const uint32_t opaqueDepthIdx =
-    m_backend.bindlessLookupSampledImageAutoOrCrash(*opaqueDepthTex, "ppll_resolve opaque_depth");
 
   const auto formats = vulkan::extractAttachmentFormats(batch);
   CHECK_EQ(formats.colorFormats.size(), size_t{1}) << "PPLL resolve requires exactly one color attachment.";
@@ -64,9 +75,8 @@ void ZVulkanTexturePPLLPipelineContext::record(Z3DRendererBase& renderer,
   auto& quad = m_backend.fullscreenQuadVertexBuffer();
   cmd.bindVertexBuffers(0, {quad.buffer()}, {vk::DeviceSize(0)});
 
-  // Bind set 0 (bindless sampled images).
-  {
-    std::array<vk::DescriptorSet, 1> sets0{m_backend.bindlessSampledImageDescriptorSet()};
+  if (!usePushDescriptors) {
+    const std::array<vk::DescriptorSet, 1> sets0{m_backend.bindlessSampledImageDescriptorSet()};
     cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipeline.pipeline->pipelineLayout(), 0, sets0, {});
   }
 
@@ -79,11 +89,33 @@ void ZVulkanTexturePPLLPipelineContext::record(Z3DRendererBase& renderer,
   cmd.setViewport(0, viewport);
   cmd.setScissor(0, scissor);
 
-  PPLLResolvePushConstants constants;
-  constants.opaqueDepthTexture = opaqueDepthIdx;
-  const auto* bytes = reinterpret_cast<const std::uint8_t*>(&constants);
-  vk::ArrayProxy<const std::uint8_t> payloadBytes(sizeof(constants), bytes);
-  cmd.pushConstants(pipeline.pipeline->pipelineLayout(), vk::ShaderStageFlagBits::eFragment, 0, payloadBytes);
+  if (usePushDescriptors) {
+    vk::DescriptorImageInfo imageInfo = opaqueDepthTexture.descriptorInfo();
+    CHECK(imageInfo.imageView) << "PPLL resolve push descriptor has no image view";
+    CHECK(imageInfo.imageLayout == opaqueDepthTexture.layout())
+      << fmt::format("PPLL resolve push descriptor layout {} does not match tracked texture layout {}",
+                     enumOrUnderlying(imageInfo.imageLayout, 16),
+                     enumOrUnderlying(opaqueDepthTexture.layout(), 16));
+    imageInfo.sampler = vk::Sampler{};
+
+    vk::WriteDescriptorSet write{};
+    write.dstBinding = kOpaqueDepthPushDescriptorBinding;
+    write.dstArrayElement = 0u;
+    write.descriptorCount = 1u;
+    write.descriptorType = vk::DescriptorType::eSampledImage;
+    write.pImageInfo = &imageInfo;
+    const std::array<vk::WriteDescriptorSet, 1> writes{write};
+    cmd.pushDescriptorSetKHR(vk::PipelineBindPoint::eGraphics,
+                             pipeline.pipeline->pipelineLayout(),
+                             kOpaqueDepthPushDescriptorSet,
+                             writes);
+  } else {
+    PPLLResolvePushConstants constants;
+    constants.opaqueDepthTexture = opaqueDepthIdx;
+    const auto* bytes = reinterpret_cast<const std::uint8_t*>(&constants);
+    const vk::ArrayProxy<const std::uint8_t> payloadBytes(sizeof(constants), bytes);
+    cmd.pushConstants(pipeline.pipeline->pipelineLayout(), vk::ShaderStageFlagBits::eFragment, 0, payloadBytes);
+  }
 
   cmd.draw(4, 1, 0, 0);
 }
@@ -116,25 +148,45 @@ ZVulkanTexturePPLLPipelineContext::ensurePipeline(const PipelineKey& key, const 
   }
 
   auto& device = m_backend.device();
+  const bool usePushDescriptors = device.context().supportsPushDescriptors();
 
   PipelineInstance instance;
-  instance.shader =
-    std::make_unique<ZVulkanShader>(device,
-                                    ZVulkanShader::spirvResourcePath(QStringLiteral("pass.vert.spv")),
-                                    ZVulkanShader::spirvResourcePath(QStringLiteral("ppll_resolve.frag.spv")),
-                                    std::nullopt);
+  instance.shader = std::make_unique<ZVulkanShader>(
+    device,
+    ZVulkanShader::spirvResourcePath(QStringLiteral("pass.vert.spv")),
+    ZVulkanShader::spirvResourcePath(usePushDescriptors ? QStringLiteral("ppll_resolve_push.frag.spv")
+                                                        : QStringLiteral("ppll_resolve.frag.spv")),
+    std::nullopt);
 
   auto vertexInput = makeVertexInputState();
   instance.pipeline = device.createPipeline(*instance.shader, vertexInput, vk::PrimitiveTopology::eTriangleStrip);
 
-  const vk::DescriptorSetLayout bindlessLayout = m_backend.bindlessSampledImageDescriptorSetLayout();
-  CHECK(bindlessLayout) << "PPLL resolve missing bindless descriptor set layout";
   const vk::DescriptorSetLayout empty = m_backend.emptyDescriptorSetLayout();
   CHECK(empty) << "PPLL resolve missing empty descriptor set layout";
   const vk::DescriptorSetLayout oitLayout = m_backend.oitDescriptorSetLayout();
   CHECK(oitLayout) << "PPLL resolve missing OIT descriptor set layout";
-  std::vector<vk::DescriptorSetLayout> layouts{bindlessLayout, empty, empty, oitLayout};
-  instance.pipeline->setDescriptorSetLayouts(layouts);
+  if (usePushDescriptors) {
+    if (!m_opaqueDepthPushDescriptorSetLayout.has_value()) {
+      const vk::DescriptorSetLayoutBinding binding{.binding = kOpaqueDepthPushDescriptorBinding,
+                                                   .descriptorType = vk::DescriptorType::eSampledImage,
+                                                   .descriptorCount = 1u,
+                                                   .stageFlags = vk::ShaderStageFlagBits::eFragment};
+      const vk::DescriptorSetLayoutCreateInfo layoutInfo{
+        .flags = vk::DescriptorSetLayoutCreateFlagBits::ePushDescriptorKHR,
+        .bindingCount = 1u,
+        .pBindings = &binding,
+      };
+      m_opaqueDepthPushDescriptorSetLayout.emplace(device.context().device(), layoutInfo);
+    }
+    CHECK(m_opaqueDepthPushDescriptorSetLayout.has_value());
+    const std::vector<vk::DescriptorSetLayout> layouts{empty, **m_opaqueDepthPushDescriptorSetLayout, empty, oitLayout};
+    instance.pipeline->setDescriptorSetLayouts(layouts);
+  } else {
+    const vk::DescriptorSetLayout bindlessLayout = m_backend.bindlessSampledImageDescriptorSetLayout();
+    CHECK(bindlessLayout) << "PPLL resolve missing bindless descriptor set layout";
+    const std::vector<vk::DescriptorSetLayout> layouts{bindlessLayout, empty, empty, oitLayout};
+    instance.pipeline->setDescriptorSetLayouts(layouts);
+  }
   instance.pipeline->setAttachmentFormats(formats.colorFormats, formats.depthFormat);
   instance.pipeline->setCullMode(vk::CullModeFlagBits::eNone);
   instance.pipeline->setFrontFace(vk::FrontFace::eCounterClockwise);
@@ -164,10 +216,12 @@ ZVulkanTexturePPLLPipelineContext::ensurePipeline(const PipelineKey& key, const 
   blendAttachment.alphaBlendOp = vk::BlendOp::eAdd;
   instance.pipeline->setColorBlendAttachment(blendAttachment);
 
-  vk::PushConstantRange range{.stageFlags = vk::ShaderStageFlagBits::eFragment,
-                              .offset = 0,
-                              .size = static_cast<uint32_t>(sizeof(PPLLResolvePushConstants))};
-  instance.pipeline->setPushConstantRanges({range});
+  if (!usePushDescriptors) {
+    const vk::PushConstantRange range{.stageFlags = vk::ShaderStageFlagBits::eFragment,
+                                      .offset = 0,
+                                      .size = static_cast<uint32_t>(sizeof(PPLLResolvePushConstants))};
+    instance.pipeline->setPushConstantRanges({range});
+  }
   instance.pipeline->create();
 
   auto [inserted, _] = m_pipelineCache.insert({key, std::move(instance)});

@@ -220,6 +220,21 @@ TEST(ZVulkanDeviceSupportTest, PhysicalDevicePreferenceOrdersByPowerThenUuid)
   EXPECT_FALSE(Preference::isPreferredBefore(preferred, preferred));
 }
 
+TEST(ZVulkanDeviceSupportTest, PushDescriptorsRequireExtensionAndNonzeroCapacity)
+{
+  ZVulkanDeviceSupport support;
+  EXPECT_FALSE(support.supportsPushDescriptors());
+
+  support.pushDescriptorExtension = true;
+  EXPECT_FALSE(support.supportsPushDescriptors());
+
+  support.maxPushDescriptors = 1u;
+  EXPECT_TRUE(support.supportsPushDescriptors());
+
+  support.pushDescriptorExtension = false;
+  EXPECT_FALSE(support.supportsPushDescriptors());
+}
+
 TEST(ZVulkanDeviceSupportTest, UpdateAfterBindBudgetCountsSharedBindlessStateOncePerFrameSlot)
 {
   using Policy = ZVulkanDeviceSupport::DescriptorPoolPolicy;
@@ -611,7 +626,7 @@ TEST(ZVulkanDeviceSupportTest, VulkanIcdStartupSmoke)
     EXPECT_EQ(table.commandBufferCompatibilityGeneration(), generationBeforeStaleRetirement);
   }
 
-  uint32_t deferredCallbackCount = 0u;
+  uint32_t unsubmittedCompletionCallbackCount = 0u;
   {
     auto frame = device->frameExecutor().beginFrame();
     ASSERT_TRUE(frame.valid());
@@ -619,17 +634,19 @@ TEST(ZVulkanDeviceSupportTest, VulkanIcdStartupSmoke)
     device->beginBindlessFrameSlot(frame);
     EXPECT_TRUE(device->frameExecutor().isPreRecordSafePoint(frame));
     (void)frame.commandBuffer();
-    device->frameExecutor().scheduleAfterCompletion(frame, [&deferredCallbackCount]() {
-      ++deferredCallbackCount;
+    device->frameExecutor().scheduleAfterCompletion(frame, [&unsubmittedCompletionCallbackCount]() {
+      ++unsubmittedCompletionCallbackCount;
     });
     EXPECT_FALSE(device->frameExecutor().isPreRecordSafePoint(frame));
     EXPECT_FALSE(device->frameExecutor().allFrameSlotsDescriptorMutationSafe());
     EXPECT_FALSE(device->waitForAllFramesAndDrainBindlessRetirements());
-    EXPECT_EQ(deferredCallbackCount, 0u);
+    EXPECT_EQ(unsubmittedCompletionCallbackCount, 0u);
   }
   EXPECT_TRUE(device->frameExecutor().allFrameSlotsDescriptorMutationSafe());
   EXPECT_TRUE(device->waitForAllFramesAndDrainBindlessRetirements());
-  EXPECT_EQ(deferredCallbackCount, 1u);
+  // No queue owned this recording, so release discarded callbacks whose
+  // contract requires a completed submission fence.
+  EXPECT_EQ(unsubmittedCompletionCallbackCount, 0u);
 
   const uint64_t expectedReservation = context.supportsDescriptorIndexingSampledImageUpdateAfterBind()
                                          ? context.selectedDeviceSupport().requiredUpdateAfterBindDescriptors

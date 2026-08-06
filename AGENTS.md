@@ -100,7 +100,7 @@ Scope: Required instructions for anyone (human or automated agent) changing this
 - Prefer Vulkan-Hpp and RAII types throughout (`vk::`, `vk::raii::`) instead of C API. Use strong enums/flags (`vk::Result`, `vk::ImageLayout`, etc.).
 - Avoid `VK_TRUE`/`VK_FALSE`; use `bool` fields on Hpp structs. Avoid `VK_NULL_HANDLE`; prefer default-constructed Hpp handles (e.g., `vk::Buffer{}`).
 - Result checks: compare against `vk::Result` (cast when interoping with VMA or C APIs) rather than `VK_SUCCESS`.
-- Descriptor writes during recording are forbidden. Prime descriptor sets and write bindings before command buffer recording begins; during recording, only update buffer contents (host-visible) and bind pre-written sets.
+- Pool-backed descriptor-set writes during recording are forbidden. Prime ordinary descriptor sets and write their bindings before command-buffer recording begins; during recording, only update host-visible buffer contents and bind pre-written sets. `vkCmdPushDescriptorSetKHR` is permitted only for explicitly documented push-descriptor layouts because it records command-buffer-local descriptor state rather than mutating a pool-backed set.
 - Samplers/descriptors: prefer immutable samplers when feasible to avoid platform-specific sampler class issues.
 - Exceptions where C API/macros are acceptable:
   - VMA (vk_mem_alloc): uses C functions and raw handles; pass Hpp data via `reinterpret_cast` where necessary.

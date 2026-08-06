@@ -440,6 +440,7 @@ set(ATLAS_VK_SHADER_SOURCES
     ppll_count_image.frag
     ppll_store_image.frag
     ppll_resolve.frag
+    ppll_resolve_push.frag
     ppll_scan_local.comp
     ppll_scan_add.comp
 
@@ -593,6 +594,7 @@ set(SOURCES
     z3drenderingengine.h z3drenderingengine.cpp
     z3dtiledescriptor.h z3dtiledescriptor.cpp
     z3drenderedtile.h
+    z3drenderedframe.h z3drenderedframe.cpp
     zvulkanmultidevicetilecoordinator.h zvulkanmultidevicetilecoordinator.cpp
     zqtexecutor.h zqtexecutor.cpp
     zrenderthreadexecutor_tls.h zrenderthreadexecutor_tls.cpp

@@ -253,11 +253,18 @@ struct ZVulkanDeviceSupport
   std::string updateAfterBindFallbackReason;
   bool memoryBudget = false;
   bool calibratedTimestamps = false;
+  bool pushDescriptorExtension = false;
+  uint32_t maxPushDescriptors = 0u;
   bool maintenance7 = false;
   bool nestedCommandBuffer = false;
   bool portabilityTriangleFans = false;
   uint32_t maxComputeWorkGroupCountX = 0u;
   std::vector<Rejection> rejections;
+
+  [[nodiscard]] bool supportsPushDescriptors() const
+  {
+    return pushDescriptorExtension && maxPushDescriptors >= 1u;
+  }
 
   [[nodiscard]] bool compatible() const
   {

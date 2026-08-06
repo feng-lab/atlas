@@ -132,6 +132,11 @@ public:
     return selectedDeviceSupport().memoryBudget;
   }
 
+  [[nodiscard]] bool supportsPushDescriptors() const
+  {
+    return selectedDeviceSupport().supportsPushDescriptors();
+  }
+
   [[nodiscard]] const ZVulkanDeviceSupport& selectedDeviceSupport() const
   {
     return deviceSupport(m_selectedDeviceIndex);

@@ -7,8 +7,9 @@
 #include "zdoc.h"
 #include "zjson.h"
 #include "zlog.h"
-#include "zview.h"
 #include "zstringutils.h"
+#include "zview.h"
+#include "zvulkanmultidevicetilecoordinator.h"
 
 #include "zcommandlineflags.h"
 
@@ -21,12 +22,18 @@
 #include <QFileInfo>
 #include <QThread>
 
+#include <algorithm>
 #include <limits>
 #include <string>
 #include <utility>
 #include <vector>
 
 ABSL_FLAG(bool, run_export_3d_scene, false, "Enable exporting a 3D scene screenshot via command line");
+ABSL_FLAG(std::vector<std::string>,
+          atlas_vk_multi_device_tile_worker_indices,
+          std::vector<std::string>{},
+          "Preference-sorted Vulkan device indices used as in-process workers for tiled scene export. "
+          "Specify at least two distinct compatible indices; empty keeps the direct rendering path.");
 
 ABSL_DECLARE_FLAG(std::string, filename);
 ABSL_DECLARE_FLAG(std::string, output_filename);
@@ -118,12 +125,67 @@ bool configureSingleGpuFromFlags(QString& error)
 
 std::pair<int, int> resolveSceneTileSettings()
 {
-  const auto tileSizeInfo = getCommandLineFlagInfoOrDie("output_tile_size");
-  const auto tileBorderInfo = getCommandLineFlagInfoOrDie("output_tile_border");
-  if (tileSizeInfo.isDefault && tileBorderInfo.isDefault) {
+  if (!wasCommandLineFlagSpecified("output_tile_size") && !wasCommandLineFlagSpecified("output_tile_border")) {
     return {0, 0};
   }
   return {absl::GetFlag(FLAGS_output_tile_size), absl::GetFlag(FLAGS_output_tile_border)};
+}
+
+bool resolveVulkanTileWorkerSelections(Z3DRenderingEngine& engine,
+                                       std::vector<ZVulkanDeviceSupport::DeviceSelection>& resolvedSelections,
+                                       QString& error)
+{
+  const std::vector<std::string> requestedIndices = absl::GetFlag(FLAGS_atlas_vk_multi_device_tile_worker_indices);
+  if (requestedIndices.empty()) {
+    return true;
+  }
+  if (requestedIndices.size() < 2u) {
+    error = "--atlas_vk_multi_device_tile_worker_indices requires at least two device indices";
+    return false;
+  }
+  if (static_cast<RenderBackend>(engine.globalParas().renderBackend.associatedData()) != RenderBackend::Vulkan) {
+    error = "--atlas_vk_multi_device_tile_worker_indices requires the active Vulkan rendering backend";
+    return false;
+  }
+
+  const auto compatibleSelections = engine.compatibleVulkanTileWorkerSelections();
+  resolvedSelections.reserve(requestedIndices.size());
+  for (const std::string& requestedIndex : requestedIndices) {
+    size_t preferenceIndex = 0u;
+    if (!stringToValueNoThrow(requestedIndex, preferenceIndex)) {
+      error = QString("invalid Vulkan tile-worker device index %1").arg(QString::fromStdString(requestedIndex));
+      return false;
+    }
+
+    const auto selectionIt =
+      std::find_if(compatibleSelections.begin(), compatibleSelections.end(), [preferenceIndex](const auto& selection) {
+        return selection.preferenceIndex == preferenceIndex;
+      });
+    if (selectionIt == compatibleSelections.end()) {
+      error =
+        QString("Vulkan device index %1 is unavailable or incompatible with Atlas tile rendering").arg(preferenceIndex);
+      return false;
+    }
+    const bool duplicateIndex =
+      std::any_of(resolvedSelections.begin(), resolvedSelections.end(), [&](const auto& known) {
+        return known.preferenceIndex == selectionIt->preferenceIndex;
+      });
+    if (duplicateIndex) {
+      error = QString("Vulkan tile-worker device index %1 was specified more than once").arg(preferenceIndex);
+      return false;
+    }
+    const bool duplicateUuid =
+      std::any_of(resolvedSelections.begin(), resolvedSelections.end(), [&](const auto& known) {
+        return known.expectedDeviceUuid == selectionIt->expectedDeviceUuid;
+      });
+    if (duplicateUuid) {
+      error = QString("Vulkan tile-worker device index %1 resolves to an already selected physical device")
+                .arg(preferenceIndex);
+      return false;
+    }
+    resolvedSelections.push_back(*selectionIt);
+  }
+  return true;
 }
 
 bool loadSceneForExport(const QString& filename, ZDoc& doc, ZView& view, Z3DRenderingEngine& engine, QString& error)
@@ -337,12 +399,34 @@ int ZRunExport3DScene::run()
   }
 
   const auto [tileSize, tileBorder] = resolveSceneTileSettings();
-  engine.takeFixedSizeScreenShot(outputFilename,
-                                 absl::GetFlag(FLAGS_output_width),
-                                 absl::GetFlag(FLAGS_output_height),
-                                 Z3DScreenShotType::MonoView,
-                                 tileSize,
-                                 tileBorder);
+  std::vector<ZVulkanDeviceSupport::DeviceSelection> workerSelections;
+  if (!resolveVulkanTileWorkerSelections(engine, workerSelections, errorMsg)) {
+    LOG(ERROR) << errorMsg;
+    return 1;
+  }
+  if (workerSelections.empty()) {
+    engine.takeFixedSizeScreenShot(outputFilename,
+                                   absl::GetFlag(FLAGS_output_width),
+                                   absl::GetFlag(FLAGS_output_height),
+                                   Z3DScreenShotType::MonoView,
+                                   tileSize,
+                                   tileBorder);
+  } else {
+    try {
+      ZVulkanMultiDeviceTileCoordinator coordinator(engine, workerSelections);
+      engine.takeFixedSizeScreenShotWithVulkanTileCoordinator(outputFilename,
+                                                              absl::GetFlag(FLAGS_output_width),
+                                                              absl::GetFlag(FLAGS_output_height),
+                                                              coordinator,
+                                                              Z3DScreenShotType::MonoView,
+                                                              tileSize,
+                                                              tileBorder);
+    }
+    catch (const std::exception& e) {
+      LOG(ERROR) << "multi-device Vulkan scene export failed: " << e.what();
+      return 1;
+    }
+  }
 
   if (!m_hasError && !QFile::exists(outputFilename)) {
     LOG(ERROR) << "scene export did not produce an output image";

@@ -1,5 +1,6 @@
 #include "z3dtiledescriptor.h"
 #include "z3dcamera.h"
+#include "z3drenderedframe.h"
 
 #include <gtest/gtest.h>
 
@@ -154,6 +155,54 @@ TEST(Z3DTileDescriptorTest, TopLeftAssemblyOriginConvertsBottomLeftOutputCoordin
 
   EXPECT_EQ(tileIt->validOutputOrigin(), glm::uvec2(3, 2));
   EXPECT_EQ(tileIt->topLeftAssemblyOrigin(), glm::uvec2(3, 1));
+}
+
+TEST(Z3DTileDescriptorTest, RenderedFrameAssemblyPlacesMonoAndStereoTilesInTopLeftCoordinates)
+{
+  const auto descriptors = makeZ3DTileDescriptors(glm::uvec2(5, 3), glm::uvec2(2, 2), 1);
+  Z3DRenderedFrame monoFrame(glm::uvec2(5, 3), false);
+  Z3DRenderedFrame frame(glm::uvec2(5, 3), true);
+  std::vector<Z3DRenderedTile> renderedTiles;
+  renderedTiles.reserve(descriptors.size());
+  for (const Z3DTileDescriptor& descriptor : descriptors) {
+    const uint8_t primaryValue =
+      static_cast<uint8_t>(1u + descriptor.validOutputOrigin().x + descriptor.validOutputOrigin().y * 10u);
+    const uint8_t rightValue = static_cast<uint8_t>(primaryValue + 100u);
+    Z3DRenderedTile renderedTile;
+    renderedTile.primaryColor =
+      ZImg(ZImgInfo(descriptor.validOutputExtent().x, descriptor.validOutputExtent().y, 1, 4));
+    std::fill_n(renderedTile.primaryColor.timeData(0u), renderedTile.primaryColor.timeByteNumber(), primaryValue);
+    renderedTile.rightColor = ZImg(ZImgInfo(descriptor.validOutputExtent().x, descriptor.validOutputExtent().y, 1, 4));
+    std::fill_n(renderedTile.rightColor->timeData(0u), renderedTile.rightColor->timeByteNumber(), rightValue);
+
+    Z3DRenderedTile monoTile;
+    monoTile.primaryColor = renderedTile.primaryColor;
+    monoFrame.pasteTile(descriptor, monoTile);
+    frame.pasteTile(descriptor, renderedTile);
+    renderedTiles.push_back(std::move(renderedTile));
+  }
+
+  EXPECT_FALSE(monoFrame.rightColor.has_value());
+  ASSERT_TRUE(frame.rightColor.has_value());
+  EXPECT_EQ(monoFrame.primaryColor.info().lastChannelIsAlphaChannel, true);
+  EXPECT_EQ(frame.primaryColor.info().lastChannelIsAlphaChannel, true);
+  EXPECT_EQ(frame.rightColor->info().lastChannelIsAlphaChannel, true);
+  for (size_t tileIndex = 0u; tileIndex < descriptors.size(); ++tileIndex) {
+    const Z3DTileDescriptor& descriptor = descriptors[tileIndex];
+    const glm::uvec2 assemblyOrigin = descriptor.topLeftAssemblyOrigin();
+    const uint8_t expectedPrimary = *renderedTiles[tileIndex].primaryColor.data(0u, 0u);
+    const uint8_t expectedRight = *renderedTiles[tileIndex].rightColor->data(0u, 0u);
+    for (uint32_t y = 0u; y < descriptor.validOutputExtent().y; ++y) {
+      for (uint32_t x = 0u; x < descriptor.validOutputExtent().x; ++x) {
+        for (size_t channel = 0u; channel < 4u; ++channel) {
+          EXPECT_EQ(*frame.primaryColor.data(assemblyOrigin.x + x, assemblyOrigin.y + y, 0u, channel), expectedPrimary);
+          EXPECT_EQ(*monoFrame.primaryColor.data(assemblyOrigin.x + x, assemblyOrigin.y + y, 0u, channel),
+                    expectedPrimary);
+          EXPECT_EQ(*frame.rightColor->data(assemblyOrigin.x + x, assemblyOrigin.y + y, 0u, channel), expectedRight);
+        }
+      }
+    }
+  }
 }
 
 TEST(Z3DTileDescriptorTest, InvalidExtentsAndAttachmentOverflowFailFast)

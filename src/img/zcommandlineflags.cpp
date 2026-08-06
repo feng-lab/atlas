@@ -3,6 +3,7 @@
 #include "zlog.h"
 
 #include <absl/flags/commandlineflag.h>
+#include <absl/flags/internal/parse.h>
 #include <algorithm>
 #include <iterator>
 #include <optional>
@@ -133,6 +134,12 @@ bool commandLineFlagExists(std::string_view name)
 {
   absl::CommandLineFlag* flag = absl::FindCommandLineFlag(name);
   return flag != nullptr && !flag->IsRetired();
+}
+
+bool wasCommandLineFlagSpecified(std::string_view name)
+{
+  CHECK(commandLineFlagExists(name)) << "Unknown command line flag: " << name;
+  return absl::flags_internal::WasPresentOnCommandLine(name);
 }
 
 bool getCommandLineOption(std::string_view name, std::string* value)

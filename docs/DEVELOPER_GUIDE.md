@@ -80,8 +80,13 @@ Entry Points
     - `--run_export_3d_animation` exports a frame sequence / video from a `.animation3d`.
     - `--run_export_3d_scene` exports a single image from a `.scene` after applying `View3DGeneral` plus per-object
       `View3D` state and waiting for deferred object-view readiness to settle.
+    - `--atlas_vk_multi_device_tile_worker_indices=0,1,...` opts a Vulkan scene export into in-process spatial-tile
+      workers. The strict list of preference-sorted device indices is the complete worker set and requires at least two
+      distinct compatible physical devices. An empty list retains direct scene capture. This route applies only to tiled still capture;
+      headless animation export keeps its separate multi-process path.
     - Both runners treat the first export/rendering error as fatal in CLI mode: they log the error, cancel any active
       capture work, and return a non-zero exit code so automation does not report a false success.
+      Invalid multi-device worker selection and coordinated-capture failures are also fatal.
     - Both modes share the core output-path and size flags (`--filename`, `--output_filename`, `--output_width`,
       `--output_height`, `--overwrite`, `--limit_memory_usage_in_gb_to`) so benchmark scripts can swap between them
       without reshaping the command line.
@@ -315,7 +320,12 @@ Neuroglancer Precomputed (HTTP)
     - Runtime LOD selection uses the stable engine output size (propagated to filters via `updateSize()`) as its screen-space input. It must not depend on the filter's transient per-pass viewport, because compositor passes temporarily override that state (and the Vulkan path restores it after recording), which can otherwise stall async refinement until another camera move re-dirties the filter.
     - The runtime LOD scheduler keeps the current desired row frontier separate from async dispatch. Selection updates the stored frontier, and row completion only frees capacity plus re-pumps that frontier; cancellation never chooses retry rows on its own. This prevents backend switches or rapid view changes from leaving desired rows stranded in a "not loaded, not in flight" gap once cancelled work drains.
     - Interaction is intentionally biased toward responsiveness: while the camera is moving, Atlas uses a looser detail cutoff; after a short idle debounce it requests finer visible chunks. Non-multiscale mesh sources stay on the static import path.
-    - 3D screenshots/export reuse the same runtime LOD source, but before capture Atlas now synchronously preloads the fine visible rows for the full export view with a bounded async row window and then freezes that mesh working set for the duration of the capture (including tiled exports). Export still walks mesh filters one by one, but each filter now uses a wider `threads * 8` preload window instead of the old one-row-at-a-time blocking loop. This keeps exported mesh detail stable instead of capturing whichever async rows happened to be loaded at that moment, while avoiding unbounded per-filter fan-out.
+    - 3D screenshots and exports use the runtime LOD source. Before capture, each rendering engine participating in the
+      output synchronously preloads fine visible rows for the full export view with a bounded asynchronous row window and
+      freezes that working set for the capture. Direct captures prepare the canonical engine; coordinated Vulkan scene
+      captures prepare every worker before its first tile and retain the prepared LOD until the frame is complete. Mesh
+      filters are processed sequentially, and each filter uses a `threads * 8` preload window. The frozen working set keeps
+      tiled output independent of incidental interactive refinement state while bounding per-filter fan-out.
     - Saving/exporting an external-source Neuroglancer mesh materializes the finest mesh into the document before writing, clears the external-source JSON, and emits `meshChanged` so 3D views drop runtime LOD and treat the mesh as an ordinary local object.
   - Precomputed skeletons (`skeletons/`) are supported via `ZNeuroglancerPrecomputedSkeletonSource` (`src/atlas/zneuroglancerprecomputedskeleton.*`) and are imported into `ZSkeletonDoc` for SWC-like rendering.
   - Precomputed annotations collections are supported via `ZNeuroglancerPrecomputedAnnotationsSource` (`src/atlas/zneuroglancerprecomputedannotations.*`):
@@ -351,11 +361,14 @@ Testing (Linking Atlas Code)
   or CPU software ICD. The tests verify context, logical-device, VMA startup, and device-owned bindless slot/retirement
   lifetimes. This is an explicit local correctness check; normal platform CI remains limited to its existing build and
   packaging workflow. Do not put performance assertions in this smoke test.
-- `zvulkanmultidevicetilecoordinatortest` enables its synthetic PPLL rendering case only when
-  `ATLAS_ENABLE_VULKAN_SMOKE_TEST=1`. The gate is checked before constructing `QApplication`, a rendering engine, or a
-  `ZVulkanContext`. With the variable unset, descriptor, selection, retirement, and publication tests construct no Vulkan
-  context or logical device and require no usable ICD or GPU at runtime. This runtime gate does not remove Atlas's Vulkan
-  SDK and shader-compiler build prerequisites.
+- `zvulkanmultidevicetilecoordinatortest` enables its synthetic PPLL rendering cases only when
+  `ATLAS_ENABLE_VULKAN_SMOKE_TEST=1`. It covers the same-adapter one-worker batch and the distinct-device dynamically
+  refilled batch; the latter skips unless at least two distinct physical-device UUIDs are available in the canonical
+  engine's planning-compatible worker set. The gate is checked before constructing `QApplication`, a rendering engine, or a
+  `ZVulkanContext`. With the variable unset, descriptor,
+  rendered-frame allocation/assembly, selection, retirement, and publication tests construct no Vulkan context or logical
+  device and require no usable ICD or GPU at runtime. This runtime gate does not remove Atlas's Vulkan SDK and
+  shader-compiler build prerequisites.
 - Neuroglancer precomputed E2E tests:
   - `test/zneuroglancerprecomputede2etest.cpp` is a networked smoke test (public GCS URLs) gated by `ATLAS_ENABLE_NETWORK_TESTS=1`.
   - The same test file exercises both HTTP backends. Atlas test binaries use the test main rather than the app main, so backend selection is set inside the test with Abseil flags instead of relying on application flagfile setup.
@@ -410,10 +423,15 @@ Architecture Overview
 - Rendering engine (`Z3DRenderingEngine`) — owns one complete GL or Vulkan rendering pipeline, including its context or
   device, scratch pool, global parameters, compositor, network evaluator, and per-object 3D views. Each active Vulkan
   pipeline uses one logical device; a Vulkan tile worker has immutable backend and exact-device-selection affinity.
-- `ZVulkanMultiDeviceTileCoordinator` is an explicit synchronous tile API above complete single-device engines. It creates
-  one worker on the canonical engine's selected adapter, reapplies canonical rendering state before each tile, and
-  destroys the worker if synchronization or rendering throws. Atlas application entry points do not construct the
-  coordinator, so interactive rendering and export continue through their direct engine paths. See
+- `ZVulkanMultiDeviceTileCoordinator` is a synchronous batch API above complete single-device engines. Its explicit
+  constructor creates one independent worker per distinct compatible index-and-UUID selection. A batch snapshots canonical
+  state once, submits at most one spatial tile per worker, and refills workers as their final readbacks complete; independent
+  device queues may overlap while all engine control remains on the canonical rendering thread. Any synchronization,
+  rendering, collection, or cancellation failure discards the complete worker set and partial results. The one-argument
+  constructor provides the same batch path with one worker on the canonical adapter. The headless scene-export runner
+  constructs an operation-scoped coordinator when `--atlas_vk_multi_device_tile_worker_indices` is non-empty. Multi-tile
+  fixed-size capture streams worker results into one CPU frame; interactive rendering, GUI capture, headless animation
+  export, OpenGL, and the default empty-flag scene path remain direct. See
   [VULKAN_MULTI_GPU_DESIGN.md](VULKAN_MULTI_GPU_DESIGN.md).
 - Parameter system (`ZParameter` + subclasses) — typed, QObject-based, with signals/slots and JSON (de)serialization.
   - Each parameter can now describe its own value JSON Schema via `ZParameter::valueSchema()`.
@@ -462,10 +480,12 @@ Lookup Tables (LUTs)
   - Tiled export also calls the Vulkan scratch reclaim path at tile boundaries. This waits for in-flight tile work to reach completion safe points so released scratch slots can be reused across tiles; active/current-tile resources remain protected.
   - Shared fullscreen quad: use `Z3DRendererVulkanBackend::fullscreenQuadVertexBuffer()` in full-screen passes (background, copy, blend, glow) instead of creating per-context VBOs.
   - Vulkan descriptor guardrails:
-    - No `vkUpdateDescriptorSets` during command-buffer recording. All descriptor writes must happen in the `beginRender()` pre-record phase (after the frame-slot completion safe point, before `vk::CommandBuffer::begin()`).
-    - Sampled-image inputs are bindless (set=0). Register textures into the device-owned table for the current executor slot
+    - No `vkUpdateDescriptorSets` during command-buffer recording. All pool-backed descriptor writes happen in the `beginRender()` pre-record phase (after the frame-slot completion safe point, before `vk::CommandBuffer::begin()`).
+    - `vkCmdPushDescriptorSetKHR` is permitted only for an explicitly documented push-descriptor layout. It records command-buffer-local descriptor state and does not mutate a pool-backed descriptor set.
+    - Sampled-image inputs are normally bindless (set=0). Register textures into the device-owned table for the current executor slot
       during the pre-record phase and pass indices via push constants / UBOs; do not bind per-pass sampled-image descriptor
-      sets. Table indices and generations are slot-local even though all backends share the slot table.
+      sets. The capability-selected PPLL opaque-depth binding described under Transparency Methods is the current
+      push-descriptor exception. Table indices and generations are slot-local even though all backends share the slot table.
     - Per-draw variation must use dynamic UBO offsets and push constants; do not allocate/update per-draw descriptor sets.
     - Bindless sampled-image tables use `VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE` (not combined image samplers). Sampler state is provided via immutable samplers in the set 0 layout (see `Resources/shader/vulkan/include/bindless.glslinc`): linear clamp for 2D/2D-array sampling, linear border-zero for 3D image volumes/caches, and nearest clamp for integer fetches.
     - Never free descriptor sets individually. Rely on per-frame pool reset for transient descriptor arenas; backend
@@ -503,8 +523,9 @@ Threading Model
     - `Z3DRenderingEngine::renderThreadExecutor()` provides a `ZQtExecutor` (a `folly::Executor`) that schedules onto the engine thread via Qt event posting.
     - Pipeline contexts and Vulkan backend code should use `currentRenderThreadExecutorKeepAlive(...)` at call sites that need a keep-alive token for `co_withExecutor(...)`.
     - Teardown: `Z3DRenderingEngine::drainVulkanFrameExecutorForTeardown()` must run on the engine thread before quitting it so fence-gated continuations can complete deterministically.
-    - `ZVulkanMultiDeviceTileCoordinator` and its worker run on the canonical rendering thread. The worker borrows the
-      canonical engine's render-thread executor; the coordinator creates no worker CPU threads.
+    - `ZVulkanMultiDeviceTileCoordinator` and all of its workers run on the canonical rendering thread. Workers borrow the
+      canonical engine's render-thread executor; the coordinator creates no worker CPU threads and does not pump Qt events
+      while a synchronous batch is active.
   - UI-thread coroutine continuations should use a UI-owned executor:
     - `ZDoc::uiThreadExecutor()` / `uiThreadExecutorKeepAlive(...)` provide a `ZQtExecutor` pinned to the document’s UI-thread affinity for one-shot view/doc continuations.
     - Awaiting `co_withExecutor(doc.uiThreadExecutorKeepAlive(...), ...)` from a tracked background task is only safe when shutdown will not cancel-and-join that task from the UI thread. If the UI thread drains the task scope during close, a task that must resume on the UI thread before it can finish can deadlock shutdown.
@@ -640,8 +661,14 @@ Compositor and Rendering
   this concrete pool by reference; it must not rediscover a mutable process-global pool while rendering.
 - A headless Vulkan tile worker is an ordinary complete engine with its own compositor, scratch pool, object views,
   filters, progressive state, engine/filter-local caches, and native Vulkan resources. Canonical and worker engines refer
-  to the same document-owned objects and packs and borrow the same render-thread `ZQtExecutor`; each logical device owns a
-  separate `ZVulkanFrameExecutor`. They do not share live filter QObjects or native Vulkan resources.
+  to the same document-owned objects and packs and borrow the same render-thread `ZQtExecutor`; every worker logical device
+  owns a separate `ZVulkanFrameExecutor`. Engines do not share live filter QObjects or native Vulkan resources. Mesh-export
+  preparation is scoped to a complete coordinated frame. Worker results are owned CPU images; the assembled frame is
+  save-oriented and is not published into canonical compositor ready buffers. `Z3DGpuInfo` remains the process-global
+  capability record published by the canonical engine, so volume planning that reads it applies the canonical resource plan
+  to every worker. Compatible worker selection rejects devices whose planning-relevant texture, array-layer, or GPU-memory
+  limits are below that record. Selecting the least-capable adapter as canonical is the conservative configuration for a
+  heterogeneous set.
 
 Global Cut Mode (Binding)
 
@@ -676,9 +703,10 @@ Vulkan Notes
 - A non-empty scratch lease records its creating pool. Converting a lease to a Vulkan surface checks pool ownership, and
   native texture/buffer realization checks the creating device. Keep these checks at acquisition/realization or cache-change
   boundaries. Per-draw hot paths contain no device routing or ownership lookup.
-- `ReadbackCompletionPolicy` is independent of progressive/final render quality. The direct path keeps
+- `ReadbackCompletionPolicy` is independent of progressive/final render quality. The direct path uses
   `FollowRenderQuality`, which preserves asynchronous progressive readback and completion-waiting final readback. A worker
-  tile sets `WaitForCompletion` so its final, owned pixels are available before `renderTile()` returns.
+  tile uses `ReturnAfterSubmit`; `isVulkanTileReady()` pumps completion safe points and `collectVulkanTile()` copies owned
+  pixels after the exact render-frame token is published. The coordinator batch polls that submit/collect seam.
 - Geometry cut planes: Vulkan geometry draw shaders export active local/global clip distances through both `gl_ClipDistance` (up to the fixed-function budget) and an ordinary fragment-stage varying; fragment shaders must apply the clip helper so drivers cannot silently ignore the fixed-function path.
 - Attachment end-of-pass usage must be explicit for Vulkan:
   - `AttachmentDesc::finalUse` is the backend-neutral signal describing how a produced attachment will be used after the pass (`RenderTarget`, `Sampled`, `TransferSrc`, `General`). `Unspecified` is a hard `CHECK` in Vulkan to avoid implicit layout assumptions.
@@ -700,7 +728,7 @@ Vulkan Notes
   - Atlas supports both descriptor validity classes explicitly. When sampled-image update-after-bind is enabled, only the
     device-owned bindless set, layout, and dedicated pool use it, so their large arrays are accounted against descriptor-
     indexing limits. On the legacy path, any set-0 write advances a set-wide command-buffer compatibility generation.
-    Backend transient and persistent pools remain ordinary pools. Both paths still treat descriptor writes during recording
+    Backend transient and persistent pools remain ordinary pools. Both paths still treat pool-backed descriptor writes during recording
     as invariant violations (hard `CHECK` in `ZVulkanDescriptorSet` and `ZVulkanBindlessDescriptorSet`).
 - Vulkan residency broker (`ZVulkanResidencyManager`):
   - `ZVulkanDevice` owns one device-level broker that coordinates Vulkan memory pressure across allocation classes instead of leaving each pipeline context to make local decisions. Large allocation wrappers ask the broker before over-budget allocations and retry once after broker reclaim if VMA still fails.
@@ -728,7 +756,7 @@ Vulkan Pipeline Invariants
 - `ZVulkanPipelineCommandRecorder` remains the single draw/dispatch encoder.
 - Composite/resolve passes (DDP final, WA resolve, WB resolve) must write to exactly one color attachment; depth is disabled in the pipeline and no depth attachment is bound.
 - Texture-copy passes that do not propagate depth (for example the final RGBA8 readback copy) must use the no-depth copy variant: no destination depth attachment, no source depth descriptor lookup, `VK_FORMAT_UNDEFINED` depth pipeline format, depth test/write disabled, and a fragment shader with no `FragDepth` output.
-- Descriptor writes during command-buffer recording are forbidden. All descriptor sets must be primed before recording begins; per-draw variation uses dynamic offsets and bindless indices.
+- Pool-backed descriptor-set writes during command-buffer recording are forbidden. Ordinary descriptor sets must be primed before recording begins; per-draw variation normally uses dynamic offsets and bindless indices. Explicitly documented push-descriptor layouts record command-buffer-local state instead.
 - Dynamic UBO arena (Vulkan): all per‑draw UBOs are suballocated from a per‑frame, host‑visible "uniform arena" buffer. Capacity is fixed for the frame; exceeding it is a hard CHECK. The backend provisions a baseline capacity (default 256 KiB) and will pre‑size above it when needed (based on a cheap pre‑record estimate). Growth within a frame is not supported (would invalidate already‑bound descriptors).
 - Dynamic upload arena (Vulkan): transient vertex/index staging uses a per-frame paged linear allocator over one or more persistently mapped host-visible upload buffers. Atlas rewinds page cursors only after the frame-completion safe point, so mapped pointers handed to a submission remain valid for that submission without retiring/replacing buffers mid-frame.
   - Upload pages are reused across later submissions on the same frame slot via a compact active prefix, and unused tail pages are trimmed at the next safe slot reuse so one pathological peak frame does not keep gigabytes of mapped staging buffers alive forever.
@@ -819,8 +847,9 @@ Vulkan export benchmark harness
 
 Descriptor & Recording Guardrails (Vulkan)
 
-- No descriptor writes while a frame is recording. Atlas treats any `vkUpdateDescriptorSets` during recording as an invariant violation (hard `CHECK`).
-- Sampled-image inputs are bindless:
+- No pool-backed descriptor-set writes while a frame is recording. Atlas treats any `vkUpdateDescriptorSets` during recording as an invariant violation (hard `CHECK`).
+- `vkCmdPushDescriptorSetKHR` may be recorded only for an explicitly documented push-descriptor layout; it records command-buffer-local state and does not mutate a pool-backed descriptor set.
+- Sampled-image inputs are normally bindless:
   - Shaders read from set=0 tables (`Resources/shader/vulkan/include/bindless.glslinc`) using indices passed via push constants / UBOs and `nonuniformEXT(...)`.
   - `ZVulkanDevice` owns one table for each frame-executor slot. The slot table is shared by all renderer-backend
     instances attached to that device, while its assigned indices and compatibility state remain local to that slot.
@@ -1122,7 +1151,8 @@ Vulkan Descriptor Set/Binding Map
     - binding 5: PPLL fragments SSBO
 
 - Passing sampled inputs:
-  - Shaders receive bindless indices via push constants or small UBOs; sampling uses `nonuniformEXT(index)`.
+  - Shaders normally receive bindless indices via push constants or small UBOs; sampling uses `nonuniformEXT(index)`.
+    PPLL resolve instead uses its documented direct opaque-depth push binding when the logical device supports it.
   - Registration and index assignment happens in the beginRender pre-record phase (typically via `ZVulkanLinearScript`).
   - `ZVulkanDevice` owns one bindless descriptor set per frame-executor slot (keyed by `activeFrameKey()`) and allocates all
     of them from its dedicated bindless pool. All renderer backends on the device share the current slot's set. The set
@@ -1132,7 +1162,7 @@ Vulkan Descriptor Set/Binding Map
     registration epoch, and recording-time lookup accepts only entries touched for that submission. Legacy tables expose a
     set-wide mutation generation for command-buffer compatibility. Update-after-bind tables expose a constant compatibility
     token because current descriptor contents do not invalidate executable command buffers.
-- Required device features (Vulkan 1.3; enabled in `ZVulkanContext`): `descriptorIndexing`, `runtimeDescriptorArray`, `shaderSampledImageArrayNonUniformIndexing`, `descriptorBindingPartiallyBound`. (`descriptorBindingVariableDescriptorCount` is optional; Atlas sizes bindless tables explicitly.)
+- Required device features (Vulkan 1.3; enabled in `ZVulkanContext`): `descriptorIndexing`, `runtimeDescriptorArray`, `shaderSampledImageArrayNonUniformIndexing`, `descriptorBindingPartiallyBound`. (`descriptorBindingVariableDescriptorCount` is optional; Atlas sizes bindless tables explicitly.) `VK_KHR_push_descriptor` is also optional and does not affect device compatibility.
 - Compute helpers may bind additional sets for non-sampled resources (e.g., Block-ID compaction uses a per-pass set for its output SSBO). Set 0 remains reserved for bindless sampled images.
 
 Bindless capacity flags (requested; clamped to device limits):
@@ -1165,8 +1195,8 @@ Policy:
 
 Guidelines
 - Allocate frame‑scoped descriptor sets from the backend arena; avoid per‑context pools.
-- Do not write descriptors during recording; update UBO contents only.
-- Use bindless indices (push constants/UBOs) for volatile sampled-image inputs; register them in the pre-record phase.
+- Do not write pool-backed descriptor sets during recording; update UBO contents only.
+- Use bindless indices (push constants/UBOs) for volatile sampled-image inputs unless an explicitly documented push-descriptor layout applies; register sampled resources in the pre-record phase.
 - Keep this set ordering consistent across contexts.
 
 Invalidation & Progressive Rendering
@@ -1327,7 +1357,7 @@ Invariant Checks and GL Parity (Vulkan)
 
 Notes
 - OOM or external resource exhaustion may trip CHECKs: we treat these as fatal in Vulkan paths to avoid silent rendering fallthrough. If a path is expected to be optional/transient, prefer a guarded early return and document the GL parity.
-- Descriptor writes during recording are treated as invariant violations (CHECK). If a path needs per-draw resource variation, express it via dynamic offsets (UBOs) and bindless indices (sampled images).
+- Pool-backed descriptor-set writes during recording are treated as invariant violations (CHECK). Per-draw resource variation uses dynamic offsets, bindless indices, or an explicitly documented push-descriptor layout.
 
 - Overview
   - 3D images are rendered via `Z3DImgFilter`, which hosts two renderer paths:
@@ -1452,6 +1482,10 @@ Transparency Methods
       unspecified. Do not add depth-bit or color-bit tie-breaks solely to force identical output hashes. The scalar index
       workspace reuses existing `std430` padding, keeps the record stride at 32 bytes, and limits sorting writes to scalar
       indices while the semantic color/depth records remain unchanged.
+    - PPLL resolve selects its opaque-depth binding from logical-device capabilities. When `VK_KHR_push_descriptor` is
+      enabled and `maxPushDescriptors >= 1`, resolve pushes one samplerless sampled-image descriptor at set 1, binding 0;
+      otherwise it uses the set-0 bindless sampled-image index and push constant. Both variants keep the PPLL buffers at
+      set 3 and bind either the opaque-depth image or the existing white placeholder when no opaque depth is present.
     - PPLL fullscreen resolve enables `LessOrEqual` depth testing and depth writes. When compositing into an initialized
       target, resolve must load that target's depth attachment; when starting a new target, it clears depth to `1.0`.
       Count/store share the output depth only when no separate opaque-depth attachment is supplied. Weighted Blended has
@@ -1501,8 +1535,12 @@ Additional Architecture Notes
   - Aliases share packs only; everything above the pack (parameters, transforms, selections) is per-ID.
   - Complete Vulkan worker engines share document-owned objects and packs but own independent views, parameters, filters,
     progressive state, scratch resources, and device resources. Standard document-to-view connections maintain worker data
-    and removal lifetimes. Before each synchronous `renderTile()` call, the coordinator reapplies serialized object and
-    global state, device pixel ratio, and the complete camera state.
+    and removal lifetimes. Before submitting a coordinated batch, the coordinator captures canonical object state, global
+    and compositor state, device pixel ratio, and the complete runtime camera once. Every worker receives the same snapshot
+    in object -> device-pixel-ratio -> global/compositor -> camera order before any tile is submitted. One-worker and
+    multi-worker batches use the same synchronization path. Each synchronized worker then sets the common full-output
+    camera viewport and freezes mesh export LOD for that extent. Tile attachment sizes remain descriptor-specific while the
+    mesh working set remains fixed for the complete frame.
 
 - Frame orchestration
   - Rendering thread drives a loop of: size propagation → invalidation → progressive processing → compositor blend.
@@ -1529,9 +1567,14 @@ Additional Architecture Notes
 
 Vulkan device selection
 
-- Each `Z3DRenderingEngine` executes rendering on exactly one logical Vulkan device.
-  `ZVulkanMultiDeviceTileCoordinator` owns one same-adapter synchronous worker and does not schedule across devices. The
-  tile-worker architecture is documented in
+- Each `Z3DRenderingEngine` executes rendering on exactly one logical Vulkan device. A canonical engine exposes its complete
+  compatible `DeviceSelection` list for tile-worker construction. `ZVulkanMultiDeviceTileCoordinator` can own one exact
+  worker per distinct selected index-and-UUID pair. `renderFrame()` synchronously returns one checked, save-oriented CPU
+  frame while internally submitting one outstanding tile per worker, polling final readbacks on the canonical rendering
+  thread, pasting each completed tile immediately, and dynamically refilling the worker that completes. The headless scene
+  runner uses this path only for an explicit Vulkan multi-worker, multi-tile still capture. Compatibility does not imply a
+  speedup: each selected worker receives an initial tile while work remains, and the coordinator has no throughput admission
+  or tail-avoidance policy. The tile-worker architecture is documented in
   [VULKAN_MULTI_GPU_DESIGN.md](VULKAN_MULTI_GPU_DESIGN.md).
 - On initialization, all physical devices are enumerated and logged. Devices are sorted by preference: discrete > integrated
   > virtual > CPU, then larger device-local memory capacity, then higher API version. Otherwise equal-ranked devices use
@@ -1553,10 +1596,11 @@ Vulkan device selection
   `maxPerStageUpdateAfterBindResources`; bindless pool construction reuses the evaluated effective capacities.
 - `ZVulkanContext::physicalDevice()` returns the currently selected device. `deviceCount()` and `physicalDevice(index)` can be
   used for explicit per-device introspection. The selected index is exposed via `selectedDeviceIndex()`.
-- `ZVulkanContext::DeviceSelection` contains a preference-sorted index and expected physical-device UUID. Worker construction
-  requires both to resolve to the same compatible adapter and does not fall back. Worker initialization is Vulkan-only,
-  creates no GL surface, publishes no process-global GPU caps, borrows the canonical rendering-thread executor, and
-  propagates reported filter or view construction failures to coordinator construction.
+- `ZVulkanDeviceSupport::DeviceSelection` contains a preference-sorted index and expected physical-device UUID. Worker construction
+  requires both to resolve to the same compatible adapter and does not fall back. An explicit coordinator worker set rejects
+  selections outside the canonical compatible list and rejects duplicate indices or UUIDs. Worker initialization is
+  Vulkan-only, creates no GL surface, publishes no process-global GPU caps, borrows the canonical rendering-thread executor,
+  and propagates reported filter or view construction failures to coordinator construction.
 - Prefer a Vulkan device at startup via `--atlas_vk_device_index=N` (sorted order), or use `-1` for automatic selection.
   A compatible preferred device is selected exactly. An invalid, out-of-range, or incompatible preference logs a warning
   with the reason and falls back to the first fully compatible Vulkan device in preference order. CLI selection is
@@ -1565,6 +1609,11 @@ Vulkan device selection
   Vulkan values select indices from this preference-sorted list. Multi-process animation workers receive a corresponding
   `--atlas_vk_device_index` preference. A rejected worker preference logs a warning and uses automatic selection, so export
   automation should treat those warnings as a possible sign that multiple workers fell back to the same adapter.
+- `--atlas_vk_multi_device_tile_worker_indices` selects the complete exact worker set for in-process tiled scene export on
+  any supported platform. It requires at least two comma-separated preference indices and rejects unavailable,
+  incompatible, duplicate-index, or duplicate-UUID selections without fallback. `--atlas_vk_device_index` selects the
+  canonical engine independently. Linux scene export still accepts exactly one `--use_gpu_devices` value for that
+  canonical engine; headless animation continues to use `--use_gpu_devices` for its separate multi-process workers.
 Compositor Pass Graph (Vulkan)
 
 - Offscreen only; no swapchain.

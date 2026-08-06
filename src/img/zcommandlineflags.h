@@ -29,6 +29,8 @@ void logIgnoredCommandLineFlags();
 [[nodiscard]] bool getCommandLineFlagInfo(std::string_view name, ZCommandLineFlagInfo* info);
 [[nodiscard]] ZCommandLineFlagInfo getCommandLineFlagInfoOrDie(std::string_view name);
 [[nodiscard]] bool commandLineFlagExists(std::string_view name);
+// Includes values supplied through a command-line flag file.
+[[nodiscard]] bool wasCommandLineFlagSpecified(std::string_view name);
 
 [[nodiscard]] bool getCommandLineOption(std::string_view name, std::string* value);
 [[nodiscard]] bool setCommandLineOption(std::string_view name, std::string_view value, std::string* error = nullptr);

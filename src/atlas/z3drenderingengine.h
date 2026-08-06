@@ -46,6 +46,7 @@ class ZAnimation;
 class Z3DScratchResourcePool;
 class ZVulkanContext;
 class ZVulkanDevice;
+class ZVulkanMultiDeviceTileCoordinator;
 class ZQtExecutor;
 class ZSwcPack;
 class Z3DTileDescriptor;
@@ -60,10 +61,19 @@ class Z3DRenderingEngine
 public:
   explicit Z3DRenderingEngine(ZDoc& doc, QObject* parent = nullptr);
 
+  // Return the exact compatible adapters visible to the canonical Vulkan
+  // context. Workers re-enumerate and verify both index and UUID.
+  [[nodiscard]] std::vector<ZVulkanDeviceSupport::DeviceSelection> compatibleVulkanTileWorkerSelections() const;
+
   // Construct one complete, headless rendering engine on the canonical
   // engine's exact Vulkan adapter. The worker borrows the canonical rendering-
   // thread executor and never falls back to OpenGL.
   [[nodiscard]] std::unique_ptr<Z3DRenderingEngine> createVulkanTileWorker();
+
+  // Construct a complete worker on one exact compatible adapter reported by
+  // compatibleVulkanTileWorkerSelections().
+  [[nodiscard]] std::unique_ptr<Z3DRenderingEngine>
+  createVulkanTileWorker(const ZVulkanDeviceSupport::DeviceSelection& selection);
 
   ~Z3DRenderingEngine() override;
 
@@ -119,11 +129,34 @@ public:
                                int tileSize = 0,
                                int tileBorder = 0);
 
-  // Execute one complete tile on a headless Vulkan worker and return its valid,
-  // host-owned pixels. The caller owns mesh-export preparation and tile assembly.
-  [[nodiscard]] Z3DRenderedTile renderVulkanTile(const Z3DTileDescriptor& tile,
-                                                 bool renderStereoPair = false,
-                                                 folly::CancellationToken cancellationToken = {});
+  // Use an externally owned coordinator for the spatial tiles of a fixed-size
+  // Vulkan capture. Untiled captures retain the canonical direct path.
+  void takeFixedSizeScreenShotWithVulkanTileCoordinator(const QString& filename,
+                                                        int width,
+                                                        int height,
+                                                        ZVulkanMultiDeviceTileCoordinator& coordinator,
+                                                        Z3DScreenShotType sst = Z3DScreenShotType::MonoView,
+                                                        int tileSize = 0,
+                                                        int tileBorder = 0);
+
+  // Freeze and release full-view mesh LOD for one final-quality worker batch.
+  // The coordinator brackets every worker batch with these calls.
+  void beginVulkanTileExport(glm::uvec2 fullOutputExtent, folly::CancellationToken cancellationToken = {});
+  void endVulkanTileExport();
+
+  // Submit one final-quality worker tile without waiting for its final-pixel
+  // readback. A worker accepts exactly one outstanding tile; the returned
+  // render-frame token identifies the matching completion.
+  [[nodiscard]] uint64_t submitVulkanTile(const Z3DTileDescriptor& tile,
+                                          bool renderStereoPair = false,
+                                          folly::CancellationToken cancellationToken = {});
+
+  // Pump Vulkan completion safe points without waiting for an unsignaled fence
+  // and report whether the exact outstanding tile has published final pixels.
+  [[nodiscard]] bool isVulkanTileReady(uint64_t renderFrameToken);
+
+  // Copy and crop a ready tile into owned pixels.
+  [[nodiscard]] Z3DRenderedTile collectVulkanTile(uint64_t renderFrameToken);
 
   void takeScreenShot(const QString& filename, Z3DScreenShotType sst);
 
@@ -427,15 +460,25 @@ private:
 
   void rotateZM();
 
+  void takeFixedSizeScreenShotImpl(const QString& filename,
+                                   int width,
+                                   int height,
+                                   Z3DScreenShotType sst,
+                                   int tileSize,
+                                   int tileBorder,
+                                   /*nullable*/ ZVulkanMultiDeviceTileCoordinator* coordinator);
+
   // private version will throw exception on error
-  void takeFixedSizeScreenShotWithoutResetCanvasSizePrivate(const QString& filename,
-                                                            int width,
-                                                            int height,
-                                                            Z3DScreenShotType sst,
-                                                            bool reportProgress = false,
-                                                            folly::CancellationToken cancellationToken = {},
-                                                            int tileSize = 0,
-                                                            int tileBorder = 0);
+  void takeFixedSizeScreenShotWithoutResetCanvasSizePrivate(
+    const QString& filename,
+    int width,
+    int height,
+    Z3DScreenShotType sst,
+    bool reportProgress = false,
+    folly::CancellationToken cancellationToken = {},
+    int tileSize = 0,
+    int tileBorder = 0,
+    /*nullable*/ ZVulkanMultiDeviceTileCoordinator* coordinator = nullptr);
 
   void takeFixedSizeScreenShotWithoutResetCanvasSizeByTilePrivate(const QString& filename,
                                                                   const QString& rightFilename,
@@ -473,7 +516,7 @@ private:
 
   // Execute one pass over the current filter pipeline, polling
   // cancellationToken between filters. Ordinary callers consume progress;
-  // synchronous tile rendering also validates the immutable frame identity.
+  // asynchronous tile submission also retains the immutable frame identity.
   double processFrame(bool stereo, bool progressiveRendering, folly::CancellationToken cancellationToken = {});
   [[nodiscard]] FrameProcessResult
   processFrameWithIdentity(bool stereo, bool progressiveRendering, folly::CancellationToken cancellationToken = {});
@@ -484,6 +527,11 @@ private:
 
   void prepareMeshFiltersForExport(const glm::uvec2& exportSize, folly::CancellationToken cancellationToken = {});
   void finishMeshFiltersForExport();
+
+  struct PendingVulkanTile;
+  void checkVulkanTileWorkerExecutionContext() const;
+  [[nodiscard]] bool pendingVulkanTilePublished() const;
+  void clearVulkanTileRegion();
 
 private:
   const Role m_role;
@@ -502,6 +550,8 @@ private:
   // Vulkan context/device owned at engine level (mirrors GL ownership)
   std::unique_ptr<ZVulkanContext> m_vkContext;
   std::unique_ptr<ZVulkanDevice> m_vkDevice;
+  std::unique_ptr<PendingVulkanTile> m_pendingVulkanTile;
+  std::optional<glm::uvec2> m_vulkanTileExportExtent;
   std::unique_ptr<ZQtExecutor> m_ownedRenderThreadExecutor;
   ZQtExecutor* const m_renderThreadExecutor;
   QTimer* m_vkCompletionPollTimer = nullptr;

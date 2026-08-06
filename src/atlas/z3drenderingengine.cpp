@@ -35,7 +35,9 @@
 #include "zcpuinfo.h"
 #include "zexception.h"
 #include "z3dperfcollector.h"
+#include "z3drenderedframe.h"
 #include "z3dtiledescriptor.h"
+#include "zvulkanmultidevicetilecoordinator.h"
 #include "zabslflagtypes.h"
 #include "zqtexecutor.h"
 #include "zrenderthreadexecutor_tls.h"
@@ -55,6 +57,7 @@ ABSL_DECLARE_FLAG(bool, atlas_enable_benchmark_screen_space_sufficiency_audit);
 #include <QMetaObject>
 #include <QTimer>
 #include <QThread>
+#include <algorithm>
 #include <array>
 #include <chrono>
 #include <cmath>
@@ -307,6 +310,17 @@ Z3DGpuInfo::GenericCaps genericCapsFromVulkanPhysicalDevice(vk::raii::PhysicalDe
   return caps;
 }
 
+bool supportsCanonicalGpuPlanning(const Z3DGpuInfo::GenericCaps& workerCaps)
+{
+  const auto& canonicalCaps = Z3DGpuInfo::instance();
+  const uint32_t canonicalMaxTextureSize = canonicalCaps.maxTextureSize();
+  return workerCaps.maxTextureSize >= canonicalMaxTextureSize &&
+         workerCaps.maxViewportDim >= static_cast<int>(canonicalMaxTextureSize) &&
+         workerCaps.max3DTextureSize >= canonicalCaps.max3DTextureSize() &&
+         workerCaps.maxArrayTextureLayers >= canonicalCaps.maxArrayTextureLayers() &&
+         workerCaps.gpuMemoryCapacityMB >= canonicalCaps.gpuMemoryCapacityMB();
+}
+
 void updateGenericGpuInfoFromVulkanPhysicalDevice(vk::raii::PhysicalDevice& physicalDevice)
 {
   Z3DGpuInfo::instance().overrideGenericCaps(genericCapsFromVulkanPhysicalDevice(physicalDevice));
@@ -442,6 +456,18 @@ folly::coro::Task<void> composeAnimationFrameAsync(const QString& tempDirPath,
 }
 
 } // namespace
+
+struct Z3DRenderingEngine::PendingVulkanTile
+{
+  PendingVulkanTile(const Z3DTileDescriptor& tileDescriptor, bool stereo)
+    : tile(tileDescriptor)
+    , renderStereoPair(stereo)
+  {}
+
+  Z3DTileDescriptor tile;
+  bool renderStereoPair = false;
+  uint64_t renderFrameToken = 0u;
+};
 
 void Z3DRenderingEngine::CheckOpenGLStateFilterWrapper::afterFilterProcess(const Z3DFilter* p)
 {
@@ -637,7 +663,7 @@ Z3DRenderingEngine::Z3DRenderingEngine(ZDoc& doc,
   }
 }
 
-std::unique_ptr<Z3DRenderingEngine> Z3DRenderingEngine::createVulkanTileWorker()
+std::vector<ZVulkanDeviceSupport::DeviceSelection> Z3DRenderingEngine::compatibleVulkanTileWorkerSelections() const
 {
   CHECK(m_role == Role::Canonical) << "Only a canonical rendering engine can create tile workers";
   CHECK(m_initialized);
@@ -649,10 +675,40 @@ std::unique_ptr<Z3DRenderingEngine> Z3DRenderingEngine::createVulkanTileWorker()
   CHECK(currentRenderThreadExecutorOrNull() == m_renderThreadExecutor)
     << "The shared rendering-thread executor must be installed before worker creation";
   CHECK(m_vkContext != nullptr);
-  const auto deviceSelection = m_vkContext->selectedDeviceSelection();
+
+  std::vector<ZVulkanDeviceSupport::DeviceSelection> selections;
+  selections.reserve(m_vkContext->deviceCount());
+  for (size_t index = 0u; index < m_vkContext->deviceCount(); ++index) {
+    if (!m_vkContext->deviceSupport(index).compatible()) {
+      continue;
+    }
+    const auto workerCaps = genericCapsFromVulkanPhysicalDevice(m_vkContext->physicalDevice(index));
+    if (!supportsCanonicalGpuPlanning(workerCaps)) {
+      VLOG(1) << "Excluding Vulkan tile-worker device " << index
+              << " because its image-planning limits are below the canonical device";
+      continue;
+    }
+    selections.push_back(m_vkContext->deviceSelection(index));
+  }
+  CHECK(!selections.empty()) << "The canonical Vulkan context has no compatible tile-worker adapter";
+  return selections;
+}
+
+std::unique_ptr<Z3DRenderingEngine> Z3DRenderingEngine::createVulkanTileWorker()
+{
+  CHECK(m_vkContext != nullptr);
+  return createVulkanTileWorker(m_vkContext->selectedDeviceSelection());
+}
+
+std::unique_ptr<Z3DRenderingEngine>
+Z3DRenderingEngine::createVulkanTileWorker(const ZVulkanDeviceSupport::DeviceSelection& selection)
+{
+  const auto compatibleSelections = compatibleVulkanTileWorkerSelections();
+  CHECK(std::find(compatibleSelections.begin(), compatibleSelections.end(), selection) != compatibleSelections.end())
+    << "A Vulkan tile worker requires an exact compatible adapter from the canonical context";
 
   auto worker = std::unique_ptr<Z3DRenderingEngine>(
-    new Z3DRenderingEngine(m_doc, Role::VulkanTileWorker, deviceSelection, m_renderThreadExecutor, nullptr));
+    new Z3DRenderingEngine(m_doc, Role::VulkanTileWorker, selection, m_renderThreadExecutor, nullptr));
 
   QStringList initializationErrors;
   const QMetaObject::Connection initializationErrorConnection = connect(
@@ -894,6 +950,30 @@ void Z3DRenderingEngine::takeFixedSizeScreenShot(const QString& filename,
                                                  int tileSize,
                                                  int tileBorder)
 {
+  takeFixedSizeScreenShotImpl(filename, width, height, sst, tileSize, tileBorder, nullptr);
+}
+
+void Z3DRenderingEngine::takeFixedSizeScreenShotWithVulkanTileCoordinator(
+  const QString& filename,
+  int width,
+  int height,
+  ZVulkanMultiDeviceTileCoordinator& coordinator,
+  Z3DScreenShotType sst,
+  int tileSize,
+  int tileBorder)
+{
+  CHECK(coordinator.coordinates(*this)) << "A Vulkan tile coordinator can only capture its canonical engine";
+  takeFixedSizeScreenShotImpl(filename, width, height, sst, tileSize, tileBorder, &coordinator);
+}
+
+void Z3DRenderingEngine::takeFixedSizeScreenShotImpl(const QString& filename,
+                                                     int width,
+                                                     int height,
+                                                     Z3DScreenShotType sst,
+                                                     int tileSize,
+                                                     int tileBorder,
+                                                     /*nullable*/ ZVulkanMultiDeviceTileCoordinator* coordinator)
+{
   Q_EMIT progressChanged(5);
   auto progressGuard = folly::makeGuard([this]() {
     Q_EMIT progressChanged(100);
@@ -915,7 +995,8 @@ void Z3DRenderingEngine::takeFixedSizeScreenShot(const QString& filename,
                                                          true,
                                                          token,
                                                          tileSize,
-                                                         tileBorder);
+                                                         tileBorder,
+                                                         coordinator);
     Q_EMIT progressChanged(98);
   }
   catch (const ZCancellationException&) {
@@ -931,9 +1012,7 @@ void Z3DRenderingEngine::takeFixedSizeScreenShot(const QString& filename,
   }
 }
 
-Z3DRenderedTile Z3DRenderingEngine::renderVulkanTile(const Z3DTileDescriptor& tile,
-                                                     bool renderStereoPair,
-                                                     folly::CancellationToken cancellationToken)
+void Z3DRenderingEngine::checkVulkanTileWorkerExecutionContext() const
 {
   CHECK(m_role == Role::VulkanTileWorker) << "Only a headless Vulkan tile worker may execute a worker tile";
   CHECK(QThread::currentThread() == thread()) << "A Vulkan worker tile must execute on its engine thread";
@@ -942,8 +1021,71 @@ Z3DRenderedTile Z3DRenderingEngine::renderVulkanTile(const Z3DTileDescriptor& ti
   CHECK(m_initialized);
   CHECK(m_compositor != nullptr);
   CHECK(m_compositor->rendererBase().activeBackend() == RenderBackend::Vulkan);
+  CHECK(m_vkDevice != nullptr);
+  CHECK(m_scratchPool->vulkanDevice() == m_vkDevice.get())
+    << "A Vulkan tile worker must observe failures on its own scratch-pool device";
+}
+
+void Z3DRenderingEngine::beginVulkanTileExport(glm::uvec2 fullOutputExtent, folly::CancellationToken cancellationToken)
+{
+  checkVulkanTileWorkerExecutionContext();
+  CHECK(m_pendingVulkanTile == nullptr) << "A Vulkan tile export cannot begin with an outstanding tile";
+  CHECK(!m_vulkanTileExportExtent.has_value()) << "A Vulkan tile export is already active";
+  CHECK_GT(fullOutputExtent.x, 0u);
+  CHECK_GT(fullOutputExtent.y, 0u);
+  m_globalParas->camera.viewportChanged(fullOutputExtent);
+  prepareMeshFiltersForExport(fullOutputExtent, cancellationToken);
+  m_vulkanTileExportExtent = fullOutputExtent;
+}
+
+void Z3DRenderingEngine::endVulkanTileExport()
+{
+  checkVulkanTileWorkerExecutionContext();
+  CHECK(m_vulkanTileExportExtent.has_value()) << "A Vulkan tile export is not active";
+  CHECK(m_pendingVulkanTile == nullptr) << "A Vulkan tile export cannot end with an outstanding tile";
+  finishMeshFiltersForExport();
+  m_vulkanTileExportExtent.reset();
+}
+
+void Z3DRenderingEngine::clearVulkanTileRegion()
+{
+  checkVulkanTileWorkerExecutionContext();
+  m_globalParas->camera.setTileFrustum();
+  m_compositor->setRenderingRegion();
+}
+
+bool Z3DRenderingEngine::pendingVulkanTilePublished() const
+{
+  checkVulkanTileWorkerExecutionContext();
+  CHECK(m_pendingVulkanTile != nullptr) << "A Vulkan tile completion check requires an outstanding tile";
+  CHECK_GT(m_pendingVulkanTile->renderFrameToken, 0u);
+
+  const uint64_t expectedToken = m_pendingVulkanTile->renderFrameToken;
+  auto eyePublished = [this, expectedToken](Z3DEye eye) {
+    const uint64_t publishedToken = m_compositor->lastPublishedRenderFrameToken(eye);
+    CHECK_LE(publishedToken, expectedToken)
+      << "A Vulkan tile worker published a newer frame while an older tile remained outstanding";
+    return publishedToken == expectedToken;
+  };
+
+  if (m_pendingVulkanTile->renderStereoPair) {
+    return eyePublished(LeftEye) && eyePublished(RightEye);
+  }
+  return eyePublished(MonoEye);
+}
+
+uint64_t Z3DRenderingEngine::submitVulkanTile(const Z3DTileDescriptor& tile,
+                                              bool renderStereoPair,
+                                              folly::CancellationToken cancellationToken)
+{
+  checkVulkanTileWorkerExecutionContext();
+  CHECK(m_vulkanTileExportExtent.has_value()) << "A Vulkan tile requires an active export batch";
+  CHECK(tile.fullOutputExtent() == *m_vulkanTileExportExtent)
+    << "A Vulkan tile must use the full output extent prepared for its export batch";
+  CHECK(m_pendingVulkanTile == nullptr) << "A Vulkan tile worker accepts only one outstanding tile";
+
+  auto pendingTile = std::make_unique<PendingVulkanTile>(tile, renderStereoPair);
   const glm::uvec2 fullOutputExtent = tile.fullOutputExtent();
-  const glm::uvec2 validOutputExtent = tile.validOutputExtent();
   const glm::uvec2 attachmentExtent = tile.attachmentExtent();
   const double normalizedLeft = tile.normalizedLeft();
   const double normalizedRight = tile.normalizedRight();
@@ -956,46 +1098,73 @@ Z3DRenderedTile Z3DRenderingEngine::renderVulkanTile(const Z3DTileDescriptor& ti
     endDeferredRenderingErrorFrame(startedDeferredErrorFrame);
   });
 
-  m_compositor->setReadbackCompletionPolicy(ReadbackCompletionPolicy::WaitForCompletion);
+  m_compositor->setReadbackCompletionPolicy(ReadbackCompletionPolicy::ReturnAfterSubmit);
 
-  // A failed/cancelled attempt must not leave a tile projection active for the
-  // next assignment. Output extent is intentionally replaced by each attempt.
-  auto tileRegionGuard = folly::makeGuard([this]() {
-    m_globalParas->camera.setTileFrustum();
-    m_compositor->setRenderingRegion();
+  // The output extent and tile projection remain immutable until final
+  // readback publication. On a pre-publication failure there is no pending
+  // tile to collect, so restore the full-frame projection immediately.
+  auto failedTileRegionGuard = folly::makeGuard([this]() {
+    clearVulkanTileRegion();
   });
 
-  CHECK(m_vkDevice != nullptr);
-  CHECK(m_scratchPool->vulkanDevice() == m_vkDevice.get())
-    << "A Vulkan tile worker must observe failures on its own scratch-pool device";
   m_vkDevice->ensureSubmissionUsable();
 
   maybeCancel(cancellationToken);
-  const ZImgRegion validRegion = validAttachmentRegion(tile);
   setOutputSize(attachmentExtent);
   m_globalParas->camera.viewportChanged(fullOutputExtent);
   m_globalParas->camera.setTileFrustum(normalizedLeft, normalizedRight, normalizedBottom, normalizedTop);
   m_compositor->setRenderingRegion(normalizedLeft, normalizedRight, normalizedBottom, normalizedTop);
 
   const FrameProcessResult frameResult = processFrameWithIdentity(renderStereoPair, false, cancellationToken);
-  maybeCancel(cancellationToken);
   if (!m_deferredRenderingErrors.empty()) {
     throw ZException(
       fmt::format("Vulkan worker tile rendering failed: {}", takeDeferredRenderingErrors().toStdString()));
   }
   CHECK_GT(frameResult.renderFrameToken, 0u);
-  if (renderStereoPair) {
-    CHECK_EQ(m_compositor->lastPublishedRenderFrameToken(LeftEye), frameResult.renderFrameToken)
-      << "Vulkan worker left-eye ready buffer was not published by the current tile attempt";
-    CHECK_EQ(m_compositor->lastPublishedRenderFrameToken(RightEye), frameResult.renderFrameToken)
-      << "Vulkan worker right-eye ready buffer was not published by the current tile attempt";
-  } else {
-    CHECK_EQ(m_compositor->lastPublishedRenderFrameToken(MonoEye), frameResult.renderFrameToken)
-      << "Vulkan worker mono ready buffer was not published by the current tile attempt";
+  pendingTile->renderFrameToken = frameResult.renderFrameToken;
+  m_pendingVulkanTile = std::move(pendingTile);
+  failedTileRegionGuard.dismiss();
+  return frameResult.renderFrameToken;
+}
+
+bool Z3DRenderingEngine::isVulkanTileReady(uint64_t renderFrameToken)
+{
+  checkVulkanTileWorkerExecutionContext();
+  CHECK(m_pendingVulkanTile != nullptr) << "A Vulkan tile readiness query requires an outstanding tile";
+  CHECK_EQ(renderFrameToken, m_pendingVulkanTile->renderFrameToken)
+    << "A Vulkan tile readiness query used the wrong render-frame token";
+
+  auto* backend = m_compositor->rendererBase().backend();
+  CHECK(backend != nullptr) << "A Vulkan tile worker has no active renderer backend";
+  backend->pollCompletionsAndPumpSafePoints();
+
+  const bool ready = pendingVulkanTilePublished();
+  if (!ready && !backend->hasInFlightFrames()) {
+    throw ZException(
+      fmt::format("Vulkan tile frame {} has no in-flight submission or published final readback", renderFrameToken));
   }
+  return ready;
+}
+
+Z3DRenderedTile Z3DRenderingEngine::collectVulkanTile(uint64_t renderFrameToken)
+{
+  checkVulkanTileWorkerExecutionContext();
+  CHECK(m_pendingVulkanTile != nullptr) << "A Vulkan tile collection requires an outstanding tile";
+  CHECK_EQ(renderFrameToken, m_pendingVulkanTile->renderFrameToken)
+    << "A Vulkan tile collection used the wrong render-frame token";
+  CHECK(pendingVulkanTilePublished()) << "A Vulkan tile cannot be collected before final readback publication";
+
+  auto pendingTile = std::move(m_pendingVulkanTile);
+  auto tileRegionGuard = folly::makeGuard([this]() {
+    clearVulkanTileRegion();
+  });
+
+  const glm::uvec2 attachmentExtent = pendingTile->tile.attachmentExtent();
+  const glm::uvec2 validOutputExtent = pendingTile->tile.validOutputExtent();
+  const ZImgRegion validRegion = validAttachmentRegion(pendingTile->tile);
 
   Z3DRenderedTile result;
-  if (renderStereoPair) {
+  if (pendingTile->renderStereoPair) {
     const Z3DLocalColorBuffer* const leftBuffer = m_compositor->leftReadyLocalBuffer();
     const Z3DLocalColorBuffer* const rightBuffer = m_compositor->rightReadyLocalBuffer();
     CHECK(leftBuffer != nullptr);
@@ -1016,7 +1185,7 @@ Z3DRenderedTile Z3DRenderingEngine::renderVulkanTile(const Z3DTileDescriptor& ti
 
   CHECK_EQ(result.primaryColor.width(), validOutputExtent.x);
   CHECK_EQ(result.primaryColor.height(), validOutputExtent.y);
-  CHECK_EQ(result.rightColor.has_value(), renderStereoPair);
+  CHECK_EQ(result.rightColor.has_value(), pendingTile->renderStereoPair);
   if (result.rightColor.has_value()) {
     CHECK_EQ(result.rightColor->width(), validOutputExtent.x);
     CHECK_EQ(result.rightColor->height(), validOutputExtent.y);
@@ -2567,7 +2736,8 @@ void Z3DRenderingEngine::takeFixedSizeScreenShotWithoutResetCanvasSizePrivate(
   bool reportProgress,
   folly::CancellationToken cancellationToken,
   int tileSize,
-  int tileBorder)
+  int tileBorder,
+  /*nullable*/ ZVulkanMultiDeviceTileCoordinator* coordinator)
 {
   const bool startedDeferredErrorFrame = beginDeferredRenderingErrorFrame();
   auto deferredErrorFrameGuard = folly::makeGuard([this, startedDeferredErrorFrame]() {
@@ -2578,8 +2748,12 @@ void Z3DRenderingEngine::takeFixedSizeScreenShotWithoutResetCanvasSizePrivate(
   CHECK(tileSize >= 0 && tileBorder >= 0);
   constexpr int kDefaultTileSize = 2048;
   constexpr int kDefaultTileBorder = 128;
-  int resolvedTileSize = tileSize > 0 ? tileSize : kDefaultTileSize;
+  const int resolvedTileSize = tileSize > 0 ? tileSize : kDefaultTileSize;
   const int resolvedTileBorder = (tileSize > 0 || tileBorder > 0) ? tileBorder : kDefaultTileBorder;
+  const auto backend = static_cast<RenderBackend>(m_globalParas->renderBackend.associatedData());
+  if (coordinator != nullptr) {
+    CHECK(backend == RenderBackend::Vulkan) << "A Vulkan tile coordinator requires the canonical Vulkan backend";
+  }
 
   maybeCancel(cancellationToken);
 
@@ -2596,12 +2770,17 @@ void Z3DRenderingEngine::takeFixedSizeScreenShotWithoutResetCanvasSizePrivate(
     takeScreenShotPrivate(filename, sst, reportProgress, cancellationToken);
   } else {
     m_globalParas->camera.viewportChanged(glm::uvec2(width, height));
-    prepareMeshFiltersForExport(glm::uvec2(width, height), cancellationToken);
+    const bool useCoordinator = coordinator != nullptr;
+    if (!useCoordinator) {
+      prepareMeshFiltersForExport(glm::uvec2(width, height), cancellationToken);
+    }
     if (reportProgress) {
       Q_EMIT progressChanged(20);
     }
-    auto meshExportGuard = folly::makeGuard([this]() {
-      finishMeshFiltersForExport();
+    auto meshExportGuard = folly::makeGuard([this, useCoordinator]() {
+      if (!useCoordinator) {
+        finishMeshFiltersForExport();
+      }
     });
 
     // Guard against leaving a tile frustum / compositor rendering region active
@@ -2613,66 +2792,82 @@ void Z3DRenderingEngine::takeFixedSizeScreenShotWithoutResetCanvasSizePrivate(
       m_compositor->setRenderingRegion();
     });
 
-    const auto backend = static_cast<RenderBackend>(m_globalParas->renderBackend.associatedData());
-    const bool flipYForSave = shouldFlipYWhenSaving(backend);
+    const bool flipYForSave = !useCoordinator && shouldFlipYWhenSaving(backend);
 
-    ZImg img(ZImgInfo(width, height, 1, 4));
-    img.infoRef().lastChannelIsAlphaChannel = true;
+    ZImg img;
     ZImg rightImg;
-    if (sst != Z3DScreenShotType::MonoView) {
-      rightImg = ZImg(ZImgInfo(width, height, 1, 4));
-      rightImg.infoRef().lastChannelIsAlphaChannel = true;
-    }
 
     const auto tileDescriptors = makeZ3DTileDescriptors(glm::uvec2(width, height),
                                                         glm::uvec2(resolvedTileSize),
                                                         static_cast<uint32_t>(resolvedTileBorder));
     CHECK(!tileDescriptors.empty());
-    uint64_t completedTiles = 0;
-    for (const Z3DTileDescriptor& tile : tileDescriptors) {
-      maybeCancel(cancellationToken);
-
-      const ZImgRegion validRegion = validAttachmentRegion(tile);
-      setOutputSize(tile.attachmentExtent());
-      m_globalParas->camera.viewportChanged(tile.fullOutputExtent());
-
-      // The descriptor defines the tile projection and crop; the engine
-      // evaluates the tile through its direct filter pipeline.
-      m_globalParas->camera.setTileFrustum(tile.normalizedLeft(),
-                                           tile.normalizedRight(),
-                                           tile.normalizedBottom(),
-                                           tile.normalizedTop());
-      m_compositor->setRenderingRegion(tile.normalizedLeft(),
-                                       tile.normalizedRight(),
-                                       tile.normalizedBottom(),
-                                       tile.normalizedTop());
-
-      processFrame(sst != Z3DScreenShotType::MonoView, false, cancellationToken);
-
-      const glm::uvec2 pasteOrigin = saveAssemblyOrigin(tile, flipYForSave);
-      const ZVoxelCoordinate pasteCoordinate(pasteOrigin.x, pasteOrigin.y);
+    if (useCoordinator) {
+      Z3DRenderedFrame frame =
+        coordinator->renderFrame(tileDescriptors, sst != Z3DScreenShotType::MonoView, cancellationToken);
+      img = std::move(frame.primaryColor);
       if (sst == Z3DScreenShotType::MonoView) {
-        img.pasteImg(localColorBufferToRGBAImg(*m_compositor->monoReadyLocalBuffer()).crop(validRegion),
-                     pasteCoordinate);
+        CHECK(!frame.rightColor.has_value());
       } else {
-        img.pasteImg(localColorBufferToRGBAImg(*m_compositor->leftReadyLocalBuffer()).crop(validRegion),
-                     pasteCoordinate);
-        rightImg.pasteImg(localColorBufferToRGBAImg(*m_compositor->rightReadyLocalBuffer()).crop(validRegion),
-                          pasteCoordinate);
+        CHECK(frame.rightColor.has_value());
+        rightImg = std::move(*frame.rightColor);
       }
-
-      ++completedTiles;
       if (reportProgress) {
-        const auto tileProgress = static_cast<int>(
-          std::floor(static_cast<double>(completedTiles) * 70.0 / static_cast<double>(tileDescriptors.size())));
-        Q_EMIT progressChanged(20 + tileProgress);
+        Q_EMIT progressChanged(90);
+      }
+    } else {
+      img = ZImg(ZImgInfo(width, height, 1, 4));
+      img.infoRef().lastChannelIsAlphaChannel = true;
+      if (sst != Z3DScreenShotType::MonoView) {
+        rightImg = ZImg(ZImgInfo(width, height, 1, 4));
+        rightImg.infoRef().lastChannelIsAlphaChannel = true;
       }
 
-      if (backend == RenderBackend::Vulkan) {
-        // Tiled export varies scratch sizes between full and edge tiles. Once
-        // tile pixels are copied to CPU memory, drain completed Vulkan leases
-        // so old edge/full-size scratch slots can be reused across tiles.
-        m_scratchPool->reclaimVulkanScratchMemory(Z3DScratchResourcePool::VulkanScratchReclaimMode::WaitForIdle);
+      uint64_t completedTiles = 0;
+      for (const Z3DTileDescriptor& tile : tileDescriptors) {
+        maybeCancel(cancellationToken);
+
+        const ZImgRegion validRegion = validAttachmentRegion(tile);
+        setOutputSize(tile.attachmentExtent());
+        m_globalParas->camera.viewportChanged(tile.fullOutputExtent());
+
+        // The descriptor defines the tile projection and crop; the engine
+        // evaluates the tile through its direct filter pipeline.
+        m_globalParas->camera.setTileFrustum(tile.normalizedLeft(),
+                                             tile.normalizedRight(),
+                                             tile.normalizedBottom(),
+                                             tile.normalizedTop());
+        m_compositor->setRenderingRegion(tile.normalizedLeft(),
+                                         tile.normalizedRight(),
+                                         tile.normalizedBottom(),
+                                         tile.normalizedTop());
+
+        processFrame(sst != Z3DScreenShotType::MonoView, false, cancellationToken);
+
+        const glm::uvec2 pasteOrigin = saveAssemblyOrigin(tile, flipYForSave);
+        const ZVoxelCoordinate pasteCoordinate(pasteOrigin.x, pasteOrigin.y);
+        if (sst == Z3DScreenShotType::MonoView) {
+          img.pasteImg(localColorBufferToRGBAImg(*m_compositor->monoReadyLocalBuffer()).crop(validRegion),
+                       pasteCoordinate);
+        } else {
+          img.pasteImg(localColorBufferToRGBAImg(*m_compositor->leftReadyLocalBuffer()).crop(validRegion),
+                       pasteCoordinate);
+          rightImg.pasteImg(localColorBufferToRGBAImg(*m_compositor->rightReadyLocalBuffer()).crop(validRegion),
+                            pasteCoordinate);
+        }
+
+        ++completedTiles;
+        if (reportProgress) {
+          const auto tileProgress = static_cast<int>(
+            std::floor(static_cast<double>(completedTiles) * 70.0 / static_cast<double>(tileDescriptors.size())));
+          Q_EMIT progressChanged(20 + tileProgress);
+        }
+
+        if (backend == RenderBackend::Vulkan) {
+          // Tiled export varies scratch sizes between full and edge tiles. Once
+          // tile pixels are copied to CPU memory, drain completed Vulkan leases
+          // so old edge/full-size scratch slots can be reused across tiles.
+          m_scratchPool->reclaimVulkanScratchMemory(Z3DScratchResourcePool::VulkanScratchReclaimMode::WaitForIdle);
+        }
       }
     }
 

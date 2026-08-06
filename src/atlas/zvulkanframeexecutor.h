@@ -85,6 +85,8 @@ public:
   // Schedule a callback to run once the frame's submission fence signals.
   // Callbacks are executed on the caller thread when the executor observes
   // fence completion (waitForCompletion, acquireFrame reuse, or waitForAllInFlight).
+  // Releasing a definitely-unsubmitted acquisition discards these callbacks
+  // because no submission fence can complete.
   void scheduleAfterCompletion(ActiveFrame& frame, std::function<void()> fn);
   void waitForCompletion(ActiveFrame& frame);
   // Wait for all in-flight frames managed by this executor. This is intended

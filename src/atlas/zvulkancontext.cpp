@@ -940,6 +940,10 @@ void ZVulkanContext::pickPhysicalDevice()
     LOG(INFO) << fmt::format("      Device UUID:          {}", uuidToString(infos[i].preference.deviceUuid));
     LOG(INFO) << fmt::format("      Device-Local Memory:  {} MB",
                              infos[i].preference.deviceLocalMemoryBytes / (1024 * 1024));
+    LOG(INFO) << fmt::format("      Push Descriptors:     extension={} max={} usable={}",
+                             m_deviceSupports[i].pushDescriptorExtension,
+                             m_deviceSupports[i].maxPushDescriptors,
+                             m_deviceSupports[i].supportsPushDescriptors());
     if (!m_deviceSupports[i].compatible()) {
       LOG(INFO) << fmt::format("      Atlas compatibility:  rejected ({})", m_deviceSupports[i].rejectionSummary());
     } else {
@@ -1207,6 +1211,13 @@ ZVulkanDeviceSupport ZVulkanContext::evaluateDeviceSupport(vk::raii::PhysicalDev
 
   result.memoryBudget = isExtensionAvailable(VK_EXT_MEMORY_BUDGET_EXTENSION_NAME, extensions);
   result.calibratedTimestamps = isExtensionAvailable(VK_EXT_CALIBRATED_TIMESTAMPS_EXTENSION_NAME, extensions);
+  result.pushDescriptorExtension = isExtensionAvailable(VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME, extensions);
+  if (result.pushDescriptorExtension) {
+    const auto pushDescriptorProperties =
+      physicalDevice.getProperties2<vk::PhysicalDeviceProperties2, vk::PhysicalDevicePushDescriptorPropertiesKHR>();
+    result.maxPushDescriptors =
+      pushDescriptorProperties.get<vk::PhysicalDevicePushDescriptorPropertiesKHR>().maxPushDescriptors;
+  }
   result.maintenance7 = isExtensionAvailable(VK_KHR_MAINTENANCE_7_EXTENSION_NAME, extensions);
   result.nestedCommandBuffer = isExtensionAvailable(VK_EXT_NESTED_COMMAND_BUFFER_EXTENSION_NAME, extensions);
   return result;
@@ -1423,6 +1434,10 @@ void ZVulkanContext::createLogicalDevice()
   if (m_supportsCalibratedTimestamps) {
     CHECK(isExtensionAvailable(VK_EXT_CALIBRATED_TIMESTAMPS_EXTENSION_NAME, deviceExtensionProperties));
     enabledExtensions.push_back(VK_EXT_CALIBRATED_TIMESTAMPS_EXTENSION_NAME);
+  }
+  if (support.supportsPushDescriptors()) {
+    CHECK(isExtensionAvailable(VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME, deviceExtensionProperties));
+    enabledExtensions.push_back(VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME);
   }
 
   // Optional: allow mixing inline draws and secondary command buffers inside a
