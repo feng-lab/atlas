@@ -1,375 +1,276 @@
-# Vulkan Multi-Device Tile-Worker Architecture
+# Vulkan Multi-Device Tile Workers
 
-This document describes Atlas's in-process Vulkan tile-worker infrastructure.
-`ZVulkanMultiDeviceTileCoordinator` owns one or more complete headless
-`Z3DRenderingEngine` workers. Each worker is bound to one exact compatible
-physical device and returns owned final pixels for spatial tiles.
+Atlas keeps each `Z3DRenderingEngine` bound to one Vulkan logical device. An
+optional, private `Z3DRenderingEngine::ZVulkanTileWorkerPool` schedules complete
+spatial tiles across multiple single-device engines and assembles their final
+CPU pixels. Filters, renderers, passes, and Vulkan resources remain unaware of
+the pool.
 
-The public batch operation is synchronous. Internally, the coordinator submits
-one tile per worker without waiting for final-pixel readback, polls completion
-on the canonical rendering thread, and refills the first available worker.
-Independent Vulkan device queues can therefore execute tile submissions at the
-same time without introducing worker CPU threads.
+The canonical engine is the public facade. It exposes compatible device
+selections and `configureVulkanTileWorkers()`; capture routing, state
+publication, worker scheduling, and cleanup remain engine implementation
+details. Passing an empty selection removes the pool.
 
-Headless scene export constructs an operation-scoped coordinator when
-`--atlas_vk_multi_device_tile_worker_indices` is non-empty. Multi-tile fixed-size
-capture uses its workers and saves the assembled CPU frame. Interactive
-rendering, GUI capture, headless animation export, OpenGL rendering, and
-single-tile scene capture use the canonical engine's direct path. Atlas's
-multi-process animation-export path is separate.
-
-Related: [Developer Guide](DEVELOPER_GUIDE.md) and
+Related references: [Developer Guide](DEVELOPER_GUIDE.md) and
 [Image Paging and Progressive Rendering](Atlas_Image_Paging_and_Progressive_Rendering.md).
 
-## Current Scope
+## Scope
 
-The coordinator provides:
+The pool is consumed by fixed-size tiled Vulkan capture. A configured pool is
+used only when the requested output requires more than one effective tile. A
+single-tile capture continues through the canonical engine's direct path.
 
-- explicit selection of one or more distinct compatible Vulkan devices;
-- one complete headless rendering engine and logical device per selection;
-- a synchronous `renderFrame()` batch path with overlapping submit/collect;
-- dynamic spatial-tile refill based on observed completion;
-- mono or complete stereo-pair tiles;
-- one canonical state snapshot for every coordinated batch;
-- worker-side full-output mesh-LOD preparation for the batch lifetime;
-- final-quality rendering, guard removal, and streaming assembly into one
-  save-oriented, top-left-origin CPU frame;
-- opt-in routing for tiled headless Vulkan scene export; and
-- all-or-nothing worker cleanup on synchronization, rendering, or cancellation
-  failure.
+The application entry point is opt-in headless scene export through
+`--atlas_vk_multi_device_tile_worker_indices`. The flag names the complete
+participating device set and requires at least two distinct compatible physical
+devices. The engine API also accepts a one-device set, which is useful for the
+canonical-adapter integration path and tests. The scene exporter
+requests mono output; the pool and result types also support a complete stereo
+pair per tile.
 
-The coordinator does not provide:
+Interactive rendering and animation export do not configure or use
+the pool. OpenGL never constructs or executes worker lanes.
 
-- automatic multi-device-set selection or performance policy;
-- interactive-rendering or headless-animation routing;
-- publication into canonical compositor ready buffers or the interactive
-  canvas;
-- more than one outstanding tile per worker;
-- independent worker CPU threads;
-- automatic worker reconstruction;
-- continuation on a reduced worker set after failure; and
-- physical-device-loss recovery.
+With no pool configured:
 
-Native Vulkan resources remain local to the logical device that created them.
-Device compatibility is a correctness gate, not a performance admission
-policy. Each selected worker receives one initial tile when work is available;
-dynamic refill adapts later assignments but cannot retract a slow outstanding
-tile or remove worker construction and state-synchronization cost. A
-substantially slower adapter can therefore make a batch slower than the fastest
-adapter alone. Device sets and tile settings must be benchmarked on
-representative scenes before performance-sensitive use.
+- `render()` and `renderFast()` have no pool branch or worker-state work;
+- direct and tiled captures use the canonical engine;
+- no worker thread, engine, context, logical device, or snapshot is allocated;
+- filters and per-draw code perform no worker or device-routing lookup; and
+- fixed-size capture performs no worker construction, state publication,
+  scheduling, or device routing.
 
-## Architecture and Ownership
+This keeps the ordinary single-device render hot path free of multi-device
+scheduling overhead.
+
+## Ownership and Threading
 
 ```text
-canonical Z3DRenderingEngine
-  `-- optional ZVulkanMultiDeviceTileCoordinator
-        |-- worker Z3DRenderingEngine -> logical device A
-        |-- worker Z3DRenderingEngine -> logical device B
+canonical Z3DRenderingEngine (one device, canonical rendering thread)
+  `-- optional private Z3DRenderingEngine::ZVulkanTileWorkerPool
+        |-- canonical lane, when its device is selected
+        |-- QThread -> complete worker Z3DRenderingEngine -> device B
+        |-- QThread -> complete worker Z3DRenderingEngine -> device C
         `-- ...
 ```
 
-Each active rendering engine uses exactly one logical device. A tile worker has
-immutable Vulkan-backend and exact-device-selection affinity. Filters, passes,
-and draw calls do not select devices.
+The configured selections are the complete participating set. When they
+include the canonical device, the existing canonical engine renders as one
+lane; the pool does not construct a duplicate engine for that device. When the
+canonical device is absent, it publishes state and waits for worker lanes but
+does not claim tiles.
 
-`ZVulkanDevice` owns the allocator, descriptor state, staging resources,
-`ZVulkanFrameExecutor`, and completion state for one logical device. Every
-worker is a complete `Z3DRenderingEngine` and owns its Vulkan context, device,
-scratch pool, parameters, views, filters, compositor, ready buffers, readback
-resources, engine-local caches, and progressive state.
+Configuration is synchronous on the canonical engine thread. Reconfiguration
+releases the current pool before constructing its replacement, so two complete
+device sets are never resident at once. A construction failure propagates to
+the caller and leaves the canonical engine without a pool.
 
-The canonical engine and workers refer to the same document-owned objects and
-data packs. They do not share filter or parameter QObjects, scratch leases,
-descriptors, textures, ready buffers, native GPU resources, or progressive
-validity state. Only the canonical engine may propagate view-originated
-selection or visibility changes back to the shared document.
+Every non-canonical selection owns a dedicated `QThread`, dispatcher, complete
+Vulkan-only `Z3DRenderingEngine`, and engine-local `ZQtExecutor`. The worker
+engine is constructed, initialized, invoked, and destroyed on that thread. It
+owns its context, logical device, allocator, frame executor, scratch pool,
+filters, compositor, pipeline contexts, descriptors, textures, readback state,
+ready buffers, caches, and progressive validity. Native Vulkan objects never
+cross device boundaries. Every participating engine retains the ordinary
+configured frame-slot count; the one-outstanding-tile lane contract does not
+restrict the engine's internal Vulkan submissions to one executor slot.
 
-`Z3DGpuInfo` remains the process-global capability record published by the
-canonical engine. Worker initialization does not replace it. Volume planning
-that reads `Z3DGpuInfo` therefore uses the canonical adapter's limits for every
-worker. Worker selection excludes devices whose 2D/3D texture dimensions,
-array-layer count, or GPU-memory planning capacity are below the canonical
-record. Using the least-capable adapter as the canonical device provides the
-conservative configuration for a heterogeneous worker set.
+One queued lane callback performs the complete batch on each worker thread.
+The canonical lane executes the same operation inline on the canonical engine
+thread. Worker threads and independent Vulkan queues can therefore record,
+submit, wait for readback, and claim later tiles concurrently. The caller waits
+for every lane before the synchronous capture call returns.
 
-All coordinator and worker operations run on the canonical rendering thread.
-Workers borrow the canonical engine's installed `ZQtExecutor`; the coordinator
-does not create CPU threads or pump Qt events. Command recording and queue
-submission are serialized on that thread, while already-submitted work on
-independent device queues may overlap.
+The pool is destroyed on the canonical engine thread. Each worker engine is
+deleted on its owning thread before that thread is stopped and joined. The
+canonical engine releases the pool before tearing down its own rendering
+resources.
 
-The coordinator must be destroyed on the canonical rendering thread while the
-canonical engine and borrowed executor are still alive.
+## Document and Render State
 
-### Direct Single-Device Rendering
+All engines observe the same `ZDoc`. Worker views use their normal document
+subscriptions for object and data-pack lifetime changes, and document-owned
+payloads are shared directly. Only the canonical engine may propagate
+view-originated selection or visibility mutations back to the document.
 
-The normal rendering and capture APIs do not allocate or consult a coordinator.
-Interactive rendering, GUI screenshots, headless animation export, OpenGL
-rendering, and headless scene export with an empty
-`--atlas_vk_multi_device_tile_worker_indices` flag execute on the canonical
-engine. `takeFixedSizeScreenShot()` passes no coordinator, so direct tiled
-export submits every tile through that engine.
+Mutable rendering state is engine-local. Workers do not share filter,
+parameter, compositor, camera, scratch, descriptor, or ready-buffer QObjects
+with the canonical engine or with one another.
 
-The opt-in headless scene route passes an externally owned coordinator to
-`takeFixedSizeScreenShotWithVulkanTileCoordinator()`. The engine verifies that
-the coordinator belongs to that exact canonical engine. If the output fits in
-one effective tile, pixel capture still executes directly on the canonical
-engine; the requested worker set is nevertheless validated and initialized
-before that size branch. Otherwise the coordinator renders the spatial tile
+At the start of every batch with a noncanonical lane, the canonical engine
+publishes one immutable `Z3DRenderingEngine::VulkanTileRenderState` containing:
+
+- compositor and global-parameter JSON;
+- every available per-object view state;
+- device pixel ratio; and
+- the complete runtime camera.
+
+All non-canonical lanes share that immutable publication. Before claiming a
+tile, each worker applies object states, device pixel ratio, general state, and
+finally the complete camera. Object state is applied before bound-dependent
+global parameters, and the camera is last so worker-local bound updates do not
+replace the canonical clipping range. The canonical lane already owns the
+published values and does not serialize them back into itself.
+
+Each lane then installs the common full-output viewport and prepares mesh LOD
+for that extent. The prepared LOD remains active for the lane's batch. Every
+tile independently installs its attachment size, guarded frustum, and
+compositor rendering region; full-frame output-size state is not copied among
+engines.
+
+The lane callback does not pump its Qt event loop. Consequently, engine-local
+filter and parameter state is fixed for the callback after state application.
+The immutable publication does not freeze or version shared document payloads;
+the fixed-size export route requires the document scene to remain
+stable for the synchronous batch.
+
+`Z3DGpuInfo` remains the canonical engine's process-wide planning record.
+Worker initialization does not replace it. Compatible worker candidates must
+satisfy the Vulkan pipeline contract and the canonical record's relevant image
+and memory-planning limits.
+
+## Device Selection
+
+`compatibleVulkanTileWorkerSelections()` returns exact, preference-sorted
+device selections from the initialized canonical Vulkan context. Each
+selection contains both an index and the expected physical-device UUID.
+
+Pool configuration requires every selection to belong to that compatible set,
+with unique indices and UUIDs. A non-canonical worker independently enumerates
+devices and requires both values to identify the requested adapter. There is no
+substitute-device or OpenGL fallback.
+
+Compatibility is a correctness gate, not a speed policy. A slower device can
+hold the batch tail after claiming a tile, and workers add construction, state
+synchronization, and device-local resource costs. Concurrent devices can also
+contend for host CPU, driver, and shared-memory bandwidth. Representative
+scenes and tile sizes determine whether a selected set improves throughput.
+
+## Tile and Batch Contract
+
+`Z3DTileDescriptor` is pure spatial geometry. It stores a full output extent,
+a bottom-left-origin valid output rectangle, and guard width. Attachment
+extent, guarded frustum, crop region, and top-left assembly origin are derived
+from those values. `makeZ3DTileDescriptors()` covers odd and edge extents
+exactly once in bottom-row-first serpentine order.
+
+Before scheduling, the pool verifies that the descriptor list is non-empty,
+uses one full output extent, contains no overlapping valid rectangles, and
+covers every output pixel exactly once.
+
+A tile runs the complete active filter and compositor pipeline on one engine.
+Transparency resolves locally inside that tile. Stereo eyes are not separate
+tasks: a stereo assignment renders and returns both eyes before the lane claims
+more work. Results contain owned, guard-free, top-left-origin RGBA pixels and
+no device, engine, QObject, or native-resource handle.
+
+The batch owns:
+
+- an atomic next-tile index for dynamic claims;
+- an atomic stop flag;
+- the first observed failure and first non-cancellation failure;
+- one full-size `Z3DRenderedFrame`;
+- completion state for every descriptor; and
+- a mutex protecting frame assembly.
+
+Each lane claims one index at a time. Faster lanes collect their current result
+and atomically claim another tile, so work distribution follows completed
+throughput rather than a fixed partition. Each engine permits exactly one
+outstanding tile.
+
+## Submission, Readback, and Assembly
+
+At batch entry, each participating engine saves its existing readback
+completion policy and selects `ReturnAfterSubmit`. Mesh export state and the
+original readback policy are restored when the lane finishes or abandons the
 batch.
 
-Direct rendering performs no worker selection or per-draw device routing.
-OpenGL never constructs or consults the Vulkan coordinator. Healthy
-single-device Vulkan submission performs only constant-time sticky-failure
-observations at backend entry and frame acquisition.
+For each claimed tile, the engine:
 
-## Device Selection and Worker Construction
-
-Worker construction requires an initialized canonical Vulkan engine on its
-rendering thread. `compatibleVulkanTileWorkerSelections()` returns each
-physical device that satisfies the Vulkan pipeline contract and exposes
-planning-relevant limits at least as large as the canonical capability record,
-represented by a preference-sorted index plus expected device UUID.
-
-The explicit coordinator constructor accepts a caller-supplied sequence of
-these selections. It requires:
-
-- at least one selection;
-- every selection to belong to the canonical compatible-device set;
-- unique preference indices; and
-- unique physical-device UUIDs.
-
-Each worker independently enumerates devices and requires both parts of its
-selection to resolve to the same compatible adapter. Exact worker selection
-never falls back to another adapter or to OpenGL. A worker:
-
-- initializes an independent Vulkan context and logical device;
-- creates no OpenGL surface or canvas;
-- does not overwrite process-global GPU capability state;
-- borrows the canonical rendering-thread executor; and
-- propagates reported filter or view initialization failures.
-
-Partially constructed worker sets are destroyed if any worker fails to
-initialize. The one-argument coordinator constructor creates one worker on the
-canonical engine's selected adapter; it executes the same batch path as an
-explicit multi-device worker set.
-
-For headless scene export,
-`--atlas_vk_multi_device_tile_worker_indices` is a comma-separated list of
-preference-sorted Vulkan indices and requires at least two entries. Every entry
-must resolve to a compatible device, and both preference indices and physical
-device UUIDs must be unique. Invalid, unavailable, incompatible, or duplicate
-entries fail export without selecting a substitute device.
-
-The flag contains the complete worker set. The canonical adapter renders tiles
-only when its index is included in that list. `--atlas_vk_device_index` and the
-single Linux scene-export value accepted by `--use_gpu_devices` select the
-canonical engine independently.
-
-## Tile Descriptor and Result Contract
-
-The unit of work is a spatial tile.
-
-- A tile runs the complete active filter and compositor pipeline.
-- Stereo remains inside one attempt; eyes are not separate tasks.
-- Transparency resolves inside the tile; no OIT state crosses devices.
-- A tile returns final display pixels rather than native GPU resources or an
-  intermediate render target.
-- Returned images contain only the guard-free valid region.
-
-`Z3DTileDescriptor` stores the full output extent, a bottom-left-origin
-half-open valid output rectangle, and guard width. Checked accessors derive the
-expanded attachment extent and origin, normalized frustum bounds, valid
-attachment crop, and top-left assembly origin. Guards may extend beyond the
-full output so edge tiles retain the same filtering context.
-
-`makeZ3DTileDescriptors()` covers the complete output exactly once, including
-odd extents and edge tiles, in bottom-row-first serpentine order.
-
-`Z3DRenderedTile` owns top-left-origin RGBA pixels. `primaryColor` contains the
-mono or left-eye result; `rightColor` is present only when the same attempt
-rendered a stereo pair. These are save-oriented straight-alpha pixels after
-premultiplied-color correction, not interactive premultiplied ready-buffer
-data.
-
-`renderFrame()` requires a non-empty descriptor sequence that shares one full
-output extent, contains no overlapping valid rectangles, and covers every
-output pixel exactly once. It allocates one `Z3DRenderedFrame`, collects tiles
-in completion order, validates each tile's size, RGBA8 type, and eye mode, and
-immediately pastes it at `topLeftAssemblyOrigin()`. Completed tile images are
-released instead of being retained for a second full-frame assembly pass. The
-returned primary and optional right-eye images are top-left-origin and ready to
-save without another vertical flip.
-
-Descriptors and results contain no engine, device, QObject, scheduler, or
-native resource handle.
-
-## Batch State Snapshot
-
-Before a coordinated batch submits any tile, the coordinator captures:
-
-1. global and compositor JSON state;
-2. every available canonical object-view state;
-3. device pixel ratio; and
-4. the complete runtime camera, including fields omitted from scene JSON.
-
-It then applies the same captured values to every worker in this order:
-
-1. object-view states;
-2. device pixel ratio;
-3. global and compositor state; and
-4. complete camera state.
-
-Object state precedes global state so bound-dependent parameters use final
-canonical object ranges. Camera state is applied last so worker-local
-provisional bounds cannot replace its clipping range. Full-frame output size is
-not copied; every tile submission installs its own attachment extent while the
-camera receives the descriptor's full output extent.
-
-State capture and application are synchronous on the canonical rendering
-thread and do not pump Qt events. No queued document or parameter update can
-interleave with a batch. Synchronization is allowed only when no worker has an
-outstanding tile. If capture or application fails for any worker, the entire
-worker set is discarded and no tile is submitted.
-
-After synchronization, every worker sets the common full-output camera
-viewport and prepares mesh filters for that full view. The prepared export LOD
-remains fixed while the worker renders its assigned tiles and is released after
-the complete frame has been assembled. Each submitted descriptor must match
-the extent used for that preparation.
-
-Workers retain ordinary document-to-view subscriptions for object and data
-lifetime changes between batches. The coordinator does not expose a batch
-ticket that survives across rendering-thread event-loop turns.
-
-## Submit, Collect, and Dynamic Refill
-
-Each worker accepts exactly one outstanding tile. `submitVulkanTile()`:
-
-1. validates worker role, thread affinity, device ownership, and healthy
-   submission state;
+1. validates role, thread, device, batch extent, and submission health;
 2. observes cancellation before recording;
-3. installs the attachment extent, full-output viewport, guarded tile frustum,
-   and compositor rendering region;
-4. records and submits the complete final-quality mono or stereo pipeline with
-   `ReadbackCompletionPolicy::ReturnAfterSubmit`; and
-5. retains the descriptor, eye mode, and render-frame token until collection.
+3. installs the tile attachment size and guarded projection;
+4. records and submits the complete mono or stereo frame;
+5. retains the descriptor, eye mode, and immutable render-frame token;
+6. pumps device-local completion safe points until final readback publication;
+7. accepts ready pixels only when the published eye token or tokens exactly
+   match the outstanding frame token; and
+8. materializes only the valid attachment rectangle from mapped RGBA8 readback,
+   directly deinterleaving, correcting premultiplied color, and applying the
+   required row orientation.
 
-The tile projection and output extent remain unchanged while final-pixel
-readback is pending. `isVulkanTileReady()` pumps completion safe points and
-accepts readiness only when the published eye token or tokens exactly match the
-outstanding render-frame token. A newer publication while an older tile remains
-outstanding is an invariant violation.
+The lane keeps its tile projection for the batch. The next submission replaces
+that projection directly, and normal completion or failure abandonment restores
+the full-frame projection once at the batch boundary.
 
-`collectVulkanTile()` validates the ready buffers, copies and crops the valid
-region into owned images, normalizes image orientation, clears the outstanding
-assignment, and restores the worker's full-frame projection.
+Deferred image paging or preview warnings emitted while processing a tile are
+treated as tile failures. The canonical lane can borrow the enclosing capture
+error scope; an independent worker owns a tile-local scope.
 
-`renderFrame()` uses a dynamic shared queue:
+A submitted tile keeps its Vulkan and readback resources alive through the
+normal device-local fence and publication lifecycle. A stop request does not
+discard an outstanding submission. The lane waits for publication, collects
+the result to close its ownership boundary, and only then stops or claims more
+work.
 
-1. submit one tile to each worker while unassigned tiles remain;
-2. poll every assigned worker on the canonical rendering thread;
-3. collect completed pixels for the original tile index;
-4. paste the owned result into the output frame and release the tile image;
-5. immediately give that worker the next unassigned tile; and
-6. return only after every output pixel has a result.
+Completed tiles are pasted immediately into the batch frame under the assembly
+mutex and then released. Per-tile dimensions, RGBA8 type, eye mode, placement,
+and one-time completion are checked. The returned frame is save-oriented and
+requires no additional vertical flip.
 
-Workers therefore receive work according to observed completion rate instead
-of a fixed equal partition. Polling does not process Qt events. Independent
-device queues may overlap, although mandatory synchronization inside an
-individual rendering pipeline can limit the amount of overlap for that tile.
+Direct tiled Vulkan capture uses the same valid-region conversion. Guard pixels
+are not copied into an intermediate `ZImg`, and conversion does not allocate a
+full-attachment double-precision alpha image or a second cropped image.
 
-## Cancellation and Failure Cleanup
+## Cancellation and Failure
 
-Cancellation is observed before initial submission, between assignments, and
-between completion-poll iterations. Once cancellation is observed, the
-coordinator submits no new tiles. Worker teardown drains already-submitted work
-to its completion boundary; partial results are not returned.
+Cancellation is checked before batch publication, before tile submission, and
+between assignments. Once a lane observes cancellation or the shared stop
+flag, it makes no further claims. A claim already past that observation point
+can still submit; it is drained and collected before the lane exits. Partial
+pixels are never saved or returned.
 
-Any synchronization, rendering, collection, or cancellation exception makes
-the batch fail as a unit. The coordinator:
+Every lane catches its local exception, records the first observed failure,
+sets the shared stop flag, and restores or abandons its engine-side export
+state. Any observed non-cancellation failure, whether raised while rendering or
+cleaning up, takes precedence over an ordinary cancellation so an unsafe pool
+cannot be retained merely because another lane observed cancellation first.
+Other lanes finish any outstanding tile and stop. The caller joins all worker
+tasks before rethrowing the selected failure.
 
-- stops assigning work;
-- destroys every worker on the canonical rendering thread;
-- lets engine teardown drain known submissions and completion safe points;
-- discards all partial results; and
-- rethrows the failure.
+Normal cancellation preserves the configured pool after all lanes have
+cleanly restored their state. A non-cancellation batch failure removes the
+pool, destroys non-canonical engines on their owning threads, and requires
+explicit reconfiguration before another pooled tiled capture. Backend-owned
+resources from submitted work remain governed by each device's normal
+completion or failed-device teardown rules. Abandonment advances the
+compositor's readback-owner revision, so a late completion retires its resources
+without publishing pixels from the failed attempt. The batch never continues
+with a reduced device set and never returns a partially assembled frame.
 
-The coordinator does not continue on a reduced device set and does not reuse a
-partially synchronized or failed worker set. A later call observes that no
-healthy workers remain.
+## Heterogeneous Output and Dense Slice Binding
 
-## Headless Scene Export
+Atlas does not normalize floating-point, depth, fragment-order, or
+transparency results across drivers. Dynamic claims can assign a tile to a
+different adapter on another run. Cross-device pixels and complete image
+hashes are therefore not guaranteed to be identical, even though guard pixels
+preserve the required spatial context.
 
-`ZRunExport3DScene` owns the coordinator for one export operation. With an
-empty worker-index flag, it calls the ordinary fixed-size screenshot path. With
-a non-empty valid worker list, it creates exact-device workers and passes the
-coordinator to the fixed-size screenshot API. A multi-tile capture renders
-final-quality tiles, assembles them as they complete, and writes the same mono
-image output used by direct scene export.
-
-The scene runner requests `MonoView`. The coordinator and frame types preserve
-complete stereo-pair tile semantics, but no application entry point routes
-stereo export through the coordinator. Headless animation export does not use
-the in-process coordinator.
-
-Atlas does not normalize numerical results across physical devices. Each tile
-contains the pixels produced by its assigned adapter and driver.
-Device-dependent floating-point, depth, fragment-order, and backend feature
-behavior can therefore produce per-tile differences, especially for
-transparency modes. Guard pixels preserve spatial filtering context but do not
-reconcile cross-device numerical differences. Every selected adapter must be
-able to render the scene correctly and satisfy the canonical adapter's resource
-plan. Direct rendering on each adapter verifies device-local output but does
-not by itself verify a plan derived from a stronger canonical adapter. Use the
-least-capable adapter as canonical, validate the complete worker set on the
-target scene, or use equivalent adapters. Use direct rendering when uniform
-output across tile boundaries is required.
-
-Dynamic refill assigns later tiles according to the completion order observed
-by the coordinator. When heterogeneous adapters produce different pixels, a
-later tile can be assigned to a different adapter on another run. Exact
-tile-to-adapter assignment, assembled pixels, and image hashes are therefore
-not guaranteed to repeat across runs.
-
-The ordinary Vulkan submission lifecycle also applies:
-
-- recording either submits a complete command buffer or enters the
-  definitive-unsubmitted abort path;
-- definitive-unsubmitted cleanup drains resource-release hooks, discards
-  fence-completion callbacks, retires unavailable readbacks, and records the
-  first sticky device failure;
-- queue-submission or fence-observation failures are fatal because submission
-  ownership is uncertain;
-- submitted resources remain alive until fence completion; and
-- a readback staging slot is reusable only after both its producer and consumer
-  owners finish.
+Dense, non-paged single-channel Vulkan slices select their push-descriptor or
+bindless texture-binding path independently from each logical device's
+capabilities. Selection contains no vendor branch and does not share descriptor
+state across engines. See the Developer Guide's Slices Path for the binding
+contracts.
 
 ## Validation
 
-CPU-only tests cover tile geometry and projection, output orientation,
-descriptor invariants, mono/stereo frame allocation and odd-grid top-left
-placement, exact index-and-UUID selection, readback ownership, and publication
-identity without constructing a Vulkan context or logical device.
+CPU-only tile tests cover geometry, projection, exact coverage, odd extents,
+guard behavior, orientation, mono/stereo allocation, assembly, invalid
+descriptor extents, and attachment overflow.
 
-The opt-in Vulkan coordinator smoke tests run only when
-`ATLAS_ENABLE_VULKAN_SMOKE_TEST=1`:
-
-- `SingleAdapterPpllBatchPreservesParityAndCanonicalEngine` validates the
-  one-worker batch path, synchronized state, exact same-adapter PPLL tile
-  parity, teardown, and continued canonical rendering. Its synthetic scene
-  contains opaque and translucent geometry and verifies a non-empty translucent
-  contribution before comparing tiled results.
-- `DistinctPhysicalDevicesCompleteBatchAndPreserveCanonicalEngine` requires at
-  least two distinct physical-device UUIDs in the canonical engine's
-  planning-compatible worker set, otherwise it skips. It constructs exact
-  workers on two devices, executes the dynamically refilled PPLL batch,
-  validates the assembled frame contract, records cross-device pixel deltas as
-  diagnostics, and verifies that canonical state and rendering remain intact.
-  Device-dependent deltas are not a pass/fail threshold.
-
-With the environment variable unset, the smoke tests skip before constructing
-`QApplication`, `Z3DRenderingEngine`, or `ZVulkanContext`. Normal CI therefore
-does not require a Vulkan ICD or GPU. Atlas still retains its normal Vulkan SDK
-and shader-compiler build prerequisites.
+Complete-engine worker tests are opt-in through
+`ATLAS_ENABLE_VULKAN_SMOKE_TEST=1`. They cover canonical-device participation,
+same-adapter PPLL parity, a two-physical-device batch, immutable state transfer,
+assembled-frame contracts, worker teardown, and continued canonical rendering.
+Without the environment variable, the tests skip before constructing a Vulkan
+engine, so ordinary CI does not require a Vulkan ICD or GPU.

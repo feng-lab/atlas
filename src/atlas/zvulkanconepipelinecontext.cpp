@@ -1000,7 +1000,7 @@ ZVulkanConePipelineContext::ensurePipeline(const PipelineKey& key, const vulkan:
 
 vk::PipelineVertexInputStateCreateInfo ZVulkanConePipelineContext::makeVertexInputState() const
 {
-  static std::array<vk::VertexInputBindingDescription, 5> bindings{
+  static const std::array<vk::VertexInputBindingDescription, 5> bindings{
     vk::VertexInputBindingDescription{.binding = 0,
                                       .stride = static_cast<uint32_t>(sizeof(glm::vec4)),
                                       .inputRate = vk::VertexInputRate::eVertex}, // origin
@@ -1017,7 +1017,7 @@ vk::PipelineVertexInputStateCreateInfo ZVulkanConePipelineContext::makeVertexInp
                                       .stride = static_cast<uint32_t>(sizeof(glm::vec4)),
                                       .inputRate = vk::VertexInputRate::eVertex}  // top color
   };
-  static std::array<vk::VertexInputAttributeDescription, 5> attrs{
+  static const std::array<vk::VertexInputAttributeDescription, 5> attrs{
     vk::VertexInputAttributeDescription{.location = 0,
                                         .binding = 0,
                                         .format = vk::Format::eR32G32B32A32Sfloat,
@@ -1037,7 +1037,7 @@ vk::PipelineVertexInputStateCreateInfo ZVulkanConePipelineContext::makeVertexInp
                                         .offset = 0                                                               }
   };
 
-  static vk::PipelineVertexInputStateCreateInfo info{};
+  vk::PipelineVertexInputStateCreateInfo info{};
   info.vertexBindingDescriptionCount = static_cast<uint32_t>(bindings.size());
   info.pVertexBindingDescriptions = bindings.data();
   info.vertexAttributeDescriptionCount = static_cast<uint32_t>(attrs.size());

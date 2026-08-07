@@ -10,9 +10,10 @@
 
 namespace nim {
 
-// Lightweight, lock-free (single-threaded) perf collector.
-// Aggregates per-submission CPU/GPU scopes under a user-visible frame token
-// and emits a single summary when a token is safe to flush.
+// Lightweight collector local to one rendering thread. It aggregates
+// per-submission CPU/GPU scopes under a lane-local render-frame token and
+// emits one summary when a token is safe to flush. Thread-local aggregation
+// needs no cross-lane lock; optional process-global file output is serialized.
 class Z3DPerfCollector
 {
 public:
@@ -103,6 +104,8 @@ public:
     Stats stats; // lightweight counters for diagnostics
   };
 
+  // Each rendering lane owns independent token and aggregation state, so
+  // ingestion never crosses threads.
   static Z3DPerfCollector& instance();
 
   // `off` disables performance-token registration, CPU/GPU scopes, and

@@ -164,6 +164,13 @@ private:
 
   Z3DRendererVulkanBackend& m_backend;
 
+  // Dense slices bind exactly one volume and one colormap. Keep their sampler
+  // contract local to this context so the push-descriptor path does not change
+  // the sampler state of residency-managed textures used by other pipelines.
+  std::optional<vk::raii::Sampler> m_denseSliceVolumeSampler;
+  std::optional<vk::raii::Sampler> m_denseSliceColormapSampler;
+  std::optional<vk::raii::DescriptorSetLayout> m_denseSlicePushDescriptorSetLayout;
+
   std::map<SlicePipelineKey, PipelineInstance> m_slicePipelines;
   std::map<MergePipelineKey, PipelineInstance> m_mergePipelines;
   std::map<BlockIdPipelineKey, PipelineInstance> m_blockIdPipelines;
@@ -195,7 +202,7 @@ private:
 
   // Bindless + dynamic-UBO descriptor state.
   // - set 0: backend bindless sampled-image tables (shared, per frame-slot)
-  // - set 1: small per-draw UBO for bindless texture indices (fast slice path)
+  // - set 1: per-draw bindless image indices (dense fallback and paged draws)
   // - set 2: paging PageData UBO (paged slice + block-ID discovery)
 
   std::unique_ptr<ZVulkanBuffer> m_vertexBuffer;
@@ -218,6 +225,7 @@ private:
   ensureVolumeTexture(Z3DImg& owner, size_t channel, uint64_t generation, std::shared_ptr<const ZImg> image);
   ZVulkanTexture& ensureColormapTexture(size_t channel, const ZColorMap* colorMap, ChannelResources& resources);
 
+  void ensureDenseSlicePushDescriptorResources();
   PipelineInstance& ensureSlicePipeline(const SlicePipelineKey& key, const vulkan::AttachmentFormats& formats);
   PipelineInstance& ensureMergePipeline(const MergePipelineKey& key, const vulkan::AttachmentFormats& formats);
   PipelineInstance& ensureBlockIdPipeline(const BlockIdPipelineKey& key, vk::Format colorFormat);

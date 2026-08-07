@@ -51,6 +51,34 @@ constexpr uint32_t kInvalidBlockID = 0u;
 constexpr uint32_t kUnmappedBlockID = 0xFFFFFFFFu;
 constexpr uint32_t kBlockIdCompactionHeaderWords = 1u + 8u; // [count][counts[8]]
 constexpr uint32_t kDenseBitsetInvalidBlockIdFlag = 0x80000000u;
+constexpr uint32_t kDenseSliceVolumeBinding = 0u;
+constexpr uint32_t kDenseSliceColormapBinding = 1u;
+constexpr uint32_t kDenseSlicePushDescriptorCount = 2u;
+
+bool supportsDenseSlicePushDescriptors(ZVulkanDevice& device)
+{
+  const auto& support = device.context().selectedDeviceSupport();
+  return support.pushDescriptorExtension && support.maxPushDescriptors >= kDenseSlicePushDescriptorCount;
+}
+
+vk::DescriptorImageInfo denseSlicePushDescriptorInfo(ZVulkanTexture& texture,
+                                                     ZVulkanDevice& device,
+                                                     vk::ImageViewType expectedViewType,
+                                                     const char* label)
+{
+  CHECK_EQ(&texture.ownerDevice(), &device) << label << " belongs to a different Vulkan device";
+  CHECK(texture.resident()) << label << " is not resident";
+  CHECK(static_cast<bool>(texture.info().usage & vk::ImageUsageFlagBits::eSampled)) << label << " is not sampleable";
+  CHECK(texture.info().viewType == expectedViewType)
+    << label << " has view type " << enumOrUnderlying(texture.info().viewType, 16) << ", expected "
+    << enumOrUnderlying(expectedViewType, 16);
+
+  vk::DescriptorImageInfo info = texture.descriptorInfo();
+  CHECK(info.imageView) << label << " has no image view";
+  CHECK(info.imageLayout == texture.layout()) << label << " descriptor layout does not match its tracked layout";
+  info.sampler = vk::Sampler{}; // The push-descriptor layout provides the immutable sampler.
+  return info;
+}
 
 inline VulkanBlockIdCompactionMethod vkBlockIdCompactionMethod()
 {
@@ -253,6 +281,7 @@ void ZVulkanImgSlicePipelineContext::preRecordBindlessWarmup(const BindlessWarmu
     imageBlockUploader = &m_backend.sharedImageBlockUploader();
     imageBlockUploader->bindToImage(image);
   }
+  const bool useDenseSlicePushDescriptors = !desc.wantsPaging && supportsDenseSlicePushDescriptors(m_backend.device());
 
   for (size_t channelIndex : desc.channels) {
     CHECK_LT(channelIndex, channelCount) << "Slice bindless warmup: channel index out of range";
@@ -263,7 +292,9 @@ void ZVulkanImgSlicePipelineContext::preRecordBindlessWarmup(const BindlessWarmu
       CHECK(channelImage != nullptr) << "Slice bindless warmup: missing channel image";
       const uint64_t generation = image.volumeGeneration(channelIndex);
       ZVulkanTexture& vol = ensureVolumeTexture(image, channelIndex, generation, channelImage);
-      (void)m_backend.bindlessRegisterSampledImageAuto(vol, "slice_volume");
+      if (!useDenseSlicePushDescriptors) {
+        (void)m_backend.bindlessRegisterSampledImageAuto(vol, "slice_volume");
+      }
     }
 
     if (desc.wantsColormap) {
@@ -272,7 +303,9 @@ void ZVulkanImgSlicePipelineContext::preRecordBindlessWarmup(const BindlessWarmu
       const ZColorMap* colorMap = (*desc.colormaps)[channelIndex];
       CHECK(colorMap != nullptr) << "Slice bindless warmup: null ZColorMap for channel " << channelIndex;
       ZVulkanTexture& colormap = ensureColormapTexture(channelIndex, colorMap, resources);
-      (void)m_backend.bindlessRegisterSampledImageAuto(colormap, "slice_colormap");
+      if (!useDenseSlicePushDescriptors) {
+        (void)m_backend.bindlessRegisterSampledImageAuto(colormap, "slice_colormap");
+      }
     }
 
     if (desc.wantsPaging) {
@@ -1116,8 +1149,6 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
       drawSpec.expectedDescriptorSetCount = 3;
       recorder.recordGraphicsDraw(drawSpec);
     } else {
-      const vk::DescriptorSet dsIndices = m_backend.sharedImgIndicesDescriptorSet();
-      CHECK(dsIndices) << "Slice fast draw missing backend-shared indices descriptor set (unexpected)";
       CHECK(inputs.volume && inputs.colormap) << "Slice fast draw missing textures";
 
       sliceKey.levelCount = 1u;
@@ -1125,23 +1156,55 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
       drawSpec.pipelineHandle = pipeline.pipeline->pipelineHandle();
       drawSpec.pipelineLayoutHandle = pipeline.pipeline->pipelineLayoutHandle();
 
-      SliceSingleChannelBindlessUBOStd140 ubo{};
-      ubo.volume_1 = m_backend.bindlessLookupSampledImageAutoOrCrash(*inputs.volume, "slice_fast_volume");
-      ubo.colormap_1 = m_backend.bindlessLookupSampledImageAutoOrCrash(*inputs.colormap, "slice_fast_colormap");
+      if (supportsDenseSlicePushDescriptors(m_backend.device())) {
+        CHECK(m_denseSliceVolumeSampler.has_value());
+        CHECK(m_denseSliceColormapSampler.has_value());
+        vk::DescriptorImageInfo volumeInfo = denseSlicePushDescriptorInfo(*inputs.volume,
+                                                                          m_backend.device(),
+                                                                          vk::ImageViewType::e3D,
+                                                                          "Slice fast volume texture");
+        vk::DescriptorImageInfo colormapInfo = denseSlicePushDescriptorInfo(*inputs.colormap,
+                                                                            m_backend.device(),
+                                                                            vk::ImageViewType::e2D,
+                                                                            "Slice fast colormap texture");
 
-      const auto slice = m_backend.suballocateUniformFor(payload, sizeof(ubo));
-      CHECK(slice.mapped != nullptr) << "Slice indices uniform slice mapping missing";
-      std::memcpy(slice.mapped, &ubo, sizeof(ubo));
-      CHECK(slice.offset <= std::numeric_limits<uint32_t>::max())
-        << "Slice indices dynamic offset exceeds uint32 range: " << slice.offset;
-      const uint32_t dynOffset = static_cast<uint32_t>(slice.offset);
+        std::array<vk::WriteDescriptorSet, kDenseSlicePushDescriptorCount> writes{};
+        writes[0].dstBinding = kDenseSliceVolumeBinding;
+        writes[0].descriptorCount = 1u;
+        writes[0].descriptorType = vk::DescriptorType::eCombinedImageSampler;
+        writes[0].pImageInfo = &volumeInfo;
+        writes[1].dstBinding = kDenseSliceColormapBinding;
+        writes[1].descriptorCount = 1u;
+        writes[1].descriptorType = vk::DescriptorType::eCombinedImageSampler;
+        writes[1].pImageInfo = &colormapInfo;
 
-      const std::array<vk::DescriptorSet, 2> descriptorSets{m_backend.bindlessSampledImageDescriptorSet(), dsIndices};
-      const std::array<uint32_t, 1> dynamicOffsets{dynOffset};
-      drawSpec.descriptorSets = descriptorSets;
-      drawSpec.dynamicOffsets = dynamicOffsets;
-      drawSpec.expectedDescriptorSetCount = 2;
-      recorder.recordGraphicsDraw(drawSpec);
+        const vk::PipelineLayout pipelineLayout = pipeline.pipeline->pipelineLayout();
+        recorder.recordGraphicsDraw(drawSpec, [&](vk::raii::CommandBuffer& cb) {
+          cb.pushDescriptorSetKHR(vk::PipelineBindPoint::eGraphics, pipelineLayout, 0u, writes);
+          cb.draw(drawSpec.vertexCount, drawSpec.instanceCount, drawSpec.firstVertex, drawSpec.firstInstance);
+        });
+      } else {
+        const vk::DescriptorSet dsIndices = m_backend.sharedImgIndicesDescriptorSet();
+        CHECK(dsIndices) << "Slice fast draw missing backend-shared indices descriptor set (unexpected)";
+
+        SliceSingleChannelBindlessUBOStd140 ubo{};
+        ubo.volume_1 = m_backend.bindlessLookupSampledImageAutoOrCrash(*inputs.volume, "slice_fast_volume");
+        ubo.colormap_1 = m_backend.bindlessLookupSampledImageAutoOrCrash(*inputs.colormap, "slice_fast_colormap");
+
+        const auto slice = m_backend.suballocateUniformFor(payload, sizeof(ubo));
+        CHECK(slice.mapped != nullptr) << "Slice indices uniform slice mapping missing";
+        std::memcpy(slice.mapped, &ubo, sizeof(ubo));
+        CHECK(slice.offset <= std::numeric_limits<uint32_t>::max())
+          << "Slice indices dynamic offset exceeds uint32 range: " << slice.offset;
+        const uint32_t dynOffset = static_cast<uint32_t>(slice.offset);
+
+        const std::array<vk::DescriptorSet, 2> descriptorSets{m_backend.bindlessSampledImageDescriptorSet(), dsIndices};
+        const std::array<uint32_t, 1> dynamicOffsets{dynOffset};
+        drawSpec.descriptorSets = descriptorSets;
+        drawSpec.dynamicOffsets = dynamicOffsets;
+        drawSpec.expectedDescriptorSetCount = 2;
+        recorder.recordGraphicsDraw(drawSpec);
+      }
     }
 
     if (setFinalization && payload.streamKey != 0u) {
@@ -1385,10 +1448,10 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
 
 vk::PipelineVertexInputStateCreateInfo ZVulkanImgSlicePipelineContext::makeSliceVertexInputState() const
 {
-  static vk::VertexInputBindingDescription binding{.binding = 0,
-                                                   .stride = static_cast<uint32_t>(sizeof(SliceVertex)),
-                                                   .inputRate = vk::VertexInputRate::eVertex};
-  static std::array<vk::VertexInputAttributeDescription, 2> attrs{
+  static const vk::VertexInputBindingDescription binding{.binding = 0,
+                                                         .stride = static_cast<uint32_t>(sizeof(SliceVertex)),
+                                                         .inputRate = vk::VertexInputRate::eVertex};
+  static const std::array<vk::VertexInputAttributeDescription, 2> attrs{
     vk::VertexInputAttributeDescription{.location = 0,
                                         .binding = 0,
                                         .format = vk::Format::eR32G32B32Sfloat,
@@ -1399,7 +1462,7 @@ vk::PipelineVertexInputStateCreateInfo ZVulkanImgSlicePipelineContext::makeSlice
                                         .offset = static_cast<uint32_t>(offsetof(SliceVertex, texCoord))}
   };
 
-  static vk::PipelineVertexInputStateCreateInfo info{};
+  vk::PipelineVertexInputStateCreateInfo info{};
   info.vertexBindingDescriptionCount = 1;
   info.pVertexBindingDescriptions = &binding;
   info.vertexAttributeDescriptionCount = static_cast<uint32_t>(attrs.size());
@@ -1410,14 +1473,14 @@ vk::PipelineVertexInputStateCreateInfo ZVulkanImgSlicePipelineContext::makeSlice
 vk::PipelineVertexInputStateCreateInfo ZVulkanImgSlicePipelineContext::makeQuadVertexInputState() const
 {
   // Align with pass.vert (vec3 attribute at location 0)
-  static vk::VertexInputBindingDescription binding{.binding = 0,
-                                                   .stride = static_cast<uint32_t>(sizeof(glm::vec3)),
-                                                   .inputRate = vk::VertexInputRate::eVertex};
-  static vk::VertexInputAttributeDescription attr{.location = 0,
-                                                  .binding = 0,
-                                                  .format = vk::Format::eR32G32B32Sfloat,
-                                                  .offset = 0};
-  static vk::PipelineVertexInputStateCreateInfo info{};
+  static const vk::VertexInputBindingDescription binding{.binding = 0,
+                                                         .stride = static_cast<uint32_t>(sizeof(glm::vec3)),
+                                                         .inputRate = vk::VertexInputRate::eVertex};
+  static const vk::VertexInputAttributeDescription attr{.location = 0,
+                                                        .binding = 0,
+                                                        .format = vk::Format::eR32G32B32Sfloat,
+                                                        .offset = 0};
+  vk::PipelineVertexInputStateCreateInfo info{};
   info.vertexBindingDescriptionCount = 1;
   info.pVertexBindingDescriptions = &binding;
   info.vertexAttributeDescriptionCount = 1;
@@ -1576,6 +1639,62 @@ ZVulkanTexture& ZVulkanImgSlicePipelineContext::ensureColormapTexture(size_t cha
   return *resources.colormapTexture;
 }
 
+void ZVulkanImgSlicePipelineContext::ensureDenseSlicePushDescriptorResources()
+{
+  auto& device = m_backend.device();
+  CHECK(supportsDenseSlicePushDescriptors(device));
+  if (m_denseSlicePushDescriptorSetLayout.has_value()) {
+    CHECK(m_denseSliceVolumeSampler.has_value());
+    CHECK(m_denseSliceColormapSampler.has_value());
+    return;
+  }
+  CHECK(!m_denseSliceVolumeSampler.has_value());
+  CHECK(!m_denseSliceColormapSampler.has_value());
+
+  const vk::SamplerCreateInfo volumeSamplerInfo{.magFilter = vk::Filter::eLinear,
+                                                .minFilter = vk::Filter::eLinear,
+                                                .mipmapMode = vk::SamplerMipmapMode::eNearest,
+                                                .addressModeU = vk::SamplerAddressMode::eClampToBorder,
+                                                .addressModeV = vk::SamplerAddressMode::eClampToBorder,
+                                                .addressModeW = vk::SamplerAddressMode::eClampToBorder,
+                                                .borderColor = vk::BorderColor::eFloatTransparentBlack};
+  vk::raii::Sampler volumeSampler{device.context().device(), volumeSamplerInfo};
+
+  const vk::SamplerCreateInfo colormapSamplerInfo{.magFilter = vk::Filter::eLinear,
+                                                  .minFilter = vk::Filter::eLinear,
+                                                  .mipmapMode = vk::SamplerMipmapMode::eNearest,
+                                                  .addressModeU = vk::SamplerAddressMode::eClampToEdge,
+                                                  .addressModeV = vk::SamplerAddressMode::eClampToEdge,
+                                                  .addressModeW = vk::SamplerAddressMode::eClampToEdge,
+                                                  .borderColor = vk::BorderColor::eFloatOpaqueWhite};
+  vk::raii::Sampler colormapSampler{device.context().device(), colormapSamplerInfo};
+
+  const std::array<vk::Sampler, 1> volumeImmutableSampler{*volumeSampler};
+  const std::array<vk::Sampler, 1> colormapImmutableSampler{*colormapSampler};
+  const std::array<vk::DescriptorSetLayoutBinding, kDenseSlicePushDescriptorCount> bindings{
+    vk::DescriptorSetLayoutBinding{.binding = kDenseSliceVolumeBinding,
+                                   .descriptorType = vk::DescriptorType::eCombinedImageSampler,
+                                   .descriptorCount = 1u,
+                                   .stageFlags = vk::ShaderStageFlagBits::eFragment,
+                                   .pImmutableSamplers = volumeImmutableSampler.data()  },
+    vk::DescriptorSetLayoutBinding{.binding = kDenseSliceColormapBinding,
+                                   .descriptorType = vk::DescriptorType::eCombinedImageSampler,
+                                   .descriptorCount = 1u,
+                                   .stageFlags = vk::ShaderStageFlagBits::eFragment,
+                                   .pImmutableSamplers = colormapImmutableSampler.data()}
+  };
+  const vk::DescriptorSetLayoutCreateInfo layoutInfo{
+    .flags = vk::DescriptorSetLayoutCreateFlagBits::ePushDescriptorKHR,
+    .bindingCount = static_cast<uint32_t>(bindings.size()),
+    .pBindings = bindings.data(),
+  };
+  vk::raii::DescriptorSetLayout descriptorSetLayout{device.context().device(), layoutInfo};
+
+  m_denseSliceVolumeSampler.emplace(std::move(volumeSampler));
+  m_denseSliceColormapSampler.emplace(std::move(colormapSampler));
+  m_denseSlicePushDescriptorSetLayout.emplace(std::move(descriptorSetLayout));
+}
+
 ZVulkanImgSlicePipelineContext::PipelineInstance&
 ZVulkanImgSlicePipelineContext::ensureSlicePipeline(const SlicePipelineKey& key,
                                                     const vulkan::AttachmentFormats& formats)
@@ -1585,16 +1704,16 @@ ZVulkanImgSlicePipelineContext::ensureSlicePipeline(const SlicePipelineKey& key,
     return it->second;
   }
 
-  const vk::DescriptorSetLayout bindlessLayout = m_backend.bindlessSampledImageDescriptorSetLayout();
-  CHECK(bindlessLayout) << "Slice pipeline requires backend bindless descriptor set layout";
-
   auto& device = m_backend.device();
 
   const bool paged = key.levelCount > 1u;
+  const bool useDenseSlicePushDescriptors = !paged && supportsDenseSlicePushDescriptors(device);
   const QString vertexShader = paged ? QStringLiteral("transform_with_3dtexture_and_eye_coordinate.vert.spv")
                                      : QStringLiteral("transform_with_3dtexture.vert.spv");
-  const QString fragmentShader = paged ? QStringLiteral("image3d_slice_with_colormap.frag.spv")
-                                       : QStringLiteral("volume_slice_with_colormap_single_channel.frag.spv");
+  const QString fragmentShader =
+    paged ? QStringLiteral("image3d_slice_with_colormap.frag.spv")
+          : (useDenseSlicePushDescriptors ? QStringLiteral("volume_slice_with_colormap_single_channel_push.frag.spv")
+                                          : QStringLiteral("volume_slice_with_colormap_single_channel.frag.spv"));
 
   PipelineInstance instance;
   instance.shader = std::make_unique<ZVulkanShader>(device,
@@ -1605,12 +1724,20 @@ ZVulkanImgSlicePipelineContext::ensureSlicePipeline(const SlicePipelineKey& key,
   auto vertexState = makeSliceVertexInputState();
   instance.pipeline = device.createPipeline(*instance.shader, vertexState, vk::PrimitiveTopology::eTriangleList);
   if (paged) {
+    const vk::DescriptorSetLayout bindlessLayout = m_backend.bindlessSampledImageDescriptorSetLayout();
+    CHECK(bindlessLayout) << "Slice paged pipeline requires backend bindless descriptor set layout";
     const vk::DescriptorSetLayout indicesLayout = m_backend.imgIndicesDescriptorSetLayout();
     CHECK(indicesLayout) << "Slice paged pipeline requires backend indices descriptor set layout";
     const vk::DescriptorSetLayout pageDataLayout = m_backend.imgPageDataDescriptorSetLayout();
     CHECK(pageDataLayout) << "Slice paged pipeline requires backend page-data descriptor set layout";
     instance.pipeline->setDescriptorSetLayouts({bindlessLayout, indicesLayout, pageDataLayout});
+  } else if (useDenseSlicePushDescriptors) {
+    ensureDenseSlicePushDescriptorResources();
+    CHECK(m_denseSlicePushDescriptorSetLayout.has_value());
+    instance.pipeline->setDescriptorSetLayouts({**m_denseSlicePushDescriptorSetLayout});
   } else {
+    const vk::DescriptorSetLayout bindlessLayout = m_backend.bindlessSampledImageDescriptorSetLayout();
+    CHECK(bindlessLayout) << "Slice fast pipeline requires backend bindless descriptor set layout";
     const vk::DescriptorSetLayout indicesLayout = m_backend.imgIndicesDescriptorSetLayout();
     CHECK(indicesLayout) << "Slice fast pipeline requires backend indices descriptor set layout";
     instance.pipeline->setDescriptorSetLayouts({bindlessLayout, indicesLayout});

@@ -102,6 +102,10 @@ public:
   // belongs to the current render frame rather than an earlier submission.
   [[nodiscard]] uint64_t lastPublishedRenderFrameToken(Z3DEye eye) const;
 
+  // Reject final-readback completions already submitted for this compositor.
+  // Their device/staging resources still retire through the normal callback.
+  void invalidatePendingVulkanFinalReadbacks();
+
   void invalidate(State inv) override;
 
   void setProgressiveRenderingMode(bool v) override;
@@ -398,9 +402,9 @@ private:
   void releaseVulkanFinalReadbackMappings();
   void releaseVulkanFinalReadbackMappingsLocked();
 
-  // Completion callbacks snapshot this value. Resizes, backend changes, and
-  // destruction advance it so an old callback can retire its staging slot but
-  // cannot publish through a stale compositor destination.
+  // Completion callbacks snapshot this value. Resizes, backend changes,
+  // abandoned submissions, and destruction advance it so an old callback can
+  // retire its staging slot but cannot publish through a stale destination.
   uint64_t m_vulkanFinalReadbackOwnerRevision = 1u;
 
   // Z3DVertexBufferObject m_PBO;

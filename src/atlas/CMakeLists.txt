@@ -347,6 +347,7 @@ set(ATLAS_VK_SHADER_SOURCES
 
     # Volume single-channel
     volume_slice_with_colormap_single_channel.frag
+    volume_slice_with_colormap_single_channel_push.frag
     volume_slice_with_transfun_single_channel.frag
     volume_raycaster_single_channel.frag
 
@@ -595,7 +596,7 @@ set(SOURCES
     z3dtiledescriptor.h z3dtiledescriptor.cpp
     z3drenderedtile.h
     z3drenderedframe.h z3drenderedframe.cpp
-    zvulkanmultidevicetilecoordinator.h zvulkanmultidevicetilecoordinator.cpp
+    zvulkantileworkerpool_p.h zvulkantileworkerpool.cpp
     zqtexecutor.h zqtexecutor.cpp
     zrenderthreadexecutor_tls.h zrenderthreadexecutor_tls.cpp
     z3dobjview.h z3dobjview.cpp

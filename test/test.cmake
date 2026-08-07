@@ -130,26 +130,27 @@ add_gtest_executable(ztupleliketest)
 # Atlas-side tests
 
 add_atlas_gtest_executable(zcurlruntimetest)
+add_atlas_gtest_executable(z3drenderglobalstatetest)
 add_atlas_gtest_executable(z3dtiledescriptortest)
-add_atlas_gtest_executable(zvulkanmultidevicetilecoordinatortest)
+add_atlas_gtest_executable(zvulkantileworkerpooltest)
 if (APPLE)
-  set(_atlas_vulkan_coordinator_test_spv_dir
-      "$<TARGET_FILE_DIR:zvulkanmultidevicetilecoordinatortest>/../Resources/shader/vulkan/spv")
+  set(_atlas_vulkan_tile_worker_test_spv_dir
+      "$<TARGET_FILE_DIR:zvulkantileworkerpooltest>/../Resources/shader/vulkan/spv")
 else ()
-  set(_atlas_vulkan_coordinator_test_spv_dir
-      "$<TARGET_FILE_DIR:zvulkanmultidevicetilecoordinatortest>/Resources/shader/vulkan/spv")
+  set(_atlas_vulkan_tile_worker_test_spv_dir
+      "$<TARGET_FILE_DIR:zvulkantileworkerpooltest>/Resources/shader/vulkan/spv")
 endif ()
 add_custom_target(
-  zvulkanmultidevicetilecoordinatortest_resources
-  COMMAND ${CMAKE_COMMAND} -E make_directory "${_atlas_vulkan_coordinator_test_spv_dir}"
+  zvulkantileworkerpooltest_resources
+  COMMAND ${CMAKE_COMMAND} -E make_directory "${_atlas_vulkan_tile_worker_test_spv_dir}"
   COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different
           "${CMAKE_CURRENT_LIST_DIR}/../src/atlas/Resources/shader/vulkan/spv"
-          "${_atlas_vulkan_coordinator_test_spv_dir}"
+          "${_atlas_vulkan_tile_worker_test_spv_dir}"
   VERBATIM)
-add_dependencies(zvulkanmultidevicetilecoordinatortest_resources vulkan_shaders)
-add_dependencies(zvulkanmultidevicetilecoordinatortest
-                 zvulkanmultidevicetilecoordinatortest_resources)
-unset(_atlas_vulkan_coordinator_test_spv_dir)
+add_dependencies(zvulkantileworkerpooltest_resources vulkan_shaders)
+add_dependencies(zvulkantileworkerpooltest
+                 zvulkantileworkerpooltest_resources)
+unset(_atlas_vulkan_tile_worker_test_spv_dir)
 
 # Vulkan RAII pipeline recorder debug checks (debug-only assertions in code)
 # This test only exercises header + a few .cpp symbols; there is no GPU work.

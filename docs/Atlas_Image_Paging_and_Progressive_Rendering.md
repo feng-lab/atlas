@@ -15,8 +15,13 @@ Scope
 
 - This document details the Atlas image paging and progressive volume rendering pipeline across OpenGL and Vulkan backends, from ingesting images to progressive full‑resolution rendering. It focuses on the filter/renderers, image cache layout and updates, the block‑ID discovery pass, and how progressive rounds converge to a full‑resolution result.
 - Relevant code: `src/atlas/` (filter, renderers, cache), `src/img/` and `src/atlas/zimgpack.*` (I/O and tile management), scratch resource pool, and shaders listed in `src/atlas/CMakeLists.txt`.
-- Each paged interactive or export renderer remains a one-device engine. These paths do not construct
-  `ZVulkanMultiDeviceTileCoordinator`; see
+- Each render engine remains bound to one GPU device. Interactive rendering and untiled captures run on the canonical
+  engine and its selected device.
+- For a fixed-size capture that spans multiple tiles, an explicitly configured compatible Vulkan device set is served by
+  a private `Z3DRenderingEngine::ZVulkanTileWorkerPool` owned by the canonical engine. The canonical adapter renders tiles
+  only when it is in that set. Every selected noncanonical adapter has a private render engine on its own rendering thread.
+- Paging state, residency, and GPU resources remain local to each engine. The private pool publishes the canonical render
+  state to its worker engines, distributes tile descriptors, and assembles the completed tiles. See
   [VULKAN_MULTI_GPU_DESIGN.md](VULKAN_MULTI_GPU_DESIGN.md) for the tile-worker contract.
 
 Quick Reference — Addressable Max Size (cubic/isotropic estimate)
@@ -415,6 +420,8 @@ Conventions
 - Color writes use premultiplied alpha (rgb scaled by a) unless forced opaque.
 - Depth mapping uses ze↔zw transforms with uniforms `ze_to_zw_a`, `ze_to_zw_b`: zw = a/ze + b.
 - Transfer functions/colormaps are sampled by scalar voxel intensity in [0,1]. On OpenGL they are 1D textures; on Vulkan they are 2D Nx1 textures for MoltenVK/Metal portability.
+- Vulkan dense single-channel slices select a capability-supported direct binding or the bindless fallback. Paged slices
+  use their page-directory, page-table, cache, volume, and colormap bindings; see the Developer Guide's Slices Path.
 - Progressive raycasting uses a color target and a ray‑state target (ray length and resolved depth). Completed rays mark length=1.
 - Full‑res paging uses a page directory and page table cache (RGBA32UI) to address into an image cache atlas (R8/R16/R32F).
 

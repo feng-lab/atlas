@@ -1488,7 +1488,7 @@ void ZVulkanEllipsoidPipelineContext::uploadGeometry(const EllipsoidPayload& pay
 
 vk::PipelineVertexInputStateCreateInfo ZVulkanEllipsoidPipelineContext::makeVertexInputState() const
 {
-  static std::array<vk::VertexInputBindingDescription, 7> bindings{
+  static const std::array<vk::VertexInputBindingDescription, 7> bindings{
     vk::VertexInputBindingDescription{.binding = 0,
                                       .stride = static_cast<uint32_t>(sizeof(glm::vec4)),
                                       .inputRate = vk::VertexInputRate::eVertex}, // axis1
@@ -1511,7 +1511,7 @@ vk::PipelineVertexInputStateCreateInfo ZVulkanEllipsoidPipelineContext::makeVert
                                       .stride = static_cast<uint32_t>(sizeof(glm::vec4)),
                                       .inputRate = vk::VertexInputRate::eVertex}  // specular
   };
-  static std::array<vk::VertexInputAttributeDescription, 7> attrs{
+  static const std::array<vk::VertexInputAttributeDescription, 7> attrs{
     vk::VertexInputAttributeDescription{.location = 0,
                                         .binding = 0,
                                         .format = vk::Format::eR32G32B32A32Sfloat,
@@ -1538,7 +1538,7 @@ vk::PipelineVertexInputStateCreateInfo ZVulkanEllipsoidPipelineContext::makeVert
                                         .format = vk::Format::eR32G32B32A32Sfloat,
                                         .offset = 0                                                               }
   };
-  static vk::PipelineVertexInputStateCreateInfo info{};
+  vk::PipelineVertexInputStateCreateInfo info{};
   info.vertexBindingDescriptionCount = static_cast<uint32_t>(bindings.size());
   info.pVertexBindingDescriptions = bindings.data();
   info.vertexAttributeDescriptionCount = static_cast<uint32_t>(attrs.size());

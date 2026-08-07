@@ -883,6 +883,14 @@ uint64_t Z3DCompositor::lastPublishedRenderFrameToken(Z3DEye eye) const
   return m_lastPublishedRenderFrameToken[eyeIndex];
 }
 
+void Z3DCompositor::invalidatePendingVulkanFinalReadbacks()
+{
+  CHECK(m_rendererBase.activeBackend() == RenderBackend::Vulkan)
+    << "Only an active Vulkan compositor can invalidate Vulkan readbacks";
+  const std::scoped_lock lock(m_globalParameters.targetSwitchMutex);
+  advanceVulkanFinalReadbackOwnerRevision();
+}
+
 void Z3DCompositor::invalidate(State inv)
 {
   // VLOG(1) << "1";
@@ -1600,9 +1608,9 @@ double Z3DCompositor::processGL(Z3DEye eye)
                            (void*)m_monoReadyLocalBuffer);
     // Log scratch pool memory usage after the mono render completes
     const auto& pool = m_rendererBase.scratchPool();
-    static uint64_t s_lastCreate = 0;
-    static uint64_t s_lastChange = 0;
-    static uint64_t s_lastReuse = 0;
+    thread_local uint64_t s_lastCreate = 0;
+    thread_local uint64_t s_lastChange = 0;
+    thread_local uint64_t s_lastReuse = 0;
     const uint64_t curCreate = pool.creationCounter();
     const uint64_t curChange = pool.changeCounter();
     const uint64_t curReuse = pool.reuseStatsCounter();
@@ -3208,7 +3216,7 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
       }
 
       if (eyeCopy == MonoEye) {
-        static uint64_t s_lastCreate = 0, s_lastChange = 0, s_lastReuse = 0;
+        thread_local uint64_t s_lastCreate = 0, s_lastChange = 0, s_lastReuse = 0;
         const uint64_t curCreate = scratchPool->creationCounter();
         const uint64_t curChange = scratchPool->changeCounter();
         const uint64_t curReuse = scratchPool->reuseStatsCounter();
@@ -3774,8 +3782,8 @@ void Z3DCompositor::recordSceneSegmentsVulkan(const std::vector<Z3DBoundedFilter
 
 void Z3DCompositor::ensureOutputTargets(const glm::uvec2& size)
 {
-  auto ensureLease = [&](Z3DScratchResourcePool::RenderTargetLease& lease) {
-    const RenderBackend activeBackend = m_rendererBase.activeBackend();
+  const RenderBackend activeBackend = m_rendererBase.activeBackend();
+  auto needsReplacement = [&](const Z3DScratchResourcePool::RenderTargetLease& lease) {
     const bool hasVulkanImage = lease.vulkanImage != nullptr;
     const bool hasGLTarget = lease.renderTarget != nullptr;
 
@@ -3790,27 +3798,35 @@ void Z3DCompositor::ensureOutputTargets(const glm::uvec2& size)
     const bool backendMismatch = lease.backend != activeBackend;
     const bool missingResource = (activeBackend == RenderBackend::Vulkan && !hasVulkanImage) ||
                                  (activeBackend == RenderBackend::OpenGL && !hasGLTarget);
-
-    if (missingResource || backendMismatch || sizeMismatch) {
-      lease.release();
-      if (activeBackend == RenderBackend::Vulkan) {
-        m_rendererBase.scratchPool().reclaimVulkanScratchMemory(
-          Z3DScratchResourcePool::VulkanScratchReclaimMode::WaitForIdle);
-      }
-      m_rendererBase.acquirePersistentTempRenderTarget2D(lease, size);
-      LOG(INFO) << fmt::format("ensureOutputTargets reacquired {}x{} backend={} hasVulkanImage={} hasGLTarget={}",
-                               size.x,
-                               size.y,
-                               lease.backend == RenderBackend::Vulkan ? "Vulkan" : "OpenGL",
-                               lease.vulkanImage != nullptr,
-                               lease.renderTarget != nullptr);
-    }
+    return missingResource || backendMismatch || sizeMismatch;
   };
 
-  ensureLease(m_outRenderTarget1);
-  ensureLease(m_outRenderTarget2);
-  ensureLease(m_leftEyeOutRenderTarget1);
-  ensureLease(m_leftEyeOutRenderTarget2);
+  auto leases = std::to_array<Z3DScratchResourcePool::RenderTargetLease*>(
+    {&m_outRenderTarget1, &m_outRenderTarget2, &m_leftEyeOutRenderTarget1, &m_leftEyeOutRenderTarget2});
+  decltype(leases) replacements{};
+  size_t replacementCount = 0u;
+  for (auto* lease : leases) {
+    CHECK(lease != nullptr);
+    if (needsReplacement(*lease)) {
+      lease->release();
+      replacements[replacementCount++] = lease;
+    }
+  }
+
+  if (replacementCount != 0u) {
+    if (activeBackend == RenderBackend::Vulkan) {
+      m_rendererBase.scratchPool().reclaimVulkanScratchMemory(
+        Z3DScratchResourcePool::VulkanScratchReclaimMode::WaitForIdle);
+    }
+    for (size_t replacementIndex = 0u; replacementIndex < replacementCount; ++replacementIndex) {
+      m_rendererBase.acquirePersistentTempRenderTarget2D(*replacements[replacementIndex], size);
+    }
+    LOG(INFO) << fmt::format("ensureOutputTargets reacquired {} target(s) at {}x{} for {}",
+                             replacementCount,
+                             size.x,
+                             size.y,
+                             activeBackend == RenderBackend::Vulkan ? "Vulkan" : "OpenGL");
+  }
 
   // Keep renderer viewport in sync with the active output size so batches
   // recorded immediately after a resize use a valid renderArea that matches

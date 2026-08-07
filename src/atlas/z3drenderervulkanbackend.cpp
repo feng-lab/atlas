@@ -786,8 +786,15 @@ try {
   // completion-safe pins even though command recording has not begun yet.
   s_currentBackend = this;
   installScratchPoolCallbacksForActiveFrame();
-  CHECK(m_staticCacheEpoch < std::numeric_limits<uint64_t>::max()) << "Static cache epoch overflow";
-  ++m_staticCacheEpoch;
+  // Transparency algorithms can split one logical frame across submissions;
+  // those internal boundaries must not make unchanged geometry look cold.
+  CHECK_GE(frameResources.realFrameToken, m_staticCacheEpochFrameToken)
+    << "Vulkan render-frame tokens must be monotonic within one backend";
+  if (frameResources.realFrameToken > m_staticCacheEpochFrameToken) {
+    CHECK(m_staticCacheEpoch < std::numeric_limits<uint64_t>::max()) << "Static cache epoch overflow";
+    ++m_staticCacheEpoch;
+    m_staticCacheEpochFrameToken = frameResources.realFrameToken;
+  }
 
   // These helpers may attach submission-owned resources or advance cached
   // Vulkan state. Exceptions after active-frame publication therefore use the
@@ -4235,16 +4242,27 @@ void Z3DRendererVulkanBackend::primePPLLForStorePass(const glm::uvec4& viewport,
   CHECK(m_supportsFragStoresAndAtomics) << "PPLL requires fragment storage buffer atomics (fragmentStoresAndAtomics)";
 
   const size_t desiredRing = std::max<size_t>(1, static_cast<size_t>(m_maxFramesInFlight));
-  if (m_ppllFrameRing.size() != desiredRing) {
-    // Resizing the PPLL ring can destroy buffers for dropped slots. Make sure
-    // cached secondaries rebuild before executing any command buffer recorded
-    // against now-destroyed OIT resources.
+  if (m_ppllFrameRing.empty()) {
     ++m_oitResourcesRevision;
     m_ppllFrameRing.resize(desiredRing);
+    m_ppllRingIndex.reset();
+    m_activePPLLIndex.reset();
+    m_ppllRingFrameToken = 0u;
   }
-  const size_t ringSize = m_ppllFrameRing.empty() ? 1 : m_ppllFrameRing.size();
+  CHECK_EQ(m_ppllFrameRing.size(), desiredRing) << "The PPLL ring must retain the immutable Vulkan frame-executor size";
+  CHECK(!m_ppllFrameRing.empty());
+  const size_t ringSize = m_ppllFrameRing.size();
   const uint64_t realFrameToken = Z3DRenderGlobalState::instance().currentRenderFrameToken();
-  m_activePPLLIndex = static_cast<size_t>(realFrameToken % ringSize);
+  CHECK_GT(realFrameToken, 0u);
+  if (realFrameToken != m_ppllRingFrameToken) {
+    CHECK(m_ppllRingFrameToken == 0u || realFrameToken > m_ppllRingFrameToken)
+      << "PPLL render-frame tokens must advance monotonically on one backend";
+    m_ppllRingIndex = m_ppllRingIndex.has_value() ? (*m_ppllRingIndex + 1u) % ringSize : 0u;
+    m_ppllRingFrameToken = realFrameToken;
+  }
+  CHECK(m_ppllRingIndex.has_value());
+  CHECK_LT(*m_ppllRingIndex, ringSize);
+  m_activePPLLIndex = *m_ppllRingIndex;
 
   ensurePPLLResources(viewport, requestedFragments);
 
@@ -4841,7 +4859,7 @@ bool Z3DRendererVulkanBackend::prepareStaticPromotionBudget(StaticPressureDomain
                                             .reason = reason});
   (void)reclaimStats;
   const auto retryPressure = residency.allocationPressureFor(requestedBytes);
-  if (!retryPressure.needsReclaim()) {
+  if (!retryPressure.needsReclaim() || !residency.strictBudgetActive()) {
     return true;
   }
 

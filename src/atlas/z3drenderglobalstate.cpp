@@ -2,7 +2,25 @@
 
 #include "zlog.h"
 
+#include <limits>
+
 namespace nim {
+namespace {
+
+struct RenderFrameContext
+{
+  uint64_t token = 0u;
+  std::chrono::steady_clock::time_point perfStartTime{};
+  uint32_t submissionCursor = 0u;
+};
+
+RenderFrameContext& currentRenderFrameContext()
+{
+  thread_local RenderFrameContext context;
+  return context;
+}
+
+} // namespace
 
 Z3DRenderGlobalState& Z3DRenderGlobalState::instance()
 {
@@ -12,13 +30,33 @@ Z3DRenderGlobalState& Z3DRenderGlobalState::instance()
 
 Z3DRenderGlobalState::Z3DRenderGlobalState() = default;
 
+uint64_t Z3DRenderGlobalState::currentRenderFrameToken() const
+{
+  return currentRenderFrameContext().token;
+}
+
+std::chrono::steady_clock::time_point Z3DRenderGlobalState::currentPerfFrameStartTime() const
+{
+  return currentRenderFrameContext().perfStartTime;
+}
+
 uint32_t Z3DRenderGlobalState::nextRenderFrameSubmissionId(uint64_t token)
 {
+  auto& context = currentRenderFrameContext();
   CHECK_GT(token, 0u);
-  CHECK_EQ(token, m_currentRenderFrameToken)
-    << "Render submission ID requested for a non-current render token. token=" << token
-    << " current=" << m_currentRenderFrameToken;
-  return ++m_currentRenderFrameSubmissionCursor;
+  CHECK_EQ(token, context.token) << "Render submission ID requested for a non-current render token. token=" << token
+                                 << " current=" << context.token;
+  return ++context.submissionCursor;
+}
+
+uint64_t Z3DRenderGlobalState::beginNewRenderFrameToken(bool collectPerf)
+{
+  auto& context = currentRenderFrameContext();
+  CHECK_LT(context.token, std::numeric_limits<uint64_t>::max()) << "Render frame token space exhausted";
+  ++context.token;
+  context.perfStartTime = collectPerf ? std::chrono::steady_clock::now() : std::chrono::steady_clock::time_point{};
+  context.submissionCursor = 0u;
+  return context.token;
 }
 
 bool Z3DRenderGlobalState::hasCancellationSource() const

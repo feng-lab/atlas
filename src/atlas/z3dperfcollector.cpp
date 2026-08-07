@@ -11,6 +11,7 @@
 #include <array>
 #include <cctype>
 #include <limits>
+#include <mutex>
 #include <optional>
 #include <unordered_map>
 #include "zjson.h"
@@ -69,11 +70,17 @@ namespace {
 inline constexpr char kPerfFrameSchema[] = "atlas.perf.frame";
 inline constexpr uint64_t kPerfFrameSchemaVersion = 1u;
 
+std::mutex& perfOutputMutex()
+{
+  static std::mutex mutex;
+  return mutex;
+}
+
 } // namespace
 
 Z3DPerfCollector& Z3DPerfCollector::instance()
 {
-  static Z3DPerfCollector inst;
+  thread_local Z3DPerfCollector inst;
   return inst;
 }
 
@@ -401,9 +408,18 @@ void Z3DPerfCollector::flush(uint64_t token)
     LOG(INFO) << cpuMsg;
   }
 
-  // Optional: emit a Chrome trace JSON for this frame
+  // Optional file outputs are process-global command-line destinations. Keep
+  // independent rendering lanes from interleaving writes to the same files.
   const bool traceCalibrated = absl::GetFlag(FLAGS_atlas_perf_trace_calibrated);
   const std::optional<std::string> tracePath = absl::GetFlag(FLAGS_atlas_perf_trace);
+  const std::optional<std::string> traceAppendPath = absl::GetFlag(FLAGS_atlas_perf_trace_append);
+  const std::optional<std::string> perfSummary = absl::GetFlag(FLAGS_atlas_perf_summary);
+  std::unique_lock<std::mutex> outputLock;
+  if (tracePath.has_value() || traceAppendPath.has_value() || perfSummary.has_value()) {
+    outputLock = std::unique_lock(perfOutputMutex());
+  }
+
+  // Optional: emit a Chrome trace JSON for this frame
   if (tracePath.has_value()) {
     struct Ev
     {
@@ -482,7 +498,6 @@ void Z3DPerfCollector::flush(uint64_t token)
   }
 
   // Optional: append this frame's trace events to a multi-frame Chrome trace file
-  const std::optional<std::string> traceAppendPath = absl::GetFlag(FLAGS_atlas_perf_trace_append);
   if (traceAppendPath.has_value()) {
     // Build events as above
     struct Ev
@@ -622,7 +637,6 @@ void Z3DPerfCollector::flush(uint64_t token)
   }
 
   // Optional: per-frame summary export (CSV/JSON)
-  const std::optional<std::string> perfSummary = absl::GetFlag(FLAGS_atlas_perf_summary);
   if (perfSummary.has_value()) {
     try {
       // parse format:path

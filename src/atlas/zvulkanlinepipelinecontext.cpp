@@ -68,7 +68,7 @@ size_t staticSliceBytes(const Z3DRendererVulkanBackend::StaticSlice& slice)
 
 vk::PipelineVertexInputStateCreateInfo makeWideVertexInput()
 {
-  static std::array<vk::VertexInputBindingDescription, 5> bindings{
+  static const std::array<vk::VertexInputBindingDescription, 5> bindings{
     vk::VertexInputBindingDescription{.binding = 0,
                                       .stride = static_cast<uint32_t>(sizeof(glm::vec3)),
                                       .inputRate = vk::VertexInputRate::eVertex}, // p0
@@ -85,7 +85,7 @@ vk::PipelineVertexInputStateCreateInfo makeWideVertexInput()
                                       .stride = static_cast<uint32_t>(sizeof(float)),
                                       .inputRate = vk::VertexInputRate::eVertex}  // flags
   };
-  static std::array<vk::VertexInputAttributeDescription, 5> attrs{
+  static const std::array<vk::VertexInputAttributeDescription, 5> attrs{
     vk::VertexInputAttributeDescription{.location = 0,
                                         .binding = 0,
                                         .format = vk::Format::eR32G32B32Sfloat,
@@ -104,7 +104,7 @@ vk::PipelineVertexInputStateCreateInfo makeWideVertexInput()
                                         .offset = 0                                                               },
     vk::VertexInputAttributeDescription{.location = 4, .binding = 4, .format = vk::Format::eR32Sfloat, .offset = 0}
   };
-  static vk::PipelineVertexInputStateCreateInfo info{};
+  vk::PipelineVertexInputStateCreateInfo info{};
   info.vertexBindingDescriptionCount = static_cast<uint32_t>(bindings.size());
   info.pVertexBindingDescriptions = bindings.data();
   info.vertexAttributeDescriptionCount = static_cast<uint32_t>(attrs.size());
@@ -114,7 +114,7 @@ vk::PipelineVertexInputStateCreateInfo makeWideVertexInput()
 
 vk::PipelineVertexInputStateCreateInfo makeThinVertexInput()
 {
-  static std::array<vk::VertexInputBindingDescription, 2> bindings{
+  static const std::array<vk::VertexInputBindingDescription, 2> bindings{
     vk::VertexInputBindingDescription{.binding = 0,
                                       .stride = static_cast<uint32_t>(sizeof(glm::vec3)),
                                       .inputRate = vk::VertexInputRate::eVertex}, // position
@@ -122,7 +122,7 @@ vk::PipelineVertexInputStateCreateInfo makeThinVertexInput()
                                       .stride = static_cast<uint32_t>(sizeof(glm::vec4)),
                                       .inputRate = vk::VertexInputRate::eVertex}  // color
   };
-  static std::array<vk::VertexInputAttributeDescription, 2> attrs{
+  static const std::array<vk::VertexInputAttributeDescription, 2> attrs{
     vk::VertexInputAttributeDescription{.location = 0,
                                         .binding = 0,
                                         .format = vk::Format::eR32G32B32Sfloat,
@@ -132,7 +132,7 @@ vk::PipelineVertexInputStateCreateInfo makeThinVertexInput()
                                         .format = vk::Format::eR32G32B32A32Sfloat,
                                         .offset = 0}
   };
-  static vk::PipelineVertexInputStateCreateInfo info{};
+  vk::PipelineVertexInputStateCreateInfo info{};
   info.vertexBindingDescriptionCount = static_cast<uint32_t>(bindings.size());
   info.pVertexBindingDescriptions = bindings.data();
   info.vertexAttributeDescriptionCount = static_cast<uint32_t>(attrs.size());

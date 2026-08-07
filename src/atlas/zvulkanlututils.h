@@ -5,7 +5,7 @@
 
 namespace nim::vulkan {
 
-// Vulkan portability: use 2D Nx1 textures for LUTs (MoltenVK lacks native 1D).
+// Use 2D Nx1 LUTs so every Vulkan target follows the same texture and sampling contract.
 inline void ensure1DLUTTexture(ZVulkanDevice& device,
                                std::unique_ptr<ZVulkanTexture>& texture,
                                uint32_t width,

@@ -59,61 +59,61 @@ vk::PipelineVertexInputStateCreateInfo makeSoAMeshVertexInput(MeshPayload::Color
   // mesh.vert (Vulkan) declares locations 0..5 unconditionally; specialization
   // constants gate usage but validation requires attribute descriptions to
   // exist for every declared location when vertex input is not dynamic.
-  static std::array<vk::VertexInputBindingDescription, 6> bindings{};
-  // binding 0: position (vec3)
-  bindings[0] = vk::VertexInputBindingDescription{.binding = 0,
-                                                  .stride = static_cast<uint32_t>(sizeof(glm::vec3)),
-                                                  .inputRate = vk::VertexInputRate::eVertex};
-  // binding 1: normal (vec3)
-  bindings[1] = vk::VertexInputBindingDescription{.binding = 1,
-                                                  .stride = static_cast<uint32_t>(sizeof(glm::vec3)),
-                                                  .inputRate = vk::VertexInputRate::eVertex};
-  // binding 2: color (vec4)
-  bindings[2] = vk::VertexInputBindingDescription{.binding = 2,
-                                                  .stride = static_cast<uint32_t>(sizeof(glm::vec4)),
-                                                  .inputRate = vk::VertexInputRate::eVertex};
-  // binding 3: 1D texcoord (float)
-  bindings[3] = vk::VertexInputBindingDescription{.binding = 3,
-                                                  .stride = static_cast<uint32_t>(sizeof(float)),
-                                                  .inputRate = vk::VertexInputRate::eVertex};
-  // binding 4: 2D texcoord (vec2)
-  bindings[4] = vk::VertexInputBindingDescription{.binding = 4,
-                                                  .stride = static_cast<uint32_t>(sizeof(glm::vec2)),
-                                                  .inputRate = vk::VertexInputRate::eVertex};
-  // binding 5: 3D texcoord (vec3)
-  bindings[5] = vk::VertexInputBindingDescription{.binding = 5,
-                                                  .stride = static_cast<uint32_t>(sizeof(glm::vec3)),
-                                                  .inputRate = vk::VertexInputRate::eVertex};
+  static const std::array<vk::VertexInputBindingDescription, 6> bindings{
+    // binding 0: position (vec3)
+    vk::VertexInputBindingDescription{.binding = 0,
+                                      .stride = static_cast<uint32_t>(sizeof(glm::vec3)),
+                                      .inputRate = vk::VertexInputRate::eVertex},
+    // binding 1: normal (vec3)
+    vk::VertexInputBindingDescription{.binding = 1,
+                                      .stride = static_cast<uint32_t>(sizeof(glm::vec3)),
+                                      .inputRate = vk::VertexInputRate::eVertex},
+    // binding 2: color (vec4)
+    vk::VertexInputBindingDescription{.binding = 2,
+                                      .stride = static_cast<uint32_t>(sizeof(glm::vec4)),
+                                      .inputRate = vk::VertexInputRate::eVertex},
+    // binding 3: 1D texcoord (float)
+    vk::VertexInputBindingDescription{.binding = 3,
+                                      .stride = static_cast<uint32_t>(sizeof(float)),
+                                      .inputRate = vk::VertexInputRate::eVertex},
+    // binding 4: 2D texcoord (vec2)
+    vk::VertexInputBindingDescription{.binding = 4,
+                                      .stride = static_cast<uint32_t>(sizeof(glm::vec2)),
+                                      .inputRate = vk::VertexInputRate::eVertex},
+    // binding 5: 3D texcoord (vec3)
+    vk::VertexInputBindingDescription{.binding = 5,
+                                      .stride = static_cast<uint32_t>(sizeof(glm::vec3)),
+                                      .inputRate = vk::VertexInputRate::eVertex}
+  };
 
-  static std::array<vk::VertexInputAttributeDescription, 6> attrs{};
-  attrs[0] = vk::VertexInputAttributeDescription{.location = 0,
-                                                 .binding = 0,
-                                                 .format = vk::Format::eR32G32B32Sfloat,
-                                                 .offset = 0};
-  attrs[1] = vk::VertexInputAttributeDescription{.location = 1,
-                                                 .binding = 1,
-                                                 .format = vk::Format::eR32G32B32Sfloat,
-                                                 .offset = 0};
-  attrs[2] = vk::VertexInputAttributeDescription{.location = 2,
-                                                 .binding = 2,
-                                                 .format = vk::Format::eR32G32B32A32Sfloat,
-                                                 .offset = 0};
-  // location 3: 1D texcoord from binding 3
-  attrs[3] =
-    vk::VertexInputAttributeDescription{.location = 3, .binding = 3, .format = vk::Format::eR32Sfloat, .offset = 0};
-  // location 4: 2D texcoord from binding 4
-  attrs[4] =
-    vk::VertexInputAttributeDescription{.location = 4, .binding = 4, .format = vk::Format::eR32G32Sfloat, .offset = 0};
-  // location 5: 3D texcoord from binding 5
-  attrs[5] = vk::VertexInputAttributeDescription{.location = 5,
-                                                 .binding = 5,
-                                                 .format = vk::Format::eR32G32B32Sfloat,
-                                                 .offset = 0};
+  static const std::array<vk::VertexInputAttributeDescription, 6> attrs{
+    vk::VertexInputAttributeDescription{.location = 0,
+                                        .binding = 0,
+                                        .format = vk::Format::eR32G32B32Sfloat,
+                                        .offset = 0                                                                  },
+    vk::VertexInputAttributeDescription{.location = 1,
+                                        .binding = 1,
+                                        .format = vk::Format::eR32G32B32Sfloat,
+                                        .offset = 0                                                                  },
+    vk::VertexInputAttributeDescription{.location = 2,
+                                        .binding = 2,
+                                        .format = vk::Format::eR32G32B32A32Sfloat,
+                                        .offset = 0                                                                  },
+    // location 3: 1D texcoord from binding 3
+    vk::VertexInputAttributeDescription{.location = 3, .binding = 3, .format = vk::Format::eR32Sfloat,    .offset = 0},
+    // location 4: 2D texcoord from binding 4
+    vk::VertexInputAttributeDescription{.location = 4, .binding = 4, .format = vk::Format::eR32G32Sfloat, .offset = 0},
+    // location 5: 3D texcoord from binding 5
+    vk::VertexInputAttributeDescription{.location = 5,
+                                        .binding = 5,
+                                        .format = vk::Format::eR32G32B32Sfloat,
+                                        .offset = 0                                                                  }
+  };
 
   constexpr uint32_t bindingCount = 6;
   constexpr uint32_t attrCount = 6;
 
-  static vk::PipelineVertexInputStateCreateInfo info{};
+  vk::PipelineVertexInputStateCreateInfo info{};
   info.vertexBindingDescriptionCount = bindingCount;
   info.pVertexBindingDescriptions = bindings.data();
   info.vertexAttributeDescriptionCount = attrCount;
@@ -127,18 +127,20 @@ vk::PipelineVertexInputStateCreateInfo makeSoAMeshDepthVertexInput()
   // - mesh_depth.vert only consumes attr_vertex at location 0.
   // - Keep the vertex input state minimal to avoid Vulkan validation warnings
   //   about unused attributes and to reduce vertex fetch work.
-  static std::array<vk::VertexInputBindingDescription, 1> bindings{};
-  bindings[0] = vk::VertexInputBindingDescription{.binding = 0,
-                                                  .stride = static_cast<uint32_t>(sizeof(glm::vec3)),
-                                                  .inputRate = vk::VertexInputRate::eVertex};
+  static const std::array<vk::VertexInputBindingDescription, 1> bindings{
+    vk::VertexInputBindingDescription{.binding = 0,
+                                      .stride = static_cast<uint32_t>(sizeof(glm::vec3)),
+                                      .inputRate = vk::VertexInputRate::eVertex}
+  };
 
-  static std::array<vk::VertexInputAttributeDescription, 1> attrs{};
-  attrs[0] = vk::VertexInputAttributeDescription{.location = 0,
-                                                 .binding = 0,
-                                                 .format = vk::Format::eR32G32B32Sfloat,
-                                                 .offset = 0};
+  static const std::array<vk::VertexInputAttributeDescription, 1> attrs{
+    vk::VertexInputAttributeDescription{.location = 0,
+                                        .binding = 0,
+                                        .format = vk::Format::eR32G32B32Sfloat,
+                                        .offset = 0}
+  };
 
-  static vk::PipelineVertexInputStateCreateInfo info{};
+  vk::PipelineVertexInputStateCreateInfo info{};
   info.vertexBindingDescriptionCount = static_cast<uint32_t>(bindings.size());
   info.pVertexBindingDescriptions = bindings.data();
   info.vertexAttributeDescriptionCount = static_cast<uint32_t>(attrs.size());

@@ -9,7 +9,6 @@
 #include "zlog.h"
 #include "zstringutils.h"
 #include "zview.h"
-#include "zvulkanmultidevicetilecoordinator.h"
 
 #include "zcommandlineflags.h"
 
@@ -32,7 +31,7 @@ ABSL_FLAG(bool, run_export_3d_scene, false, "Enable exporting a 3D scene screens
 ABSL_FLAG(std::vector<std::string>,
           atlas_vk_multi_device_tile_worker_indices,
           std::vector<std::string>{},
-          "Preference-sorted Vulkan device indices used as in-process workers for tiled scene export. "
+          "Preference-sorted Vulkan device indices participating in the private tiled-capture pool. "
           "Specify at least two distinct compatible indices; empty keeps the direct rendering path.");
 
 ABSL_DECLARE_FLAG(std::string, filename);
@@ -404,29 +403,21 @@ int ZRunExport3DScene::run()
     LOG(ERROR) << errorMsg;
     return 1;
   }
-  if (workerSelections.empty()) {
-    engine.takeFixedSizeScreenShot(outputFilename,
-                                   absl::GetFlag(FLAGS_output_width),
-                                   absl::GetFlag(FLAGS_output_height),
-                                   Z3DScreenShotType::MonoView,
-                                   tileSize,
-                                   tileBorder);
-  } else {
+  if (!workerSelections.empty()) {
     try {
-      ZVulkanMultiDeviceTileCoordinator coordinator(engine, workerSelections);
-      engine.takeFixedSizeScreenShotWithVulkanTileCoordinator(outputFilename,
-                                                              absl::GetFlag(FLAGS_output_width),
-                                                              absl::GetFlag(FLAGS_output_height),
-                                                              coordinator,
-                                                              Z3DScreenShotType::MonoView,
-                                                              tileSize,
-                                                              tileBorder);
+      engine.configureVulkanTileWorkers(workerSelections);
     }
     catch (const std::exception& e) {
-      LOG(ERROR) << "multi-device Vulkan scene export failed: " << e.what();
+      LOG(ERROR) << "Vulkan tile-worker configuration failed: " << e.what();
       return 1;
     }
   }
+  engine.takeFixedSizeScreenShot(outputFilename,
+                                 absl::GetFlag(FLAGS_output_width),
+                                 absl::GetFlag(FLAGS_output_height),
+                                 Z3DScreenShotType::MonoView,
+                                 tileSize,
+                                 tileBorder);
 
   if (!m_hasError && !QFile::exists(outputFilename)) {
     LOG(ERROR) << "scene export did not produce an output image";

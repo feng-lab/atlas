@@ -1768,6 +1768,7 @@ public:
   std::mutex m_pendingEvictionsMutex;
   std::unordered_set<uint64_t> m_pendingEvictStreamKeys;
   uint64_t m_staticCacheEpoch = 0;
+  uint64_t m_staticCacheEpochFrameToken = 0;
   struct StaticEvictionTelemetry
   {
     StaticCacheOwner owner = StaticCacheOwner::Mesh;
@@ -1780,10 +1781,10 @@ public:
   std::vector<StaticEvictionTelemetry> m_recentStaticEvictions;
 
   // PPLL (exact OIT): per-pixel fragment list resources are maintained in a
-  // small ring keyed by the UI/perf frame token (not by Vulkan frame-executor
-  // slots). This ensures multiple submissions within the same UI frame (count →
-  // scan/readback → store/resolve) all reference the same buffers even when the
-  // frame executor advances its command-buffer slot.
+  // backend-local ring. A new render-frame token observed by this backend
+  // advances the ring exactly once, while all submissions within that pipeline
+  // evaluation (count → scan/readback → store/resolve) keep the same buffers
+  // even when the frame executor advances its command-buffer slot.
   struct PPLLResources
   {
     static constexpr uint32_t kBlockSize = 256u;
@@ -1817,7 +1818,9 @@ public:
     size_t blockPrefixesCapacityBytes = 0;
   };
   std::vector<PPLLResources> m_ppllFrameRing;
+  std::optional<size_t> m_ppllRingIndex;
   std::optional<size_t> m_activePPLLIndex;
+  uint64_t m_ppllRingFrameToken = 0u;
   // Bumped whenever any PPLL buffer is replaced (destroyed + recreated).
   uint64_t m_oitResourcesRevision = 1;
 

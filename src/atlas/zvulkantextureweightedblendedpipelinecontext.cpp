@@ -103,17 +103,17 @@ void ZVulkanTextureWeightedBlendedPipelineContext::record(Z3DRendererBase& rende
 
 vk::PipelineVertexInputStateCreateInfo ZVulkanTextureWeightedBlendedPipelineContext::makeVertexInputState() const
 {
-  static vk::VertexInputBindingDescription binding{.binding = 0,
-                                                   .stride = static_cast<uint32_t>(sizeof(glm::vec3)),
-                                                   .inputRate = vk::VertexInputRate::eVertex};
-  static std::array<vk::VertexInputAttributeDescription, 1> attrs{
+  static const vk::VertexInputBindingDescription binding{.binding = 0,
+                                                         .stride = static_cast<uint32_t>(sizeof(glm::vec3)),
+                                                         .inputRate = vk::VertexInputRate::eVertex};
+  static const std::array<vk::VertexInputAttributeDescription, 1> attrs{
     vk::VertexInputAttributeDescription{.location = 0,
                                         .binding = 0,
                                         .format = vk::Format::eR32G32B32Sfloat,
                                         .offset = 0}
   };
 
-  static vk::PipelineVertexInputStateCreateInfo info{};
+  vk::PipelineVertexInputStateCreateInfo info{};
   info.vertexBindingDescriptionCount = 1;
   info.pVertexBindingDescriptions = &binding;
   info.vertexAttributeDescriptionCount = static_cast<uint32_t>(attrs.size());

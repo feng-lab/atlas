@@ -1406,7 +1406,7 @@ For reproducible still-image capture from saved workspaces:
    - `--limit_memory_usage_in_gb_to 12`
    - On Linux: `--use_gpu_devices=0`. The value selects an EGL device under OpenGL or the preference-sorted Vulkan
      device under Vulkan; Atlas configures the corresponding backend-specific device flag automatically.
-   - For in-process Vulkan multi-device tile rendering, specify the complete worker set with
+   - For in-process Vulkan multi-device rendering of a fixed-size tiled capture, specify the complete device set with
      `--atlas_vk_multi_device_tile_worker_indices=0,1,...`.
 4. An opt-in multi-device Vulkan still export can be run as follows:
    ```bash
@@ -1423,31 +1423,33 @@ For reproducible still-image capture from saved workspaces:
      --output_tile_border 64 \
      --overwrite
    ```
-   The worker values are preference-sorted Vulkan device indices and form the complete worker set. At least two distinct
+   The values are preference-sorted Vulkan device indices and form the complete selected device set. At least two distinct
    compatible physical devices are required. Invalid, unavailable, incompatible, duplicate-index, or duplicate-device
-   selections fail export without fallback. Include the canonical adapter's index when that adapter should also render
-   tiles; `--atlas_vk_device_index` selects the canonical engine independently.
+   selections fail export without fallback. `--atlas_vk_device_index` selects the canonical engine independently, and the
+   canonical adapter renders tiles only when its index is also in the selected set. The canonical engine owns a private
+   tile-worker pool; each selected noncanonical adapter runs a private render engine on its own rendering thread.
 
-   Worker tile rendering is used only when the image is split into more than one tile. A single-tile image is captured by
-   the canonical engine even when the worker flag is present, although Atlas still validates and initializes the requested
-   workers before choosing that direct size branch. Omitting the worker flag avoids all worker selection and construction
-   and keeps the direct path. The in-process option does not affect interactive rendering or headless animation export. On
-   Linux, the one value accepted by `--use_gpu_devices` for scene export selects the canonical engine and is independent of
-   the tile-worker list.
+   The private pool is used only when the fixed output is split into more than one tile. An untiled image is captured by the
+   canonical engine and device even when the device-set flag is present, although Atlas still validates and initializes the
+   requested pool before choosing that direct size branch. Omitting the device-set flag avoids tiled-capture device
+   selection and pool construction. This in-process pool does not route interactive rendering or headless animation export;
+   interactive and untiled rendering remain canonical single-device paths. On Linux, the one value accepted by
+   `--use_gpu_devices` for scene export selects the canonical engine and is independent of the tiled-capture device set.
 
    Different adapters or drivers can produce different pixel values, especially with depth- or fragment-order-sensitive
    transparency. Atlas assembles each adapter's tile without cross-device color or transparency reconciliation. Volume
-   resource planning uses the canonical adapter's capability record for all workers, so every selected adapter must support
-   that plan as well as render the scene correctly. Atlas rejects workers whose advertised planning limits are lower than the
-   canonical record. For heterogeneous devices, selecting the least-capable adapter with `--atlas_vk_device_index` is the
-   conservative configuration. Validate the complete device set on the target scene, and use direct rendering or equivalent
-   adapters when uniform output across tile boundaries is required.
+   resource planning uses the canonical adapter's capability record across the selected set, so every selected adapter must
+   support that plan as well as render the scene correctly. Atlas rejects devices whose advertised planning limits are lower
+   than the canonical record. For heterogeneous devices, selecting the least-capable adapter with
+   `--atlas_vk_device_index` is the conservative configuration. Validate the complete device set on the target scene, and
+   use direct rendering or equivalent adapters when uniform output across tile boundaries is required.
 
-   Compatible devices are not automatically selected by speed. Atlas initially gives one tile to each requested worker
-   while work remains and dynamically refills workers that finish, but it cannot retract a tile already assigned to a much
-   slower adapter. Worker setup and state synchronization also add fixed cost. The multi-device option can therefore be
-   slower than the fastest adapter alone; benchmark the exact device set, scene types, output size, tile size, and guard
-   width before using it for performance-sensitive exports.
+   Compatible devices are not automatically selected by speed. Each participating engine claims one tile at a time from
+   the shared queue while work remains, so engines that finish sooner naturally receive more tiles. Atlas cannot retract a
+   tile already assigned to a much slower adapter. Private-engine setup and state synchronization also add fixed cost, and
+   devices can contend for host CPU, driver, and shared-memory bandwidth while rendering concurrently. The multi-device
+   option can therefore be slower than the fastest adapter alone; benchmark the exact device set, scene types, output size,
+   tile size, and guard width before using it for performance-sensitive exports.
 
    Dynamic refill assigns later tiles according to observed completion. If heterogeneous adapters produce different
    pixels, a later tile can be assigned to a different adapter on another run. Exact assembled pixels and image hashes are
@@ -1747,9 +1749,9 @@ Use **Help → Shortcuts** in either the 2D or 3D window to open this section di
 | `--limit_memory_usage_in_gb_to` | Cap GPU memory usage (GB). |
 | `--atlas_vk_residency_budget_bytes` | Strict byte cap for Atlas-owned Vulkan device-local residency. When set, Atlas keeps each existing Vulkan pass hot set within the cap by making needed resources resident and evicting cold backing at safe points; paged image caches are sized from the effective Vulkan budget rather than uncapped physical VRAM. If one required pass working set exceeds the cap, export fails with a memory diagnostic instead of allocating past the cap. |
 | `--atlas_vk_device_index` | Prefer a Vulkan adapter by its preference-sorted startup index; `-1` uses automatic selection. Otherwise equal-ranked adapters use device UUID as the stable final tie-break. Atlas uses a compatible preferred adapter exactly. Invalid, out-of-range, or incompatible values log a warning and fall back to the first fully compatible Vulkan adapter. |
-| `--atlas_vk_multi_device_tile_worker_indices` | Comma-separated preference-sorted Vulkan indices for in-process tiled headless scene export, for example `0,1`. The complete list must contain at least two distinct compatible physical devices; invalid or duplicate selections fail without fallback. Empty keeps direct rendering. This flag does not route interactive or animation rendering. |
+| `--atlas_vk_multi_device_tile_worker_indices` | Comma-separated preference-sorted Vulkan indices for the private, engine-owned pool used by fixed-size tiled headless scene capture, for example `0,1`. The complete list must contain at least two distinct compatible physical devices; invalid or duplicate selections fail without fallback. The canonical adapter renders tiles only when listed; every selected noncanonical adapter uses a private engine on its own rendering thread. Empty keeps direct rendering. Interactive rendering and untiled captures remain on the canonical device, and this flag does not route animation rendering. |
 | `--atlas_perf_mode` | Vulkan performance collection mode: `off` disables collector timing/scopes/output while retaining the render-frame identity required for resource and presentation ordering; `light` records top-level submission/pass metrics (default), and `full` also records nested GPU scopes. |
-| `--use_gpu_devices` | Specify comma-separated backend device indices for Linux headless export, for example `0,1`. OpenGL values are EGL device IDs; Vulkan values are preference-sorted Vulkan indices and are passed to animation workers as `--atlas_vk_device_index` preferences. Rejected Vulkan preferences warn and use automatic selection, which can place multiple animation workers on the same adapter. Scene export accepts exactly one value for its canonical engine; use `--atlas_vk_multi_device_tile_worker_indices` for its separate in-process Vulkan tile-worker set. |
+| `--use_gpu_devices` | Specify comma-separated backend device indices for Linux headless export, for example `0,1`. OpenGL values are EGL device IDs; Vulkan values are preference-sorted Vulkan indices and are passed to animation workers as `--atlas_vk_device_index` preferences. Rejected Vulkan preferences warn and use automatic selection, which can place multiple animation workers on the same adapter. Scene export accepts exactly one value for its canonical engine; use `--atlas_vk_multi_device_tile_worker_indices` for its private in-process Vulkan tiled-capture device set. |
 | `--__use_EGL` | Force EGL context creation (Linux headless). |
 | `--v=LEVEL` | Adjust log verbosity; `--v=1` prints additional diagnostics. |
 

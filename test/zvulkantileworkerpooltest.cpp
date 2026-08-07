@@ -1,5 +1,4 @@
 #include "z3drenderingengine.h"
-#include "z3drenderedframe.h"
 #include "z3dtiledescriptor.h"
 #include "zcommandlineflags.h"
 #include "zdoc.h"
@@ -7,7 +6,6 @@
 #include "zrenderthreadexecutor_tls.h"
 #include "zswc.h"
 #include "zswcdoc.h"
-#include "zvulkanmultidevicetilecoordinator.h"
 
 #include <absl/flags/flag.h>
 #include <gtest/gtest.h>
@@ -46,13 +44,13 @@ std::unique_ptr<QApplication> makeSmokeTestApplicationIfNeeded()
 
 #if defined(__linux__)
   static int argc = 3;
-  static char arg0[] = "zvulkanmultidevicetilecoordinatortest";
+  static char arg0[] = "zvulkantileworkerpooltest";
   static char arg1[] = "-platform";
   static char arg2[] = "offscreen";
   static char* argv[] = {arg0, arg1, arg2, nullptr};
 #else
   static int argc = 1;
-  static char arg0[] = "zvulkanmultidevicetilecoordinatortest";
+  static char arg0[] = "zvulkantileworkerpooltest";
   static char* argv[] = {arg0, nullptr};
 #endif
   return std::make_unique<QApplication>(argc, argv);
@@ -64,7 +62,7 @@ enum class WorkerExecution
   DistinctDevicesBatch
 };
 
-void runPpllTileParity(WorkerExecution execution)
+void runPpllTileWorkerSmoke(WorkerExecution execution)
 {
   if (!vulkanSmokeEnabled()) {
     GTEST_SKIP() << "Set ATLAS_ENABLE_VULKAN_SMOKE_TEST=1 with a Vulkan ICD to run the complete-engine worker smoke";
@@ -161,6 +159,7 @@ void runPpllTileParity(WorkerExecution execution)
   const QString canonicalOpaqueOnlyPath = outputDirectory.filePath(QStringLiteral("canonical_opaque_only.png"));
   const QString canonicalBeforePath = outputDirectory.filePath(QStringLiteral("canonical_before_worker.png"));
   const QString canonicalTiledPath = outputDirectory.filePath(QStringLiteral("canonical_tiled.png"));
+  const QString workerTiledPath = outputDirectory.filePath(QStringLiteral("worker_tiled.png"));
   const QString canonicalAfterPath = outputDirectory.filePath(QStringLiteral("canonical_after_worker.png"));
   QSignalSpy canonicalRenderingErrors(canonical.get(), &Z3DRenderingEngine::renderingError);
 
@@ -196,37 +195,40 @@ void runPpllTileParity(WorkerExecution execution)
   ASSERT_TRUE(canonicalRenderingErrors.empty());
   const ZImg canonicalTiledPixels = ZImg::readImgPixelsOnly(canonicalTiledPath);
 
-  {
-    std::unique_ptr<ZVulkanMultiDeviceTileCoordinator> coordinator;
-    if (execution == WorkerExecution::DistinctDevicesBatch) {
-      coordinator =
-        std::make_unique<ZVulkanMultiDeviceTileCoordinator>(*canonical, std::span(distinctWorkerSelections));
-    } else {
-      coordinator = std::make_unique<ZVulkanMultiDeviceTileCoordinator>(*canonical);
-    }
-
-    EXPECT_TRUE(coordinator->coordinates(*canonical));
-    const Z3DRenderedFrame frame = coordinator->renderFrame(tiles);
-    ASSERT_FALSE(frame.rightColor.has_value());
-    const ZImg& assembled = frame.primaryColor;
-    if (execution == WorkerExecution::SameAdapterBatch) {
-      EXPECT_TRUE(assembled == canonicalTiledPixels)
-        << "assembled=" << assembled.info() << ", canonical_tiled=" << canonicalTiledPixels.info();
-    } else {
-      ASSERT_TRUE(assembled.isSameType(canonicalTiledPixels));
-      ASSERT_TRUE(assembled.isSameSize(canonicalTiledPixels));
-      size_t mismatchedBytes = 0u;
-      int maximumByteDifference = 0;
-      for (size_t byteIndex = 0u; byteIndex < assembled.timeByteNumber(); ++byteIndex) {
-        const int difference = std::abs(static_cast<int>(assembled.timeData(0u)[byteIndex]) -
-                                        static_cast<int>(canonicalTiledPixels.timeData(0u)[byteIndex]));
-        mismatchedBytes += difference != 0 ? 1u : 0u;
-        maximumByteDifference = std::max(maximumByteDifference, difference);
-      }
-      testing::Test::RecordProperty("cross_device_mismatched_bytes", mismatchedBytes);
-      testing::Test::RecordProperty("cross_device_maximum_byte_difference", maximumByteDifference);
-    }
+  if (execution == WorkerExecution::DistinctDevicesBatch) {
+    canonical->configureVulkanTileWorkers(distinctWorkerSelections);
+  } else {
+    const auto canonicalSelection = canonical->compatibleVulkanTileWorkerSelections().front();
+    canonical->configureVulkanTileWorkers(std::span(&canonicalSelection, 1u));
   }
+  canonical->takeFixedSizeScreenShot(workerTiledPath,
+                                     kReferenceWidth,
+                                     kReferenceHeight,
+                                     Z3DScreenShotType::MonoView,
+                                     static_cast<int>(kTileExtent),
+                                     static_cast<int>(kGuardPixels));
+  ASSERT_TRUE(canonicalRenderingErrors.empty());
+  const ZImg assembled = ZImg::readImgPixelsOnly(workerTiledPath);
+  EXPECT_FALSE(assembled == canonicalOpaqueOnlyPixels)
+    << "The worker result must retain the scene's translucent contribution";
+  if (execution == WorkerExecution::SameAdapterBatch) {
+    EXPECT_TRUE(assembled == canonicalTiledPixels)
+      << "assembled=" << assembled.info() << ", canonical_tiled=" << canonicalTiledPixels.info();
+  } else {
+    ASSERT_TRUE(assembled.isSameType(canonicalTiledPixels));
+    ASSERT_TRUE(assembled.isSameSize(canonicalTiledPixels));
+    size_t mismatchedBytes = 0u;
+    int maximumByteDifference = 0;
+    for (size_t byteIndex = 0u; byteIndex < assembled.timeByteNumber(); ++byteIndex) {
+      const int difference = std::abs(static_cast<int>(assembled.timeData(0u)[byteIndex]) -
+                                      static_cast<int>(canonicalTiledPixels.timeData(0u)[byteIndex]));
+      mismatchedBytes += difference != 0 ? 1u : 0u;
+      maximumByteDifference = std::max(maximumByteDifference, difference);
+    }
+    testing::Test::RecordProperty("cross_device_mismatched_bytes", mismatchedBytes);
+    testing::Test::RecordProperty("cross_device_maximum_byte_difference", maximumByteDifference);
+  }
+  canonical->configureVulkanTileWorkers(std::span<const ZVulkanDeviceSupport::DeviceSelection>{});
   EXPECT_EQ(currentRenderThreadExecutorOrNull(), canonicalExecutor);
 
   canonical->takeFixedSizeScreenShot(canonicalAfterPath,
@@ -253,14 +255,14 @@ void runPpllTileParity(WorkerExecution execution)
   EXPECT_EQ(currentRenderThreadExecutorOrNull(), nullptr);
 }
 
-TEST(ZVulkanMultiDeviceTileCoordinatorTest, SingleAdapterPpllBatchPreservesParityAndCanonicalEngine)
+TEST(ZVulkanTileWorkerPoolTest, CanonicalAdapterPpllBatchPreservesParityAndCanonicalEngine)
 {
-  runPpllTileParity(WorkerExecution::SameAdapterBatch);
+  runPpllTileWorkerSmoke(WorkerExecution::SameAdapterBatch);
 }
 
-TEST(ZVulkanMultiDeviceTileCoordinatorTest, DistinctPhysicalDevicesCompleteBatchAndPreserveCanonicalEngine)
+TEST(ZVulkanTileWorkerPoolTest, DistinctPhysicalDevicesCompleteBatchAndPreserveCanonicalEngine)
 {
-  runPpllTileParity(WorkerExecution::DistinctDevicesBatch);
+  runPpllTileWorkerSmoke(WorkerExecution::DistinctDevicesBatch);
 }
 
 } // namespace

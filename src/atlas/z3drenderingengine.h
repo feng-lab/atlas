@@ -16,8 +16,10 @@
 #include <QPointer>
 #include <boost/unordered/unordered_flat_set.hpp>
 #include <cstdint>
+#include <memory>
 #include <mutex>
 #include <optional>
+#include <span>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -28,6 +30,8 @@ class QTimer;
 class QString;
 
 namespace nim {
+
+enum class ReadbackCompletionPolicy : uint8_t;
 
 class Z3DFilter;
 class Z3DMeshFilter;
@@ -46,7 +50,6 @@ class ZAnimation;
 class Z3DScratchResourcePool;
 class ZVulkanContext;
 class ZVulkanDevice;
-class ZVulkanMultiDeviceTileCoordinator;
 class ZQtExecutor;
 class ZSwcPack;
 class Z3DTileDescriptor;
@@ -62,18 +65,13 @@ public:
   explicit Z3DRenderingEngine(ZDoc& doc, QObject* parent = nullptr);
 
   // Return the exact compatible adapters visible to the canonical Vulkan
-  // context. Workers re-enumerate and verify both index and UUID.
+  // context. Worker engines re-enumerate and verify both index and UUID.
   [[nodiscard]] std::vector<ZVulkanDeviceSupport::DeviceSelection> compatibleVulkanTileWorkerSelections() const;
 
-  // Construct one complete, headless rendering engine on the canonical
-  // engine's exact Vulkan adapter. The worker borrows the canonical rendering-
-  // thread executor and never falls back to OpenGL.
-  [[nodiscard]] std::unique_ptr<Z3DRenderingEngine> createVulkanTileWorker();
-
-  // Construct a complete worker on one exact compatible adapter reported by
-  // compatibleVulkanTileWorkerSelections().
-  [[nodiscard]] std::unique_ptr<Z3DRenderingEngine>
-  createVulkanTileWorker(const ZVulkanDeviceSupport::DeviceSelection& selection);
+  // Configure the device set used by subsequent tiled Vulkan captures. An
+  // empty set removes the worker pool and leaves every render on this engine.
+  // The canonical engine participates when its adapter is present in the set.
+  void configureVulkanTileWorkers(std::span<const ZVulkanDeviceSupport::DeviceSelection> selections);
 
   ~Z3DRenderingEngine() override;
 
@@ -128,35 +126,6 @@ public:
                                Z3DScreenShotType sst = Z3DScreenShotType::MonoView,
                                int tileSize = 0,
                                int tileBorder = 0);
-
-  // Use an externally owned coordinator for the spatial tiles of a fixed-size
-  // Vulkan capture. Untiled captures retain the canonical direct path.
-  void takeFixedSizeScreenShotWithVulkanTileCoordinator(const QString& filename,
-                                                        int width,
-                                                        int height,
-                                                        ZVulkanMultiDeviceTileCoordinator& coordinator,
-                                                        Z3DScreenShotType sst = Z3DScreenShotType::MonoView,
-                                                        int tileSize = 0,
-                                                        int tileBorder = 0);
-
-  // Freeze and release full-view mesh LOD for one final-quality worker batch.
-  // The coordinator brackets every worker batch with these calls.
-  void beginVulkanTileExport(glm::uvec2 fullOutputExtent, folly::CancellationToken cancellationToken = {});
-  void endVulkanTileExport();
-
-  // Submit one final-quality worker tile without waiting for its final-pixel
-  // readback. A worker accepts exactly one outstanding tile; the returned
-  // render-frame token identifies the matching completion.
-  [[nodiscard]] uint64_t submitVulkanTile(const Z3DTileDescriptor& tile,
-                                          bool renderStereoPair = false,
-                                          folly::CancellationToken cancellationToken = {});
-
-  // Pump Vulkan completion safe points without waiting for an unsignaled fence
-  // and report whether the exact outstanding tile has published final pixels.
-  [[nodiscard]] bool isVulkanTileReady(uint64_t renderFrameToken);
-
-  // Copy and crop a ready tile into owned pixels.
-  [[nodiscard]] Z3DRenderedTile collectVulkanTile(uint64_t renderFrameToken);
 
   void takeScreenShot(const QString& filename, Z3DScreenShotType sst);
 
@@ -409,6 +378,8 @@ protected:
   void getGLFocus();
 
 private:
+  class ZVulkanTileWorkerPool;
+
   enum class Role : uint8_t
   {
     Canonical,
@@ -418,7 +389,6 @@ private:
   Z3DRenderingEngine(ZDoc& doc,
                      Role role,
                      std::optional<ZVulkanDeviceSupport::DeviceSelection> exactVulkanSelection,
-                     ZQtExecutor* sharedRenderThreadExecutor,
                      QObject* parent);
 
   void resetCameraCenter();
@@ -465,20 +435,17 @@ private:
                                    int height,
                                    Z3DScreenShotType sst,
                                    int tileSize,
-                                   int tileBorder,
-                                   /*nullable*/ ZVulkanMultiDeviceTileCoordinator* coordinator);
+                                   int tileBorder);
 
   // private version will throw exception on error
-  void takeFixedSizeScreenShotWithoutResetCanvasSizePrivate(
-    const QString& filename,
-    int width,
-    int height,
-    Z3DScreenShotType sst,
-    bool reportProgress = false,
-    folly::CancellationToken cancellationToken = {},
-    int tileSize = 0,
-    int tileBorder = 0,
-    /*nullable*/ ZVulkanMultiDeviceTileCoordinator* coordinator = nullptr);
+  void takeFixedSizeScreenShotWithoutResetCanvasSizePrivate(const QString& filename,
+                                                            int width,
+                                                            int height,
+                                                            Z3DScreenShotType sst,
+                                                            bool reportProgress = false,
+                                                            folly::CancellationToken cancellationToken = {},
+                                                            int tileSize = 0,
+                                                            int tileBorder = 0);
 
   void takeFixedSizeScreenShotWithoutResetCanvasSizeByTilePrivate(const QString& filename,
                                                                   const QString& rightFilename,
@@ -529,7 +496,18 @@ private:
   void finishMeshFiltersForExport();
 
   struct PendingVulkanTile;
+  struct VulkanTileRenderState;
+  [[nodiscard]] std::shared_ptr<const VulkanTileRenderState> publishVulkanTileRenderState() const;
+  void applyVulkanTileRenderState(const VulkanTileRenderState& state);
   void checkVulkanTileWorkerExecutionContext() const;
+  void beginVulkanTileExport(glm::uvec2 fullOutputExtent, folly::CancellationToken cancellationToken = {});
+  void endVulkanTileExport();
+  void abandonVulkanTileExportAfterFailure();
+  [[nodiscard]] uint64_t submitVulkanTile(const Z3DTileDescriptor& tile,
+                                          bool renderStereoPair = false,
+                                          folly::CancellationToken cancellationToken = {});
+  [[nodiscard]] bool isVulkanTileReady(uint64_t renderFrameToken);
+  [[nodiscard]] Z3DRenderedTile collectVulkanTile(uint64_t renderFrameToken);
   [[nodiscard]] bool pendingVulkanTilePublished() const;
   void clearVulkanTileRegion();
 
@@ -552,8 +530,8 @@ private:
   std::unique_ptr<ZVulkanDevice> m_vkDevice;
   std::unique_ptr<PendingVulkanTile> m_pendingVulkanTile;
   std::optional<glm::uvec2> m_vulkanTileExportExtent;
+  std::optional<ReadbackCompletionPolicy> m_vulkanTilePreviousReadbackCompletionPolicy;
   std::unique_ptr<ZQtExecutor> m_ownedRenderThreadExecutor;
-  ZQtExecutor* const m_renderThreadExecutor;
   QTimer* m_vkCompletionPollTimer = nullptr;
   bool m_initialized = false;
   ZDoc& m_doc;
@@ -632,6 +610,11 @@ private:
   // Pending per-object View3D json waiting for objViewReady
   std::unordered_map<size_t, json::object> m_pendingObjViewJson;
   int m_sceneApplyOutstanding = 0;
+
+  // Non-null only for explicitly configured tiled Vulkan worker capture.
+  // Declared last so worker lanes are released before the engine's render
+  // resources during normal member destruction.
+  std::unique_ptr<ZVulkanTileWorkerPool> m_vulkanTileWorkerPool;
 
   // (m_observedWGs and m_shuttingDown declared above to ensure lifetime beyond compositor)
 };
