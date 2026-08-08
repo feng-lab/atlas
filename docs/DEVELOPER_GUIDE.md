@@ -477,7 +477,7 @@ Lookup Tables (LUTs)
   - Scratch-pool recycling: Vulkan scratch image leases are released only after the submitting frame’s fence signals. The pool defers slot reuse by registering an “after completion” hook at the frame-completion safe point (via `registerAfterCurrentFrameCompletionHook()` through the backend-installed scratch scheduler).
   - Vulkan scratch reuse policy: completed scratch slots are reusable slot inventory. The first-order goal is reuse parity with OpenGL: Vulkan should reuse compatible free scratch slots before allocating new ones, including reusing larger BlockID attachment sets when the request needs fewer attachments. If no free slot is visible but a compatible slot has a deferred release pending, acquisition pumps the completion safe point and rescans before growing.
   - Vulkan scratch residency: scratch leases keep stable `ZVulkanTexture` object identity, but their backing `VkImage` allocations are demand-resident. Acquisition may return non-resident logical textures; `ZVulkanLinearScript` extracts the next submission's draw-pass image working set from attachments, external image uses, and shader-hook sampled images, then asks the scratch pool to make that hot set resident before descriptor priming/recording. Backend texture operations such as readback and texture clear/copy prepare and pin their own command textures internally, so compositor/renderer call sites do not carry residency metadata. Under explicit strict residency budgets, existing script node/pass boundaries become residency safe points: Atlas waits there when needed so cold scratch backings can be host-backed and evicted between passes. Strict mode does not split draw payloads or rewrite the render plan; if one existing pass hot set cannot fit, it fails with diagnostics. Default uncapped rendering keeps the existing coalesced path.
-  - Cold scratch eviction is content-preserving when the slot is still logically leased: after the previous submission fence completes, the pool copies resident attachment contents to host memory, releases the `VkImage` backing, and restores the image from that host backup when a later pass declares that contents are required. Clear/dont-care attachment writes may restore only backing memory because prior contents are not required. If a later pass requires contents and no host/source backup exists, Atlas fails loudly instead of drawing stale data.
+  - Cold scratch eviction is content-preserving when the slot is still logically leased: after the previous submission fence completes, the pool copies resident attachment contents to host memory, releases the `VkImage` backing, and restores the image from that host backup when a later pass declares that contents are required. A clear/dont-care write may restore only backing memory when the pass overwrites every texture subresource whose contents remain semantically required; a view- or render-area-scoped clear does not make untouched pixels or array layers disposable. If a later pass requires contents and no host/source backup exists, Atlas fails loudly instead of drawing stale data.
   - Linear-script attachment use must describe the first semantic use, not just eventual reads. A target that will be loaded or sampled later in a submission needs either valid preserved contents or an earlier declared writer. In particular, when an empty scene has no visible background and no renderable geometry, the Vulkan compositor records a real color/depth clear command with `contentsRequired=false`; an empty `script.raster(...)` callback is not sufficient because raster nodes without batches are skipped. This applies only to the geometry-capable base-scene call. Background-only OIT staging does not pay for the extra clear because its resolve pass owns target initialization.
   - Non-progressive capture/export does not wait between Vulkan filters just to trim scratch. Persistent filter outputs remain leased for the compositor, and reusable scratch texture objects are preserved. If memory pressure or a strict budget requires it, residency recovery evicts cold leased backing memory only at submission safe points while preserving scratch slot and `ZVulkanTexture` identity.
   - When persistent Vulkan compositor targets are resized (output targets, picking target, DDP/WA/WB transparency targets), the compositor waits for the released old target to reach the completion safe point before acquiring the replacement. This prevents old and new large render targets from coexisting during tiled export edge/full-tile size changes.
@@ -488,9 +488,10 @@ Lookup Tables (LUTs)
     - `vkCmdPushDescriptorSetKHR` is permitted only for an explicitly documented push-descriptor layout. It records command-buffer-local descriptor state and does not mutate a pool-backed descriptor set.
     - Sampled-image inputs are normally bindless (set=0). Register textures into the device-owned table for the current executor slot
       during the pre-record phase and pass indices via push constants / UBOs; do not bind per-pass sampled-image descriptor
-      sets. The capability-selected PPLL opaque-depth binding described under Transparency Methods and the dense
-      single-channel slice binding described under Slices Path are the push-descriptor exceptions. Table indices and
-      generations are slot-local even though all backends share the slot table.
+      sets. The capability-selected PPLL opaque-depth binding described under Transparency Methods, the dense
+      single-channel slice binding described under Slices Path, and the layer-array merge depth binding described under
+      Compositor Integration are the push-descriptor exceptions. Table indices and generations are slot-local even though
+      all backends share the slot table.
     - Per-draw variation must use dynamic UBO offsets and push constants; do not allocate/update per-draw descriptor sets.
     - Bindless sampled-image tables use `VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE` (not combined image samplers). Sampler state is provided via immutable samplers in the set 0 layout (see `Resources/shader/vulkan/include/bindless.glslinc`): linear clamp for 2D/2D-array sampling, linear border-zero for 3D image volumes/caches, and nearest clamp for integer fetches.
     - Never free descriptor sets individually. Rely on per-frame pool reset for transient descriptor arenas; backend
@@ -839,26 +840,35 @@ Render-frame Identity and Performance Instrumentation
 
 Vulkan export benchmark harness
 
-- `util/benchmark/export_scene_animation_stability.py` runs complete scene and animation export matrices for OpenGL,
-  Vulkan, or both. Each Vulkan invocation receives a unique run-local NDJSON path and uses
-  `--vulkan-perf-mode=off|light|full`; a successful instrumented run with missing/empty perf output is a failure.
+- `util/benchmark/export_scene_animation_stability.py` runs scene and animation export matrices for OpenGL, Vulkan, or
+  both. With no explicit input it uses both default workload sets; once `--scene` or `--animation` is supplied, only the
+  supplied workload kinds run. `--extra-arg` applies to both kinds, while `--scene-extra-arg` and
+  `--animation-extra-arg` configure their distinct multi-device routes. Generated commands explicitly clear scene and
+  animation routing flags that were not supplied for that workload, so persisted Atlas settings cannot select an
+  unrecorded device route.
+- Each single-process Vulkan invocation receives a unique run-local NDJSON path and uses
+  `--vulkan-perf-mode=off|light|full`; a successful instrumented run with missing/empty perf output is a failure. A
+  multi-process animation run uses supervisor wall time and exact frame-index coverage as its performance profile. It
+  requires `--child-timeout-seconds=0` because terminating the supervisor alone cannot establish that all rendering
+  workers have stopped.
 - Current JSON performance-summary lines identify themselves as `schema="atlas.perf.frame"`, `schema_version=1`, and must
-  contain every version-1 field, including `submissions` and `fence_waits`. For cross-revision comparisons, the harness also
-  recognizes the exact pre-schema unversioned record shape that predates those two counters. Such records remain valid,
-  but both counters are reported as unavailable rather than synthesized as zero. Unknown, partial, unmarked-current, or
-  mixed record profiles fail validation.
+  contain every version-1 field, including `submissions` and `fence_waits`. The harness also accepts the exact unversioned
+  compatibility profile, for which both counters are unavailable rather than synthesized as zero. Unknown, partial,
+  unmarked-current, or mixed record profiles fail validation.
 - The harness derives the exact expected animation frame count from `Animation3D.Duration`, the requested FPS, and the
   inclusive-start/exclusive-end range. Non-zero Atlas exits, missing/zero-byte outputs, and any exact frame-count mismatch
   are retained in the aggregate and make the harness exit non-zero; remaining planned runs still execute.
 - Reproducibility metadata includes Git revision/dirty state, executable SHA-256, complete top-level scene/animation
   SHA-256 values, OS/CPU/RAM, best-effort GPU/driver data, ICD environment, dimensions, FPS/range, and exact Atlas args.
-  Hashing intentionally covers the top-level inputs rather than recursively fetching every referenced local/remote asset,
-  which would distort benchmark setup time. Use `--gpu-name`/`--gpu-driver` when platform discovery is insufficient.
+  Input provenance hashes the selected top-level scene and animation files; referenced local or remote assets are not
+  recursively fetched. Use `--gpu-name`/`--gpu-driver` when platform discovery is insufficient.
 - Outputs include per-run manifests, `run_summary.csv`, `file_hashes.csv`, stability and aggregate JSON, and aggregate
-  Markdown. `--run-label` identifies a run; `--baseline-root` writes complete baseline/candidate duration and exact
-  same-backend output-hash comparisons. No arbitrary regression threshold is baked into the script.
+  Markdown. Exact output hashes remain the default pass criterion. The explicit per-kind `record-only` hash policy retains
+  and reports every hash variation without failing on variation alone; missing outputs or run coverage still fail.
+  `--run-label` identifies a run; `--baseline-root` writes complete baseline/candidate duration and same-backend
+  output-hash comparisons.
 - `util/benchmark/atlas_gui_rotate_batch.py` accepts an optional `--backend` plus repeatable `--extra-atlas-arg` and records
-  the exact launch command. It still requires its existing macOS GUI capture/calibration workflow.
+  the exact launch command. It requires the macOS GUI capture/calibration workflow.
 
 Descriptor & Recording Guardrails (Vulkan)
 
@@ -1072,6 +1082,7 @@ primaryRecorder.endRenderingSegment(backgroundSegment);
   - Recording-session sync point: `processBatches(...)` ends with no active dynamic rendering segment and flushes any scheduled upload→static copies (`flushScheduledCopies`). This ensures orchestration code (DDP/PPLL) can safely insert compute/copy work between sessions without accidentally recording inside `vkCmdBeginRendering`.
 - Rendering segment: a single `vkCmdBeginRendering`/`vkCmdEndRendering` region inside one recording session.
   - Segment coalescing is allowed only when begin-rendering state matches: render area + the ordered attachment set + per-attachment load/store/clear + final-use contracts. Do not merge segments across incompatible pass metadata; doing so creates silent state leakage (wrong clears, wrong final layouts, or read-while-write feedback loops).
+  - For a tracked attachment, the opening transition uses the texture's current layout as `oldLayout` for every load operation, including `Clear`; an untracked attachment uses its explicit `initialLayout`. The barrier covers the texture's full subresource range, while a dynamic-rendering clear affects only the bound view and render area. A newly created tracked texture uses `eUndefined` until its first transition.
   - External resource dependencies are explicit: passes must declare external image/buffer uses in `BackendPassDesc` so Vulkan can insert layout transitions and buffer memory barriers without label/payload heuristics.
 - Frame-completion safe point: after the submission fence signals, the backend reaches `applyPendingArenaReset` and runs after-completion hooks. Anything that depends on “GPU really finished” (scratch reuse, descriptor arena reset, block-ID compaction parsing) must be attached to this safe point.
 - Exact PPLL deliberately uses two submissions: count/scan plus its required CPU prefix readback, then
@@ -1405,7 +1416,7 @@ Notes
   - When full-res is active (`!fast && isVolumeDownsampled()`), the renderer:
     - Renders a “block-id” pass (`image3d_raycaster_blockID.frag`) to discover which cache blocks are needed along the rays for the current view.
     - Downloads per-pixel block IDs to CPU, compacts/deduplicates them, and asks `Z3DImg::updateAndUploadPageDirectoryCaches()` to read/upload those blocks.
-    - Then renders per-channel into a layer-array RT; multi-channel results are merged via `image2d_array_compositor.frag`.
+    - Then renders per channel into a layer-array target; raycaster and slice layer-array results use the shared image-array compositor algorithm and select its bindless or hybrid depth-push wrapper from the logical device's capabilities.
   - A local cut whose lower and upper bounds are equal is a planar slice, not a volume raycast. OpenGL handles that case through `render2DSliceOf3DImage()`: fast preview first, then a slice-shaped block-ID pass and a paged transfer-function slice draw. Vulkan mirrors that behavior with explicit planar progressive stages; the volumetric progressive raycaster stages remain volume-only and should continue to `CHECK` if planar geometry reaches them.
   - `Z3DImg` owns:
     - Page directory and page table cache textures (3D integer textures) per channel.
@@ -1457,6 +1468,7 @@ Notes
 
 - Compositor Integration
   - Filters render into their own RTs per eye and then copy/blend into the compositing chain using `Z3DTextureCopyRenderer`.
+  - Vulkan raycaster and slice layer-array merges require real color and depth 2D-array attachments and share the algorithm in `image2d_array_compositor_common.glslinc`. Color remains in the set-0 bindless sampled-image table. When `VK_KHR_push_descriptor` is enabled and `maxPushDescriptors >= 1`, the merge pushes the samplerless depth array at set 1, binding 0; otherwise depth also uses the set-0 bindless table. Both variants keep explicit sampled-image uses for residency, depth-read layout/aspect selection, and synchronization.
   - Bound boxes are drawn as local overlay with depth test and alpha blend after the main pass.
 
 User-Facing Behavior (summary)
@@ -1638,22 +1650,33 @@ Vulkan device selection
   best-effort; strict `DeviceSelection` construction does not fall back.
 - Headless animation export maps `--use_gpu_devices` according to the requested backend. Vulkan lists are supported on every
   platform and select indices from this preference-sorted list; OpenGL lists select EGL devices and remain Linux-only.
-  The animation supervisor resolves the requested half-open frame interval, divides it into balanced nonempty ranges, and
-  uses one ordinary single-device Atlas process per active range; multi-range exports launch child processes. Vulkan workers
-  receive the corresponding `--atlas_vk_device_index` preference. The supervisor waits for every render process before
-  reporting a failure. When compression is enabled, one final process encodes exactly the resolved frame interval after all
-  ranges succeed. An explicit top-level `-platform` QPA option is relayed unchanged to render and compression children.
-  Otherwise child QPA selection follows inherited `QT_QPA_PLATFORM`, when set, or Qt's default. Each child reloads the
-  standard persisted user settings. The supervisor explicitly supplies the export, backend, device, range, and process-role
-  flags. A rejected worker preference logs a warning and uses automatic selection, so export automation should treat those
-  warnings as a possible sign that multiple workers fell back to the same adapter. An empty list retains the direct
-  one-process path.
+  The animation supervisor resolves the requested half-open frame interval and divides it into adjacent, nonempty ranges.
+  Ranges are balanced by default; `--animation_gpu_device_frame_weights` optionally assigns positive integer frame shares
+  corresponding one-to-one with `--use_gpu_devices`. One ordinary single-device Atlas process owns each active range;
+  multi-range exports launch child processes.
+  Each frame is assigned to exactly one process. That process retains ownership of its adjacent range, document, renderer,
+  and caches for the range's lifetime, including the tile-major path used by large animation outputs. Vulkan
+  workers receive the corresponding `--atlas_vk_device_index` preference. The supervisor reads the animation metadata
+  needed to resolve frame ranges; each rendering process performs the complete document and referenced-data load.
+  The supervisor waits for every render process before reporting a failure. When compression is enabled, one final process
+  encodes exactly the resolved frame interval after all ranges succeed. An explicit top-level `-platform` QPA option is
+  relayed unchanged to render and compression children. Otherwise child QPA selection follows inherited
+  `QT_QPA_PLATFORM`, when set, or Qt's default. On displayless Linux hosts, callers must select Qt's `offscreen` platform
+  before startup. OpenGL device selection uses a separate surfaceless EGL context and does not require a particular Qt QPA
+  plugin. Each child reloads the standard persisted user settings. The supervisor explicitly supplies the export, backend,
+  device, range, and process-role flags. A rejected worker preference logs a warning and uses automatic selection, so export
+  automation should treat those warnings as a possible sign that multiple workers fell back to the same adapter. An empty
+  list retains the direct one-process path. With `--v=1`, the supervisor emits one wall-time summary for each successful
+  range worker, including its requested device and frame interval.
 - `--atlas_vk_multi_device_tile_worker_indices` selects the complete participating device set for in-process tiled scene export on
   any supported platform. It requires at least two comma-separated preference indices and rejects unavailable,
   incompatible, duplicate-index, or duplicate-UUID selections without fallback. The canonical engine renders pool tiles
   only when this list includes its independently selected device. `--atlas_vk_device_index` selects the canonical engine.
   Linux scene export accepts exactly one `--use_gpu_devices` value for that canonical engine; headless animation uses the
   same flag for its separate cross-platform Vulkan process workers or Linux EGL process workers.
+- With `--v=1`, each Vulkan tile lane that exits without a lane-local exception emits one batch summary containing its
+  actual preference index, rendered tile count, valid and guarded attachment pixel counts, and wall time. The counters and
+  clocks are skipped when that verbosity is disabled.
 Compositor Pass Graph (Vulkan)
 
 - Offscreen only; no swapchain.

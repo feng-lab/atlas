@@ -1379,13 +1379,20 @@ For automation or cluster rendering:
      animation export divides the value among its active render workers. The default value of zero uses detected-memory
      sizing in each process.
    - `--use_gpu_devices=0,1`. With Vulkan, this is available on macOS, Windows, and Linux: Atlas divides the requested
-     half-open frame range into nonempty ranges and uses one single-device Atlas process per range; multi-range exports
-     launch child processes. The values are preference-sorted Vulkan device indices, and each process receives the matching
-     `--atlas_vk_device_index` preference. With OpenGL, explicit animation devices remain Linux/EGL-only and the values are
-     EGL device IDs. Invalid or incompatible Vulkan preferences warn and use automatic selection, which can place multiple
-     workers on the same adapter. An empty list retains the ordinary one-process, one-device export path.
+     half-open frame range into adjacent, nonempty ranges and uses one single-device Atlas process per range; each frame is
+     rendered by exactly one process, and multi-range exports launch child processes. The values are preference-sorted
+     Vulkan device indices, and each process receives the matching `--atlas_vk_device_index` preference. With OpenGL,
+     explicit animation devices remain Linux/EGL-only and the values are EGL device IDs. Invalid or incompatible Vulkan
+     preferences warn and use automatic selection, which can place multiple workers on the same adapter. An empty list
+     retains the ordinary one-process, one-device export path.
+   - `--animation_gpu_device_frame_weights=2,1` optionally gives the listed animation devices positive integer frame
+     shares. The values correspond one-to-one with `--use_gpu_devices`; an empty list keeps balanced ranges. Weighting
+     changes only the size of each adjacent range: every frame still belongs to one process, and that process keeps the
+     same document, renderer, and caches for the range's lifetime.
    - An explicit Qt `-platform <plugin>` option is passed unchanged to rendering and compression child processes. Every
-     child also loads the standard Atlas user settings flagfile.
+     child also loads the standard Atlas user settings flagfile. On a displayless Linux host, launch Atlas with
+     `-platform offscreen` or `QT_QPA_PLATFORM=offscreen`. Linux OpenGL device selection uses a separate surfaceless EGL
+     context and does not otherwise require Qt's `offscreen` plugin.
 4. Monitor CLI logs for progress updates and errors while the export is running.
 5. Atlas exits non-zero if the export reports an error. For a multi-process animation export, any worker error fails the
    export after every launched rendering worker has stopped; video compression does not start after a worker failure.
@@ -1758,6 +1765,7 @@ Use **Help → Shortcuts** in either the 2D or 3D window to open this section di
 | `--atlas_vk_multi_device_tile_worker_indices` | Comma-separated preference-sorted Vulkan indices for the private, engine-owned pool used by fixed-size tiled headless scene capture, for example `0,1`. The complete list must contain at least two distinct compatible physical devices; invalid or duplicate selections fail without fallback. The canonical adapter renders tiles only when listed; every selected noncanonical adapter uses a private engine on its own rendering thread. Empty keeps direct rendering. Interactive rendering and untiled captures remain on the canonical device, and this flag does not route animation rendering. |
 | `--atlas_perf_mode` | Vulkan performance collection mode: `off` disables collector timing/scopes/output while retaining the render-frame identity required for resource and presentation ordering; `light` records top-level submission/pass metrics (default), and `full` also records nested GPU scopes. |
 | `--use_gpu_devices` | Specify comma-separated backend device indices, for example `0,1`. Vulkan animation export supports the list on macOS, Windows, and Linux and uses one single-device process per nonempty frame range; multi-range exports launch child processes. Values are preference-sorted Vulkan indices passed as `--atlas_vk_device_index` preferences. Rejected preferences warn and use automatic selection, which can place multiple workers on the same adapter. OpenGL animation values are EGL device IDs and are Linux-only. Scene export keeps its Linux-only, exactly-one-value canonical-device behavior; use `--atlas_vk_multi_device_tile_worker_indices` for the separate in-process Vulkan tiled-capture device set. Empty retains the direct one-process path. |
+| `--animation_gpu_device_frame_weights` | Optional comma-separated positive integer frame shares corresponding one-to-one with `--use_gpu_devices` during multi-process animation export, for example `2,1`. Empty keeps balanced adjacent frame ranges. Each active device still owns one persistent adjacent range; weights do not distribute animation frames through scene tile workers. |
 | `--__use_EGL` | Force EGL context creation (Linux headless). |
 | `--v=LEVEL` | Adjust log verbosity; `--v=1` prints additional diagnostics. |
 

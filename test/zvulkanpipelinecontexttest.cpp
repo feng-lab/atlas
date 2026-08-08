@@ -32,6 +32,20 @@ private:
 
 } // namespace
 
+TEST(VulkanAttachmentTransitionPolicyTest, ClearDoesNotDiscardTrackedContents)
+{
+  nim::ZVulkanAttachmentInfo info{};
+  info.loadOp = vk::AttachmentLoadOp::eClear;
+  info.initialLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
+
+  EXPECT_EQ(nim::vulkan::attachmentTransitionOldLayout(info, vk::ImageLayout::eColorAttachmentOptimal),
+            vk::ImageLayout::eColorAttachmentOptimal);
+  EXPECT_EQ(nim::vulkan::attachmentTransitionOldLayout(info, std::nullopt), vk::ImageLayout::eShaderReadOnlyOptimal);
+
+  info.initialLayout = vk::ImageLayout::eUndefined;
+  EXPECT_EQ(nim::vulkan::attachmentTransitionOldLayout(info, std::nullopt), vk::ImageLayout::eUndefined);
+}
+
 TEST(ReadbackCompletionPolicyTest, SeparatesCompletionFromRenderQuality)
 {
   using nim::ReadbackCompletionPolicy;

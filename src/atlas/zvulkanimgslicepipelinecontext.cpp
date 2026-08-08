@@ -54,6 +54,8 @@ constexpr uint32_t kDenseBitsetInvalidBlockIdFlag = 0x80000000u;
 constexpr uint32_t kDenseSliceVolumeBinding = 0u;
 constexpr uint32_t kDenseSliceColormapBinding = 1u;
 constexpr uint32_t kDenseSlicePushDescriptorCount = 2u;
+constexpr uint32_t kMergeDepthPushDescriptorSet = 1u;
+constexpr uint32_t kMergeDepthPushDescriptorBinding = 0u;
 
 bool supportsDenseSlicePushDescriptors(ZVulkanDevice& device)
 {
@@ -61,10 +63,10 @@ bool supportsDenseSlicePushDescriptors(ZVulkanDevice& device)
   return support.pushDescriptorExtension && support.maxPushDescriptors >= kDenseSlicePushDescriptorCount;
 }
 
-vk::DescriptorImageInfo denseSlicePushDescriptorInfo(ZVulkanTexture& texture,
-                                                     ZVulkanDevice& device,
-                                                     vk::ImageViewType expectedViewType,
-                                                     const char* label)
+vk::DescriptorImageInfo pushDescriptorImageInfo(ZVulkanTexture& texture,
+                                                ZVulkanDevice& device,
+                                                vk::ImageViewType expectedViewType,
+                                                const char* label)
 {
   CHECK_EQ(&texture.ownerDevice(), &device) << label << " belongs to a different Vulkan device";
   CHECK(texture.resident()) << label << " is not resident";
@@ -76,7 +78,9 @@ vk::DescriptorImageInfo denseSlicePushDescriptorInfo(ZVulkanTexture& texture,
   vk::DescriptorImageInfo info = texture.descriptorInfo();
   CHECK(info.imageView) << label << " has no image view";
   CHECK(info.imageLayout == texture.layout()) << label << " descriptor layout does not match its tracked layout";
-  info.sampler = vk::Sampler{}; // The push-descriptor layout provides the immutable sampler.
+  // The descriptor layout either supplies an immutable sampler or the shader
+  // uses a samplerless texel fetch.
+  info.sampler = vk::Sampler{};
   return info;
 }
 
@@ -1159,14 +1163,14 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
       if (supportsDenseSlicePushDescriptors(m_backend.device())) {
         CHECK(m_denseSliceVolumeSampler.has_value());
         CHECK(m_denseSliceColormapSampler.has_value());
-        vk::DescriptorImageInfo volumeInfo = denseSlicePushDescriptorInfo(*inputs.volume,
-                                                                          m_backend.device(),
-                                                                          vk::ImageViewType::e3D,
-                                                                          "Slice fast volume texture");
-        vk::DescriptorImageInfo colormapInfo = denseSlicePushDescriptorInfo(*inputs.colormap,
-                                                                            m_backend.device(),
-                                                                            vk::ImageViewType::e2D,
-                                                                            "Slice fast colormap texture");
+        vk::DescriptorImageInfo volumeInfo = pushDescriptorImageInfo(*inputs.volume,
+                                                                     m_backend.device(),
+                                                                     vk::ImageViewType::e3D,
+                                                                     "Slice fast volume texture");
+        vk::DescriptorImageInfo colormapInfo = pushDescriptorImageInfo(*inputs.colormap,
+                                                                       m_backend.device(),
+                                                                       vk::ImageViewType::e2D,
+                                                                       "Slice fast colormap texture");
 
         std::array<vk::WriteDescriptorSet, kDenseSlicePushDescriptorCount> writes{};
         writes[0].dstBinding = kDenseSliceVolumeBinding;
@@ -1246,7 +1250,10 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
 
   Image2DArrayCompositorPushConstants pc{};
   pc.color_texture = m_backend.bindlessLookupSampledImageAutoOrCrash(*layerColor, "slice_merge_layer_color");
-  pc.depth_texture = m_backend.bindlessLookupSampledImageAutoOrCrash(*layerDepth, "slice_merge_layer_depth");
+  const bool usePushDepth = m_backend.device().context().supportsPushDescriptors();
+  if (!usePushDepth) {
+    pc.depth_texture = m_backend.bindlessLookupSampledImageAutoOrCrash(*layerDepth, "slice_merge_layer_depth");
+  }
   const std::array<vk::DescriptorSet, 1> mergeSets{m_backend.bindlessSampledImageDescriptorSet()};
 
   ZVulkanGraphicsDrawSpec mergeDraw{};
@@ -1268,7 +1275,28 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
   mergeDraw.vertexOffsets = vertexOffsets;
   mergeDraw.vertexCount = static_cast<uint32_t>(m_quadVertexCount);
   mergeDraw.instanceCount = 1;
-  recorder.recordGraphicsDraw(mergeDraw);
+  if (usePushDepth) {
+    CHECK(layerDepth->descriptorAspect() == vk::ImageAspectFlagBits::eDepth)
+      << "Slice merge depth descriptor must select only the depth aspect";
+    vk::DescriptorImageInfo depthInfo = pushDescriptorImageInfo(*layerDepth,
+                                                                m_backend.device(),
+                                                                vk::ImageViewType::e2DArray,
+                                                                "Slice merge depth texture");
+    vk::WriteDescriptorSet write{};
+    write.dstBinding = kMergeDepthPushDescriptorBinding;
+    write.dstArrayElement = 0u;
+    write.descriptorCount = 1u;
+    write.descriptorType = vk::DescriptorType::eSampledImage;
+    write.pImageInfo = &depthInfo;
+    const std::array<vk::WriteDescriptorSet, 1> writes{write};
+    const vk::PipelineLayout pipelineLayout = mergePipeline.pipeline->pipelineLayout();
+    recorder.recordGraphicsDraw(mergeDraw, [&](vk::raii::CommandBuffer& cb) {
+      cb.pushDescriptorSetKHR(vk::PipelineBindPoint::eGraphics, pipelineLayout, kMergeDepthPushDescriptorSet, writes);
+      cb.draw(mergeDraw.vertexCount, mergeDraw.instanceCount, mergeDraw.firstVertex, mergeDraw.firstInstance);
+    });
+  } else {
+    recorder.recordGraphicsDraw(mergeDraw);
+  }
 
   if (absl::GetFlag(FLAGS_atlas_debug_save_slice_layers)) {
     auto leaseRef = payload.layerLease;
@@ -1798,19 +1826,37 @@ ZVulkanImgSlicePipelineContext::ensureMergePipeline(const MergePipelineKey& key,
   }
 
   auto& device = m_backend.device();
+  const bool usePushDepth = device.context().supportsPushDescriptors();
 
   PipelineInstance instance;
   instance.shader = std::make_unique<ZVulkanShader>(
     device,
     ZVulkanShader::spirvResourcePath(QStringLiteral("pass.vert.spv")),
-    ZVulkanShader::spirvResourcePath(QStringLiteral("image2d_array_compositor.frag.spv")),
+    ZVulkanShader::spirvResourcePath(usePushDepth ? QStringLiteral("image2d_array_compositor_depth_push.frag.spv")
+                                                  : QStringLiteral("image2d_array_compositor.frag.spv")),
     std::nullopt);
 
   auto vertexState = makeQuadVertexInputState();
   instance.pipeline = device.createPipeline(*instance.shader, vertexState, vk::PrimitiveTopology::eTriangleStrip);
   const vk::DescriptorSetLayout bindlessLayout = m_backend.bindlessSampledImageDescriptorSetLayout();
   CHECK(bindlessLayout) << "Slice merge pipeline requires backend bindless descriptor set layout";
-  instance.pipeline->setDescriptorSetLayouts({bindlessLayout});
+  if (usePushDepth) {
+    if (!m_mergeDepthPushDescriptorSetLayout.has_value()) {
+      const vk::DescriptorSetLayoutBinding binding{.binding = kMergeDepthPushDescriptorBinding,
+                                                   .descriptorType = vk::DescriptorType::eSampledImage,
+                                                   .descriptorCount = 1u,
+                                                   .stageFlags = vk::ShaderStageFlagBits::eFragment};
+      const vk::DescriptorSetLayoutCreateInfo layoutInfo{
+        .flags = vk::DescriptorSetLayoutCreateFlagBits::ePushDescriptorKHR,
+        .bindingCount = 1u,
+        .pBindings = &binding,
+      };
+      m_mergeDepthPushDescriptorSetLayout.emplace(device.context().device(), layoutInfo);
+    }
+    instance.pipeline->setDescriptorSetLayouts({bindlessLayout, **m_mergeDepthPushDescriptorSetLayout});
+  } else {
+    instance.pipeline->setDescriptorSetLayouts({bindlessLayout});
+  }
   instance.pipeline->setAttachmentFormats(formats.colorFormats, formats.depthFormat);
   instance.pipeline->setCullMode(vk::CullModeFlagBits::eNone);
   instance.pipeline->setFrontFace(vk::FrontFace::eCounterClockwise);

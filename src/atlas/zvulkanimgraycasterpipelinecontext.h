@@ -296,6 +296,7 @@ private:
   std::map<PlanarBlockIdPipelineKey, PipelineInstance> m_planarBlockIdPipelines;
   std::map<PlanarPagedPipelineKey, PipelineInstance> m_planarPagedPipelines;
   std::map<CopyPipelineKey, PipelineInstance> m_copyPipelines;
+  std::optional<vk::raii::DescriptorSetLayout> m_mergeDepthPushDescriptorSetLayout;
   std::map<MergePipelineKey, PipelineInstance> m_mergePipelines;
 
   // (probes removed)
@@ -586,7 +587,7 @@ private:
                              vk::raii::CommandBuffer& cmd,
                              const CompositingConfig& composite,
                              ZVulkanTexture& layerColor,
-                             /*nullable*/ ZVulkanTexture* layerDepth,
+                             ZVulkanTexture& layerDepth,
                              uint32_t channelCount);
 
   // (public) see takePendingFinalization() above

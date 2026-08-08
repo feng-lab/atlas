@@ -170,6 +170,7 @@ private:
   std::optional<vk::raii::Sampler> m_denseSliceVolumeSampler;
   std::optional<vk::raii::Sampler> m_denseSliceColormapSampler;
   std::optional<vk::raii::DescriptorSetLayout> m_denseSlicePushDescriptorSetLayout;
+  std::optional<vk::raii::DescriptorSetLayout> m_mergeDepthPushDescriptorSetLayout;
 
   std::map<SlicePipelineKey, PipelineInstance> m_slicePipelines;
   std::map<MergePipelineKey, PipelineInstance> m_mergePipelines;

@@ -18,6 +18,7 @@
 #include <QFileInfo>
 #include <QTemporaryDir>
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <cstdint>
 #include <limits>
@@ -77,6 +78,11 @@ ABSL_FLAG(std::vector<std::string>,
           "Comma-separated backend device indices to use (e.g., '0,1,2,3'). OpenGL values select EGL device IDs; "
           "Vulkan values select preference-sorted Vulkan device indices. Vulkan animation workers are supported on "
           "all platforms; explicit OpenGL devices require Linux EGL.");
+ABSL_FLAG(std::vector<std::string>,
+          animation_gpu_device_frame_weights,
+          std::vector<std::string>{},
+          "Positive integer frame weights corresponding to --use_gpu_devices. Empty uses balanced contiguous ranges. "
+          "Animation export only.");
 ABSL_DECLARE_FLAG(uint32_t, use_gpu_device);
 
 #if defined(__linux__)
@@ -139,22 +145,63 @@ bool prepareVideoOutput(const QString& outputFilename, bool overwriteExisting, Q
 } // namespace
 
 std::vector<ZRunExport3DAnimation::FrameRange>
-ZRunExport3DAnimation::splitFrameRange(int startFrame, int endFrame, size_t maxWorkerCount)
+ZRunExport3DAnimation::splitFrameRange(int startFrame,
+                                       int endFrame,
+                                       size_t maxWorkerCount,
+                                       const std::vector<uint32_t>& workerWeights)
 {
   CHECK_GE(startFrame, 0);
   CHECK_LT(startFrame, endFrame);
   CHECK_GT(maxWorkerCount, 0u);
+  CHECK(workerWeights.empty() || workerWeights.size() == maxWorkerCount);
+  for (const uint32_t weight : workerWeights) {
+    CHECK_GT(weight, 0u);
+  }
 
   const size_t frameCount = static_cast<size_t>(static_cast<int64_t>(endFrame) - startFrame);
   const size_t workerCount = std::min(maxWorkerCount, frameCount);
-  const size_t baseFrameCount = frameCount / workerCount;
-  const size_t remainder = frameCount % workerCount;
+  std::vector<size_t> rangeFrameCounts(workerCount, 0u);
+  if (workerWeights.empty()) {
+    const size_t baseFrameCount = frameCount / workerCount;
+    const size_t remainder = frameCount % workerCount;
+    for (size_t workerIndex = 0; workerIndex < workerCount; ++workerIndex) {
+      rangeFrameCounts[workerIndex] = baseFrameCount + (workerIndex < remainder ? 1u : 0u);
+    }
+  } else {
+    uint64_t remainingWeight = 0u;
+    for (size_t workerIndex = 0; workerIndex < workerCount; ++workerIndex) {
+      const uint32_t weight = workerWeights[workerIndex];
+      CHECK_LE(remainingWeight, std::numeric_limits<uint64_t>::max() - weight);
+      remainingWeight += weight;
+    }
+
+    size_t remainingFrameCount = frameCount;
+    for (size_t workerIndex = 0; workerIndex < workerCount; ++workerIndex) {
+      const uint64_t weight = workerWeights[workerIndex];
+      const size_t remainingWorkerCount = workerCount - workerIndex;
+      if (remainingWorkerCount == 1u) {
+        rangeFrameCounts[workerIndex] = remainingFrameCount;
+        break;
+      }
+
+      CHECK_LE(static_cast<uint64_t>(remainingFrameCount), std::numeric_limits<uint64_t>::max() / weight);
+      const uint64_t weightedFrames = static_cast<uint64_t>(remainingFrameCount) * weight;
+      const uint64_t wholeFrames = weightedFrames / remainingWeight;
+      const uint64_t fractionalFrames = weightedFrames % remainingWeight;
+      const uint64_t halfWeight = remainingWeight / 2u + remainingWeight % 2u;
+      const size_t roundedFrameCount = static_cast<size_t>(wholeFrames + (fractionalFrames >= halfWeight ? 1u : 0u));
+      const size_t maximumFrameCount = remainingFrameCount - (remainingWorkerCount - 1u);
+      rangeFrameCounts[workerIndex] = std::clamp(roundedFrameCount, size_t{1u}, maximumFrameCount);
+      remainingFrameCount -= rangeFrameCounts[workerIndex];
+      remainingWeight -= weight;
+    }
+  }
 
   std::vector<FrameRange> ranges;
   ranges.reserve(workerCount);
   int rangeStart = startFrame;
   for (size_t workerIndex = 0; workerIndex < workerCount; ++workerIndex) {
-    const size_t rangeFrameCount = baseFrameCount + (workerIndex < remainder ? 1u : 0u);
+    const size_t rangeFrameCount = rangeFrameCounts[workerIndex];
     CHECK_GT(rangeFrameCount, 0u);
     const int rangeEnd = rangeStart + static_cast<int>(rangeFrameCount);
     ranges.emplace_back(rangeStart, rangeEnd);
@@ -272,7 +319,13 @@ int ZRunExport3DAnimation::run(const QStringList& childQpaPlatformArguments)
   }
 
   const RenderBackend requestedBackend = absl::GetFlag(FLAGS_atlas_default_render_backend);
-  if (const std::vector<std::string> gpuDevices = absl::GetFlag(FLAGS_use_gpu_devices); !gpuDevices.empty()) {
+  const std::vector<std::string> gpuDevices = absl::GetFlag(FLAGS_use_gpu_devices);
+  const std::vector<std::string> frameWeightStrings = absl::GetFlag(FLAGS_animation_gpu_device_frame_weights);
+  if (gpuDevices.empty() && !frameWeightStrings.empty()) {
+    LOG(ERROR) << "--animation_gpu_device_frame_weights requires --use_gpu_devices";
+    return 1;
+  }
+  if (!gpuDevices.empty()) {
 #if !defined(__linux__)
     if (requestedBackend != RenderBackend::Vulkan) {
       LOG(ERROR) << "Explicit OpenGL devices for animation export require Linux EGL";
@@ -297,6 +350,29 @@ int ZRunExport3DAnimation::run(const QStringList& childQpaPlatformArguments)
     }
     CHECK(!gpuList.empty());
 
+    std::vector<uint32_t> frameWeights;
+    if (!frameWeightStrings.empty()) {
+      if (gpuList.size() < 2u) {
+        LOG(ERROR) << "--animation_gpu_device_frame_weights requires at least two GPU devices";
+        return 1;
+      }
+      if (frameWeightStrings.size() != gpuList.size()) {
+        LOG(ERROR) << fmt::format("animation GPU frame-weight count {} does not match device count {}",
+                                  frameWeightStrings.size(),
+                                  gpuList.size());
+        return 1;
+      }
+      frameWeights.reserve(frameWeightStrings.size());
+      for (const std::string& weightString : frameWeightStrings) {
+        uint32_t weight = 0u;
+        if (!stringToValueNoThrow(weightString, weight) || weight == 0u) {
+          LOG(ERROR) << fmt::format("invalid animation GPU frame weight {}", weightString);
+          return 1;
+        }
+        frameWeights.push_back(weight);
+      }
+    }
+
     auto selectDirectDevice = [requestedBackend](uint32_t deviceIndex) {
       if (requestedBackend == RenderBackend::Vulkan) {
         absl::SetFlag(&FLAGS_atlas_vk_device_index, static_cast<int32_t>(deviceIndex));
@@ -308,22 +384,25 @@ int ZRunExport3DAnimation::run(const QStringList& childQpaPlatformArguments)
     if (gpuList.size() == 1u) {
       selectDirectDevice(gpuList.front());
     } else {
-      ZDoc doc;
-      doc.animation3DDoc().setShowLoadIssueDialogs(false);
-      QString errorMsg;
-      const size_t animationId = doc.animation3DDoc().loadFile(filename, errorMsg);
-      if (animationId == 0) {
-        LOG(ERROR) << "load animation file error: " << errorMsg;
-        return 1;
+      const QDir animationDirectory = QFileInfo(filename).absoluteDir();
+      filename = QFileInfo(filename).absoluteFilePath();
+      if (QFileInfo(outputFilename).isRelative()) {
+        outputFilename = animationDirectory.absoluteFilePath(outputFilename);
       }
-      if (const QString& loadIssues = doc.animation3DDoc().animation(animationId).lastLoadIssues();
-          !loadIssues.isEmpty()) {
-        LOG(ERROR) << "load animation file error: " << loadIssues;
+      if (!outputImageFolderName.isEmpty() && QFileInfo(outputImageFolderName).isRelative()) {
+        outputImageFolderName = animationDirectory.absoluteFilePath(outputImageFolderName);
+      }
+
+      double animationDuration = 0.0;
+      try {
+        animationDuration = Z3DAnimation::readDurationFromFile(filename);
+      }
+      catch (const std::exception& e) {
+        LOG(ERROR) << fmt::format("load animation file error: {}", e.what());
         return 1;
       }
 
-      const int totalFrameCount =
-        std::max(1, static_cast<int>(std::ceil(doc.animation3DDoc().animation(animationId).duration() * outputFps)));
+      const int totalFrameCount = std::max(1, static_cast<int>(std::ceil(animationDuration * outputFps)));
       const int startFrame = absl::GetFlag(FLAGS_output_start_frame);
       if (startFrame < 0 || startFrame >= totalFrameCount) {
         LOG(ERROR) << fmt::format("Video start frame {} is not correct", startFrame);
@@ -337,7 +416,7 @@ int ZRunExport3DAnimation::run(const QStringList& childQpaPlatformArguments)
         return 1;
       }
 
-      const std::vector<FrameRange> frameRanges = splitFrameRange(startFrame, endFrame, gpuList.size());
+      const std::vector<FrameRange> frameRanges = splitFrameRange(startFrame, endFrame, gpuList.size(), frameWeights);
       CHECK(!frameRanges.empty());
       if (frameRanges.size() == 1u) {
         selectDirectDevice(gpuList.front());
@@ -382,9 +461,13 @@ int ZRunExport3DAnimation::run(const QStringList& childQpaPlatformArguments)
           const auto [workerStartFrame, workerEndFrame] = frameRanges[workerIndex];
           const uint32_t deviceIndex = gpuList[workerIndex];
           gpuFutures.push_back(folly::via(cpuExecutor, [=]() {
+            const bool logWorkerSummary = VLOG_IS_ON(1);
+            const auto workerStart =
+              logWorkerSummary ? std::chrono::steady_clock::now() : std::chrono::steady_clock::time_point{};
             QStringList arguments;
             arguments << "--run_export_3d_animation"
                       << "--use_gpu_devices="
+                      << "--animation_gpu_device_frame_weights="
                       << "--only_compress_video=false"
                       << "--filename" << filename << "--atlas_default_render_backend"
                       << (requestedBackend == RenderBackend::Vulkan ? "vulkan" : "opengl") << "--output_filename"
@@ -416,6 +499,17 @@ int ZRunExport3DAnimation::run(const QStringList& childQpaPlatformArguments)
             }
             if (!renderingProcess.waitForFinished(-1) || !renderingProcess.finishedWithoutError()) {
               throw ZException(fmt::format("rendering process error: {}", renderingProcess.processError()));
+            }
+            if (logWorkerSummary) {
+              VLOG(1) << fmt::format(
+                "ATLAS_ANIMATION_WORKER_FINISHED backend={} requested_device_index={} frame_start={} frame_end={} "
+                "frame_count={} elapsed_ms={:.3f}",
+                requestedBackend == RenderBackend::Vulkan ? "vulkan" : "opengl",
+                deviceIndex,
+                workerStartFrame,
+                workerEndFrame,
+                workerEndFrame - workerStartFrame,
+                std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - workerStart).count());
             }
             LOG(INFO) << fmt::format("rendering process finished for frames [{}, {}) on device {}",
                                      workerStartFrame,

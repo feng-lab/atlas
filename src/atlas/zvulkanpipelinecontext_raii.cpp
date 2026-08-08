@@ -104,27 +104,17 @@ void transitionImage(vk::raii::CommandBuffer& cmd,
 {
   validateTrackingTexture(info);
 
-  // Choose the most reliable oldLayout:
-  // - If the pass clears the attachment (loadOp=CLEAR), we can safely start
-  //   from UNDEFINED regardless of previously tracked layout.
-  // - Otherwise, prefer the tracking texture's current layout when provided.
-  //   This guards against stale initialLayout snapshots.
-  vk::ImageLayout requestedOld = info.initialLayout;
-  vk::ImageLayout trackedOld = requestedOld;
+  // Prefer the tracking texture's current layout when provided. A clear only
+  // covers the render area and selected attachment view, while this barrier
+  // covers the texture's full subresource range, so it cannot discard the
+  // previous contents of the remaining pixels or array layers.
+  const vk::ImageLayout requestedOld = info.initialLayout;
+  std::optional<vk::ImageLayout> trackedLayout;
   if (info.trackingTexture != nullptr) {
-    trackedOld = info.trackingTexture->layout();
+    trackedLayout = info.trackingTexture->layout();
   }
-  vk::ImageLayout effectiveOld = requestedOld;
-  if (info.loadOp == vk::AttachmentLoadOp::eClear) {
-    effectiveOld = vk::ImageLayout::eUndefined;
-  } else if (info.trackingTexture != nullptr && trackedOld != requestedOld) {
-    // Prefer the tracked layout when it disagrees with the provided snapshot.
-    effectiveOld = trackedOld;
-  }
-  // Avoid no-op old==new transitions that leave brand-new images UNDEFINED on GPU.
-  if (effectiveOld == newLayout && trackedOld == vk::ImageLayout::eUndefined) {
-    effectiveOld = vk::ImageLayout::eUndefined;
-  }
+  const vk::ImageLayout trackedOld = trackedLayout.value_or(requestedOld);
+  const vk::ImageLayout effectiveOld = vulkan::attachmentTransitionOldLayout(info, trackedLayout);
 
   const vk::ImageAspectFlags aspect = resolveAttachmentAspect(info);
 

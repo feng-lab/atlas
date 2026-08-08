@@ -3,6 +3,7 @@
 #include "z3dtiledescriptor.h"
 #include "zcancellation.h"
 #include "zexception.h"
+#include "zlog.h"
 #include "zvulkancontext.h"
 
 #include <QMetaObject>
@@ -269,6 +270,12 @@ void Z3DRenderingEngine::ZVulkanTileWorkerPool::renderLane(Z3DRenderingEngine& e
                                                            const std::shared_ptr<Batch>& batch) noexcept
 {
   CHECK(batch != nullptr);
+  const bool logWorkerSummary = VLOG_IS_ON(1);
+  const auto workerStart =
+    logWorkerSummary ? std::chrono::steady_clock::now() : std::chrono::steady_clock::time_point{};
+  size_t renderedTileCount = 0u;
+  uint64_t renderedValidPixels = 0u;
+  uint64_t renderedAttachmentPixels = 0u;
   bool exportActive = false;
   try {
     if (workerState != nullptr) {
@@ -304,6 +311,13 @@ void Z3DRenderingEngine::ZVulkanTileWorkerPool::renderLane(Z3DRenderingEngine& e
         std::this_thread::sleep_for(kCompletionPollInterval);
       }
       Z3DRenderedTile renderedTile = engine.collectVulkanTile(renderFrameToken);
+      if (logWorkerSummary) {
+        const glm::uvec2 validExtent = batch->tiles[tileIndex].validOutputExtent();
+        const glm::uvec2 attachmentExtent = batch->tiles[tileIndex].attachmentExtent();
+        ++renderedTileCount;
+        renderedValidPixels += static_cast<uint64_t>(validExtent.x) * validExtent.y;
+        renderedAttachmentPixels += static_cast<uint64_t>(attachmentExtent.x) * attachmentExtent.y;
+      }
 
       if (batch->cancellationToken.isCancellationRequested()) {
         batch->stop.store(true, std::memory_order_release);
@@ -321,6 +335,18 @@ void Z3DRenderingEngine::ZVulkanTileWorkerPool::renderLane(Z3DRenderingEngine& e
 
     exportActive = false;
     engine.endVulkanTileExport();
+    if (logWorkerSummary) {
+      CHECK(engine.m_vkContext != nullptr);
+      const auto deviceSelection = engine.m_vkContext->selectedDeviceSelection();
+      VLOG(1) << fmt::format(
+        "ATLAS_VULKAN_TILE_WORKER_FINISHED device_index={} tiles={} valid_pixels={} "
+        "attachment_pixels={} elapsed_ms={:.3f}",
+        deviceSelection.preferenceIndex,
+        renderedTileCount,
+        renderedValidPixels,
+        renderedAttachmentPixels,
+        std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - workerStart).count());
+    }
   }
   catch (...) {
     const std::exception_ptr failure = std::current_exception();

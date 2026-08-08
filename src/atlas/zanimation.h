@@ -216,6 +216,10 @@ Q_SIGNALS:
                                           int tileBorder);
 
 protected:
+  static constexpr double kDefaultDuration = 10.0;
+
+  [[nodiscard]] static double normalizedDuration(double duration);
+
   void disableAnimationOf(size_t id);
 
   void tryLinkAnimationWith(size_t id);

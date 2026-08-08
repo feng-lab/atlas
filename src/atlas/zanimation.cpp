@@ -290,7 +290,7 @@ ZAnimation::ZAnimation(ZDoc& doc, QObject* parent)
   : QObject(parent)
   , m_doc(doc)
   , m_engine(nullptr)
-  , m_duration(10.0)
+  , m_duration(kDefaultDuration)
   , m_nextUniqueId(100)
 {
   connect(&m_doc, &ZDoc::objAboutToBeRemoved, this, &ZAnimation::disableAnimationOf);
@@ -1437,11 +1437,16 @@ void ZAnimation::writeContent(const QString& fn, const QString& jsonKey)
 
 void ZAnimation::setDurationImpl(double duration)
 {
-  duration = std::max(1.0, duration);
+  duration = normalizedDuration(duration);
   if (m_duration != duration) {
     m_duration = duration;
     Q_EMIT durationChanged(m_duration);
   }
+}
+
+double ZAnimation::normalizedDuration(double duration)
+{
+  return std::max(1.0, duration);
 }
 
 ZAnimation::UndoSnapshot ZAnimation::captureUndoSnapshot() const

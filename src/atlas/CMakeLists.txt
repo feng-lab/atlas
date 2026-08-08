@@ -364,6 +364,7 @@ set(ATLAS_VK_SHADER_SOURCES
     # Compositors and copy
     compositor.frag
     image2d_array_compositor.frag
+    image2d_array_compositor_depth_push.frag
     copy_raycaster_image.frag
     depth_ramp.frag
 

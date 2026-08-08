@@ -97,6 +97,19 @@ DEFAULT_OUTPUT_PARENT = DEFAULT_PATH_CONFIG.output_parent
 DEFAULT_QT_PLATFORM = "auto"
 DEFAULT_BACKENDS = ("opengl", "vulkan")
 DEFAULT_ANIMATION_DURATION_SECONDS = 10.0
+EXACT_HASH_POLICY = "exact"
+RECORD_ONLY_HASH_POLICY = "record-only"
+DEFAULT_HASH_POLICY = EXACT_HASH_POLICY
+HASH_POLICIES = (EXACT_HASH_POLICY, RECORD_ONLY_HASH_POLICY)
+_ANIMATION_FRAME_NAME_PREFIX = "frame_"
+_SCENE_ROUTING_FLAG_DEFAULTS = (
+    ("--use_gpu_devices", ""),
+    ("--atlas_vk_multi_device_tile_worker_indices", ""),
+)
+_ANIMATION_ROUTING_FLAG_DEFAULTS = (
+    ("--use_gpu_devices", ""),
+    ("--animation_gpu_device_frame_weights", ""),
+)
 
 
 @dataclass(frozen=True)
@@ -457,15 +470,9 @@ def _animation_duration_seconds(source: Path) -> float:
     if not isinstance(animation, dict):
         raise ValueError(f"Animation3D in {source} is not an object")
     raw_duration = animation.get("Duration", DEFAULT_ANIMATION_DURATION_SECONDS)
-    try:
-        duration = float(raw_duration)
-    except (TypeError, ValueError) as exc:
-        raise ValueError(
-            f"Invalid Animation3D.Duration in {source}: {raw_duration}"
-        ) from exc
-    if not math.isfinite(duration) or duration < 0.0:
-        raise ValueError(f"Invalid Animation3D.Duration in {source}: {duration}")
-    return duration
+    if not _is_json_number(raw_duration):
+        raise ValueError(f"Invalid Animation3D.Duration in {source}: {raw_duration}")
+    return max(1.0, float(raw_duration))
 
 
 def _expected_animation_frame_count(
@@ -546,6 +553,31 @@ def _verify_inputs(paths: list[Path], kind: str) -> list[Path]:
     return verified
 
 
+def _selected_workload_paths(
+    scene_values: list[str] | None, animation_values: list[str] | None
+) -> tuple[list[Path], list[Path]]:
+    if scene_values is None and animation_values is None:
+        return list(DEFAULT_SCENES), list(DEFAULT_ANIMATIONS)
+    return (
+        [Path(path) for path in scene_values or []],
+        [Path(path) for path in animation_values or []],
+    )
+
+
+def _with_absent_flag_defaults(
+    arguments: list[str], defaults: tuple[tuple[str, str], ...]
+) -> list[str]:
+    result = list(arguments)
+    for flag_name, default_value in defaults:
+        if any(
+            argument == flag_name or argument.startswith(f"{flag_name}=")
+            for argument in arguments
+        ):
+            continue
+        result.append(f"{flag_name}={default_value}")
+    return result
+
+
 def _validate_args(args: argparse.Namespace) -> None:
     positive_values = {
         "scene_runs": args.scene_runs,
@@ -561,8 +593,11 @@ def _validate_args(args: argparse.Namespace) -> None:
         raise ValueError(f"Benchmark counts and dimensions must be positive: {invalid}")
     if args.animation_start_frame < 0:
         raise ValueError("--animation-start-frame must be non-negative")
-    if args.child_timeout_seconds < 0.0:
-        raise ValueError("--child-timeout-seconds must be non-negative")
+    if (
+        not math.isfinite(args.child_timeout_seconds)
+        or args.child_timeout_seconds < 0.0
+    ):
+        raise ValueError("--child-timeout-seconds must be finite and non-negative")
     if (
         args.animation_end_frame >= 0
         and args.animation_end_frame <= args.animation_start_frame
@@ -599,13 +634,19 @@ def _parse_args() -> argparse.Namespace:
         "--scene",
         action="append",
         default=None,
-        help="Scene file to export. Repeat to override/add scenes.",
+        help=(
+            "Scene file to export. Repeat to select multiple scenes. Providing any "
+            "--scene or --animation disables the implicit default workloads."
+        ),
     )
     parser.add_argument(
         "--animation",
         action="append",
         default=None,
-        help="Animation file to export. Repeat to override/add animations.",
+        help=(
+            "Animation file to export. Repeat to select multiple animations. Providing any "
+            "--scene or --animation disables the implicit default workloads."
+        ),
     )
     parser.add_argument(
         "--backend",
@@ -685,12 +726,48 @@ def _parse_args() -> argparse.Namespace:
         help="Additional raw Atlas argument appended to every invocation",
     )
     parser.add_argument(
+        "--scene-extra-arg",
+        action="append",
+        default=[],
+        help=(
+            "Additional raw Atlas argument appended only to scene invocations, after "
+            "--extra-arg values"
+        ),
+    )
+    parser.add_argument(
+        "--animation-extra-arg",
+        action="append",
+        default=[],
+        help=(
+            "Additional raw Atlas argument appended only to animation invocations, after "
+            "--extra-arg values"
+        ),
+    )
+    parser.add_argument(
+        "--scene-hash-policy",
+        choices=HASH_POLICIES,
+        default=DEFAULT_HASH_POLICY,
+        help=(
+            "Output-hash policy for repeated scene exports. 'exact' fails on hash "
+            "variation; 'record-only' records variation without failing the run."
+        ),
+    )
+    parser.add_argument(
+        "--animation-hash-policy",
+        choices=HASH_POLICIES,
+        default=DEFAULT_HASH_POLICY,
+        help=(
+            "Output-hash policy for repeated animation exports. 'exact' fails on hash "
+            "variation; 'record-only' records variation without failing the run."
+        ),
+    )
+    parser.add_argument(
         "--child-timeout-seconds",
         type=float,
         default=0.0,
         help=(
-            "Maximum wall time for each Atlas export process. Zero keeps the "
-            "historical unlimited wait. A timeout fails that run and continues."
+            "Maximum wall time for each single-process Atlas export. Zero disables "
+            "the timeout. Multi-process animation requires zero."
         ),
     )
     parser.add_argument(
@@ -699,7 +776,8 @@ def _parse_args() -> argparse.Namespace:
         default="light",
         help=(
             "Atlas performance instrumentation used for Vulkan runs. Non-off modes "
-            "write a unique NDJSON summary inside every run directory."
+            "write a unique NDJSON summary inside every single-process run directory; "
+            "multi-process animation reports supervisor wall time only."
         ),
     )
     parser.add_argument(
@@ -945,7 +1023,7 @@ def _build_animation_command(
             "--output_image_folder_name",
             str(frames_dir),
             "--output_image_name_prefix",
-            "frame_",
+            _ANIMATION_FRAME_NAME_PREFIX,
             "--output_image_name_field_width",
             "6",
             "--skip_video_compression",
@@ -973,6 +1051,40 @@ def _vulkan_perf_summary_config(
     if vulkan_perf_mode == "off":
         return "off", None
     return vulkan_perf_mode, run_dir / "vulkan_perf_summary.ndjson"
+
+
+def _animation_uses_multiple_processes(
+    extra_args: list[str], expected_frame_count: int
+) -> bool:
+    if expected_frame_count <= 1:
+        return False
+    device_value: str | None = None
+    flag_name = "--use_gpu_devices"
+    for index, argument in enumerate(extra_args):
+        if argument.startswith(f"{flag_name}="):
+            device_value = argument.partition("=")[2]
+        elif argument == flag_name:
+            device_value = extra_args[index + 1] if index + 1 < len(extra_args) else ""
+    if device_value is None:
+        return False
+    devices = [value.strip() for value in device_value.split(",") if value.strip()]
+    return len(devices) > 1
+
+
+def _validate_multi_process_animation_timeout(
+    extra_args: list[str], expected_frame_counts: list[int], timeout_seconds: float
+) -> None:
+    if timeout_seconds <= 0.0:
+        return
+    if any(
+        _animation_uses_multiple_processes(extra_args, frame_count)
+        for frame_count in expected_frame_counts
+    ):
+        raise ValueError(
+            "--child-timeout-seconds must be zero for multi-process animation "
+            "because stopping only the supervisor cannot guarantee that all rendering "
+            "workers have stopped"
+        )
 
 
 _PERF_SCHEMA = "atlas.perf.frame"
@@ -1008,6 +1120,13 @@ _LEGACY_UNVERSIONED_PERF_STATS = (
 )
 
 _CURRENT_PERF_STATS = _LEGACY_UNVERSIONED_PERF_STATS + _NEW_PERF_STATS
+_MULTI_PROCESS_ANIMATION_PERF_PROFILE = "multi-process-animation-wall-time-only"
+_MULTI_PROCESS_ANIMATION_UNAVAILABLE_METRICS = (
+    "cpu_ms",
+    "gpu_ms",
+    "gpu_scoped_ms",
+    "top",
+) + _CURRENT_PERF_STATS
 _LEGACY_UNVERSIONED_PERF_TOP_LEVEL_KEYS = frozenset(
     {"frame", "cpu_ms", "gpu_ms", "gpu_scoped_ms", "top", "stats"}
 )
@@ -1180,6 +1299,66 @@ def _parse_perf_summary(path: Path | None) -> PerfSummaryParseResult:
     )
 
 
+def _animation_frame_output_failures(
+    file_entries: list[dict[str, Any]], expected_frame_range: range
+) -> list[str]:
+    relative_prefix = f"frames/{_ANIMATION_FRAME_NAME_PREFIX}"
+    suffix = ".png"
+    paths_by_index: dict[int, list[str]] = defaultdict(list)
+    invalid_paths: list[str] = []
+    for entry in file_entries:
+        relative_path = str(entry["relative_path"])
+        if not relative_path.startswith(relative_prefix) or not relative_path.endswith(
+            suffix
+        ):
+            invalid_paths.append(relative_path)
+            continue
+        index_text = relative_path[len(relative_prefix) : -len(suffix)]
+        if not index_text or any(
+            character < "0" or character > "9" for character in index_text
+        ):
+            invalid_paths.append(relative_path)
+            continue
+        paths_by_index[int(index_text)].append(relative_path)
+
+    failures: list[str] = []
+    missing_indices = [
+        frame_index
+        for frame_index in expected_frame_range
+        if frame_index not in paths_by_index
+    ]
+    if missing_indices:
+        failures.append(
+            "missing animation frame index(es): "
+            + ", ".join(str(frame_index) for frame_index in missing_indices)
+        )
+
+    unexpected_paths = list(invalid_paths)
+    for frame_index, paths in paths_by_index.items():
+        if frame_index not in expected_frame_range:
+            unexpected_paths.extend(paths)
+    if unexpected_paths:
+        failures.append(
+            "unexpected animation output file(s): "
+            + ", ".join(sorted(unexpected_paths))
+        )
+
+    duplicate_indices = [
+        (frame_index, sorted(paths))
+        for frame_index, paths in sorted(paths_by_index.items())
+        if len(paths) > 1
+    ]
+    if duplicate_indices:
+        failures.append(
+            "duplicate animation frame index(es): "
+            + "; ".join(
+                f"{frame_index}: {', '.join(paths)}"
+                for frame_index, paths in duplicate_indices
+            )
+        )
+    return failures
+
+
 def _validate_run_outputs(
     *,
     returncode: int,
@@ -1191,6 +1370,7 @@ def _validate_run_outputs(
     timed_out: bool,
     timeout_seconds: float,
     dry_run: bool,
+    expected_animation_frame_range: range | None = None,
 ) -> tuple[str, ...]:
     if dry_run:
         return ()
@@ -1205,6 +1385,12 @@ def _validate_run_outputs(
     if len(file_entries) != expected_file_count:
         failures.append(
             f"expected {expected_file_count} output file(s), found {len(file_entries)}"
+        )
+    if expected_animation_frame_range is not None:
+        failures.extend(
+            _animation_frame_output_failures(
+                file_entries, expected_animation_frame_range
+            )
         )
     zero_byte_outputs = [
         entry["relative_path"] for entry in file_entries if entry["size_bytes"] <= 0
@@ -1356,9 +1542,17 @@ def _run_animation_case(
     resolved_qt_platform = _resolve_qt_platform(
         qt_platform, backend, backend_qt_platform
     )
-    perf_mode, perf_summary_path = _vulkan_perf_summary_config(
-        backend, run_dir, vulkan_perf_mode
+    multi_process_animation = _animation_uses_multiple_processes(
+        extra_args, expected_frame_count
     )
+    if multi_process_animation:
+        # A multi-process animation run uses supervisor wall time as its
+        # run-level performance measurement.
+        perf_mode, perf_summary_path = "off", None
+    else:
+        perf_mode, perf_summary_path = _vulkan_perf_summary_config(
+            backend, run_dir, vulkan_perf_mode
+        )
 
     command = _build_animation_command(
         atlas_binary=atlas_binary,
@@ -1388,7 +1582,15 @@ def _run_animation_case(
     files = _collect_animation_outputs(frames_dir)
     file_entries, total_bytes = _hash_output_files(run_dir, files)
     _write_checksums(run_dir / "checksums.sha256", file_entries)
-    perf_summary = _parse_perf_summary(perf_summary_path)
+    if multi_process_animation:
+        perf_summary = PerfSummaryParseResult(
+            record_count=0,
+            profile=_MULTI_PROCESS_ANIMATION_PERF_PROFILE,
+            unavailable_metrics=_MULTI_PROCESS_ANIMATION_UNAVAILABLE_METRICS,
+            errors=(),
+        )
+    else:
+        perf_summary = _parse_perf_summary(perf_summary_path)
     failures = _validate_run_outputs(
         returncode=returncode,
         file_entries=file_entries,
@@ -1399,6 +1601,9 @@ def _run_animation_case(
         timed_out=timed_out,
         timeout_seconds=child_timeout_seconds,
         dry_run=dry_run,
+        expected_animation_frame_range=range(
+            start_frame, start_frame + expected_frame_count
+        ),
     )
 
     run_record = RunRecord(
@@ -1540,7 +1745,21 @@ def _write_file_hashes_csv(output_root: Path, rows: list[dict[str, Any]]) -> Non
 def _build_stability_summary(
     rows: list[dict[str, Any]],
     expected_groups: dict[RunGroupKey, int] | None = None,
+    hash_policies: dict[str, str] | None = None,
 ) -> dict[str, Any]:
+    resolved_hash_policies = {
+        "scene": DEFAULT_HASH_POLICY,
+        "animation": DEFAULT_HASH_POLICY,
+        **(hash_policies or {}),
+    }
+    invalid_hash_policies = {
+        kind: policy
+        for kind, policy in resolved_hash_policies.items()
+        if policy not in HASH_POLICIES
+    }
+    if invalid_hash_policies:
+        raise ValueError(f"Invalid output-hash policies: {invalid_hash_policies}")
+
     grouped: dict[tuple[str, str, str, str, str, str], list[dict[str, Any]]] = (
         defaultdict(list)
     )
@@ -1565,6 +1784,8 @@ def _build_stability_summary(
         relative_path,
     ), group_rows in sorted(grouped.items()):
         hashes = sorted({row["sha256"] for row in group_rows})
+        hashes_identical = len(hashes) == 1
+        hash_policy = resolved_hash_policies.get(kind, DEFAULT_HASH_POLICY)
         expected_run_count = (
             expected_groups.get((kind, backend, label, source_sha256, source_path))
             if expected_groups is not None
@@ -1587,8 +1808,9 @@ def _build_stability_summary(
                 "expected_run_count": expected_run_count,
                 "complete_run_coverage": complete_run_coverage,
                 "unique_hash_count": len(hashes),
-                "all_hashes_identical": len(hashes) == 1,
-                "stable_and_complete": len(hashes) == 1
+                "all_hashes_identical": hashes_identical,
+                "hash_policy": hash_policy,
+                "stable_and_complete": hashes_identical
                 and complete_run_coverage is not False,
                 "hashes": hashes,
             }
@@ -1596,6 +1818,10 @@ def _build_stability_summary(
 
     return {
         "generated_at": datetime.now().isoformat(),
+        "hash_policies": resolved_hash_policies,
+        "hash_variation_count": sum(
+            not entry["all_hashes_identical"] for entry in summary_rows
+        ),
         "entries": summary_rows,
     }
 
@@ -1729,6 +1955,7 @@ def _build_aggregate_summary(
         )
 
     stability_failure_count = 0
+    hash_variation_count = 0
     if stability_summary is not None:
         for entry in stability_summary.get("entries", []):
             reasons: list[str] = []
@@ -1738,10 +1965,13 @@ def _build_aggregate_summary(
                     f"{entry['run_count']} of {entry['expected_run_count']} run(s)"
                 )
             if not entry.get("all_hashes_identical", False):
-                reasons.append(
-                    f"output {entry['relative_path']} is nondeterministic; "
-                    f"hashes={entry.get('hashes', [])}"
-                )
+                hash_variation_count += 1
+                hash_policy = entry.get("hash_policy", DEFAULT_HASH_POLICY)
+                if hash_policy != RECORD_ONLY_HASH_POLICY:
+                    reasons.append(
+                        f"output {entry['relative_path']} is nondeterministic; "
+                        f"hashes={entry.get('hashes', [])}"
+                    )
             if not reasons:
                 continue
             stability_failure_count += 1
@@ -1785,6 +2015,7 @@ def _build_aggregate_summary(
         "all_runs_complete": all_complete,
         "groups": group_entries,
         "backend_comparisons": backend_comparisons,
+        "hash_variation_count": hash_variation_count,
         "stability_failure_count": stability_failure_count,
         "failures": failures,
         "harness_errors": harness_errors,
@@ -1810,6 +2041,9 @@ def _write_aggregate_markdown(output_root: Path, summary: dict[str, Any]) -> Non
         f"Runs: {summary['recorded_run_count']} recorded / "
         f"{summary['expected_run_count']} expected; "
         f"{summary['successful_run_count']} successful.",
+        "",
+        f"Output hash variations: {summary['hash_variation_count']} recorded; "
+        f"{summary['stability_failure_count']} stability failure(s).",
         "",
         "## Per-case durations",
         "",
@@ -1924,6 +2158,21 @@ def _manifest_input_signature(manifest: dict[str, Any]) -> list[dict[str, Any]]:
     return sorted(signature, key=lambda entry: json.dumps(entry, sort_keys=True))
 
 
+def _manifest_effective_extra_args(manifest: dict[str, Any]) -> dict[str, list[Any]]:
+    common_args = list(manifest.get("extra_args") or [])
+    return {
+        "scene": common_args + list(manifest.get("scene_extra_args") or []),
+        "animation": common_args + list(manifest.get("animation_extra_args") or []),
+    }
+
+
+def _manifest_hash_policies(manifest: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "scene": manifest.get("scene_hash_policy", DEFAULT_HASH_POLICY),
+        "animation": manifest.get("animation_hash_policy", DEFAULT_HASH_POLICY),
+    }
+
+
 def _manifest_compatibility(
     baseline: dict[str, Any], candidate: dict[str, Any]
 ) -> dict[str, Any]:
@@ -1936,7 +2185,8 @@ def _manifest_compatibility(
         "animation_runs": baseline.get("animation_runs"),
         "scene_size": baseline.get("scene_size"),
         "animation_size": baseline.get("animation_size"),
-        "extra_args": baseline.get("extra_args"),
+        "effective_extra_args": _manifest_effective_extra_args(baseline),
+        "hash_policies": _manifest_hash_policies(baseline),
         "vulkan_perf_mode": baseline.get("vulkan_perf_mode"),
         "child_timeout_seconds": baseline.get("child_timeout_seconds", 0.0),
         "inputs": _manifest_input_signature(baseline),
@@ -1950,7 +2200,8 @@ def _manifest_compatibility(
         "animation_runs": candidate.get("animation_runs"),
         "scene_size": candidate.get("scene_size"),
         "animation_size": candidate.get("animation_size"),
-        "extra_args": candidate.get("extra_args"),
+        "effective_extra_args": _manifest_effective_extra_args(candidate),
+        "hash_policies": _manifest_hash_policies(candidate),
         "vulkan_perf_mode": candidate.get("vulkan_perf_mode"),
         "child_timeout_seconds": candidate.get("child_timeout_seconds", 0.0),
         "inputs": _manifest_input_signature(candidate),
@@ -2154,25 +2405,22 @@ def main() -> int:
     if output_root.exists():
         raise FileExistsError(f"Output root already exists: {output_root}")
 
-    scenes = _verify_inputs(
-        [
-            Path(path)
-            for path in (args.scene if args.scene is not None else DEFAULT_SCENES)
-        ],
-        "scene",
+    selected_scenes, selected_animations = _selected_workload_paths(
+        args.scene, args.animation
     )
-    animations = _verify_inputs(
-        [
-            Path(path)
-            for path in (
-                args.animation if args.animation is not None else DEFAULT_ANIMATIONS
-            )
-        ],
-        "animation",
-    )
+    scenes = _verify_inputs(selected_scenes, "scene")
+    animations = _verify_inputs(selected_animations, "animation")
     backends = tuple(args.backend if args.backend is not None else DEFAULT_BACKENDS)
     if len(backends) != len(set(backends)):
         raise ValueError(f"Duplicate --backend values are not allowed: {backends}")
+
+    scene_extra_args = _with_absent_flag_defaults(
+        [*args.extra_arg, *args.scene_extra_arg], _SCENE_ROUTING_FLAG_DEFAULTS
+    )
+    animation_extra_args = _with_absent_flag_defaults(
+        [*args.extra_arg, *args.animation_extra_arg],
+        _ANIMATION_ROUTING_FLAG_DEFAULTS,
+    )
 
     atlas_binary_metadata = _file_metadata(atlas_binary)
     input_metadata = {
@@ -2194,7 +2442,17 @@ def main() -> int:
             for path in animations
         }
     )
+    _validate_multi_process_animation_timeout(
+        animation_extra_args,
+        [input_metadata[str(path)]["expected_frame_count"] for path in animations],
+        args.child_timeout_seconds,
+    )
     output_root.mkdir(parents=True, exist_ok=False)
+
+    hash_policies = {
+        "scene": args.scene_hash_policy,
+        "animation": args.animation_hash_policy,
+    }
 
     manifest = {
         "schema_version": 1,
@@ -2224,6 +2482,10 @@ def main() -> int:
             "end_frame": args.animation_end_frame,
         },
         "extra_args": args.extra_arg,
+        "scene_extra_args": args.scene_extra_arg,
+        "animation_extra_args": args.animation_extra_arg,
+        "scene_hash_policy": args.scene_hash_policy,
+        "animation_hash_policy": args.animation_hash_policy,
         "vulkan_perf_mode": args.vulkan_perf_mode,
         "child_timeout_seconds": args.child_timeout_seconds,
         "scenes": [str(path) for path in scenes],
@@ -2278,7 +2540,7 @@ def main() -> int:
                         output_root=output_root,
                         backend=backend,
                         qt_platform=args.qt_platform,
-                        extra_args=args.extra_arg,
+                        extra_args=scene_extra_args,
                         source=source,
                         source_sha256=source_sha256,
                         output_key=case.output_key,
@@ -2322,7 +2584,7 @@ def main() -> int:
                         output_root=output_root,
                         backend=backend,
                         qt_platform=args.qt_platform,
-                        extra_args=args.extra_arg,
+                        extra_args=animation_extra_args,
                         source=source,
                         source_sha256=source_sha256,
                         output_key=case.output_key,
@@ -2371,7 +2633,9 @@ def main() -> int:
     _write_run_summary_csv(output_root, run_records)
     _write_file_hashes_csv(output_root, file_hash_rows)
     stability_summary = _build_stability_summary(
-        file_hash_rows, expected_groups=expected_groups
+        file_hash_rows,
+        expected_groups=expected_groups,
+        hash_policies=hash_policies,
     )
     _write_json(output_root / "stability_summary.json", stability_summary)
 

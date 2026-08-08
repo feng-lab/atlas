@@ -34,6 +34,18 @@ struct ZVulkanAttachmentInfo
   ZVulkanTexture* trackingTexture{nullptr};
 };
 
+namespace vulkan {
+
+[[nodiscard]] inline vk::ImageLayout
+attachmentTransitionOldLayout(const ZVulkanAttachmentInfo& info, std::optional<vk::ImageLayout> trackedLayout) noexcept
+{
+  // Load operations affect the bound view and render area, not the current
+  // layout of the barrier's complete subresource range.
+  return trackedLayout.value_or(info.initialLayout);
+}
+
+} // namespace vulkan
+
 struct ZVulkanDescriptorBindInfo
 {
   uint32_t firstSet{0};

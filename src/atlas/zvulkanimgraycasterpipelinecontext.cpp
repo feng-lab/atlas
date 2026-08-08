@@ -133,6 +133,27 @@ namespace nim {
 
 namespace {
 
+constexpr uint32_t kMergeDepthPushDescriptorSet = 1u;
+constexpr uint32_t kMergeDepthPushDescriptorBinding = 0u;
+
+vk::DescriptorImageInfo mergeDepthPushDescriptorInfo(ZVulkanTexture& texture, ZVulkanDevice& device, const char* label)
+{
+  CHECK_EQ(&texture.ownerDevice(), &device) << label << " belongs to a different Vulkan device";
+  CHECK(texture.resident()) << label << " is not resident";
+  CHECK(static_cast<bool>(texture.info().usage & vk::ImageUsageFlagBits::eSampled)) << label << " is not sampleable";
+  CHECK(texture.info().viewType == vk::ImageViewType::e2DArray)
+    << label << " has view type " << enumOrUnderlying(texture.info().viewType, 16) << ", expected "
+    << enumOrUnderlying(vk::ImageViewType::e2DArray, 16);
+  CHECK(texture.descriptorAspect() == vk::ImageAspectFlagBits::eDepth)
+    << label << " descriptor must select only the depth aspect";
+
+  vk::DescriptorImageInfo info = texture.descriptorInfo();
+  CHECK(info.imageView) << label << " has no image view";
+  CHECK(info.imageLayout == texture.layout()) << label << " descriptor layout does not match its tracked layout";
+  info.sampler = vk::Sampler{};
+  return info;
+}
+
 ImgCompositingMode sanitizeMode(ImgCompositingMode mode)
 {
   switch (mode) {
@@ -1773,6 +1794,7 @@ void ZVulkanImgRaycasterPipelineContext::recordStageFastMerge(Z3DRendererBase& r
   auto* layerColor = payload.channelLayerLease->colorAttachment(0);
   auto* layerDepth = payload.channelLayerLease->depthAttachmentTexture();
   CHECK(layerColor != nullptr) << "FastMerge stage missing layer color attachment";
+  CHECK(layerDepth != nullptr) << "FastMerge stage missing layer depth attachment";
 
   ensureQuadVertexBuffer();
 
@@ -1784,7 +1806,7 @@ void ZVulkanImgRaycasterPipelineContext::recordStageFastMerge(Z3DRendererBase& r
                           cmd,
                           composite,
                           *layerColor,
-                          layerDepth,
+                          *layerDepth,
                           static_cast<uint32_t>(payload.visibleChannels.size()));
     m_backend.endGpuScope(*t);
   } else {
@@ -1794,7 +1816,7 @@ void ZVulkanImgRaycasterPipelineContext::recordStageFastMerge(Z3DRendererBase& r
                           cmd,
                           composite,
                           *layerColor,
-                          layerDepth,
+                          *layerDepth,
                           static_cast<uint32_t>(payload.visibleChannels.size()));
   }
 }
@@ -2228,6 +2250,7 @@ void ZVulkanImgRaycasterPipelineContext::recordStageProgressiveMerge(Z3DRenderer
   auto* layerColor = payload.channelLayerLease->colorAttachment(0);
   auto* layerDepth = payload.channelLayerLease->depthAttachmentTexture();
   CHECK(layerColor != nullptr) << "Vulkan raycaster merge stage missing layer color attachment";
+  CHECK(layerDepth != nullptr) << "Vulkan raycaster merge stage missing layer depth attachment";
 
   uint32_t channelCount = static_cast<uint32_t>(payload.visibleChannels.size());
   const bool wantsFinalization = payload.requestFinalization;
@@ -2277,7 +2300,7 @@ void ZVulkanImgRaycasterPipelineContext::recordStageProgressiveMerge(Z3DRenderer
     }
   }
 
-  recordMergeFromLayers(batch, viewport, scissor, cmd, composite, *layerColor, layerDepth, channelCount);
+  recordMergeFromLayers(batch, viewport, scissor, cmd, composite, *layerColor, *layerDepth, channelCount);
 
   if (setFinalization) {
     m_pendingFinalization = fin;
@@ -2592,7 +2615,7 @@ void ZVulkanImgRaycasterPipelineContext::recordMergeFromLayers(const RenderBatch
                                                                vk::raii::CommandBuffer& cmd,
                                                                const CompositingConfig& composite,
                                                                ZVulkanTexture& layerColor,
-                                                               /*nullable*/ ZVulkanTexture* layerDepth,
+                                                               ZVulkanTexture& layerDepth,
                                                                uint32_t channelCount)
 {
   ensureQuadVertexBuffer();
@@ -2609,8 +2632,10 @@ void ZVulkanImgRaycasterPipelineContext::recordMergeFromLayers(const RenderBatch
   auto& mergePipeline = ensureMergePipeline(mergeKey, finalFormats);
   RaycasterCopyMergePushConstants pc{};
   pc.color_texture = m_backend.bindlessLookupSampledImageAutoOrCrash(layerColor, "ray_merge_layer_color");
-  pc.depth_texture = layerDepth ? m_backend.bindlessLookupSampledImageAutoOrCrash(*layerDepth, "ray_merge_layer_depth")
-                                : 0u; // bindless placeholder index 0 (2DArray)
+  const bool usePushDepth = m_backend.device().context().supportsPushDescriptors();
+  if (!usePushDepth) {
+    pc.depth_texture = m_backend.bindlessLookupSampledImageAutoOrCrash(layerDepth, "ray_merge_layer_depth");
+  }
   const std::array<vk::DescriptorSet, 1> descriptorSets{m_backend.bindlessSampledImageDescriptorSet()};
 
   ZVulkanPipelineCommandRecorder recorder(cmd);
@@ -2633,7 +2658,24 @@ void ZVulkanImgRaycasterPipelineContext::recordMergeFromLayers(const RenderBatch
   drawSpec.pushConstantsStages = vk::ShaderStageFlagBits::eFragment;
   drawSpec.requirePushConstants = true;
 
-  recorder.recordGraphicsDraw(drawSpec);
+  if (usePushDepth) {
+    vk::DescriptorImageInfo depthInfo =
+      mergeDepthPushDescriptorInfo(layerDepth, m_backend.device(), "Raycaster merge depth texture");
+    vk::WriteDescriptorSet write{};
+    write.dstBinding = kMergeDepthPushDescriptorBinding;
+    write.dstArrayElement = 0u;
+    write.descriptorCount = 1u;
+    write.descriptorType = vk::DescriptorType::eSampledImage;
+    write.pImageInfo = &depthInfo;
+    const std::array<vk::WriteDescriptorSet, 1> writes{write};
+    const vk::PipelineLayout pipelineLayout = mergePipeline.pipeline->pipelineLayout();
+    recorder.recordGraphicsDraw(drawSpec, [&](vk::raii::CommandBuffer& cb) {
+      cb.pushDescriptorSetKHR(vk::PipelineBindPoint::eGraphics, pipelineLayout, kMergeDepthPushDescriptorSet, writes);
+      cb.draw(drawSpec.vertexCount, drawSpec.instanceCount, drawSpec.firstVertex, drawSpec.firstInstance);
+    });
+  } else {
+    recorder.recordGraphicsDraw(drawSpec);
+  }
 }
 
 void ZVulkanImgRaycasterPipelineContext::ensureEntryVertexCapacity(size_t vertexCount, size_t indexCount)
@@ -4271,11 +4313,13 @@ ZVulkanImgRaycasterPipelineContext::ensureMergePipeline(const MergePipelineKey& 
   CHECK(bindlessLayout) << "Merge pipeline requires backend bindless descriptor set layout";
 
   auto& device = m_backend.device();
+  const bool usePushDepth = device.context().supportsPushDescriptors();
   PipelineInstance instance;
   instance.shader = std::make_unique<ZVulkanShader>(
     device,
     ZVulkanShader::spirvResourcePath(QStringLiteral("pass.vert.spv")),
-    ZVulkanShader::spirvResourcePath(QStringLiteral("image2d_array_compositor.frag.spv")),
+    ZVulkanShader::spirvResourcePath(usePushDepth ? QStringLiteral("image2d_array_compositor_depth_push.frag.spv")
+                                                  : QStringLiteral("image2d_array_compositor.frag.spv")),
     std::nullopt);
 
   vk::VertexInputBindingDescription binding{.binding = 0,
@@ -4292,7 +4336,23 @@ ZVulkanImgRaycasterPipelineContext::ensureMergePipeline(const MergePipelineKey& 
   vertexInput.pVertexAttributeDescriptions = &attr;
 
   instance.pipeline = device.createPipeline(*instance.shader, vertexInput, vk::PrimitiveTopology::eTriangleStrip);
-  instance.pipeline->setDescriptorSetLayouts({bindlessLayout});
+  if (usePushDepth) {
+    if (!m_mergeDepthPushDescriptorSetLayout.has_value()) {
+      const vk::DescriptorSetLayoutBinding pushBinding{.binding = kMergeDepthPushDescriptorBinding,
+                                                       .descriptorType = vk::DescriptorType::eSampledImage,
+                                                       .descriptorCount = 1u,
+                                                       .stageFlags = vk::ShaderStageFlagBits::eFragment};
+      const vk::DescriptorSetLayoutCreateInfo layoutInfo{
+        .flags = vk::DescriptorSetLayoutCreateFlagBits::ePushDescriptorKHR,
+        .bindingCount = 1u,
+        .pBindings = &pushBinding,
+      };
+      m_mergeDepthPushDescriptorSetLayout.emplace(device.context().device(), layoutInfo);
+    }
+    instance.pipeline->setDescriptorSetLayouts({bindlessLayout, **m_mergeDepthPushDescriptorSetLayout});
+  } else {
+    instance.pipeline->setDescriptorSetLayouts({bindlessLayout});
+  }
   instance.pipeline->setAttachmentFormats(formats.colorFormats, formats.depthFormat);
   instance.colorFormats = formats.colorFormats;
   instance.depthFormat = formats.depthFormat;

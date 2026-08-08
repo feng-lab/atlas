@@ -5,6 +5,7 @@
 #include "zbenchtimer.h"
 #include <png.h>
 #include <algorithm>
+#include <bit>
 #include <csetjmp>
 #include <cstring>
 #include <limits>
@@ -55,7 +56,7 @@ struct PngWriteContext
 {
   PngWritePack png;
   std::string errorMessage;
-  ZImg tmp;
+  std::vector<uint16_t, boost::alignment::aligned_allocator<uint16_t, 64>> row;
 };
 
 void pngErrorFunction(png_structp pngPtr, const char* message)
@@ -730,12 +731,38 @@ void ZImgPng::writeImg(const QString& filename, const ZImg& img, const ZImgWrite
 
   png_write_info(png->png.pngPtr, png->png.infoPtr);
 
-  png->tmp = ZImg(img.info());
-  CHECK(png->tmp.channelData<uint8_t>(0) != img.channelData<uint8_t>(0)) << img.info();
-  ZImgFormat::XYZCtoCXYZ(img, png->tmp);
-  for (size_t r = 0; r < png->tmp.height(); ++r) {
-    png_write_row(png->png.pngPtr,
-                  png->tmp.channelData<uint8_t>(0) + r * png->tmp.rowByteNumber() * png->tmp.numChannels());
+  if constexpr (std::endian::native == std::endian::little) {
+    if (img.bytesPerVoxel() == 2) {
+      png_set_swap(png->png.pngPtr);
+    }
+  }
+
+  const size_t rowByteCount = checkedPngMul(img.rowByteNumber(), img.numChannels(), "PNG row byte count");
+  png->row.resize(rowByteCount / sizeof(uint16_t) + rowByteCount % sizeof(uint16_t));
+  auto* rowBytes = reinterpret_cast<png_byte*>(png->row.data());
+  for (size_t r = 0; r < img.height(); ++r) {
+    if (img.numChannels() == 1) {
+      std::memcpy(rowBytes, img.rowData<uint8_t>(r), rowByteCount);
+    } else if (img.bytesPerVoxel() == 1) {
+      for (size_t c = 0; c < img.numChannels(); ++c) {
+        const uint8_t* source = img.rowData<uint8_t>(r, 0, c);
+        uint8_t* destination = rowBytes + c;
+        for (size_t x = 0; x < img.width(); ++x) {
+          *destination = source[x];
+          destination += img.numChannels();
+        }
+      }
+    } else {
+      CHECK_EQ(img.bytesPerVoxel(), 2u);
+      uint16_t* destination = png->row.data();
+      for (size_t c = 0; c < img.numChannels(); ++c) {
+        const uint16_t* source = img.rowData<uint16_t>(r, 0, c);
+        for (size_t x = 0; x < img.width(); ++x) {
+          destination[x * img.numChannels() + c] = source[x];
+        }
+      }
+    }
+    png_write_row(png->png.pngPtr, rowBytes);
   }
   png_write_end(png->png.pngPtr, nullptr);
 }

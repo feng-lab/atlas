@@ -29,9 +29,12 @@ requests mono output; the pool and result types also support a complete stereo
 pair per tile.
 
 Interactive rendering and animation export do not configure or use the pool.
-Opt-in multi-process animation export instead assigns disjoint frame ranges to
-separate single-device Atlas processes. OpenGL never constructs or executes
-tile-worker lanes.
+Opt-in multi-process animation export instead assigns adjacent frame ranges to
+separate single-device Atlas processes. Each process retains one range, document,
+renderer, and its caches for that range's lifetime. Ranges are balanced by default;
+optional positive integer frame weights change their relative sizes without changing
+ownership or continuity. Frames are not distributed through the tile-worker lanes.
+OpenGL never constructs or executes tile-worker lanes.
 
 With no pool configured:
 
@@ -250,7 +253,7 @@ compositor's readback-owner revision, so a late completion retires its resources
 without publishing pixels from the failed attempt. The batch never continues
 with a reduced device set and never returns a partially assembled frame.
 
-## Heterogeneous Output and Dense Slice Binding
+## Heterogeneous Output and Device-Local Image Binding
 
 Atlas does not normalize floating-point, depth, fragment-order, or
 transparency results across drivers. Dynamic claims can assign a tile to a
@@ -258,10 +261,15 @@ different adapter on another run. Cross-device pixels and complete image
 hashes are therefore not guaranteed to be identical, even though guard pixels
 preserve the required spatial context.
 
-Dense, non-paged single-channel Vulkan slices select their push-descriptor or
-bindless texture-binding path independently from each logical device's
-capabilities. Selection contains no vendor branch and does not share descriptor
-state across engines. See the Developer Guide's Slices Path for the binding
+Each Vulkan engine selects image-binding variants from its own logical-device
+capabilities. A dense, non-paged single-channel slice uses the two-descriptor
+push variant when `VK_KHR_push_descriptor` is enabled and
+`maxPushDescriptors >= 2`. Raycaster and slice layer-array merges keep color
+bindless and use the samplerless depth-array push descriptor when the extension
+is enabled and `maxPushDescriptors >= 1`. The corresponding bindless variant is
+used when a required capability is unavailable. Selection contains no vendor
+branch, and descriptor state is not shared across engines. See the Developer
+Guide's Slices Path and Compositor Integration sections for the binding
 contracts.
 
 ## Validation

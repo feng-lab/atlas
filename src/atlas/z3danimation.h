@@ -21,6 +21,10 @@ public:
 
   void load(const QString& fn, bool showLoadIssuesDialog = true);
 
+  // Read only the timeline duration needed to divide an export into frame ranges.
+  // Referenced scene data remains owned and loaded by each rendering process.
+  [[nodiscard]] static double readDurationFromFile(const QString& fn);
+
   void save(const QString& fn);
 
   [[nodiscard]] const ZCameraParameterAnimation* cameraParameterAnimation() const

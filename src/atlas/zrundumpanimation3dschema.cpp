@@ -409,9 +409,9 @@ static void makeSampleAssets(const QDir& dir,
   // SWC
   swcPath = dir.filePath("sample.swc");
   writeTextFile(swcPath, "# sample swc\n1 1 0 0 0 1 -1\n2 3 1 0 0 1 1\n");
-  // Image PNG
+  // Image TIFF
   imgPath = dir.filePath("sample.tif");
-  // Create a small RGBA image to avoid single-channel conversion asserts in PNG writer
+  // Use RGBA data so the schema fixture includes channel and alpha metadata.
   ZImgInfo iinfo(16, 16, 1, 4, 1, 1, VoxelFormat::Unsigned);
   iinfo.lastChannelIsAlphaChannel = true;
   ZImg img(iinfo);

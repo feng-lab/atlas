@@ -99,6 +99,43 @@ class ExportSceneAnimationStabilityTest(unittest.TestCase):
         self.assertEqual(incompatible["status"], "incompatible")
         self.assertIsNone(incompatible["cases"][0]["candidate_minus_baseline_seconds"])
 
+    def test_manifest_compatibility_compares_effective_args_and_hash_policies(
+        self,
+    ) -> None:
+        old_manifest = {"extra_args": ["--common=true"]}
+        equivalent_manifest = {
+            "extra_args": [],
+            "scene_extra_args": ["--common=true"],
+            "animation_extra_args": ["--common=true"],
+            "scene_hash_policy": "exact",
+            "animation_hash_policy": "exact",
+        }
+
+        equivalent = benchmark._manifest_compatibility(
+            old_manifest, equivalent_manifest
+        )
+        scene_args_changed = benchmark._manifest_compatibility(
+            old_manifest,
+            {
+                **equivalent_manifest,
+                "scene_extra_args": ["--common=true", "--scene-only=true"],
+            },
+        )
+        hash_policy_changed = benchmark._manifest_compatibility(
+            old_manifest,
+            {**equivalent_manifest, "scene_hash_policy": "record-only"},
+        )
+
+        self.assertTrue(equivalent["compatible"])
+        self.assertEqual(
+            [entry["field"] for entry in scene_args_changed["mismatches"]],
+            ["effective_extra_args"],
+        )
+        self.assertEqual(
+            [entry["field"] for entry in hash_policy_changed["mismatches"]],
+            ["hash_policies"],
+        )
+
     def test_aggregate_fails_when_any_expected_run_is_missing(self) -> None:
         key: benchmark.RunGroupKey = (
             "scene",
@@ -149,13 +186,32 @@ class ExportSceneAnimationStabilityTest(unittest.TestCase):
                 4,
             )
 
-    def test_missing_animation_duration_uses_atlas_ten_second_default(self) -> None:
+    def test_animation_duration_uses_atlas_default_and_minimum(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
-            animation_path = Path(temp_dir) / "sample.animation3d"
+            root = Path(temp_dir)
+            animation_path = root / "sample.animation3d"
+            short_animation_path = root / "short.animation3d"
+            negative_animation_path = root / "negative.animation3d"
+            invalid_animation_path = root / "invalid.animation3d"
             animation_path.write_text(json.dumps({"Animation3D": {}}), encoding="utf-8")
+            short_animation_path.write_text(
+                json.dumps({"Animation3D": {"Duration": 0.25}}), encoding="utf-8"
+            )
+            negative_animation_path.write_text(
+                json.dumps({"Animation3D": {"Duration": -2.0}}), encoding="utf-8"
+            )
+            invalid_animation_path.write_text(
+                json.dumps({"Animation3D": {"Duration": "2.5"}}), encoding="utf-8"
+            )
 
             self.assertEqual(
                 benchmark._animation_duration_seconds(animation_path), 10.0
+            )
+            self.assertEqual(
+                benchmark._animation_duration_seconds(short_animation_path), 1.0
+            )
+            self.assertEqual(
+                benchmark._animation_duration_seconds(negative_animation_path), 1.0
             )
             self.assertEqual(
                 benchmark._expected_animation_frame_count(
@@ -163,6 +219,33 @@ class ExportSceneAnimationStabilityTest(unittest.TestCase):
                 ),
                 300,
             )
+            self.assertEqual(
+                benchmark._expected_animation_frame_count(
+                    short_animation_path, fps=4, start_frame=0, end_frame=-1
+                ),
+                4,
+            )
+            with self.assertRaisesRegex(ValueError, "Invalid Animation3D.Duration"):
+                benchmark._animation_duration_seconds(invalid_animation_path)
+
+    def test_explicit_workload_selection_disables_implicit_defaults(self) -> None:
+        scene = "/data/sample.scene"
+        animation = "/data/sample.animation3d"
+
+        default_scenes, default_animations = benchmark._selected_workload_paths(
+            None, None
+        )
+        scene_only, no_animations = benchmark._selected_workload_paths([scene], None)
+        no_scenes, animation_only = benchmark._selected_workload_paths(
+            None, [animation]
+        )
+
+        self.assertEqual(default_scenes, list(benchmark.DEFAULT_SCENES))
+        self.assertEqual(default_animations, list(benchmark.DEFAULT_ANIMATIONS))
+        self.assertEqual(scene_only, [Path(scene)])
+        self.assertEqual(no_animations, [])
+        self.assertEqual(no_scenes, [])
+        self.assertEqual(animation_only, [Path(animation)])
 
     def test_same_basename_inputs_get_distinct_output_directories(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -427,6 +510,86 @@ class ExportSceneAnimationStabilityTest(unittest.TestCase):
             )
         )
 
+    def test_record_only_hash_policy_reports_variation_without_failing(self) -> None:
+        key: benchmark.RunGroupKey = (
+            "scene",
+            "vulkan",
+            "sample.scene",
+            "source",
+            "/data/sample.scene",
+        )
+        rows = [
+            {
+                "kind": "scene",
+                "backend": "vulkan",
+                "label": "sample.scene",
+                "source_sha256": "source",
+                "source_path": "/data/sample.scene",
+                "relative_path": "export.png",
+                "sha256": output_hash,
+            }
+            for output_hash in ("first", "second")
+        ]
+        stability = benchmark._build_stability_summary(
+            rows,
+            expected_groups={key: 2},
+            hash_policies={"scene": "record-only"},
+        )
+        summary = benchmark._build_aggregate_summary(
+            runs=[],
+            expected_groups={},
+            expected_source_paths={},
+            harness_errors=[],
+            stability_summary=stability,
+            dry_run=False,
+            run_label="candidate",
+        )
+
+        entry = stability["entries"][0]
+        self.assertFalse(entry["all_hashes_identical"])
+        self.assertFalse(entry["stable_and_complete"])
+        self.assertEqual(entry["hash_policy"], "record-only")
+        self.assertEqual(stability["hash_variation_count"], 1)
+        self.assertEqual(summary["hash_variation_count"], 1)
+        self.assertEqual(summary["stability_failure_count"], 0)
+        self.assertEqual(summary["status"], "passed")
+
+    def test_record_only_hash_policy_does_not_hide_missing_run_coverage(self) -> None:
+        stability = {
+            "entries": [
+                {
+                    "kind": "animation",
+                    "backend": "vulkan",
+                    "label": "sample.animation3d",
+                    "source_sha256": "source",
+                    "source_path": "/data/sample.animation3d",
+                    "relative_path": "frames/frame_000000.png",
+                    "run_count": 1,
+                    "expected_run_count": 2,
+                    "complete_run_coverage": False,
+                    "all_hashes_identical": False,
+                    "hash_policy": "record-only",
+                    "hashes": ["first"],
+                }
+            ]
+        }
+        summary = benchmark._build_aggregate_summary(
+            runs=[],
+            expected_groups={},
+            expected_source_paths={},
+            harness_errors=[],
+            stability_summary=stability,
+            dry_run=False,
+            run_label="candidate",
+        )
+
+        self.assertEqual(summary["status"], "failed")
+        self.assertEqual(summary["hash_variation_count"], 1)
+        self.assertEqual(summary["stability_failure_count"], 1)
+        reasons = summary["failures"][0]["reasons"]
+        self.assertTrue(any("appeared in 1 of 2" in reason for reason in reasons))
+        self.assertFalse(any("nondeterministic" in reason for reason in reasons))
+
     def test_run_validation_reports_all_observed_failures(self) -> None:
         failures = benchmark._validate_run_outputs(
             returncode=7,
@@ -445,6 +608,72 @@ class ExportSceneAnimationStabilityTest(unittest.TestCase):
         self.assertTrue(any("expected 2" in failure for failure in failures))
         self.assertTrue(any("zero-byte" in failure for failure in failures))
         self.assertTrue(any("perf summary" in failure for failure in failures))
+
+    def test_run_validation_requires_exact_animation_frame_indices(self) -> None:
+        entries = [
+            {"relative_path": "frames/frame_000011.png", "size_bytes": 1},
+            {"relative_path": "frames/frame_000012.png", "size_bytes": 1},
+        ]
+
+        failures = benchmark._validate_run_outputs(
+            returncode=0,
+            file_entries=entries,
+            expected_file_count=2,
+            perf_summary_path=None,
+            perf_summary_frame_count=0,
+            perf_summary_errors=(),
+            timed_out=False,
+            timeout_seconds=0.0,
+            dry_run=False,
+            expected_animation_frame_range=range(10, 12),
+        )
+
+        self.assertIn("missing animation frame index(es): 10", failures)
+        self.assertIn(
+            "unexpected animation output file(s): frames/frame_000012.png",
+            failures,
+        )
+
+    def test_run_validation_accepts_total_derived_frame_padding(self) -> None:
+        entries = [
+            {"relative_path": "frames/frame_0000000.png", "size_bytes": 1},
+            {"relative_path": "frames/frame_0000001.png", "size_bytes": 1},
+        ]
+
+        failures = benchmark._validate_run_outputs(
+            returncode=0,
+            file_entries=entries,
+            expected_file_count=2,
+            perf_summary_path=None,
+            perf_summary_frame_count=0,
+            perf_summary_errors=(),
+            timed_out=False,
+            timeout_seconds=0.0,
+            dry_run=False,
+            expected_animation_frame_range=range(0, 2),
+        )
+
+        self.assertEqual(failures, ())
+
+    def test_frame_validation_rejects_malformed_and_duplicate_indices(self) -> None:
+        failures = benchmark._animation_frame_output_failures(
+            [
+                {"relative_path": "frames/frame_000010.png", "size_bytes": 1},
+                {"relative_path": "frames/frame_10.png", "size_bytes": 1},
+                {"relative_path": "frames/frame_bad.png", "size_bytes": 1},
+            ],
+            range(10, 11),
+        )
+
+        self.assertIn(
+            "unexpected animation output file(s): frames/frame_bad.png", failures
+        )
+        self.assertTrue(
+            any(
+                failure.startswith("duplicate animation frame index(es): 10:")
+                for failure in failures
+            )
+        )
 
     def test_opengl_command_keeps_perf_collection_disabled_after_extra_args(
         self,
@@ -467,6 +696,83 @@ class ExportSceneAnimationStabilityTest(unittest.TestCase):
             command.index("--atlas_perf_mode=off"),
             command.index("--atlas_perf_mode=full"),
         )
+
+    def test_multi_process_animation_detection_requires_devices_and_frames(
+        self,
+    ) -> None:
+        self.assertTrue(
+            benchmark._animation_uses_multiple_processes(
+                ["--use_gpu_devices=0,1"], expected_frame_count=2
+            )
+        )
+        self.assertFalse(
+            benchmark._animation_uses_multiple_processes(
+                ["--use_gpu_devices=0,1"], expected_frame_count=1
+            )
+        )
+        self.assertFalse(
+            benchmark._animation_uses_multiple_processes(
+                ["--use_gpu_devices=0"], expected_frame_count=2
+            )
+        )
+        self.assertFalse(
+            benchmark._animation_uses_multiple_processes(
+                ["--use_gpu_devices=0,1", "--use_gpu_devices=0"],
+                expected_frame_count=2,
+            )
+        )
+
+    def test_absent_routing_flags_receive_explicit_empty_defaults(self) -> None:
+        scene_args = benchmark._with_absent_flag_defaults(
+            ["--scene-only=true"], benchmark._SCENE_ROUTING_FLAG_DEFAULTS
+        )
+        animation_args = benchmark._with_absent_flag_defaults(
+            ["--use_gpu_devices=0,1"],
+            benchmark._ANIMATION_ROUTING_FLAG_DEFAULTS,
+        )
+
+        self.assertEqual(
+            scene_args,
+            [
+                "--scene-only=true",
+                "--use_gpu_devices=",
+                "--atlas_vk_multi_device_tile_worker_indices=",
+            ],
+        )
+        self.assertEqual(
+            animation_args,
+            [
+                "--use_gpu_devices=0,1",
+                "--animation_gpu_device_frame_weights=",
+            ],
+        )
+
+    def test_validate_args_rejects_non_finite_child_timeout(self) -> None:
+        for timeout in ("nan", "inf", "-inf"):
+            with self.subTest(timeout=timeout):
+                with mock.patch.object(
+                    sys,
+                    "argv",
+                    [
+                        "export_scene_animation_stability.py",
+                        f"--child-timeout-seconds={timeout}",
+                    ],
+                ):
+                    args = benchmark._parse_args()
+                with self.assertRaisesRegex(ValueError, "finite and non-negative"):
+                    benchmark._validate_args(args)
+
+    def test_multi_process_animation_rejects_supervisor_only_timeout(self) -> None:
+        benchmark._validate_multi_process_animation_timeout(
+            ["--use_gpu_devices=0,1"], [1], timeout_seconds=5.0
+        )
+        benchmark._validate_multi_process_animation_timeout(
+            ["--use_gpu_devices=0,1"], [4], timeout_seconds=0.0
+        )
+        with self.assertRaisesRegex(ValueError, "must be zero"):
+            benchmark._validate_multi_process_animation_timeout(
+                ["--use_gpu_devices=0,1"], [4], timeout_seconds=5.0
+            )
 
     def test_dry_run_writes_complete_manifest_and_unique_vulkan_perf_paths(
         self,
@@ -495,6 +801,11 @@ class ExportSceneAnimationStabilityTest(unittest.TestCase):
                 "--extra-arg=--atlas_default_render_backend=opengl",
                 "--extra-arg=--atlas_perf_mode=off",
                 "--extra-arg=--atlas_perf_summary=json:/tmp/not-authoritative.ndjson",
+                "--extra-arg=--common=true",
+                "--scene-extra-arg=--scene-only=true",
+                "--animation-extra-arg=--animation-only=true",
+                "--animation-hash-policy",
+                "record-only",
                 "--scene-runs",
                 "1",
                 "--animation-runs",
@@ -516,6 +827,12 @@ class ExportSceneAnimationStabilityTest(unittest.TestCase):
             )
             self.assertEqual(manifest["vulkan_perf_mode"], "light")
             self.assertEqual(len(manifest["dataset_hashes"]), 2)
+            self.assertEqual(manifest["scene_extra_args"], ["--scene-only=true"])
+            self.assertEqual(
+                manifest["animation_extra_args"], ["--animation-only=true"]
+            )
+            self.assertEqual(manifest["scene_hash_policy"], "exact")
+            self.assertEqual(manifest["animation_hash_policy"], "record-only")
             animation_metadata = next(
                 entry
                 for entry in manifest["input_files"]
@@ -558,6 +875,34 @@ class ExportSceneAnimationStabilityTest(unittest.TestCase):
                 scene_run["command"].index("--atlas_perf_mode=light"),
                 scene_run["command"].index("--atlas_perf_mode=off"),
             )
+            self.assertIn("--common=true", scene_run["command"])
+            self.assertIn("--common=true", animation_run["command"])
+            self.assertIn("--scene-only=true", scene_run["command"])
+            self.assertLess(
+                scene_run["command"].index("--common=true"),
+                scene_run["command"].index("--scene-only=true"),
+            )
+            self.assertNotIn("--scene-only=true", animation_run["command"])
+            self.assertIn("--animation-only=true", animation_run["command"])
+            self.assertLess(
+                animation_run["command"].index("--common=true"),
+                animation_run["command"].index("--animation-only=true"),
+            )
+            self.assertNotIn("--animation-only=true", scene_run["command"])
+            self.assertIn("--use_gpu_devices=", scene_run["command"])
+            self.assertIn(
+                "--atlas_vk_multi_device_tile_worker_indices=",
+                scene_run["command"],
+            )
+            self.assertIn("--use_gpu_devices=", animation_run["command"])
+            self.assertIn(
+                "--animation_gpu_device_frame_weights=",
+                animation_run["command"],
+            )
+            self.assertNotIn(
+                "--atlas_vk_multi_device_tile_worker_indices=",
+                animation_run["command"],
+            )
             self.assertEqual(animation_run["expected_file_count"], 5)
 
             aggregate = json.loads(
@@ -565,6 +910,93 @@ class ExportSceneAnimationStabilityTest(unittest.TestCase):
             )
             self.assertEqual(aggregate["status"], "dry_run")
             self.assertTrue(aggregate["all_runs_complete"])
+
+    def test_multi_process_animation_records_wall_time_without_perf_summary(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            animation_path = root / "sample.animation3d"
+            animation_path.write_text(
+                json.dumps({"Animation3D": {"Duration": 1.0}}), encoding="utf-8"
+            )
+            output_root = root / "results"
+            argv = [
+                "export_scene_animation_stability.py",
+                "--atlas-path",
+                sys.executable,
+                "--output-root",
+                str(output_root),
+                "--animation",
+                str(animation_path),
+                "--backend",
+                "vulkan",
+                "--animation-extra-arg=--use_gpu_devices=0,1",
+                "--animation-extra-arg=--animation_gpu_device_frame_weights=2,1",
+                "--animation-runs",
+                "1",
+                "--animation-fps",
+                "4",
+                "--dry-run",
+            ]
+
+            with (
+                mock.patch.object(sys, "argv", argv),
+                mock.patch.object(benchmark, "_git_metadata", return_value={}),
+                mock.patch.object(benchmark, "_host_metadata", return_value={}),
+            ):
+                self.assertEqual(benchmark.main(), 0)
+
+            manifest = json.loads(
+                (output_root / "manifest.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(manifest["scenes"], [])
+            self.assertEqual(manifest["animations"], [str(animation_path.resolve())])
+            self.assertEqual(
+                manifest["animation_extra_args"],
+                [
+                    "--use_gpu_devices=0,1",
+                    "--animation_gpu_device_frame_weights=2,1",
+                ],
+            )
+
+            run_path = (
+                output_root
+                / "vulkan"
+                / "animation"
+                / animation_path.name
+                / "run_01"
+                / "run.json"
+            )
+            run = json.loads(run_path.read_text(encoding="utf-8"))["run"]
+            self.assertIsNone(run["perf_summary_path"])
+            self.assertEqual(run["perf_summary_frame_count"], 0)
+            self.assertEqual(
+                run["perf_summary_profile"],
+                benchmark._MULTI_PROCESS_ANIMATION_PERF_PROFILE,
+            )
+            self.assertEqual(
+                run["perf_summary_unavailable_metrics"],
+                list(benchmark._MULTI_PROCESS_ANIMATION_UNAVAILABLE_METRICS),
+            )
+            self.assertIn("--atlas_perf_mode=off", run["command"])
+            self.assertIn("--use_gpu_devices=0,1", run["command"])
+            self.assertIn("--animation_gpu_device_frame_weights=2,1", run["command"])
+            self.assertNotIn("--use_gpu_devices=", run["command"])
+            self.assertNotIn("--animation_gpu_device_frame_weights=", run["command"])
+            self.assertFalse(
+                any(
+                    argument.startswith("--atlas_perf_summary=json:")
+                    for argument in run["command"]
+                )
+            )
+            self.assertEqual(run["expected_file_count"], 4)
+
+            aggregate = json.loads(
+                (output_root / "aggregate_summary.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(aggregate["status"], "dry_run")
+            self.assertEqual(aggregate["recorded_run_count"], 1)
 
     def test_child_process_failure_makes_complete_aggregate_fail(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

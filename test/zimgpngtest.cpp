@@ -8,6 +8,7 @@
 #include <QFile>
 #include <QTemporaryDir>
 
+#include <algorithm>
 #include <span>
 #include <vector>
 
@@ -81,6 +82,49 @@ TEST(ZImgPng, RoundTripsBasicRgbImage)
   EXPECT_EQ(img.channelData<uint8_t>(1)[0], 50u);
   EXPECT_EQ(img.channelData<uint8_t>(2)[0], 100u);
   EXPECT_EQ(img.channelData<uint8_t>(0)[img.width() * img.height() - 1], 12u);
+}
+
+TEST(ZImgPng, RoundTripsSupportedChannelLayouts)
+{
+  QTemporaryDir tmp;
+  ASSERT_TRUE(tmp.isValid());
+
+  for (const size_t bytesPerVoxel : {1u, 2u}) {
+    for (const size_t channelCount : {1u, 2u, 3u, 4u}) {
+      SCOPED_TRACE(testing::Message() << "bytes=" << bytesPerVoxel << ", channels=" << channelCount);
+      ZImgInfo info(3, 2, 1, channelCount, 1, bytesPerVoxel, VoxelFormat::Unsigned);
+      info.lastChannelIsAlphaChannel = channelCount == 2u || channelCount == 4u;
+      ZImg source(info);
+      for (size_t c = 0; c < channelCount; ++c) {
+        for (size_t i = 0; i < source.channelVoxelNumber(); ++i) {
+          if (bytesPerVoxel == 1u) {
+            source.channelData<uint8_t>(c)[i] = static_cast<uint8_t>(20u * c + i);
+          } else {
+            source.channelData<uint16_t>(c)[i] = static_cast<uint16_t>(0x1200u + 0x40u * c + i);
+          }
+        }
+      }
+
+      const QString path = QDir(tmp.path()).filePath(QString("fixture_%1_%2.png").arg(bytesPerVoxel).arg(channelCount));
+      source.save(path, FileFormat::Png);
+      const ZImg decoded(path, ZImgRegion(), 0, 1, 1, 1, FileFormat::Png);
+
+      ASSERT_EQ(decoded.numChannels(), channelCount);
+      ASSERT_EQ(decoded.bytesPerVoxel(), bytesPerVoxel);
+      EXPECT_EQ(decoded.info().lastChannelIsAlphaChannel, channelCount == 2u || channelCount == 4u);
+      for (size_t c = 0; c < channelCount; ++c) {
+        if (bytesPerVoxel == 1u) {
+          EXPECT_TRUE(std::equal(source.channelData<uint8_t>(c),
+                                 source.channelData<uint8_t>(c) + source.channelVoxelNumber(),
+                                 decoded.channelData<uint8_t>(c)));
+        } else {
+          EXPECT_TRUE(std::equal(source.channelData<uint16_t>(c),
+                                 source.channelData<uint16_t>(c) + source.channelVoxelNumber(),
+                                 decoded.channelData<uint16_t>(c)));
+        }
+      }
+    }
+  }
 }
 
 TEST(ZImgPng, RejectsTruncatedLocalFile)

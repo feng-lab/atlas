@@ -2,6 +2,8 @@
 #include "z3drenderingengine.h"
 #include "zcameraparameteranimation.h"
 #include "zdoc.h"
+#include "zexception.h"
+#include "zjson.h"
 
 namespace nim {
 
@@ -33,6 +35,30 @@ void Z3DAnimation::load(const QString& fn, bool showLoadIssuesDialog)
   readContent(fn, "Animation3D", showLoadIssuesDialog);
   m_cameraParameterAnimation = static_cast<ZCameraParameterAnimation*>(m_globalParaAnimations[0].get());
   LOG(INFO) << "Finish loading animation";
+}
+
+double Z3DAnimation::readDurationFromFile(const QString& fn)
+{
+  const json::object root = loadJsonObject(fn);
+  const auto animationIt = root.find("Animation3D");
+  if (animationIt == root.end() || !animationIt->value().is_object()) {
+    throw ZException("File is not Animation3D format");
+  }
+
+  const json::object& animation = animationIt->value().as_object();
+  const auto docIt = animation.find("Doc");
+  if (docIt == animation.end() || !docIt->value().is_object()) {
+    throw ZException("Animation3D.Doc is not an object");
+  }
+
+  const auto durationIt = animation.find("Duration");
+  if (durationIt == animation.end()) {
+    return kDefaultDuration;
+  }
+  if (!durationIt->value().is_number()) {
+    throw ZException("Animation3D.Duration is not a number");
+  }
+  return normalizedDuration(durationIt->value().to_number<double>());
 }
 
 void Z3DAnimation::save(const QString& fn)
