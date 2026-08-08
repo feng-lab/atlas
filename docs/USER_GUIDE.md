@@ -1369,20 +1369,26 @@ For automation or cluster rendering:
 3. Optional flags:
    - `--overwrite`
    - `--output_image_folder_name frames`
-   - `--skip_video_compression`
+   - `--skip_video_compression` (requires an explicit `--output_image_folder_name`; Atlas keeps the rendered frames and
+     does not create or replace the video)
    - `--output_image_name_prefix frame_`
    - `--output_image_name_field_width 5`
    - `--output_tile_size 1024 --output_tile_border 64` (default for 3D animation export)
    - `--output_tile_size 512 --output_tile_border 64` for huge out-of-core or low-VRAM exports where smaller tiles improve page-cache reuse
-   - `--limit_memory_usage_in_gb_to 12`
-   - On Linux: `--use_gpu_devices=0,1`. With OpenGL these are EGL device IDs and Atlas enables EGL automatically;
-     with Vulkan these are preference-sorted Vulkan device indices and each export worker receives the matching
-     `--atlas_vk_device_index` preference. Otherwise equal-ranked Vulkan adapters use device UUID as a stable final
-     tie-break. Invalid or incompatible values warn and use automatic Vulkan selection, which can place multiple workers
-     on the same adapter.
+   - `--limit_memory_usage_in_gb_to=<gib>` sets an explicit total host-memory sizing budget. A multi-process
+     animation export divides the value among its active render workers. The default value of zero uses detected-memory
+     sizing in each process.
+   - `--use_gpu_devices=0,1`. With Vulkan, this is available on macOS, Windows, and Linux: Atlas divides the requested
+     half-open frame range into nonempty ranges and uses one single-device Atlas process per range; multi-range exports
+     launch child processes. The values are preference-sorted Vulkan device indices, and each process receives the matching
+     `--atlas_vk_device_index` preference. With OpenGL, explicit animation devices remain Linux/EGL-only and the values are
+     EGL device IDs. Invalid or incompatible Vulkan preferences warn and use automatic selection, which can place multiple
+     workers on the same adapter. An empty list retains the ordinary one-process, one-device export path.
+   - An explicit Qt `-platform <plugin>` option is passed unchanged to rendering and compression child processes. Every
+     child also loads the standard Atlas user settings flagfile.
 4. Monitor CLI logs for progress updates and errors while the export is running.
-5. Atlas exits non-zero if the export reports an error. In headless mode the first rendering/export error aborts the
-   export instead of continuing and returning success.
+5. Atlas exits non-zero if the export reports an error. For a multi-process animation export, any worker error fails the
+   export after every launched rendering worker has stopped; video compression does not start after a worker failure.
 
 ### 8.5 Headless 3D Scene Export
 
@@ -1403,7 +1409,7 @@ For reproducible still-image capture from saved workspaces:
    ```
 3. Optional flags:
    - `--output_tile_size 1024 --output_tile_border 64`
-   - `--limit_memory_usage_in_gb_to 12`
+   - `--limit_memory_usage_in_gb_to=<gib>` to set an explicit host-memory sizing budget
    - On Linux: `--use_gpu_devices=0`. The value selects an EGL device under OpenGL or the preference-sorted Vulkan
      device under Vulkan; Atlas configures the corresponding backend-specific device flag automatically.
    - For in-process Vulkan multi-device rendering of a fixed-size tiled capture, specify the complete device set with
@@ -1573,8 +1579,7 @@ For reproducible still-image capture from saved workspaces:
        --output_start_frame 0 \
        --output_end_frame 600 \
        --output_width 3840 \
-       --output_height 2160 \
-       --limit_memory_usage_in_gb_to 10
+       --output_height 2160
    done
    ```
 3. **Check logs** after each run for errors.
@@ -1674,7 +1679,8 @@ Tips
 1. Use aliases to isolate high-quality rendering to specific objects.
 2. Apply global cuts to remove out-of-view data.
 3. Adjust sampling rates and switch to MIP or Local MIP when real-time performance is needed.
-4. In headless mode, use `--limit_memory_usage_in_gb_to` to cap GPU memory usage.
+4. In headless mode, use `--limit_memory_usage_in_gb_to` to set Atlas' host-memory sizing budget for caches and export
+   concurrency.
 5. Disable unnecessary transparency techniques when not needed.
 
 ### 11.3 Rendering Quality Tips
@@ -1741,17 +1747,17 @@ Use **Help → Shortcuts** in either the 2D or 3D window to open this section di
 | `--output_filename` | Output path (`.mp4`/video for animation export, image path for scene export). |
 | `--output_fps`, `--output_start_frame`, `--output_end_frame` | Output frame timing. |
 | `--output_width`, `--output_height` | Frame size. |
-| `--overwrite` | Allow overwriting existing outputs. |
+| `--overwrite` | Allow replacing the final video or scene-image target. Animation frame PNGs in an explicit image folder are replaced when their frame numbers are rendered, independently of this flag. |
 | `--output_image_folder_name` | Directory for per-frame exports. |
-| `--skip_video_compression` | Render frames only, skip final video encoding. |
+| `--skip_video_compression` | Render frames only and skip final video encoding. Requires an explicit `--output_image_folder_name`; the video target is not created or replaced. |
 | `--output_image_name_prefix`, `--output_image_name_field_width` | Control image sequence naming. |
 | `--output_tile_size`, `--output_tile_border` | Enable tiled rendering for high-resolution outputs. Animation export defaults to `1024`/`64`; use `512`/`64` for huge out-of-core or low-VRAM exports where smaller tiles improve page-cache reuse. Scene export uses its built-in still-image defaults unless either flag is provided explicitly. |
-| `--limit_memory_usage_in_gb_to` | Cap GPU memory usage (GB). |
+| `--limit_memory_usage_in_gb_to` | Set Atlas' host-memory sizing budget in GiB. The default value of zero uses detected-memory sizing in each process. Multi-process animation divides an explicitly supplied total among active render workers. |
 | `--atlas_vk_residency_budget_bytes` | Strict byte cap for Atlas-owned Vulkan device-local residency. When set, Atlas keeps each existing Vulkan pass hot set within the cap by making needed resources resident and evicting cold backing at safe points; paged image caches are sized from the effective Vulkan budget rather than uncapped physical VRAM. If one required pass working set exceeds the cap, export fails with a memory diagnostic instead of allocating past the cap. |
 | `--atlas_vk_device_index` | Prefer a Vulkan adapter by its preference-sorted startup index; `-1` uses automatic selection. Otherwise equal-ranked adapters use device UUID as the stable final tie-break. Atlas uses a compatible preferred adapter exactly. Invalid, out-of-range, or incompatible values log a warning and fall back to the first fully compatible Vulkan adapter. |
 | `--atlas_vk_multi_device_tile_worker_indices` | Comma-separated preference-sorted Vulkan indices for the private, engine-owned pool used by fixed-size tiled headless scene capture, for example `0,1`. The complete list must contain at least two distinct compatible physical devices; invalid or duplicate selections fail without fallback. The canonical adapter renders tiles only when listed; every selected noncanonical adapter uses a private engine on its own rendering thread. Empty keeps direct rendering. Interactive rendering and untiled captures remain on the canonical device, and this flag does not route animation rendering. |
 | `--atlas_perf_mode` | Vulkan performance collection mode: `off` disables collector timing/scopes/output while retaining the render-frame identity required for resource and presentation ordering; `light` records top-level submission/pass metrics (default), and `full` also records nested GPU scopes. |
-| `--use_gpu_devices` | Specify comma-separated backend device indices for Linux headless export, for example `0,1`. OpenGL values are EGL device IDs; Vulkan values are preference-sorted Vulkan indices and are passed to animation workers as `--atlas_vk_device_index` preferences. Rejected Vulkan preferences warn and use automatic selection, which can place multiple animation workers on the same adapter. Scene export accepts exactly one value for its canonical engine; use `--atlas_vk_multi_device_tile_worker_indices` for its private in-process Vulkan tiled-capture device set. |
+| `--use_gpu_devices` | Specify comma-separated backend device indices, for example `0,1`. Vulkan animation export supports the list on macOS, Windows, and Linux and uses one single-device process per nonempty frame range; multi-range exports launch child processes. Values are preference-sorted Vulkan indices passed as `--atlas_vk_device_index` preferences. Rejected preferences warn and use automatic selection, which can place multiple workers on the same adapter. OpenGL animation values are EGL device IDs and are Linux-only. Scene export keeps its Linux-only, exactly-one-value canonical-device behavior; use `--atlas_vk_multi_device_tile_worker_indices` for the separate in-process Vulkan tiled-capture device set. Empty retains the direct one-process path. |
 | `--__use_EGL` | Force EGL context creation (Linux headless). |
 | `--v=LEVEL` | Adjust log verbosity; `--v=1` prints additional diagnostics. |
 

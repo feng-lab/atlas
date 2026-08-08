@@ -15,7 +15,8 @@ public:
   // log useful cpu info
   void logCpuInfo() const;
 
-  // set to limit memory usage
+  // Override the process-local RAM value used to size caches and concurrency.
+  // Requests above detected physical RAM retain the detected value.
   void setMemoryLimitInBytes(uint64_t n);
 
 protected:

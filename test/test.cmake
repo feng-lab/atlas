@@ -180,6 +180,8 @@ add_executable(
   ${CMAKE_CURRENT_LIST_DIR}/z3dblockidcollectortest.cpp
   ${CMAKE_CURRENT_LIST_DIR}/zroimaskrastertest.cpp
   ${CMAKE_CURRENT_LIST_DIR}/zcameraparameteranimationtest.cpp
+  ${CMAKE_CURRENT_LIST_DIR}/zrunexport3danimationtest.cpp
+  ${CMAKE_CURRENT_LIST_DIR}/zvideoencodertest.cpp
   ${CMAKE_CURRENT_LIST_DIR}/zcutspanparametertest.cpp
   ${CMAKE_CURRENT_LIST_DIR}/zneuroglancerprecomputedchunkdecodertest.cpp
   ${CMAKE_CURRENT_LIST_DIR}/zneuroglancerprecomputedannotationstest.cpp

@@ -39,6 +39,25 @@
 
 namespace nim {
 
+namespace {
+
+void queueCameraChange(Z3DRenderingEngine& engine, void (Z3DRenderingEngine::*change)())
+{
+  CHECK(change != nullptr);
+  engine.cancelLongRendering();
+  auto* enginePtr = &engine;
+  const bool queued = QMetaObject::invokeMethod(
+    enginePtr,
+    [enginePtr, change]() {
+      CHECK(QThread::currentThread() == enginePtr->thread()) << "Camera changes must run on the rendering thread";
+      (enginePtr->*change)();
+    },
+    Qt::QueuedConnection);
+  CHECK(queued) << "Could not queue a camera change on the rendering thread";
+}
+
+} // namespace
+
 Z3DMainWindow::Z3DMainWindow(ZDoc& doc, ZMainWindow& win2d, bool stereoView, QWidget* parent)
   : QMainWindow(parent)
   , m_doc(doc)
@@ -776,20 +795,20 @@ void Z3DMainWindow::onProgressChanged(int v)
 
 void Z3DMainWindow::zoomIn()
 {
-  m_engine->cancelLongRendering();
-  m_engine->zoomIn();
+  CHECK(m_engine);
+  queueCameraChange(*m_engine, &Z3DRenderingEngine::zoomIn);
 }
 
 void Z3DMainWindow::zoomOut()
 {
-  m_engine->cancelLongRendering();
-  m_engine->zoomOut();
+  CHECK(m_engine);
+  queueCameraChange(*m_engine, &Z3DRenderingEngine::zoomOut);
 }
 
 void Z3DMainWindow::resetCamera()
 {
-  m_engine->cancelLongRendering();
-  m_engine->resetCamera();
+  CHECK(m_engine);
+  queueCameraChange(*m_engine, &Z3DRenderingEngine::resetCamera);
 }
 
 void Z3DMainWindow::cancelRendering()

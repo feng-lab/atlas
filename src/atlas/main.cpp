@@ -24,9 +24,11 @@
 #include <QDir>
 #include <QFileInfo>
 #include <QMessageBox>
+#include <QStringList>
 #include <QTimer>
 #include <QUrl>
 #include <folly/ScopeGuard.h>
+#include <cstring>
 
 ABSL_DECLARE_FLAG(bool, run_export_3d_animation);
 ABSL_DECLARE_FLAG(bool, run_export_3d_scene);
@@ -93,8 +95,28 @@ QString getExecutablePath()
 #endif
 }
 
+namespace {
+
+QStringList explicitQpaPlatformArguments(int argc, char* argv[])
+{
+  QStringList arguments;
+  for (int index = 1; index + 1 < argc; ++index) {
+    if (std::strcmp(argv[index], "-platform") == 0) {
+      arguments << QString::fromLocal8Bit(argv[index]) << QString::fromLocal8Bit(argv[index + 1]);
+      ++index;
+    }
+  }
+  return arguments;
+}
+
+} // namespace
+
 int main(int argc, char* argv[])
 {
+  // QGuiApplication removes recognized Qt options from argv. Retain an
+  // explicit QPA choice so animation subprocesses can receive the same option.
+  const QStringList childQpaPlatformArguments = explicitQpaPlatformArguments(argc, argv);
+
 #ifdef _WIN32
   if (AttachConsole(ATTACH_PARENT_PROCESS)) {
     std::ignore = freopen("CONOUT$", "w", stdout);
@@ -226,7 +248,7 @@ int main(int argc, char* argv[])
       LOG(INFO) << "console mode";
       if (absl::GetFlag(FLAGS_run_export_3d_animation)) {
         ZRunExport3DAnimation rea;
-        return rea.run();
+        return rea.run(childQpaPlatformArguments);
       } else if (absl::GetFlag(FLAGS_run_export_3d_scene)) {
         ZRunExport3DScene res;
         return res.run();

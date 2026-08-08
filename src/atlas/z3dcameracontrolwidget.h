@@ -1,6 +1,5 @@
 #pragma once
 
-#include "z3dcameraparameter.h"
 #include <QWidget>
 
 class QSpinBox;
@@ -16,7 +15,7 @@ class Z3DCameraControlWidget : public QWidget
   Q_OBJECT
 
 public:
-  explicit Z3DCameraControlWidget(Z3DCameraParameter& camera, Z3DRenderingEngine& engine, QWidget* parent = nullptr);
+  explicit Z3DCameraControlWidget(Z3DRenderingEngine& engine, QWidget* parent = nullptr);
 
 private:
   void roll();
@@ -48,7 +47,6 @@ private:
   void createWidget();
 
 private:
-  Z3DCameraParameter& m_camera;
   Z3DRenderingEngine& m_engine;
   QSpinBox* m_rollDegreeSpinBox = nullptr;
   QSpinBox* m_azimuthDegreeSpinBox = nullptr;

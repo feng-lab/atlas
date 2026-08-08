@@ -548,7 +548,7 @@ std::shared_ptr<ZWidgetsGroup> Z3DGlobalParameters::widgetsGroup(bool includeCam
 
     for (size_t i = 0; i < m_parameters.size(); ++i) {
       if (i == m_cameraParameterIndex) {
-        m_widgetsGrp->addChild(*(new Z3DCameraControlWidget(camera, engine)), 1);
+        m_widgetsGrp->addChild(*(new Z3DCameraControlWidget(engine)), 1);
         m_widgetsGrp->addChild(*m_parameters[i], 1);
       } else {
         m_widgetsGrp->addChild(*m_parameters[i], 1);

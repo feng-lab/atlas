@@ -867,11 +867,13 @@ void ZAnimation::exportFixedSize2DAnimation(const QString& fn,
     QMessageBox::critical(QApplication::activeWindow(),
                           QApplication::applicationName(),
                           QString("Video start frame %1 is not correct").arg(startFrame));
+    return;
   }
   if (endFrame >= 0 && endFrame <= startFrame) {
     QMessageBox::critical(QApplication::activeWindow(),
                           QApplication::applicationName(),
                           QString("Video end frame %1 is not correct").arg(endFrame));
+    return;
   }
   if (endFrame < 0 || endFrame > totalNumFrames) {
     endFrame = totalNumFrames;
@@ -957,7 +959,13 @@ void ZAnimation::exportFixedSize2DAnimation(const QString& fn,
     connect(m_videoEncoder, &ZVideoEncoder::canceled, progress, &QProgressDialog::reject);
     connect(progress, &QProgressDialog::canceled, m_videoEncoder, &ZVideoEncoder::cancel);
     m_tempDir = tempdir;
-    m_videoEncoder->encode(tmpdir, namePrefix, fieldWidth, framePerSecond, dir.filePath(fn));
+    m_videoEncoder->encode(tmpdir,
+                           namePrefix,
+                           fieldWidth,
+                           framePerSecond,
+                           startFrame,
+                           static_cast<size_t>(endFrame - startFrame),
+                           dir.filePath(fn));
   }
 }
 

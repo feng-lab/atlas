@@ -22,6 +22,7 @@
 #include <QThread>
 
 #include <algorithm>
+#include <cstdint>
 #include <limits>
 #include <string>
 #include <utility>
@@ -56,6 +57,8 @@ ABSL_DECLARE_FLAG(bool, __use_EGL);
 namespace nim {
 
 namespace {
+
+constexpr uint64_t kBytesPerGiB = 1024u * 1024u * 1024u;
 
 bool prepareOutputFile(const QString& outputFilename, bool overwriteExisting, QString& error)
 {
@@ -327,8 +330,13 @@ int ZRunExport3DScene::run()
 
   m_hasError = false;
 
-  if (absl::GetFlag(FLAGS_limit_memory_usage_in_gb_to) >= 32) {
-    ZCpuInfo::instance().setMemoryLimitInBytes(absl::GetFlag(FLAGS_limit_memory_usage_in_gb_to) * 1024 * 1024 * 1024);
+  const uint64_t configuredMemoryLimitGiB = absl::GetFlag(FLAGS_limit_memory_usage_in_gb_to);
+  if (configuredMemoryLimitGiB > std::numeric_limits<uint64_t>::max() / kBytesPerGiB) {
+    LOG(ERROR) << "memory limit is too large";
+    return 1;
+  }
+  if (configuredMemoryLimitGiB > 0u) {
+    ZCpuInfo::instance().setMemoryLimitInBytes(configuredMemoryLimitGiB * kBytesPerGiB);
   }
 
   const QString filename = QString::fromStdString(absl::GetFlag(FLAGS_filename)).trimmed();

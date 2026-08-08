@@ -85,9 +85,9 @@ Entry Points
       two distinct compatible physical devices; the canonical device participates only when its index is present. An empty
       list retains direct scene capture. The pool is used only by multi-tile fixed-size still capture; headless animation
       export keeps its separate multi-process path.
-    - Both runners treat the first export/rendering error as fatal in CLI mode: they log the error, cancel any active
-      capture work, and return a non-zero exit code so automation does not report a false success.
-      Invalid tile-worker selection and tile-batch failures are also fatal.
+    - Both runners treat export/rendering errors as fatal in CLI mode: they log the error, cancel active work, and return a
+      non-zero exit code so automation does not report a false success. Invalid tile-worker selection and tile-batch
+      failures are also fatal.
     - Both modes share the core output-path and size flags (`--filename`, `--output_filename`, `--output_width`,
       `--output_height`, `--overwrite`, `--limit_memory_usage_in_gb_to`) so benchmark scripts can swap between them
       without reshaping the command line.
@@ -1237,7 +1237,7 @@ Canvas and Lifecycle
 
 - `Z3DCanvas` posts UI events to engine. It updates its view on `renderingFinished`.
 - Because render loops no longer pump the render thread's Qt event queue mid-frame, queued canvas/input events now apply after the active render unwinds unless the entry point explicitly cancels first.
-- Atlas explicitly cancels the active progressive render for the highest-value interaction starts before queueing the corresponding work: camera/navigation drags and wheel, resize, context-menu / double-click / trackball-navigation key-press delivery, screenshot/export starts, and SWC interaction-mode toggles. Generic mouse press, generic key press, and passive trailing events such as release events are still delivered later rather than aborting the render again.
+- Atlas explicitly cancels the active progressive render for the highest-value interaction starts before queueing the corresponding work: camera/navigation drags and wheel, resize, context-menu / double-click / trackball-navigation key-press delivery, screenshot/export starts, and SWC interaction-mode toggles. The 3D toolbar and Camera Control actions use the same cancellation-first boundary; rotation angles and selected object IDs cross by value, while focus/point-to bounds and every camera mutation are evaluated on the canonical rendering thread. Camera input does not request capture cancellation, so an explicit capture keeps its fixed state and the queued camera change applies afterward. Generic mouse press, generic key press, and passive trailing events such as release events are still delivered later rather than aborting the render again.
 - Teardown (ordering and guards):
   - Queued signals can arrive after detaching/destroying engine.
   - `Z3DCanvas::renderingFinished` guards its engine pointer before access.
@@ -1636,16 +1636,24 @@ Vulkan device selection
   A compatible preferred device is selected exactly. An invalid, out-of-range, or incompatible preference logs a warning
   with the reason and falls back to the first fully compatible Vulkan device in preference order. CLI selection is
   best-effort; strict `DeviceSelection` construction does not fall back.
-- Linux headless export maps `--use_gpu_devices` according to the requested backend. OpenGL values select EGL devices;
-  Vulkan values select indices from this preference-sorted list. Multi-process animation workers receive a corresponding
-  `--atlas_vk_device_index` preference. A rejected worker preference logs a warning and uses automatic selection, so export
-  automation should treat those warnings as a possible sign that multiple workers fell back to the same adapter.
+- Headless animation export maps `--use_gpu_devices` according to the requested backend. Vulkan lists are supported on every
+  platform and select indices from this preference-sorted list; OpenGL lists select EGL devices and remain Linux-only.
+  The animation supervisor resolves the requested half-open frame interval, divides it into balanced nonempty ranges, and
+  uses one ordinary single-device Atlas process per active range; multi-range exports launch child processes. Vulkan workers
+  receive the corresponding `--atlas_vk_device_index` preference. The supervisor waits for every render process before
+  reporting a failure. When compression is enabled, one final process encodes exactly the resolved frame interval after all
+  ranges succeed. An explicit top-level `-platform` QPA option is relayed unchanged to render and compression children.
+  Otherwise child QPA selection follows inherited `QT_QPA_PLATFORM`, when set, or Qt's default. Each child reloads the
+  standard persisted user settings. The supervisor explicitly supplies the export, backend, device, range, and process-role
+  flags. A rejected worker preference logs a warning and uses automatic selection, so export automation should treat those
+  warnings as a possible sign that multiple workers fell back to the same adapter. An empty list retains the direct
+  one-process path.
 - `--atlas_vk_multi_device_tile_worker_indices` selects the complete participating device set for in-process tiled scene export on
   any supported platform. It requires at least two comma-separated preference indices and rejects unavailable,
   incompatible, duplicate-index, or duplicate-UUID selections without fallback. The canonical engine renders pool tiles
   only when this list includes its independently selected device. `--atlas_vk_device_index` selects the canonical engine.
-  Linux scene export accepts exactly one `--use_gpu_devices` value for that canonical engine; headless animation continues
-  to use `--use_gpu_devices` for its separate multi-process workers.
+  Linux scene export accepts exactly one `--use_gpu_devices` value for that canonical engine; headless animation uses the
+  same flag for its separate cross-platform Vulkan process workers or Linux EGL process workers.
 Compositor Pass Graph (Vulkan)
 
 - Offscreen only; no swapchain.

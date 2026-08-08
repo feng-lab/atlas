@@ -2,15 +2,37 @@
 
 #include "z3drenderingengine.h"
 #include "zdoc.h"
+#include "zglmutils.h"
+#include "zlog.h"
+#include <QMetaObject>
+#include <QThread>
 #include <QVBoxLayout>
 #include <QPushButton>
 #include <QSpinBox>
+#include <utility>
 
 namespace nim {
 
-Z3DCameraControlWidget::Z3DCameraControlWidget(Z3DCameraParameter& camera, Z3DRenderingEngine& engine, QWidget* parent)
+namespace {
+
+void queueCameraChange(Z3DRenderingEngine& engine, auto change)
+{
+  engine.cancelLongRendering();
+  auto* enginePtr = &engine;
+  const bool queued = QMetaObject::invokeMethod(
+    enginePtr,
+    [enginePtr, change = std::move(change)]() {
+      CHECK(QThread::currentThread() == enginePtr->thread()) << "Camera changes must run on the rendering thread";
+      change(*enginePtr);
+    },
+    Qt::QueuedConnection);
+  CHECK(queued) << "Could not queue a camera change on the rendering thread";
+}
+
+} // namespace
+
+Z3DCameraControlWidget::Z3DCameraControlWidget(Z3DRenderingEngine& engine, QWidget* parent)
   : QWidget(parent)
-  , m_camera(camera)
   , m_engine(engine)
 {
   createWidget();
@@ -19,40 +41,50 @@ Z3DCameraControlWidget::Z3DCameraControlWidget(Z3DCameraParameter& camera, Z3DRe
 void Z3DCameraControlWidget::roll()
 {
   if (m_rollDegreeSpinBox->value() % 360 != 0) {
-    auto angle = glm::radians(float(m_rollDegreeSpinBox->value()));
-    m_camera.roll(angle);
+    const float angle = glm::radians(float(m_rollDegreeSpinBox->value()));
+    queueCameraChange(m_engine, [angle](Z3DRenderingEngine& engine) {
+      engine.camera().roll(angle);
+    });
   }
 }
 
 void Z3DCameraControlWidget::azimuth()
 {
   if (m_azimuthDegreeSpinBox->value() % 360 != 0) {
-    auto angle = glm::radians(float(m_azimuthDegreeSpinBox->value()));
-    m_camera.azimuth(angle);
+    const float angle = glm::radians(float(m_azimuthDegreeSpinBox->value()));
+    queueCameraChange(m_engine, [angle](Z3DRenderingEngine& engine) {
+      engine.camera().azimuth(angle);
+    });
   }
 }
 
 void Z3DCameraControlWidget::yaw()
 {
   if (m_yawDegreeSpinBox->value() % 360 != 0) {
-    auto angle = glm::radians(float(m_yawDegreeSpinBox->value()));
-    m_camera.yaw(angle);
+    const float angle = glm::radians(float(m_yawDegreeSpinBox->value()));
+    queueCameraChange(m_engine, [angle](Z3DRenderingEngine& engine) {
+      engine.camera().yaw(angle);
+    });
   }
 }
 
 void Z3DCameraControlWidget::elevation()
 {
   if (m_elevationDegreeSpinBox->value() % 360 != 0) {
-    auto angle = glm::radians(float(m_elevationDegreeSpinBox->value()));
-    m_camera.elevation(angle);
+    const float angle = glm::radians(float(m_elevationDegreeSpinBox->value()));
+    queueCameraChange(m_engine, [angle](Z3DRenderingEngine& engine) {
+      engine.camera().elevation(angle);
+    });
   }
 }
 
 void Z3DCameraControlWidget::pitch()
 {
   if (m_pitchDegreeSpinBox->value() % 360 != 0) {
-    auto angle = glm::radians(float(m_pitchDegreeSpinBox->value()));
-    m_camera.pitch(angle);
+    const float angle = glm::radians(float(m_pitchDegreeSpinBox->value()));
+    queueCameraChange(m_engine, [angle](Z3DRenderingEngine& engine) {
+      engine.camera().pitch(angle);
+    });
   }
 }
 
@@ -60,7 +92,9 @@ void Z3DCameraControlWidget::focusOn()
 {
   auto objIDs = m_engine.doc().chooseObjsWithWidget(QString("Focuses on objects..."), this);
   if (!objIDs.empty()) {
-    m_engine.cameraFocusesOn(m_engine.boundBoxOfObjsAfterClipping(objIDs));
+    queueCameraChange(m_engine, [objIDs = std::move(objIDs)](Z3DRenderingEngine& engine) {
+      engine.cameraFocusesOn(engine.boundBoxOfObjsAfterClipping(objIDs));
+    });
   }
 }
 
@@ -68,7 +102,9 @@ void Z3DCameraControlWidget::focusOnIgnoreClipping()
 {
   auto objIDs = m_engine.doc().chooseObjsWithWidget(QString("Focuses on objects (ignore clipping)..."), this);
   if (!objIDs.empty()) {
-    m_engine.cameraFocusesOn(m_engine.boundBoxOfObjs(objIDs));
+    queueCameraChange(m_engine, [objIDs = std::move(objIDs)](Z3DRenderingEngine& engine) {
+      engine.cameraFocusesOn(engine.boundBoxOfObjs(objIDs));
+    });
   }
 }
 
@@ -76,7 +112,9 @@ void Z3DCameraControlWidget::pointsTo()
 {
   auto objIDs = m_engine.doc().chooseObjsWithWidget(QString("Camera points to objects..."), this);
   if (!objIDs.empty()) {
-    m_engine.cameraPointsTo(m_engine.boundBoxOfObjsAfterClipping(objIDs));
+    queueCameraChange(m_engine, [objIDs = std::move(objIDs)](Z3DRenderingEngine& engine) {
+      engine.cameraPointsTo(engine.boundBoxOfObjsAfterClipping(objIDs));
+    });
   }
 }
 
@@ -84,28 +122,38 @@ void Z3DCameraControlWidget::pointsToIgnoreClipping()
 {
   auto objIDs = m_engine.doc().chooseObjsWithWidget(QString("Camera points to objects (ignore clipping)..."), this);
   if (!objIDs.empty()) {
-    m_engine.cameraPointsTo(m_engine.boundBoxOfObjs(objIDs));
+    queueCameraChange(m_engine, [objIDs = std::move(objIDs)](Z3DRenderingEngine& engine) {
+      engine.cameraPointsTo(engine.boundBoxOfObjs(objIDs));
+    });
   }
 }
 
 void Z3DCameraControlWidget::flipView()
 {
-  m_engine.flipView();
+  queueCameraChange(m_engine, [](Z3DRenderingEngine& engine) {
+    engine.flipView();
+  });
 }
 
 void Z3DCameraControlWidget::setXYView()
 {
-  m_engine.resetCamera();
+  queueCameraChange(m_engine, [](Z3DRenderingEngine& engine) {
+    engine.resetCamera();
+  });
 }
 
 void Z3DCameraControlWidget::setXZView()
 {
-  m_engine.setXZView();
+  queueCameraChange(m_engine, [](Z3DRenderingEngine& engine) {
+    engine.setXZView();
+  });
 }
 
 void Z3DCameraControlWidget::setYZView()
 {
-  m_engine.setYZView();
+  queueCameraChange(m_engine, [](Z3DRenderingEngine& engine) {
+    engine.setYZView();
+  });
 }
 
 void Z3DCameraControlWidget::createWidget()

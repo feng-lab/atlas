@@ -28,8 +28,10 @@ canonical-adapter integration path and tests. The scene exporter
 requests mono output; the pool and result types also support a complete stereo
 pair per tile.
 
-Interactive rendering and animation export do not configure or use
-the pool. OpenGL never constructs or executes worker lanes.
+Interactive rendering and animation export do not configure or use the pool.
+Opt-in multi-process animation export instead assigns disjoint frame ranges to
+separate single-device Atlas processes. OpenGL never constructs or executes
+tile-worker lanes.
 
 With no pool configured:
 

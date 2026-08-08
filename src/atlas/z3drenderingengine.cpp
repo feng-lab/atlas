@@ -1382,19 +1382,21 @@ void Z3DRenderingEngine::exportFixedSize3DAnimation(const ZAnimation* animation,
     tileBorder);
 
   QDir dir(QFileInfo(fn).absolutePath());
-  if (!dir.exists()) {
-    if (!dir.mkpath(".")) {
-      Q_EMIT renderingError(QString("Can not create folder %1").arg(dir.path()));
-      return;
+  if (!skipVideoCompression) {
+    if (!dir.exists()) {
+      if (!dir.mkpath(".")) {
+        Q_EMIT renderingError(QString("Can not create folder %1").arg(dir.path()));
+        return;
+      }
     }
-  }
-  if (dir.exists(fn)) {
-    if (!overwriteFileIfExist) {
-      Q_EMIT renderingError(QString("File %1 already exists").arg(dir.filePath(fn)));
-      return;
-    } else if (!QFile::remove(dir.filePath(fn))) {
-      Q_EMIT renderingError(QString("Can not replace existed file %1").arg(dir.filePath(fn)));
-      return;
+    if (dir.exists(fn)) {
+      if (!overwriteFileIfExist) {
+        Q_EMIT renderingError(QString("File %1 already exists").arg(dir.filePath(fn)));
+        return;
+      } else if (!QFile::remove(dir.filePath(fn))) {
+        Q_EMIT renderingError(QString("Can not replace existed file %1").arg(dir.filePath(fn)));
+        return;
+      }
     }
   }
   if (imageOuputFolder) {
@@ -1575,12 +1577,24 @@ void Z3DRenderingEngine::exportFixedSize3DAnimation(const ZAnimation* animation,
     if (skipVideoCompression) {
       maybeCancel(token);
       LOG(INFO) << "video compression skipped, you can run the following command to get video:";
-      ZVideoEncoder::encodeDryRun(tmpdir, namePrefix, fieldWidth, framePerSecond, dir.filePath(fn));
+      ZVideoEncoder::encodeDryRun(tmpdir,
+                                  namePrefix,
+                                  fieldWidth,
+                                  framePerSecond,
+                                  startFrame,
+                                  static_cast<size_t>(numFrame),
+                                  dir.filePath(fn));
     } else {
       connect(&videoEncoder, &ZVideoEncoder::error, this, &Z3DRenderingEngine::renderingError);
       connect(&videoEncoder, &ZVideoEncoder::finished, this, &Z3DRenderingEngine::videoEncoderFinished);
       connect(&videoEncoder, &ZVideoEncoder::canceled, this, &Z3DRenderingEngine::reportCancelError);
-      videoEncoder.encode(tmpdir, namePrefix, fieldWidth, framePerSecond, dir.filePath(fn));
+      videoEncoder.encode(tmpdir,
+                          namePrefix,
+                          fieldWidth,
+                          framePerSecond,
+                          startFrame,
+                          static_cast<size_t>(numFrame),
+                          dir.filePath(fn));
       while (!videoEncoder.waitForFinished(3000)) {
         if (token.isCancellationRequested()) {
           videoEncoder.cancel();
