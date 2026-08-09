@@ -31,6 +31,56 @@ def _perf_record(*, versioned: bool) -> dict[str, object]:
     return record
 
 
+def _animation_worker_record(
+    *,
+    requested_device_index: int | None,
+    actual_device_index: int,
+    frame_start: int,
+    frame_end: int,
+) -> dict[str, object]:
+    return {
+        "schema": benchmark._ANIMATION_WORKER_REPORT_SCHEMA,
+        "schema_version": benchmark._ANIMATION_WORKER_REPORT_SCHEMA_VERSION,
+        "backend": "vulkan",
+        "requested_device_index": requested_device_index,
+        "actual_device": {
+            "preference_index": actual_device_index,
+            "uuid": f"00000000-0000-0000-0000-{actual_device_index:012d}",
+        },
+        "frames": {
+            "start": frame_start,
+            "end": frame_end,
+            "count": frame_end - frame_start,
+        },
+        "timing_ms": {
+            "engine_init": 1.0,
+            "animation_load": 2.0,
+            "view_bind": 3.0,
+            "export": 4.0,
+            "worker_total": 10.0,
+        },
+    }
+
+
+def _parse_animation_worker_records(
+    records: list[dict[str, object]],
+    expected_frame_range: range,
+    expected_requested_device_indices: tuple[int | None, ...],
+) -> benchmark.AnimationWorkerReportParseResult:
+    with tempfile.TemporaryDirectory() as temp_dir:
+        directory = Path(temp_dir)
+        for index, record in enumerate(records):
+            (directory / f"worker_{index}.json").write_text(
+                json.dumps(record), encoding="utf-8"
+            )
+        return benchmark._parse_animation_worker_reports(
+            directory,
+            expected_frame_range=expected_frame_range,
+            expected_requested_device_indices=expected_requested_device_indices,
+            dry_run=False,
+        )
+
+
 class ExportSceneAnimationStabilityTest(unittest.TestCase):
     def test_baseline_comparison_reports_duration_delta_and_exact_hash_match(
         self,
@@ -185,6 +235,93 @@ class ExportSceneAnimationStabilityTest(unittest.TestCase):
                 ),
                 4,
             )
+
+    def test_animation_worker_reports_accept_exact_adjacent_ranges(self) -> None:
+        result = _parse_animation_worker_records(
+            [
+                _animation_worker_record(
+                    requested_device_index=0,
+                    actual_device_index=0,
+                    frame_start=5,
+                    frame_end=8,
+                ),
+                _animation_worker_record(
+                    requested_device_index=None,
+                    actual_device_index=1,
+                    frame_start=8,
+                    frame_end=10,
+                ),
+            ],
+            range(5, 10),
+            (0, None),
+        )
+        self.assertEqual(result.errors, ())
+        self.assertEqual(
+            [entry["report"]["frames"]["start"] for entry in result.records],
+            [5, 8],
+        )
+
+    def test_animation_worker_reports_reject_invalid_coverage_routing_adapter_and_timing(
+        self,
+    ) -> None:
+        first = _animation_worker_record(
+            requested_device_index=0,
+            actual_device_index=0,
+            frame_start=0,
+            frame_end=2,
+        )
+        gap = _animation_worker_record(
+            requested_device_index=1,
+            actual_device_index=1,
+            frame_start=3,
+            frame_end=4,
+        )
+        fallback = _animation_worker_record(
+            requested_device_index=1,
+            actual_device_index=0,
+            frame_start=0,
+            frame_end=2,
+        )
+        invalid_timing = _animation_worker_record(
+            requested_device_index=0,
+            actual_device_index=0,
+            frame_start=0,
+            frame_end=2,
+        )
+        invalid_timing["timing_ms"]["export"] = float("nan")
+
+        wrong_route_first = _animation_worker_record(
+            requested_device_index=1,
+            actual_device_index=1,
+            frame_start=0,
+            frame_end=2,
+        )
+        wrong_route_second = _animation_worker_record(
+            requested_device_index=1,
+            actual_device_index=1,
+            frame_start=2,
+            frame_end=4,
+        )
+
+        gap_result = _parse_animation_worker_records([first, gap], range(0, 4), (0, 1))
+        fallback_result = _parse_animation_worker_records([fallback], range(0, 2), (1,))
+        timing_result = _parse_animation_worker_records(
+            [invalid_timing], range(0, 2), (0,)
+        )
+        route_result = _parse_animation_worker_records(
+            [wrong_route_first, wrong_route_second], range(0, 4), (0, 1)
+        )
+
+        self.assertTrue(any("frame gap" in error for error in gap_result.errors))
+        self.assertTrue(
+            any("not requested" in error for error in fallback_result.errors)
+        )
+        self.assertTrue(
+            any("timing_ms.export" in error for error in timing_result.errors)
+        )
+        self.assertTrue(
+            any("not benchmark device 0" in error for error in route_result.errors)
+        )
 
     def test_animation_duration_uses_atlas_default_and_minimum(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -721,8 +858,20 @@ class ExportSceneAnimationStabilityTest(unittest.TestCase):
                 expected_frame_count=2,
             )
         )
+        self.assertEqual(
+            benchmark._expected_animation_worker_device_indices(
+                ["--use_gpu_devices=", "--atlas_vk_device_index=3"], 2
+            ),
+            (3,),
+        )
+        self.assertEqual(
+            benchmark._expected_animation_worker_device_indices(
+                ["--use_gpu_devices=", "--atlas_vk_device_index", "-1"], 2
+            ),
+            (None,),
+        )
 
-    def test_absent_routing_flags_receive_explicit_empty_defaults(self) -> None:
+    def test_absent_routing_flags_receive_explicit_defaults(self) -> None:
         scene_args = benchmark._with_absent_flag_defaults(
             ["--scene-only=true"], benchmark._SCENE_ROUTING_FLAG_DEFAULTS
         )
@@ -736,6 +885,7 @@ class ExportSceneAnimationStabilityTest(unittest.TestCase):
             [
                 "--scene-only=true",
                 "--use_gpu_devices=",
+                "--atlas_vk_device_index=-1",
                 "--atlas_vk_multi_device_tile_worker_indices=",
             ],
         )
@@ -743,6 +893,7 @@ class ExportSceneAnimationStabilityTest(unittest.TestCase):
             animation_args,
             [
                 "--use_gpu_devices=0,1",
+                "--atlas_vk_device_index=-1",
                 "--animation_gpu_device_frame_weights=",
             ],
         )
@@ -933,6 +1084,7 @@ class ExportSceneAnimationStabilityTest(unittest.TestCase):
                 "vulkan",
                 "--animation-extra-arg=--use_gpu_devices=0,1",
                 "--animation-extra-arg=--animation_gpu_device_frame_weights=2,1",
+                "--animation-extra-arg=--animation_worker_report_directory=/not-authoritative",
                 "--animation-runs",
                 "1",
                 "--animation-fps",
@@ -957,6 +1109,7 @@ class ExportSceneAnimationStabilityTest(unittest.TestCase):
                 [
                     "--use_gpu_devices=0,1",
                     "--animation_gpu_device_frame_weights=2,1",
+                    "--animation_worker_report_directory=/not-authoritative",
                 ],
             )
 
@@ -968,7 +1121,9 @@ class ExportSceneAnimationStabilityTest(unittest.TestCase):
                 / "run_01"
                 / "run.json"
             )
-            run = json.loads(run_path.read_text(encoding="utf-8"))["run"]
+            run_payload = json.loads(run_path.read_text(encoding="utf-8"))
+            run = run_payload["run"]
+            worker_report_directory = (run_path.parent / "animation_workers").resolve()
             self.assertIsNone(run["perf_summary_path"])
             self.assertEqual(run["perf_summary_frame_count"], 0)
             self.assertEqual(
@@ -990,6 +1145,27 @@ class ExportSceneAnimationStabilityTest(unittest.TestCase):
                     for argument in run["command"]
                 )
             )
+            self.assertTrue(worker_report_directory.is_dir())
+            self.assertIn(
+                f"{benchmark._ANIMATION_WORKER_REPORT_FLAG}={worker_report_directory}",
+                run["command"],
+            )
+            self.assertGreater(
+                run["command"].index(
+                    f"{benchmark._ANIMATION_WORKER_REPORT_FLAG}={worker_report_directory}"
+                ),
+                run["command"].index(
+                    f"{benchmark._ANIMATION_WORKER_REPORT_FLAG}=/not-authoritative"
+                ),
+            )
+            self.assertEqual(
+                run["animation_worker_report_directory"],
+                str(worker_report_directory),
+            )
+            self.assertEqual(run["animation_worker_report_expected_count"], 2)
+            self.assertEqual(run["animation_worker_report_count"], 0)
+            self.assertEqual(run["animation_worker_report_errors"], [])
+            self.assertEqual(run_payload["animation_worker_reports"], [])
             self.assertEqual(run["expected_file_count"], 4)
 
             aggregate = json.loads(

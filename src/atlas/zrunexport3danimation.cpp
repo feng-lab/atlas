@@ -5,6 +5,7 @@
 #include "zdoc.h"
 #include "z3drenderingengine.h"
 #include "z3danimationdoc.h"
+#include "zjson.h"
 #include "zvideoencoder.h"
 #include "zcpuinfo.h"
 #include "zexception.h"
@@ -18,6 +19,7 @@
 #include <QFileInfo>
 #include <QTemporaryDir>
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <cmath>
 #include <cstdint>
@@ -83,6 +85,10 @@ ABSL_FLAG(std::vector<std::string>,
           std::vector<std::string>{},
           "Positive integer frame weights corresponding to --use_gpu_devices. Empty uses balanced contiguous ranges. "
           "Animation export only.");
+ABSL_FLAG(std::string,
+          animation_worker_report_directory,
+          "",
+          "Directory for opt-in Vulkan animation worker JSON reports. Empty disables reporting.");
 ABSL_DECLARE_FLAG(uint32_t, use_gpu_device);
 
 #if defined(__linux__)
@@ -94,6 +100,33 @@ namespace nim {
 namespace {
 
 constexpr uint64_t kBytesPerGiB = 1024u * 1024u * 1024u;
+
+double elapsedMilliseconds(std::chrono::steady_clock::time_point start)
+{
+  return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
+}
+
+std::string formatVulkanDeviceUuid(const std::array<uint8_t, VK_UUID_SIZE>& uuid)
+{
+  return fmt::format(
+    "{:02x}{:02x}{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}",
+    uuid[0],
+    uuid[1],
+    uuid[2],
+    uuid[3],
+    uuid[4],
+    uuid[5],
+    uuid[6],
+    uuid[7],
+    uuid[8],
+    uuid[9],
+    uuid[10],
+    uuid[11],
+    uuid[12],
+    uuid[13],
+    uuid[14],
+    uuid[15]);
+}
 
 bool validateFrameSequence(const QDir& directory,
                            const QString& namePrefix,
@@ -319,6 +352,24 @@ int ZRunExport3DAnimation::run(const QStringList& childQpaPlatformArguments)
   }
 
   const RenderBackend requestedBackend = absl::GetFlag(FLAGS_atlas_default_render_backend);
+  const QString configuredWorkerReportDirectory =
+    QString::fromStdString(absl::GetFlag(FLAGS_animation_worker_report_directory)).trimmed();
+  const bool workerReportingEnabled = !configuredWorkerReportDirectory.isEmpty();
+  QString workerReportDirectory;
+  if (workerReportingEnabled) {
+    if (requestedBackend != RenderBackend::Vulkan) {
+      LOG(ERROR) << "--animation_worker_report_directory is supported only for Vulkan animation rendering";
+      return 1;
+    }
+    workerReportDirectory = QFileInfo(configuredWorkerReportDirectory).absoluteFilePath();
+    const QFileInfo reportDirectoryInfo(workerReportDirectory);
+    if ((reportDirectoryInfo.exists() && !reportDirectoryInfo.isDir()) ||
+        (!reportDirectoryInfo.exists() && !QDir().mkpath(workerReportDirectory))) {
+      LOG(ERROR) << fmt::format("could not create animation worker report directory {}",
+                                workerReportDirectory.toStdString());
+      return 1;
+    }
+  }
   const std::vector<std::string> gpuDevices = absl::GetFlag(FLAGS_use_gpu_devices);
   const std::vector<std::string> frameWeightStrings = absl::GetFlag(FLAGS_animation_gpu_device_frame_weights);
   if (gpuDevices.empty() && !frameWeightStrings.empty()) {
@@ -490,6 +541,7 @@ int ZRunExport3DAnimation::run(const QStringList& childQpaPlatformArguments)
             } else {
               arguments << "--use_gpu_device" << QString::number(deviceIndex);
             }
+            arguments << QString("--animation_worker_report_directory=%1").arg(workerReportDirectory);
             arguments << qpaPlatformArguments;
 
             ZProcess renderingProcess;
@@ -566,6 +618,8 @@ int ZRunExport3DAnimation::run(const QStringList& childQpaPlatformArguments)
   absl::SetFlag(&FLAGS___use_EGL, true);
 #endif
 
+  const auto workerStart =
+    workerReportingEnabled ? std::chrono::steady_clock::now() : std::chrono::steady_clock::time_point{};
   ZDoc doc;
   doc.animation3DDoc().setShowLoadIssueDialogs(false);
   Z3DRenderingEngine engine(doc);
@@ -574,10 +628,15 @@ int ZRunExport3DAnimation::run(const QStringList& childQpaPlatformArguments)
     m_engine = nullptr;
   });
   connect(&engine, &Z3DRenderingEngine::renderingError, this, &ZRunExport3DAnimation::logError);
+  const auto engineInitStart =
+    workerReportingEnabled ? std::chrono::steady_clock::now() : std::chrono::steady_clock::time_point{};
   engine.init();
+  const double engineInitMilliseconds = workerReportingEnabled ? elapsedMilliseconds(engineInitStart) : 0.0;
 
   QString errorMsg;
   size_t id;
+  const auto animationLoadStart =
+    workerReportingEnabled ? std::chrono::steady_clock::now() : std::chrono::steady_clock::time_point{};
   if (id = doc.animation3DDoc().loadFile(filename, errorMsg); id == 0) {
     LOG(ERROR) << "load animation file error: " << errorMsg;
     return 1;
@@ -586,13 +645,20 @@ int ZRunExport3DAnimation::run(const QStringList& childQpaPlatformArguments)
     LOG(ERROR) << "load animation file error: " << loadIssues;
     return 1;
   }
+  const double animationLoadMilliseconds = workerReportingEnabled ? elapsedMilliseconds(animationLoadStart) : 0.0;
 
+  const auto viewBindStart =
+    workerReportingEnabled ? std::chrono::steady_clock::now() : std::chrono::steady_clock::time_point{};
   doc.animation3DDoc().bindView(&engine);
+  const double viewBindMilliseconds = workerReportingEnabled ? elapsedMilliseconds(viewBindStart) : 0.0;
   if (m_hasError) {
     return 1;
   }
 
-  engine.exportFixedSize3DAnimation(&doc.animation3DDoc().animation(id),
+  Z3DAnimation& animation = doc.animation3DDoc().animation(id);
+  const auto exportStart =
+    workerReportingEnabled ? std::chrono::steady_clock::now() : std::chrono::steady_clock::time_point{};
+  engine.exportFixedSize3DAnimation(&animation,
                                     outputFilename,
                                     absl::GetFlag(FLAGS_output_fps),
                                     absl::GetFlag(FLAGS_output_start_frame),
@@ -606,7 +672,67 @@ int ZRunExport3DAnimation::run(const QStringList& childQpaPlatformArguments)
                                     absl::GetFlag(FLAGS_output_tile_size),
                                     absl::GetFlag(FLAGS_output_tile_border));
 
-  return m_hasError ? 1 : 0;
+  if (m_hasError) {
+    return 1;
+  }
+  if (!workerReportingEnabled) {
+    return 0;
+  }
+
+  const double exportMilliseconds = elapsedMilliseconds(exportStart);
+  const double workerTotalMilliseconds = elapsedMilliseconds(workerStart);
+  const int startFrame = absl::GetFlag(FLAGS_output_start_frame);
+  const int totalFrameCount = std::max(1, static_cast<int>(std::ceil(animation.duration() * outputFps)));
+  const int requestedEndFrame = absl::GetFlag(FLAGS_output_end_frame);
+  const int endFrame =
+    requestedEndFrame < 0 || requestedEndFrame > totalFrameCount ? totalFrameCount : requestedEndFrame;
+  CHECK_GE(startFrame, 0);
+  CHECK_LT(startFrame, endFrame);
+
+  const int32_t requestedDeviceIndex = absl::GetFlag(FLAGS_atlas_vk_device_index);
+  const ZVulkanDeviceSupport::DeviceSelection actualDevice = engine.activeVulkanDeviceSelection();
+  json::object actualDeviceJson;
+  actualDeviceJson["preference_index"] = static_cast<uint64_t>(actualDevice.preferenceIndex);
+  actualDeviceJson["uuid"] = formatVulkanDeviceUuid(actualDevice.expectedDeviceUuid);
+
+  json::object framesJson;
+  framesJson["start"] = startFrame;
+  framesJson["end"] = endFrame;
+  framesJson["count"] = endFrame - startFrame;
+
+  json::object timingJson;
+  timingJson["engine_init"] = engineInitMilliseconds;
+  timingJson["animation_load"] = animationLoadMilliseconds;
+  timingJson["view_bind"] = viewBindMilliseconds;
+  timingJson["export"] = exportMilliseconds;
+  timingJson["worker_total"] = workerTotalMilliseconds;
+
+  json::object reportJson;
+  reportJson["schema"] = "atlas.animation.worker";
+  reportJson["schema_version"] = 1;
+  reportJson["backend"] = "vulkan";
+  if (requestedDeviceIndex >= 0) {
+    reportJson["requested_device_index"] = requestedDeviceIndex;
+  } else {
+    reportJson["requested_device_index"] = nullptr;
+  }
+  reportJson["actual_device"] = std::move(actualDeviceJson);
+  reportJson["frames"] = std::move(framesJson);
+  reportJson["timing_ms"] = std::move(timingJson);
+
+  const QString requestedDeviceLabel =
+    requestedDeviceIndex >= 0 ? QString::number(requestedDeviceIndex) : QStringLiteral("auto");
+  const QString reportFilename =
+    QString("animation_worker_frames_%1_%2_requested_%3.json").arg(startFrame).arg(endFrame).arg(requestedDeviceLabel);
+  try {
+    saveJsonObjectAtomic(reportJson, QDir(workerReportDirectory).filePath(reportFilename));
+  }
+  catch (const std::exception& e) {
+    LOG(ERROR) << fmt::format("could not write animation worker report: {}", e.what());
+    return 1;
+  }
+
+  return 0;
 }
 
 void ZRunExport3DAnimation::logError(const QString& err)

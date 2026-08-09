@@ -90,6 +90,18 @@ TEST(ZRunExport3DAnimationTest, AppliesWeightsToTheWholeFrameRange)
   EXPECT_EQ(ranges, expected);
 }
 
+TEST(ZRunExport3DAnimationTest, KeepsEveryWeightedWorkerNonemptyUnderExtremeWeights)
+{
+  const std::vector<FrameRange> ranges = ZRunExport3DAnimation::splitFrameRange(13, 18, 3u, {1u, 100u, 1u});
+  const std::vector<FrameRange> expected{
+    {13, 14},
+    {14, 17},
+    {17, 18}
+  };
+
+  EXPECT_EQ(ranges, expected);
+}
+
 TEST(Z3DAnimationDurationMetadataTest, ReadsDurationWithoutLoadingReferencedSceneDataOrChangingWorkingDirectory)
 {
   QTemporaryDir directory;

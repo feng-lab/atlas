@@ -846,10 +846,12 @@ Vulkan export benchmark harness
   `--animation-extra-arg` configure their distinct multi-device routes. Generated commands explicitly clear scene and
   animation routing flags that were not supplied for that workload, so persisted Atlas settings cannot select an
   unrecorded device route.
-- Each single-process Vulkan invocation receives a unique run-local NDJSON path and uses
-  `--vulkan-perf-mode=off|light|full`; a successful instrumented run with missing/empty perf output is a failure. A
-  multi-process animation run uses supervisor wall time and exact frame-index coverage as its performance profile. It
-  requires `--child-timeout-seconds=0` because terminating the supervisor alone cannot establish that all rendering
+- Each single-process Vulkan invocation uses `--vulkan-perf-mode=off|light|full`; `light` and `full` runs receive a unique
+  run-local NDJSON path, and a successful instrumented run with missing or empty perf output is a failure.
+  Vulkan animation cases also receive a run-local `--animation_worker_report_directory`. The harness validates one
+  versioned report per active rendering process, the requested and actual adapter indices, and complete adjacent coverage
+  of the requested frame interval. Multi-process supervisor wall time remains the end-to-end animation measurement. Such
+  runs require `--child-timeout-seconds=0` because terminating the supervisor alone cannot establish that all rendering
   workers have stopped.
 - Current JSON performance-summary lines identify themselves as `schema="atlas.perf.frame"`, `schema_version=1`, and must
   contain every version-1 field, including `submissions` and `fence_waits`. The harness also accepts the exact unversioned
@@ -1668,15 +1670,30 @@ Vulkan device selection
   automation should treat those warnings as a possible sign that multiple workers fell back to the same adapter. An empty
   list retains the direct one-process path. With `--v=1`, the supervisor emits one wall-time summary for each successful
   range worker, including its requested device and frame interval.
+- `--animation_worker_report_directory` enables Vulkan animation worker reports. The supervisor resolves the directory to
+  an absolute path and passes it only to rendering children; the supervisor and final compression process do not write
+  reports. Each successful rendering process atomically writes one `atlas.animation.worker` version-1 JSON object with its
+  requested device index (or `null` for automatic selection), actual preference index and UUID, half-open frame range, and
+  `engine_init`, `animation_load`, `view_bind`, `export`, and `worker_total` millisecond timings. `export` covers frame
+  rendering and image output; for a direct export with compression enabled, it also includes video encoding. With an empty
+  directory no phase clocks are sampled and no report filesystem work occurs. `worker_total` spans the rendering worker's
+  document/engine construction through export; process launch, argument validation, and report serialization are outside
+  that interval.
 - `--atlas_vk_multi_device_tile_worker_indices` selects the complete participating device set for in-process tiled scene export on
   any supported platform. It requires at least two comma-separated preference indices and rejects unavailable,
   incompatible, duplicate-index, or duplicate-UUID selections without fallback. The canonical engine renders pool tiles
   only when this list includes its independently selected device. `--atlas_vk_device_index` selects the canonical engine.
   Linux scene export accepts exactly one `--use_gpu_devices` value for that canonical engine; headless animation uses the
   same flag for its separate cross-platform Vulkan process workers or Linux EGL process workers.
-- With `--v=1`, each Vulkan tile lane that exits without a lane-local exception emits one batch summary containing its
-  actual preference index, rendered tile count, valid and guarded attachment pixel counts, and wall time. The counters and
-  clocks are skipped when that verbosity is disabled.
+- At effective VLOG(1) for `zvulkantileworkerpool`, each Vulkan tile lane that exits without a lane-local exception emits
+  one batch summary containing its actual preference index, rendered tile count, valid and guarded attachment pixel counts,
+  and wall time. At effective VLOG(1) for `z3drenderingengine`, a successful direct or tile-worker-pool mono tiled capture
+  emits `ATLAS_VULKAN_TILED_CAPTURE_FINISHED` with `route=direct|worker_pool`: `tile_phase_ms` spans route-local capture
+  preparation through tiled rendering, readback, conversion, and production of the assembled CPU frame.
+  `final_output_ms` covers the synchronous full-frame image save and the direct route's full-frame Y flip when required.
+  Process, document, and canonical-engine initialization, tile-worker-pool construction and destruction, and benchmark
+  output hashing are outside these fields. Global `--v=1` enables both summaries; matching `--vmodule` entries can enable
+  them independently. Counters and clocks are skipped when their translation unit's effective verbosity is disabled.
 Compositor Pass Graph (Vulkan)
 
 - Offscreen only; no swapchain.

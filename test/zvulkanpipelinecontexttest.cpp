@@ -4,6 +4,7 @@
 #include "z3drendererbackend.h"
 #include "zvulkanfinalreadbackcompletion_p.h"
 #include <gtest/gtest.h>
+#include <array>
 
 ABSL_DECLARE_FLAG(bool, atlas_vk_enforce_pipeline_context);
 
@@ -32,18 +33,28 @@ private:
 
 } // namespace
 
-TEST(VulkanAttachmentTransitionPolicyTest, ClearDoesNotDiscardTrackedContents)
+TEST(VulkanAttachmentTransitionPolicyTest, UsesTrackedLayoutIndependentlyOfLoadOperation)
 {
-  nim::ZVulkanAttachmentInfo info{};
-  info.loadOp = vk::AttachmentLoadOp::eClear;
-  info.initialLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
+  constexpr std::array loadOps{
+    vk::AttachmentLoadOp::eLoad,
+    vk::AttachmentLoadOp::eClear,
+    vk::AttachmentLoadOp::eDontCare,
+  };
 
-  EXPECT_EQ(nim::vulkan::attachmentTransitionOldLayout(info, vk::ImageLayout::eColorAttachmentOptimal),
-            vk::ImageLayout::eColorAttachmentOptimal);
-  EXPECT_EQ(nim::vulkan::attachmentTransitionOldLayout(info, std::nullopt), vk::ImageLayout::eShaderReadOnlyOptimal);
+  for (const vk::AttachmentLoadOp loadOp : loadOps) {
+    nim::ZVulkanAttachmentInfo info{};
+    info.loadOp = loadOp;
+    info.initialLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
 
-  info.initialLayout = vk::ImageLayout::eUndefined;
-  EXPECT_EQ(nim::vulkan::attachmentTransitionOldLayout(info, std::nullopt), vk::ImageLayout::eUndefined);
+    EXPECT_EQ(nim::vulkan::attachmentTransitionOldLayout(info, vk::ImageLayout::eColorAttachmentOptimal),
+              vk::ImageLayout::eColorAttachmentOptimal);
+    EXPECT_EQ(nim::vulkan::attachmentTransitionOldLayout(info, std::nullopt), vk::ImageLayout::eShaderReadOnlyOptimal);
+    EXPECT_EQ(nim::vulkan::attachmentTransitionOldLayout(info, vk::ImageLayout::eUndefined),
+              vk::ImageLayout::eUndefined);
+
+    info.initialLayout = vk::ImageLayout::eUndefined;
+    EXPECT_EQ(nim::vulkan::attachmentTransitionOldLayout(info, std::nullopt), vk::ImageLayout::eUndefined);
+  }
 }
 
 TEST(ReadbackCompletionPolicyTest, SeparatesCompletionFromRenderQuality)

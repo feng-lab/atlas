@@ -104,10 +104,12 @@ HASH_POLICIES = (EXACT_HASH_POLICY, RECORD_ONLY_HASH_POLICY)
 _ANIMATION_FRAME_NAME_PREFIX = "frame_"
 _SCENE_ROUTING_FLAG_DEFAULTS = (
     ("--use_gpu_devices", ""),
+    ("--atlas_vk_device_index", "-1"),
     ("--atlas_vk_multi_device_tile_worker_indices", ""),
 )
 _ANIMATION_ROUTING_FLAG_DEFAULTS = (
     ("--use_gpu_devices", ""),
+    ("--atlas_vk_device_index", "-1"),
     ("--animation_gpu_device_frame_weights", ""),
 )
 
@@ -154,6 +156,12 @@ class PerfSummaryParseResult:
     record_count: int
     profile: str | None
     unavailable_metrics: tuple[str, ...]
+    errors: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class AnimationWorkerReportParseResult:
+    records: tuple[dict[str, Any], ...]
     errors: tuple[str, ...]
 
 
@@ -777,7 +785,8 @@ def _parse_args() -> argparse.Namespace:
         help=(
             "Atlas performance instrumentation used for Vulkan runs. Non-off modes "
             "write a unique NDJSON summary inside every single-process run directory; "
-            "multi-process animation reports supervisor wall time only."
+            "multi-process animation keeps supervisor wall time as its end-to-end "
+            "measurement and records per-worker phase reports."
         ),
     )
     parser.add_argument(
@@ -994,6 +1003,7 @@ def _build_animation_command(
     end_frame: int = -1,
     perf_mode: str | None = None,
     perf_summary_path: Path | None = None,
+    worker_report_directory: Path | None = None,
 ) -> list[str]:
     command = _base_command(
         atlas_binary,
@@ -1003,6 +1013,8 @@ def _build_animation_command(
         perf_mode=perf_mode,
         perf_summary_path=perf_summary_path,
     )
+    if worker_report_directory is not None:
+        command.append(f"{_ANIMATION_WORKER_REPORT_FLAG}={worker_report_directory}")
     command.extend(
         [
             "--run_export_3d_animation",
@@ -1053,22 +1065,65 @@ def _vulkan_perf_summary_config(
     return vulkan_perf_mode, run_dir / "vulkan_perf_summary.ndjson"
 
 
+def _last_flag_value(extra_args: list[str], flag_name: str) -> str | None:
+    value: str | None = None
+    for index, argument in enumerate(extra_args):
+        if argument.startswith(f"{flag_name}="):
+            value = argument.partition("=")[2]
+        elif argument == flag_name:
+            value = extra_args[index + 1] if index + 1 < len(extra_args) else ""
+    return value
+
+
+def _animation_gpu_devices(extra_args: list[str]) -> list[str]:
+    device_value = _last_flag_value(extra_args, "--use_gpu_devices")
+    if device_value is None:
+        return []
+    return [value.strip() for value in device_value.split(",") if value.strip()]
+
+
 def _animation_uses_multiple_processes(
     extra_args: list[str], expected_frame_count: int
 ) -> bool:
     if expected_frame_count <= 1:
         return False
-    device_value: str | None = None
-    flag_name = "--use_gpu_devices"
-    for index, argument in enumerate(extra_args):
-        if argument.startswith(f"{flag_name}="):
-            device_value = argument.partition("=")[2]
-        elif argument == flag_name:
-            device_value = extra_args[index + 1] if index + 1 < len(extra_args) else ""
-    if device_value is None:
-        return False
-    devices = [value.strip() for value in device_value.split(",") if value.strip()]
-    return len(devices) > 1
+    return len(_animation_gpu_devices(extra_args)) > 1
+
+
+def _expected_animation_worker_device_indices(
+    extra_args: list[str], expected_frame_count: int
+) -> tuple[int | None, ...]:
+    devices = _animation_gpu_devices(extra_args)
+    if not devices:
+        direct_device = _last_flag_value(extra_args, "--atlas_vk_device_index")
+        if direct_device is None:
+            return (None,)
+        try:
+            direct_device_index = int(direct_device, 10)
+        except ValueError as exc:
+            raise ValueError(
+                "--atlas_vk_device_index must be -1 or a nonnegative integer"
+            ) from exc
+        if direct_device_index == -1:
+            return (None,)
+        if direct_device_index < 0:
+            raise ValueError(
+                "--atlas_vk_device_index must be -1 or a nonnegative integer"
+            )
+        return (direct_device_index,)
+
+    active_devices = devices[:expected_frame_count]
+    try:
+        requested_indices = tuple(int(device, 10) for device in active_devices)
+    except ValueError as exc:
+        raise ValueError(
+            "--use_gpu_devices must contain nonnegative integer device indices"
+        ) from exc
+    if any(index < 0 for index in requested_indices):
+        raise ValueError(
+            "--use_gpu_devices must contain nonnegative integer device indices"
+        )
+    return requested_indices
 
 
 def _validate_multi_process_animation_timeout(
@@ -1086,6 +1141,26 @@ def _validate_multi_process_animation_timeout(
             "workers have stopped"
         )
 
+
+_ANIMATION_WORKER_REPORT_FLAG = "--animation_worker_report_directory"
+_ANIMATION_WORKER_REPORT_SCHEMA = "atlas.animation.worker"
+_ANIMATION_WORKER_REPORT_SCHEMA_VERSION = 1
+_ANIMATION_WORKER_REPORT_TOP_LEVEL_KEYS = frozenset(
+    {
+        "schema",
+        "schema_version",
+        "backend",
+        "requested_device_index",
+        "actual_device",
+        "frames",
+        "timing_ms",
+    }
+)
+_ANIMATION_WORKER_REPORT_DEVICE_KEYS = frozenset({"preference_index", "uuid"})
+_ANIMATION_WORKER_REPORT_FRAME_KEYS = frozenset({"start", "end", "count"})
+_ANIMATION_WORKER_REPORT_TIMING_KEYS = frozenset(
+    {"engine_init", "animation_load", "view_bind", "export", "worker_total"}
+)
 
 _PERF_SCHEMA = "atlas.perf.frame"
 _CURRENT_PERF_SCHEMA_VERSION = 1
@@ -1144,6 +1219,10 @@ def _is_json_number(value: Any) -> bool:
     )
 
 
+def _is_json_integer(value: Any) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool)
+
+
 def _describe_key_mismatch(
     *, actual: set[str], expected: frozenset[str] | set[str]
 ) -> str:
@@ -1155,6 +1234,151 @@ def _describe_key_mismatch(
     if unexpected:
         details.append(f"unexpected keys: {', '.join(unexpected)}")
     return "; ".join(details)
+
+
+def _validated_animation_worker_report(record: Any) -> dict[str, Any]:
+    def require_object(value: Any, keys: frozenset[str], name: str) -> dict[str, Any]:
+        if not isinstance(value, dict):
+            raise ValueError(f"{name} is not an object")
+        key_error = _describe_key_mismatch(actual=set(value), expected=keys)
+        if key_error:
+            raise ValueError(f"{name} shape is invalid ({key_error})")
+        return value
+
+    report = require_object(
+        record, _ANIMATION_WORKER_REPORT_TOP_LEVEL_KEYS, "top level"
+    )
+    if (
+        report["schema"] != _ANIMATION_WORKER_REPORT_SCHEMA
+        or not _is_json_integer(report["schema_version"])
+        or report["schema_version"] != _ANIMATION_WORKER_REPORT_SCHEMA_VERSION
+    ):
+        raise ValueError("schema or schema_version is unsupported")
+    if report["backend"] != "vulkan":
+        raise ValueError("backend is not 'vulkan'")
+    requested_index = report["requested_device_index"]
+    if requested_index is not None and not _is_json_integer(requested_index):
+        raise ValueError("requested_device_index is neither an integer nor null")
+
+    actual_device = require_object(
+        report["actual_device"],
+        _ANIMATION_WORKER_REPORT_DEVICE_KEYS,
+        "actual_device",
+    )
+    if (
+        not _is_json_integer(actual_device["preference_index"])
+        or actual_device["preference_index"] < 0
+        or not isinstance(actual_device["uuid"], str)
+        or not actual_device["uuid"].strip()
+    ):
+        raise ValueError("actual_device identity is invalid")
+
+    frames = require_object(
+        report["frames"], _ANIMATION_WORKER_REPORT_FRAME_KEYS, "frames"
+    )
+    if not all(_is_json_integer(frames[field]) for field in frames):
+        raise ValueError("frame fields are not integers")
+    if (
+        frames["start"] < 0
+        or frames["end"] <= frames["start"]
+        or frames["count"] != frames["end"] - frames["start"]
+    ):
+        raise ValueError("frame range or count is invalid")
+
+    timing_ms = require_object(
+        report["timing_ms"], _ANIMATION_WORKER_REPORT_TIMING_KEYS, "timing_ms"
+    )
+    invalid_timing = next(
+        (
+            field
+            for field, value in timing_ms.items()
+            if not _is_json_number(value) or value < 0
+        ),
+        None,
+    )
+    if invalid_timing is not None:
+        raise ValueError(f"timing_ms.{invalid_timing} is not finite and nonnegative")
+    return report
+
+
+def _parse_animation_worker_reports(
+    directory: Path,
+    *,
+    expected_frame_range: range,
+    expected_requested_device_indices: tuple[int | None, ...],
+    dry_run: bool,
+) -> AnimationWorkerReportParseResult:
+    if dry_run:
+        return AnimationWorkerReportParseResult((), ())
+
+    records: list[dict[str, Any]] = []
+    errors: list[str] = []
+    for path in sorted(directory.glob("*.json")):
+        try:
+            record = json.loads(path.read_text(encoding="utf-8"))
+            record = _validated_animation_worker_report(record)
+        except (OSError, json.JSONDecodeError, ValueError) as exc:
+            errors.append(f"{path.name} is invalid: {exc}")
+            continue
+        records.append({"filename": path.name, "report": record})
+
+    records.sort(
+        key=lambda entry: (
+            entry["report"]["frames"]["start"],
+            entry["report"]["frames"]["end"],
+            entry["filename"],
+        )
+    )
+    if len(records) != len(expected_requested_device_indices):
+        errors.append(
+            f"expected {len(expected_requested_device_indices)} valid report(s), "
+            f"found {len(records)}"
+        )
+
+    expected_start = expected_frame_range.start
+    expected_end = expected_frame_range.stop
+    next_frame = expected_start
+    for worker_index, entry in enumerate(records):
+        filename = entry["filename"]
+        report = entry["report"]
+        requested_device_index = report["requested_device_index"]
+        actual_device_index = report["actual_device"]["preference_index"]
+        frames = entry["report"]["frames"]
+        frame_start = frames["start"]
+        frame_end = frames["end"]
+        if frame_start > next_frame:
+            errors.append(f"frame gap [{next_frame}, {frame_start}) before {filename}")
+        elif frame_start < next_frame:
+            errors.append(
+                f"{filename} frame range starts at {frame_start}, before the next "
+                f"uncovered frame {next_frame}"
+            )
+        next_frame = max(next_frame, frame_end)
+        if (
+            requested_device_index is not None
+            and requested_device_index != actual_device_index
+        ):
+            errors.append(
+                f"{filename} selected actual device {actual_device_index}, not "
+                f"requested device {requested_device_index}"
+            )
+        if worker_index < len(expected_requested_device_indices):
+            expected_requested_device_index = expected_requested_device_indices[
+                worker_index
+            ]
+            if requested_device_index != expected_requested_device_index:
+                errors.append(
+                    f"{filename} reports requested device {requested_device_index}, "
+                    f"not benchmark device {expected_requested_device_index}"
+                )
+    if next_frame < expected_end:
+        errors.append(f"trailing frame gap [{next_frame}, {expected_end})")
+    elif next_frame > expected_end:
+        errors.append(
+            f"worker frame coverage ends at {next_frame}, after expected frame {expected_end}"
+        )
+
+    return AnimationWorkerReportParseResult(tuple(records), tuple(errors))
 
 
 def _parse_perf_summary(path: Path | None) -> PerfSummaryParseResult:
@@ -1539,6 +1763,14 @@ def _run_animation_case(
     output_video = run_dir / f"{source.stem}.mp4"
     stdout_log = run_dir / "stdout.log"
     stderr_log = run_dir / "stderr.log"
+    worker_report_directory: Path | None = None
+    expected_worker_requested_device_indices: tuple[int | None, ...] = ()
+    if backend == "vulkan":
+        worker_report_directory = (run_dir / "animation_workers").resolve()
+        worker_report_directory.mkdir(exist_ok=False)
+        expected_worker_requested_device_indices = (
+            _expected_animation_worker_device_indices(extra_args, expected_frame_count)
+        )
     resolved_qt_platform = _resolve_qt_platform(
         qt_platform, backend, backend_qt_platform
     )
@@ -1569,6 +1801,7 @@ def _run_animation_case(
         end_frame=end_frame,
         perf_mode=perf_mode,
         perf_summary_path=perf_summary_path,
+        worker_report_directory=worker_report_directory,
     )
     returncode, duration_seconds, timed_out = _run_process(
         command=command,
@@ -1591,6 +1824,14 @@ def _run_animation_case(
         )
     else:
         perf_summary = _parse_perf_summary(perf_summary_path)
+    worker_reports = AnimationWorkerReportParseResult((), ())
+    if worker_report_directory is not None:
+        worker_reports = _parse_animation_worker_reports(
+            worker_report_directory,
+            expected_frame_range=range(start_frame, start_frame + expected_frame_count),
+            expected_requested_device_indices=expected_worker_requested_device_indices,
+            dry_run=dry_run,
+        )
     failures = _validate_run_outputs(
         returncode=returncode,
         file_entries=file_entries,
@@ -1604,6 +1845,9 @@ def _run_animation_case(
         expected_animation_frame_range=range(
             start_frame, start_frame + expected_frame_count
         ),
+    )
+    failures += tuple(
+        f"animation worker report {error}" for error in worker_reports.errors
     )
 
     run_record = RunRecord(
@@ -1633,13 +1877,23 @@ def _run_animation_case(
         stdout_log=str(stdout_log),
         stderr_log=str(stderr_log),
     )
-    _write_json(
-        run_dir / "run.json",
-        {
-            "run": asdict(run_record),
-            "files": file_entries,
-        },
-    )
+    run_payload: dict[str, Any] = {
+        "run": asdict(run_record),
+        "files": file_entries,
+    }
+    if worker_report_directory is not None:
+        run_payload["run"].update(
+            {
+                "animation_worker_report_directory": str(worker_report_directory),
+                "animation_worker_report_expected_count": len(
+                    expected_worker_requested_device_indices
+                ),
+                "animation_worker_report_count": len(worker_reports.records),
+                "animation_worker_report_errors": list(worker_reports.errors),
+            }
+        )
+        run_payload["animation_worker_reports"] = list(worker_reports.records)
+    _write_json(run_dir / "run.json", run_payload)
 
     return run_record, file_entries
 

@@ -68,6 +68,9 @@ public:
   // context. Worker engines re-enumerate and verify both index and UUID.
   [[nodiscard]] std::vector<ZVulkanDeviceSupport::DeviceSelection> compatibleVulkanTileWorkerSelections() const;
 
+  // Return the exact adapter used by this initialized Vulkan engine.
+  [[nodiscard]] ZVulkanDeviceSupport::DeviceSelection activeVulkanDeviceSelection() const;
+
   // Configure the device set used by subsequent tiled Vulkan captures. An
   // empty set removes the worker pool and leaves every render on this engine.
   // The canonical engine participates when its adapter is present in the set.

@@ -754,6 +754,18 @@ std::vector<ZVulkanDeviceSupport::DeviceSelection> Z3DRenderingEngine::compatibl
   return selections;
 }
 
+ZVulkanDeviceSupport::DeviceSelection Z3DRenderingEngine::activeVulkanDeviceSelection() const
+{
+  CHECK(QThread::currentThread() == thread());
+  CHECK(m_initialized);
+  CHECK(m_globalParas != nullptr);
+  CHECK(static_cast<RenderBackend>(m_globalParas->renderBackend.associatedData()) == RenderBackend::Vulkan);
+  CHECK(m_compositor != nullptr);
+  CHECK(m_compositor->rendererBase().activeBackend() == RenderBackend::Vulkan);
+  CHECK(m_vkContext != nullptr);
+  return m_vkContext->selectedDeviceSelection();
+}
+
 void Z3DRenderingEngine::configureVulkanTileWorkers(std::span<const ZVulkanDeviceSupport::DeviceSelection> selections)
 {
   CHECK(m_role == Role::Canonical);
@@ -2876,6 +2888,11 @@ void Z3DRenderingEngine::takeFixedSizeScreenShotWithoutResetCanvasSizePrivate(
   } else {
     m_globalParas->camera.viewportChanged(glm::uvec2(width, height));
     const bool useWorkerPool = m_vulkanTileWorkerPool != nullptr;
+    const bool logVulkanTiledCapture =
+      backend == RenderBackend::Vulkan && sst == Z3DScreenShotType::MonoView && VLOG_IS_ON(1);
+    const auto tilePhaseStart =
+      logVulkanTiledCapture ? std::chrono::steady_clock::now() : std::chrono::steady_clock::time_point{};
+    double tilePhaseMilliseconds = 0.0;
     if (!useWorkerPool) {
       prepareMeshFiltersForExport(glm::uvec2(width, height), cancellationToken);
     }
@@ -3005,12 +3022,32 @@ void Z3DRenderingEngine::takeFixedSizeScreenShotWithoutResetCanvasSizePrivate(
       }
     }
 
+    if (logVulkanTiledCapture) {
+      tilePhaseMilliseconds =
+        std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - tilePhaseStart).count();
+    }
+
     maybeCancel(cancellationToken);
     if (sst == Z3DScreenShotType::MonoView) {
+      const auto finalOutputStart =
+        logVulkanTiledCapture ? std::chrono::steady_clock::now() : std::chrono::steady_clock::time_point{};
       if (flipYForSave) {
         img.flip(Dimension::Y).save(filename);
       } else {
         img.save(filename);
+      }
+      if (logVulkanTiledCapture) {
+        const double finalOutputMilliseconds =
+          std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - finalOutputStart).count();
+        VLOG(1) << fmt::format(
+          "ATLAS_VULKAN_TILED_CAPTURE_FINISHED route={} width={} height={} tiles={} tile_phase_ms={:.3f} "
+          "final_output_ms={:.3f}",
+          useWorkerPool ? "worker_pool" : "direct",
+          width,
+          height,
+          tileDescriptors.size(),
+          tilePhaseMilliseconds,
+          finalOutputMilliseconds);
       }
       LOG(INFO) << "Saved rendering (" << img.width() << ", " << img.height() << ") to file: " << filename;
     } else {
