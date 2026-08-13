@@ -328,7 +328,10 @@ loadRuntimeNeuroglancerRowsBlockingForExport(const std::shared_ptr<const ZNeurog
 
 } // namespace
 
-Z3DMeshFilter::Z3DMeshFilter(Z3DGlobalParameters& globalParas, const RegionNode* regionNode, QObject* parent)
+Z3DMeshFilter::Z3DMeshFilter(Z3DGlobalParameters& globalParas,
+                             const RegionNode* regionNode,
+                             QObject* parent,
+                             size_t objectId)
   : Z3DGeometryFilter(globalParas, parent)
   , m_triangleListRenderer(m_rendererBase)
   , m_wireframeMode("Wireframe Option")
@@ -349,6 +352,7 @@ Z3DMeshFilter::Z3DMeshFilter(Z3DGlobalParameters& globalParas, const RegionNode*
   , m_selectedMeshes(nullptr)
   , m_dataIsInvalid(false)
   , m_regionNode(regionNode)
+  , m_objectId(objectId)
 {
   m_singleColorForAllMesh.setStyle("COLOR");
   connect(&m_singleColorForAllMesh, &ZVec4Parameter::valueChanged, this, &Z3DMeshFilter::prepareColor);
@@ -435,6 +439,7 @@ Z3DMeshFilter::Z3DMeshFilter(Z3DGlobalParameters& globalParas, const RegionNode*
 
 Z3DMeshFilter::~Z3DMeshFilter()
 {
+  deregisterPickingObjects();
   if (m_runtimeNgCancellationSource) {
     m_runtimeNgCancellationSource->requestCancellation();
   }
@@ -658,6 +663,8 @@ void Z3DMeshFilter::endExportMeshLod()
 
 void Z3DMeshFilter::setData(std::vector<ZMesh*>* meshList)
 {
+  cancelMouseGesture();
+
   m_origMeshList.clear();
   if (meshList) {
     m_origMeshList = *meshList;
@@ -888,18 +895,14 @@ void Z3DMeshFilter::prepareData()
 void Z3DMeshFilter::registerPickingObjects()
 {
   if (!m_pickingObjectsRegistered) {
-    for (auto mesh : m_meshList) {
-      pickingManager().registerObject(mesh);
-    }
-    m_registeredMeshList = m_meshList;
+    CHECK(m_meshPickingTokens.empty());
     m_meshPickingColors.clear();
-    for (auto mesh : m_meshList) {
-      glm::col4 pickingColor = pickingManager().colorOfObject(mesh);
-      glm::vec4 fPickingColor(pickingColor[0] / 255.f,
-                              pickingColor[1] / 255.f,
-                              pickingColor[2] / 255.f,
-                              pickingColor[3] / 255.f);
-      m_meshPickingColors.push_back(fPickingColor);
+    m_meshPickingTokens.reserve(m_meshList.size());
+    m_meshPickingColors.reserve(m_meshList.size());
+    for (ZMesh* const mesh : m_meshList) {
+      const glm::col4 token = pickingManager().registerObject(mesh, m_objectId);
+      m_meshPickingTokens.push_back(token);
+      m_meshPickingColors.push_back(glm::vec4(token) / 255.f);
     }
     m_triangleListRenderer.setDataPickingColors(&m_meshPickingColors);
   }
@@ -910,10 +913,10 @@ void Z3DMeshFilter::registerPickingObjects()
 void Z3DMeshFilter::deregisterPickingObjects()
 {
   if (m_pickingObjectsRegistered) {
-    for (auto mesh : m_registeredMeshList) {
-      pickingManager().deregisterObject(mesh);
+    for (const glm::col4& token : m_meshPickingTokens) {
+      pickingManager().deregisterObject(token);
     }
-    m_registeredMeshList.clear();
+    m_meshPickingTokens.clear();
   }
 
   m_pickingObjectsRegistered = false;
@@ -980,62 +983,121 @@ void Z3DMeshFilter::adjustWidgets()
   m_wireframeColor.setVisible(!m_wireframeMode.isSelected("No Wireframe"));
 }
 
+bool Z3DMeshFilter::isDocumentPickingObject(const void* object) const noexcept
+{
+  return object != nullptr &&
+         std::ranges::find(m_origMeshList, static_cast<const ZMesh*>(object)) != m_origMeshList.end();
+}
+
+bool Z3DMeshFilter::isCurrentPickingObject(const void* object) const noexcept
+{
+  return object != nullptr && std::ranges::find(m_meshList, static_cast<const ZMesh*>(object)) != m_meshList.end();
+}
+
+bool Z3DMeshFilter::isObjectLevelPickingObject(const void* object) const noexcept
+{
+  return object == regionalPickingToken();
+}
+
+ZMesh* Z3DMeshFilter::resolveExactMeshPickingObject(const void* object) const noexcept
+{
+  for (ZMesh* const mesh : m_meshList) {
+    if (mesh == object) {
+      return mesh;
+    }
+  }
+  return nullptr;
+}
+
 void Z3DMeshFilter::selectMesh(QMouseEvent* e, int /*w*/, int /*h*/)
 {
-  if (m_meshList.empty()) {
-    return;
-  }
-
   e->ignore();
   if (e->type() == QEvent::MouseButtonDblClick) {
-    const void* obj = pickingManager().objectAtWidgetPos(glm::ivec2(e->position().x(), e->position().y()));
+    const Z3DPickingManager::PickingObject pickingObject =
+      pickingManager().pickingObjectAtWidgetPos(glm::ivec2(e->position().x(), e->position().y()));
+    if (pickingObject.object != nullptr && pickingObject.objectId != m_objectId) {
+      return;
+    }
+    const void* const obj = pickingObject.object;
+    if (m_meshList.empty() && !isObjectLevelPickingObject(obj)) {
+      return;
+    }
     bool appending = (e->modifiers() == Qt::ControlModifier);
     if (!obj && !appending && m_isSelected) {
       Q_EMIT objDeselected();
       return;
     }
-    bool hit = contains(m_meshList, static_cast<const ZMesh*>(obj));
-    if (hit) {
+    if (isObjectLevelPickingObject(obj) || resolveExactMeshPickingObject(obj) != nullptr) {
       Q_EMIT objSelected(appending);
       e->accept();
     }
     return;
   }
 
-  e->ignore();
   // Mouse button pressend
   // can not accept the event in button press, because we don't know if it is a selection or interaction
   if (e->type() == QEvent::MouseButtonPress) {
-    m_startCoord.x = e->position().x();
-    m_startCoord.y = e->position().y();
-    const void* obj = pickingManager().objectAtWidgetPos(glm::ivec2(e->position().x(), e->position().y()));
+    m_mousePressStart.reset();
+    m_pressedMesh = nullptr;
+    if (m_meshList.empty()) {
+      return;
+    }
+    const Z3DPickingManager::PickingObject pickingObject =
+      pickingManager().pickingObjectAtWidgetPos(glm::ivec2(e->position().x(), e->position().y()));
+    if (pickingObject.object != nullptr && pickingObject.objectId != m_objectId) {
+      return;
+    }
+    m_mousePressStart = glm::ivec2(e->position().x(), e->position().y());
+    const void* const obj = pickingObject.object;
     if (!obj) {
       return;
     }
 
-    // Check if any point was selected...
-    for (auto m : m_meshList) {
-      if (m == obj) {
-        m_pressedMesh = m;
-        break;
-      }
+    if (isObjectLevelPickingObject(obj)) {
+      // Runtime Neuroglancer chunks are local to the worker that rendered the
+      // region, so they cannot participate in exact canonical mesh selection.
+      // Their object-level selection is handled by the double-click path.
+      m_mousePressStart.reset();
+      return;
+    }
+    m_pressedMesh = resolveExactMeshPickingObject(obj);
+    if (m_pressedMesh == nullptr) {
+      m_mousePressStart.reset();
     }
     return;
   }
 
   if (e->type() == QEvent::MouseButtonRelease) {
-    if (std::abs(e->position().x() - m_startCoord.x) < 2 && std::abs(m_startCoord.y - e->position().y()) < 2) {
+    if (!m_mousePressStart.has_value()) {
+      return;
+    }
+    const glm::ivec2 pressStart = *m_mousePressStart;
+    m_mousePressStart.reset();
+    ZMesh* const pressedMesh = m_pressedMesh;
+    m_pressedMesh = nullptr;
+    if (m_meshList.empty() || (pressedMesh != nullptr && !contains(m_meshList, pressedMesh))) {
+      return;
+    }
+    constexpr double clickThreshold = 2.0;
+    if (std::abs(e->position().x() - pressStart.x) < clickThreshold &&
+        std::abs(pressStart.y - e->position().y()) < clickThreshold) {
       if (e->modifiers() == Qt::ControlModifier) {
-        Q_EMIT meshSelected(m_pressedMesh, true);
+        Q_EMIT meshSelected(pressedMesh, true);
       } else {
-        Q_EMIT meshSelected(m_pressedMesh, false);
+        Q_EMIT meshSelected(pressedMesh, false);
       }
-      if (m_pressedMesh) {
+      if (pressedMesh) {
         e->accept();
       }
     }
-    m_pressedMesh = nullptr;
   }
+}
+
+void Z3DMeshFilter::cancelMouseGesture() noexcept
+{
+  Z3DBoundedFilter::cancelMouseGesture();
+  m_mousePressStart.reset();
+  m_pressedMesh = nullptr;
 }
 
 void Z3DMeshFilter::onApplyTransform()
@@ -1221,6 +1283,10 @@ void Z3DMeshFilter::updateRuntimeNeuroglancerRefinementState()
 void Z3DMeshFilter::onRuntimeNeuroglancerCameraChanged()
 {
   if (!m_runtimeNgSourceKey || m_runtimeNgExportActive) {
+    return;
+  }
+  if (m_globalParameters.camera.isApplyingRenderRegionFrustum()) {
+    markRuntimeNeuroglancerLodDirty();
     return;
   }
   const bool wasInteractionActive = m_runtimeNgInteractionActive;

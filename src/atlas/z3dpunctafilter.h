@@ -9,6 +9,8 @@
 #include "z3dsphererenderer.h"
 #include "zeventlistenerparameter.h"
 #include "zpunctapack.h"
+#include <cstddef>
+#include <optional>
 #include <vector>
 
 namespace nim {
@@ -18,11 +20,14 @@ class Z3DPunctaFilter : public Z3DGeometryFilter
   Q_OBJECT
 
 public:
-  explicit Z3DPunctaFilter(Z3DGlobalParameters& globalParas, QObject* parent = nullptr);
+  explicit Z3DPunctaFilter(Z3DGlobalParameters& globalParas, QObject* parent = nullptr, size_t objectId = 0u);
+  ~Z3DPunctaFilter() override;
 
   void setData(ZPunctaPack& puncta);
 
   bool isReady(Z3DEye eye) const override;
+
+  [[nodiscard]] bool isCurrentPickingObject(/*nullable*/ const void* object) const noexcept;
 
   std::shared_ptr<ZWidgetsGroup> widgetsGroup();
 
@@ -39,6 +44,8 @@ Q_SIGNALS:
   void showPunctaContextMenu(QPoint globalPos);
 
 protected:
+  void cancelMouseGesture() noexcept override;
+
   void prepareColor();
 
   void adjustWidgets();
@@ -102,7 +109,7 @@ private:
   ZEventListenerParameter m_selectPunctumEvent;
   ZEventListenerParameter m_deleteSelectedPunctaEvent;
   ZEventListenerParameter m_contextMenuEvent;
-  glm::ivec2 m_startCoord{};
+  std::optional<glm::ivec2> m_mousePressStart;
   const ZPunctum* m_pressedPunctum = nullptr;
 
   std::vector<glm::vec4> m_pointAndRadius;
@@ -128,6 +135,8 @@ private:
   bool m_useEllipsoidRenderer = false;
 
   ZPunctaPack* m_punctaPack = nullptr;
+  std::vector<glm::col4> m_punctaPickingTokens;
+  const size_t m_objectId;
 };
 
 } // namespace nim

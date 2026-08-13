@@ -21,7 +21,7 @@ class Z3DCanvasPainter
 public:
   explicit Z3DCanvasPainter(Z3DCanvas& canvas);
 
-  void setRenderingEngine(Z3DRenderingEngine* engine)
+  void setRenderingEngine(/*nullable*/ Z3DRenderingEngine* engine)
   {
     m_engine = engine;
   }

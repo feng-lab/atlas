@@ -93,5 +93,90 @@ TEST(Z3DRenderGlobalStateTest, ConcurrentThreadsKeepIndependentFrameSequences)
   EXPECT_EQ(state.nextRenderFrameSubmissionId(callerToken), 2u);
 }
 
+TEST(Z3DRenderGlobalStateTest, CancellationRequestInvalidatesIdleCheckpoint)
+{
+  auto& state = Z3DRenderGlobalState::instance();
+  ASSERT_FALSE(state.hasCancellationSource());
+
+  const auto preparationCheckpoint = state.idleCancellationCheckpoint();
+  ASSERT_TRUE(preparationCheckpoint.has_value());
+  state.requestCancellation();
+  EXPECT_EQ(state.tryAcquireCancellationSource(*preparationCheckpoint), nullptr);
+
+  const auto currentCheckpoint = state.idleCancellationCheckpoint();
+  ASSERT_TRUE(currentCheckpoint.has_value());
+  auto source = state.tryAcquireCancellationSource(*currentCheckpoint);
+  ASSERT_NE(source, nullptr);
+  EXPECT_FALSE(source->getToken().isCancellationRequested());
+
+  state.requestCancellation();
+  EXPECT_TRUE(source->getToken().isCancellationRequested());
+  state.releaseCancellationSource(source);
+  EXPECT_FALSE(state.hasCancellationSource());
+}
+
+TEST(Z3DRenderGlobalStateTest, ConcurrentCancellationAcquisitionHasOneOwner)
+{
+  constexpr size_t kAcquirerCount = 8u;
+
+  auto& state = Z3DRenderGlobalState::instance();
+  ASSERT_FALSE(state.hasCancellationSource());
+  const auto checkpoint = state.idleCancellationCheckpoint();
+  ASSERT_TRUE(checkpoint.has_value());
+
+  std::barrier acquisitionBoundary(static_cast<std::ptrdiff_t>(kAcquirerCount));
+  std::vector<std::shared_ptr<folly::CancellationSource>> results(kAcquirerCount);
+  std::vector<std::thread> threads;
+  threads.reserve(kAcquirerCount);
+  for (size_t threadIndex = 0u; threadIndex < kAcquirerCount; ++threadIndex) {
+    threads.emplace_back([threadIndex, &acquisitionBoundary, &results, &state, checkpoint]() {
+      acquisitionBoundary.arrive_and_wait();
+      results[threadIndex] = state.tryAcquireCancellationSource(*checkpoint);
+    });
+  }
+  for (auto& thread : threads) {
+    thread.join();
+  }
+
+  std::shared_ptr<folly::CancellationSource> owner;
+  size_t ownerCount = 0u;
+  for (const auto& result : results) {
+    if (result) {
+      owner = result;
+      ++ownerCount;
+    }
+  }
+  ASSERT_EQ(ownerCount, 1u);
+  ASSERT_NE(owner, nullptr);
+
+  state.requestCancellation();
+  EXPECT_TRUE(owner->getToken().isCancellationRequested());
+  state.releaseCancellationSource(owner);
+  EXPECT_FALSE(state.hasCancellationSource());
+}
+
+TEST(Z3DRenderGlobalStateTest, StaleCancellationOwnerCannotReleaseReplacement)
+{
+  GTEST_FLAG_SET(death_test_style, "threadsafe");
+
+  auto& state = Z3DRenderGlobalState::instance();
+  ASSERT_FALSE(state.hasCancellationSource());
+
+  const auto firstCheckpoint = state.idleCancellationCheckpoint();
+  ASSERT_TRUE(firstCheckpoint.has_value());
+  auto firstOwner = state.tryAcquireCancellationSource(*firstCheckpoint);
+  ASSERT_NE(firstOwner, nullptr);
+  state.releaseCancellationSource(firstOwner);
+
+  const auto replacementCheckpoint = state.idleCancellationCheckpoint();
+  ASSERT_TRUE(replacementCheckpoint.has_value());
+  auto replacementOwner = state.tryAcquireCancellationSource(*replacementCheckpoint);
+  ASSERT_NE(replacementOwner, nullptr);
+  EXPECT_DEATH_IF_SUPPORTED(state.releaseCancellationSource(firstOwner),
+                            "Only the render that acquired a cancellation source may release it");
+  state.releaseCancellationSource(replacementOwner);
+  EXPECT_FALSE(state.hasCancellationSource());
+}
+
 } // namespace
 } // namespace nim

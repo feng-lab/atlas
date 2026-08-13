@@ -52,6 +52,14 @@ void Z3DFilter::onEvent(QEvent* e, int w, int h)
   }
 }
 
+void Z3DFilter::cancelMouseGesture() noexcept
+{
+  for (Z3DInteractionHandler* const handler : m_interactionHandlers) {
+    CHECK(handler != nullptr);
+    handler->cancelMouseGesture();
+  }
+}
+
 void Z3DFilter::read(const json::object& json)
 {
   for (auto para : m_parameters) {

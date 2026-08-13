@@ -94,6 +94,107 @@ TEST(Z3DTileDescriptorTest, OddExtentCoverageIsExactAndNonOverlapping)
   }));
 }
 
+TEST(Z3DTileDescriptorTest, FixedRegionsSplitIntoStableVerticalStrips)
+{
+  const auto descriptors = makeZ3DFixedRegionDescriptors(glm::uvec2(11, 7), 3u, 2u);
+  ASSERT_EQ(descriptors.size(), 3u);
+
+  const std::vector<glm::uvec2> expectedOrigins{
+    {0, 0},
+    {4, 0},
+    {8, 0}
+  };
+  const std::vector<glm::uvec2> expectedExtents{
+    {4, 7},
+    {4, 7},
+    {3, 7}
+  };
+  for (size_t i = 0u; i < descriptors.size(); ++i) {
+    EXPECT_EQ(descriptors[i].fullOutputExtent(), glm::uvec2(11, 7));
+    EXPECT_EQ(descriptors[i].validOutputOrigin(), expectedOrigins[i]);
+    EXPECT_EQ(descriptors[i].validOutputExtent(), expectedExtents[i]);
+    EXPECT_EQ(descriptors[i].guardPixels(), 2u);
+    EXPECT_EQ(descriptors[i].attachmentExtent(), expectedExtents[i] + glm::uvec2(4u));
+  }
+}
+
+TEST(Z3DTileDescriptorTest, FixedRegionsCoverOddExtentExactlyOnce)
+{
+  constexpr uint32_t width = 13u;
+  constexpr uint32_t height = 5u;
+  const auto descriptors = makeZ3DFixedRegionDescriptors(glm::uvec2(width, height), 5u, 1u);
+  std::vector<uint32_t> coverage(static_cast<size_t>(width) * height, 0u);
+
+  for (const Z3DTileDescriptor& region : descriptors) {
+    const glm::uvec2 end = region.validOutputOrigin() + region.validOutputExtent();
+    for (uint32_t y = region.validOutputOrigin().y; y < end.y; ++y) {
+      for (uint32_t x = region.validOutputOrigin().x; x < end.x; ++x) {
+        ++coverage[static_cast<size_t>(y) * width + x];
+      }
+    }
+  }
+
+  EXPECT_TRUE(std::all_of(coverage.begin(), coverage.end(), [](uint32_t count) {
+    return count == 1u;
+  }));
+}
+
+TEST(Z3DTileDescriptorTest, FixedRegionsOwnAndMapTopLeftOutputPixels)
+{
+  GTEST_FLAG_SET(death_test_style, "threadsafe");
+
+  constexpr uint32_t width = 11u;
+  constexpr uint32_t height = 7u;
+  constexpr uint32_t guardPixels = 2u;
+  const auto descriptors = makeZ3DFixedRegionDescriptors(glm::uvec2(width, height), 3u, guardPixels);
+  ASSERT_EQ(descriptors.size(), 3u);
+
+  for (uint32_t y = 0u; y < height; ++y) {
+    for (uint32_t x = 0u; x < width; ++x) {
+      const glm::uvec2 pixel(x, y);
+      const auto owner = std::find_if(descriptors.begin(), descriptors.end(), [pixel](const auto& descriptor) {
+        return descriptor.containsTopLeftOutputPixel(pixel);
+      });
+      ASSERT_NE(owner, descriptors.end());
+      EXPECT_EQ(std::count_if(descriptors.begin(),
+                              descriptors.end(),
+                              [pixel](const auto& descriptor) {
+                                return descriptor.containsTopLeftOutputPixel(pixel);
+                              }),
+                1);
+
+      const glm::uvec2 expectedAttachmentPixel =
+        owner->validAttachmentOrigin() + pixel - owner->topLeftAssemblyOrigin();
+      EXPECT_EQ(owner->topLeftAttachmentPixel(pixel), expectedAttachmentPixel);
+    }
+  }
+
+  EXPECT_EQ(descriptors[0].topLeftAttachmentPixel(glm::uvec2(0u, 0u)), glm::uvec2(2u, 2u));
+  EXPECT_EQ(descriptors[0].topLeftAttachmentPixel(glm::uvec2(3u, 6u)), glm::uvec2(5u, 8u));
+  EXPECT_FALSE(descriptors[0].containsTopLeftOutputPixel(glm::uvec2(4u, 0u)));
+  EXPECT_EQ(descriptors[1].topLeftAttachmentPixel(glm::uvec2(4u, 0u)), glm::uvec2(2u, 2u));
+  EXPECT_FALSE(descriptors[1].containsTopLeftOutputPixel(glm::uvec2(8u, 6u)));
+  EXPECT_EQ(descriptors[2].topLeftAttachmentPixel(glm::uvec2(8u, 6u)), glm::uvec2(2u, 8u));
+  EXPECT_EQ(descriptors[2].topLeftAttachmentPixel(glm::uvec2(10u, 6u)), glm::uvec2(4u, 8u));
+
+  for (const Z3DTileDescriptor& descriptor : descriptors) {
+    EXPECT_FALSE(descriptor.containsTopLeftOutputPixel(glm::uvec2(width, 0u)));
+    EXPECT_FALSE(descriptor.containsTopLeftOutputPixel(glm::uvec2(0u, height)));
+  }
+  EXPECT_DEATH_IF_SUPPORTED((void)descriptors[0].topLeftAttachmentPixel(glm::uvec2(4u, 0u)),
+                            "must belong to this tile");
+}
+
+TEST(Z3DTileDescriptorTest, SingleFixedRegionUsesTheFullOutput)
+{
+  const auto descriptors = makeZ3DFixedRegionDescriptors(glm::uvec2(7, 5), 1u, 3u);
+
+  ASSERT_EQ(descriptors.size(), 1u);
+  EXPECT_EQ(descriptors.front().validOutputOrigin(), glm::uvec2(0u));
+  EXPECT_EQ(descriptors.front().validOutputExtent(), glm::uvec2(7u, 5u));
+  EXPECT_EQ(descriptors.front().attachmentExtent(), glm::uvec2(13u, 11u));
+}
+
 TEST(Z3DTileDescriptorTest, TraversalPreservesSerpentineExportOrder)
 {
   const auto descriptors = makeZ3DTileDescriptors(glm::uvec2(7, 5), glm::uvec2(3, 2), 0);
@@ -157,6 +258,20 @@ TEST(Z3DTileDescriptorTest, TopLeftAssemblyOriginConvertsBottomLeftOutputCoordin
   EXPECT_EQ(tileIt->topLeftAssemblyOrigin(), glm::uvec2(3, 1));
 }
 
+TEST(Z3DTileDescriptorTest, TopLeftPixelOwnershipConvertsBottomLeftTileCoordinates)
+{
+  const auto descriptors = makeZ3DTileDescriptors(glm::uvec2(7, 5), glm::uvec2(3, 2), 1);
+  const Z3DTileDescriptor& tile = descriptorAt(descriptors, glm::uvec2(3, 2));
+
+  EXPECT_EQ(tile.topLeftAssemblyOrigin(), glm::uvec2(3u, 1u));
+  EXPECT_TRUE(tile.containsTopLeftOutputPixel(glm::uvec2(3u, 1u)));
+  EXPECT_TRUE(tile.containsTopLeftOutputPixel(glm::uvec2(5u, 2u)));
+  EXPECT_FALSE(tile.containsTopLeftOutputPixel(glm::uvec2(3u, 0u)));
+  EXPECT_FALSE(tile.containsTopLeftOutputPixel(glm::uvec2(3u, 3u)));
+  EXPECT_EQ(tile.topLeftAttachmentPixel(glm::uvec2(3u, 1u)), glm::uvec2(1u, 1u));
+  EXPECT_EQ(tile.topLeftAttachmentPixel(glm::uvec2(5u, 2u)), glm::uvec2(3u, 2u));
+}
+
 TEST(Z3DTileDescriptorTest, RenderedFrameAssemblyPlacesMonoAndStereoTilesInTopLeftCoordinates)
 {
   const auto descriptors = makeZ3DTileDescriptors(glm::uvec2(5, 3), glm::uvec2(2, 2), 1);
@@ -216,6 +331,13 @@ TEST(Z3DTileDescriptorTest, InvalidExtentsAndAttachmentOverflowFailFast)
   EXPECT_DEATH_IF_SUPPORTED(
     (void)makeZ3DTileDescriptors(glm::uvec2(1, 1), glm::uvec2(1, 1), std::numeric_limits<uint32_t>::max()),
     "attachment extent exceeds");
+  EXPECT_DEATH_IF_SUPPORTED((void)makeZ3DFixedRegionDescriptors(glm::uvec2(0, 5), 2u, 0u),
+                            "output width must be positive");
+  EXPECT_DEATH_IF_SUPPORTED((void)makeZ3DFixedRegionDescriptors(glm::uvec2(7, 0), 2u, 0u),
+                            "output height must be positive");
+  EXPECT_DEATH_IF_SUPPORTED((void)makeZ3DFixedRegionDescriptors(glm::uvec2(7, 5), 0u, 0u), "count must be positive");
+  EXPECT_DEATH_IF_SUPPORTED((void)makeZ3DFixedRegionDescriptors(glm::uvec2(2, 5), 3u, 0u),
+                            "cannot exceed the physical output width");
 }
 
 } // namespace

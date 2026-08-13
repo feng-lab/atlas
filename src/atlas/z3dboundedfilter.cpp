@@ -278,9 +278,19 @@ Z3DBoundedFilter::Z3DBoundedFilter(Z3DGlobalParameters& globalPara, QObject* par
   m_handleEvent.setEnabled(m_isSelected);
 }
 
+Z3DBoundedFilter::~Z3DBoundedFilter()
+{
+  for (const glm::col4& token : m_handlePickingTokens) {
+    pickingManager().deregisterObject(token);
+  }
+}
+
 void Z3DBoundedFilter::setSelected(bool v)
 {
   if (m_isSelected != v) {
+    if (!v) {
+      cancelMouseGesture();
+    }
     m_isSelected = v;
     m_handleEvent.setEnabled(v);
     invalidateResult();
@@ -592,6 +602,14 @@ void Z3DBoundedFilter::handleEvent(QMouseEvent* e, int w, int h)
   }
 
   if (e->type() == QEvent::MouseButtonRelease) {
+    updateSelectedHandle(0);
+  }
+}
+
+void Z3DBoundedFilter::cancelMouseGesture() noexcept
+{
+  Z3DFilter::cancelMouseGesture();
+  if (m_selectedHandle != 0) {
     updateSelectedHandle(0);
   }
 }
@@ -992,19 +1010,35 @@ void Z3DBoundedFilter::updateHandle()
 
 void Z3DBoundedFilter::registerHandlePickingColors()
 {
-  pickingManager().registerObject(&m_handleCenterRenderer); // center
-  pickingManager().registerObject(&m_handleArrowRenderer); // axis x
-  pickingManager().registerObject(&m_handleArrowTailPosAndTailRadius); // axis y
-  pickingManager().registerObject(&m_handleArrowheadPosAndHeadRadius); // axis z
-  m_handleCenterPickingColors.push_back(pickingManager().fColorOfObject(&m_handleCenterRenderer));
-  m_handleArrowPickingColors.push_back(pickingManager().fColorOfObject(&m_handleArrowRenderer));
-  m_handleArrowPickingColors.push_back(pickingManager().fColorOfObject(&m_handleArrowTailPosAndTailRadius));
-  m_handleArrowPickingColors.push_back(pickingManager().fColorOfObject(&m_handleArrowheadPosAndHeadRadius));
+  m_handlePickingTokens = {pickingManager().registerObject(&m_handleCenterRenderer),
+                           pickingManager().registerObject(&m_handleArrowRenderer),
+                           pickingManager().registerObject(&m_handleArrowTailPosAndTailRadius),
+                           pickingManager().registerObject(&m_handleArrowheadPosAndHeadRadius)};
+  m_handleCenterPickingColors.push_back(glm::vec4(m_handlePickingTokens[0]) / 255.f);
+  m_handleArrowPickingColors.push_back(glm::vec4(m_handlePickingTokens[1]) / 255.f);
+  m_handleArrowPickingColors.push_back(glm::vec4(m_handlePickingTokens[2]) / 255.f);
+  m_handleArrowPickingColors.push_back(glm::vec4(m_handlePickingTokens[3]) / 255.f);
   m_handleCenterRenderer.setDataPickingColors(&m_handleCenterPickingColors);
   m_handleArrowRenderer.setArrowPickingColors(&m_handleArrowPickingColors);
 }
 
-int Z3DBoundedFilter::selectedHandle(const void* obj) const
+int Z3DBoundedFilter::transformHandlePickingIndex(const void* object) const noexcept
+{
+  return selectedHandle(object);
+}
+
+const void* Z3DBoundedFilter::transformHandlePickingObject(int handleIndex) const
+{
+  CHECK_GE(handleIndex, 1);
+  CHECK_LE(handleIndex, 4);
+  const std::array<const void*, 4> handles{&m_handleCenterRenderer,
+                                           &m_handleArrowRenderer,
+                                           &m_handleArrowTailPosAndTailRadius,
+                                           &m_handleArrowheadPosAndHeadRadius};
+  return handles[static_cast<size_t>(handleIndex - 1)];
+}
+
+int Z3DBoundedFilter::selectedHandle(const void* obj) const noexcept
 {
   if (obj == &m_handleCenterRenderer) {
     return 1;

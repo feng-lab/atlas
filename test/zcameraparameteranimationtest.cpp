@@ -163,6 +163,31 @@ void expectVecNear(const glm::vec3& actual, const glm::vec3& expected, float tol
 
 } // namespace
 
+TEST(ZCameraParameterTest, TileFrustumIdentifiesSynchronousRenderRegionChange)
+{
+  Z3DCameraParameter camera("Camera");
+  bool applyingRenderRegionFrustum = false;
+  QObject::connect(&camera, &Z3DCameraParameter::valueChanged, [&]() {
+    applyingRenderRegionFrustum = camera.isApplyingRenderRegionFrustum();
+  });
+  int changeCount = 0;
+  QObject::connect(&camera, &Z3DCameraParameter::valueChanged, [&]() {
+    ++changeCount;
+  });
+
+  camera.setTileFrustum(0.25, 0.75, 0.0, 1.0);
+
+  EXPECT_EQ(changeCount, 1);
+  EXPECT_TRUE(applyingRenderRegionFrustum);
+  EXPECT_FALSE(camera.isApplyingRenderRegionFrustum());
+
+  applyingRenderRegionFrustum = true;
+  camera.setEye(glm::vec3(1.0f, 2.0f, 3.0f));
+
+  EXPECT_EQ(changeCount, 2);
+  EXPECT_FALSE(applyingRenderRegionFrustum);
+}
+
 TEST(ZCameraParameterAnimationTest, RotationSplineUsesSignConsistentQuaternions)
 {
   // Construct a sequence of camera rotations that crosses 180° so that the raw

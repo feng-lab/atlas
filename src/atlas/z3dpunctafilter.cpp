@@ -5,7 +5,7 @@
 
 namespace nim {
 
-Z3DPunctaFilter::Z3DPunctaFilter(Z3DGlobalParameters& globalParas, QObject* parent)
+Z3DPunctaFilter::Z3DPunctaFilter(Z3DGlobalParameters& globalParas, QObject* parent, size_t objectId)
   : Z3DGeometryFilter(globalParas, parent)
   , m_sphereRenderer(m_rendererBase)
   , m_ellipsoidRenderer(m_rendererBase)
@@ -28,6 +28,7 @@ Z3DPunctaFilter::Z3DPunctaFilter(Z3DGlobalParameters& globalParas, QObject* pare
   , m_selectPunctumEvent("Select Puncta", false)
   , m_deleteSelectedPunctaEvent("Delete Selected Puncta", true)
   , m_contextMenuEvent("Context Menu", false)
+  , m_objectId(objectId)
 {
   m_singleColorForAllPuncta.setStyle("COLOR");
   connect(&m_singleColorForAllPuncta, &ZVec4Parameter::valueChanged, this, &Z3DPunctaFilter::markColorDirty);
@@ -116,6 +117,11 @@ Z3DPunctaFilter::Z3DPunctaFilter(Z3DGlobalParameters& globalParas, QObject* pare
   addEventListener(m_contextMenuEvent);
 
   adjustWidgets();
+}
+
+Z3DPunctaFilter::~Z3DPunctaFilter()
+{
+  deregisterPickingObjects();
 }
 
 double Z3DPunctaFilter::process(Z3DEye)
@@ -280,17 +286,15 @@ void Z3DPunctaFilter::renderPicking(Z3DEye eye)
 void Z3DPunctaFilter::registerPickingObjects()
 {
   if (!m_pickingObjectsRegistered) {
-    for (auto punctum : m_punctaPack->punctaPts()) {
-      pickingManager().registerObject(punctum);
-    }
+    CHECK(m_punctaPack != nullptr);
+    CHECK(m_punctaPickingTokens.empty());
     m_pointPickingColors.clear();
-    for (auto punctum : m_punctaPack->punctaPts()) {
-      glm::col4 pickingColor = pickingManager().colorOfObject(punctum);
-      glm::vec4 fPickingColor(pickingColor[0] / 255.f,
-                              pickingColor[1] / 255.f,
-                              pickingColor[2] / 255.f,
-                              pickingColor[3] / 255.f);
-      m_pointPickingColors.push_back(fPickingColor);
+    m_punctaPickingTokens.reserve(m_punctaPack->punctaPts().size());
+    m_pointPickingColors.reserve(m_punctaPack->punctaPts().size());
+    for (const ZPunctum* const punctum : m_punctaPack->punctaPts()) {
+      const glm::col4 token = pickingManager().registerObject(punctum, m_objectId);
+      m_punctaPickingTokens.push_back(token);
+      m_pointPickingColors.push_back(glm::vec4(token) / 255.f);
     }
     if (usesEllipsoidRendering()) {
       m_ellipsoidRenderer.setDataPickingColors(&m_pointPickingColors);
@@ -305,12 +309,22 @@ void Z3DPunctaFilter::registerPickingObjects()
 void Z3DPunctaFilter::deregisterPickingObjects()
 {
   if (m_pickingObjectsRegistered) {
-    for (auto punctum : m_punctaPack->punctaPts()) {
-      pickingManager().deregisterObject(punctum);
+    CHECK(m_punctaPack != nullptr);
+    for (const glm::col4& token : m_punctaPickingTokens) {
+      pickingManager().deregisterObject(token);
     }
+    m_punctaPickingTokens.clear();
   }
 
   m_pickingObjectsRegistered = false;
+}
+
+bool Z3DPunctaFilter::isCurrentPickingObject(const void* object) const noexcept
+{
+  if (object == nullptr || m_punctaPack == nullptr) {
+    return false;
+  }
+  return m_punctaPack->punctumToRow().contains(static_cast<const ZPunctum*>(object));
 }
 
 void Z3DPunctaFilter::prepareData()
@@ -402,6 +416,8 @@ void Z3DPunctaFilter::punctumBound(const ZPunctum& p, ZBBox<glm::dvec3>& result)
 
 void Z3DPunctaFilter::updateData()
 {
+  cancelMouseGesture();
+
   double minMeanInten = std::numeric_limits<double>::max();
   double maxMeanInten = std::numeric_limits<double>::lowest();
   double minMaxInten = std::numeric_limits<double>::max();
@@ -524,13 +540,17 @@ void Z3DPunctaFilter::adjustWidgets()
 
 void Z3DPunctaFilter::selectPuncta(QMouseEvent* e, int /*w*/, int /*h*/)
 {
-  if (!m_punctaPack || m_punctaPack->puncta().data.empty()) {
-    return;
-  }
-
   e->ignore();
   if (e->type() == QEvent::MouseButtonDblClick) {
-    const void* obj = pickingManager().objectAtWidgetPos(glm::ivec2(e->position().x(), e->position().y()));
+    if (!m_punctaPack || m_punctaPack->puncta().data.empty()) {
+      return;
+    }
+    const Z3DPickingManager::PickingObject pickingObject =
+      pickingManager().pickingObjectAtWidgetPos(glm::ivec2(e->position().x(), e->position().y()));
+    if (pickingObject.object != nullptr && pickingObject.objectId != m_objectId) {
+      return;
+    }
+    const void* const obj = pickingObject.object;
     bool appending = (e->modifiers() == Qt::ControlModifier);
     if (!obj && !appending && m_isSelected) {
       Q_EMIT objDeselected();
@@ -544,17 +564,21 @@ void Z3DPunctaFilter::selectPuncta(QMouseEvent* e, int /*w*/, int /*h*/)
     return;
   }
 
-  if (m_punctaPack->isLocked()) {
-    return;
-  }
-
-  e->ignore();
   // Mouse button pressend
   // can not accept the event in button press, because we don't know if it is a selection or interaction
   if (e->type() == QEvent::MouseButtonPress) {
-    m_startCoord.x = e->position().x();
-    m_startCoord.y = e->position().y();
-    const void* obj = pickingManager().objectAtWidgetPos(glm::ivec2(e->position().x(), e->position().y()));
+    m_mousePressStart.reset();
+    m_pressedPunctum = nullptr;
+    if (!m_punctaPack || m_punctaPack->puncta().data.empty() || m_punctaPack->isLocked()) {
+      return;
+    }
+    const Z3DPickingManager::PickingObject pickingObject =
+      pickingManager().pickingObjectAtWidgetPos(glm::ivec2(e->position().x(), e->position().y()));
+    if (pickingObject.object != nullptr && pickingObject.objectId != m_objectId) {
+      return;
+    }
+    m_mousePressStart = glm::ivec2(e->position().x(), e->position().y());
+    const void* const obj = pickingObject.object;
     if (!obj) {
       return;
     }
@@ -570,14 +594,31 @@ void Z3DPunctaFilter::selectPuncta(QMouseEvent* e, int /*w*/, int /*h*/)
   }
 
   if (e->type() == QEvent::MouseButtonRelease) {
-    if (std::abs(e->position().x() - m_startCoord.x) < 2 && std::abs(m_startCoord.y - e->position().y()) < 2) {
-      Q_EMIT punctumSelected(m_pressedPunctum, e->modifiers() == Qt::ControlModifier);
-      if (m_pressedPunctum) {
+    if (!m_mousePressStart.has_value()) {
+      return;
+    }
+    const glm::ivec2 pressStart = *m_mousePressStart;
+    m_mousePressStart.reset();
+    const ZPunctum* const pressedPunctum = m_pressedPunctum;
+    m_pressedPunctum = nullptr;
+    if (!m_punctaPack || m_punctaPack->puncta().data.empty() || m_punctaPack->isLocked() ||
+        (pressedPunctum != nullptr && !contains(m_punctaPack->punctaPts(), pressedPunctum))) {
+      return;
+    }
+    if (std::abs(e->position().x() - pressStart.x) < 2 && std::abs(pressStart.y - e->position().y()) < 2) {
+      Q_EMIT punctumSelected(pressedPunctum, e->modifiers() == Qt::ControlModifier);
+      if (pressedPunctum) {
         e->accept();
       }
     }
-    m_pressedPunctum = nullptr;
   }
+}
+
+void Z3DPunctaFilter::cancelMouseGesture() noexcept
+{
+  Z3DBoundedFilter::cancelMouseGesture();
+  m_mousePressStart.reset();
+  m_pressedPunctum = nullptr;
 }
 
 void Z3DPunctaFilter::contextMenuEvent(QContextMenuEvent* e, int, int)
@@ -587,7 +628,12 @@ void Z3DPunctaFilter::contextMenuEvent(QContextMenuEvent* e, int, int)
   }
 
   if (isVisible() && !isSelected() && m_punctaPack && !m_punctaPack->selectedPuncta().empty()) {
-    const void* obj = pickingManager().objectAtWidgetPos(glm::ivec2(e->x(), e->y()));
+    const Z3DPickingManager::PickingObject pickingObject =
+      pickingManager().pickingObjectAtWidgetPos(glm::ivec2(e->x(), e->y()));
+    if (pickingObject.object != nullptr && pickingObject.objectId != m_objectId) {
+      return;
+    }
+    const void* const obj = pickingObject.object;
     if (!obj) {
       return;
     }

@@ -85,4 +85,35 @@ makeZ3DTileDescriptors(glm::uvec2 fullOutputExtent, glm::uvec2 tileExtent, uint3
   return descriptors;
 }
 
+std::vector<Z3DTileDescriptor>
+makeZ3DFixedRegionDescriptors(glm::uvec2 fullOutputExtent, size_t regionCount, uint32_t guardPixels)
+{
+  CHECK_GT(fullOutputExtent.x, 0u) << "Fixed-region output width must be positive";
+  CHECK_GT(fullOutputExtent.y, 0u) << "Fixed-region output height must be positive";
+  CHECK_GT(regionCount, 0u) << "Fixed-region count must be positive";
+  CHECK_LE(regionCount, static_cast<size_t>(fullOutputExtent.x))
+    << "Fixed-region count cannot exceed the physical output width";
+
+  std::vector<Z3DTileDescriptor> descriptors;
+  CHECK_LE(regionCount, descriptors.max_size()) << "Fixed-region count exceeds the platform container capacity";
+  descriptors.reserve(regionCount);
+
+  const uint32_t count = static_cast<uint32_t>(regionCount);
+  const uint32_t baseWidth = fullOutputExtent.x / count;
+  const uint32_t widerRegionCount = fullOutputExtent.x % count;
+  uint32_t originX = 0u;
+  for (uint32_t regionIndex = 0u; regionIndex < count; ++regionIndex) {
+    const uint32_t regionWidth = baseWidth + (regionIndex < widerRegionCount ? 1u : 0u);
+    descriptors.emplace_back(fullOutputExtent,
+                             glm::uvec2(originX, 0u),
+                             glm::uvec2(regionWidth, fullOutputExtent.y),
+                             guardPixels);
+    originX += regionWidth;
+  }
+
+  CHECK_EQ(descriptors.size(), regionCount);
+  CHECK_EQ(originX, fullOutputExtent.x);
+  return descriptors;
+}
+
 } // namespace nim

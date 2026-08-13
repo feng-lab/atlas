@@ -21,7 +21,7 @@ void Z3DMeshView::docMeshesAdded(const std::vector<size_t>& objs)
 {
   try {
     for (auto id : objs) {
-      auto viewControl = new Z3DMeshFilter(m_engine.globalParas(), nullptr, this);
+      auto viewControl = new Z3DMeshFilter(m_engine.globalParas(), nullptr, this, id);
       viewControl->setData(m_doc.meshList(id));
       viewControl->setExternalSourceState(m_doc.jsonValue(id), m_doc.externalRemoteContext(id));
       viewControl->setSelected(m_doc.isObjSelected(id));
@@ -55,7 +55,7 @@ void Z3DMeshView::docMeshesAdded(const std::vector<size_t>& objs)
 void Z3DMeshView::docMeshAdded(size_t id)
 {
   try {
-    auto viewControl = new Z3DMeshFilter(m_engine.globalParas(), nullptr, this);
+    auto viewControl = new Z3DMeshFilter(m_engine.globalParas(), nullptr, this, id);
     viewControl->setData(m_doc.meshList(id));
     viewControl->setExternalSourceState(m_doc.jsonValue(id), m_doc.externalRemoteContext(id));
     viewControl->setSelected(m_doc.isObjSelected(id));

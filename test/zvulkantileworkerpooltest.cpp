@@ -198,7 +198,7 @@ void runPpllTileWorkerSmoke(WorkerExecution execution)
   if (execution == WorkerExecution::DistinctDevicesBatch) {
     canonical->configureVulkanTileWorkers(distinctWorkerSelections);
   } else {
-    const auto canonicalSelection = canonical->compatibleVulkanTileWorkerSelections().front();
+    const auto canonicalSelection = canonical->activeVulkanDeviceSelection();
     canonical->configureVulkanTileWorkers(std::span(&canonicalSelection, 1u));
   }
   canonical->takeFixedSizeScreenShot(workerTiledPath,
@@ -228,7 +228,6 @@ void runPpllTileWorkerSmoke(WorkerExecution execution)
     testing::Test::RecordProperty("cross_device_mismatched_bytes", mismatchedBytes);
     testing::Test::RecordProperty("cross_device_maximum_byte_difference", maximumByteDifference);
   }
-  canonical->configureVulkanTileWorkers(std::span<const ZVulkanDeviceSupport::DeviceSelection>{});
   EXPECT_EQ(currentRenderThreadExecutorOrNull(), canonicalExecutor);
 
   canonical->takeFixedSizeScreenShot(canonicalAfterPath,

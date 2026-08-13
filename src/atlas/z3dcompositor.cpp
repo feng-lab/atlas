@@ -875,6 +875,39 @@ void Z3DCompositor::setRenderingRegion(double left, double right, double bottom,
   m_region = glm::vec4(left, right - left, bottom, top - bottom);
 }
 
+uint32_t Z3DCompositor::requiredScreenSpaceGuardPixels() const
+{
+  const auto geometryAAMode = static_cast<GeometryAAMode>(m_globalParameters.geometriesAAMode.associatedData());
+  uint32_t requiredGuard = geometryAAMode == GeometryAAMode::Supersample2x2 ? 1u : 0u;
+
+  const auto includeGlowSupport = [&requiredGuard](const Z3DBoundedFilter& filter) {
+    const auto* glowEnabled = dynamic_cast<const ZBoolParameter*>(filter.parameter(QStringLiteral("Glow")));
+    if (glowEnabled == nullptr || !glowEnabled->get()) {
+      return;
+    }
+
+    const auto* blurRadius = dynamic_cast<const ZIntParameter*>(filter.parameter(QStringLiteral("Glow Blur Radius")));
+    const auto* blurScale = dynamic_cast<const ZFloatParameter*>(filter.parameter(QStringLiteral("Glow Blur Scale")));
+    CHECK(blurRadius != nullptr);
+    CHECK(blurScale != nullptr);
+    CHECK_GE(blurRadius->get(), 0);
+    CHECK_GE(blurScale->get(), 0.0f);
+    const double supportRadius = std::ceil(static_cast<double>(blurRadius->get()) * blurScale->get());
+    CHECK_LE(supportRadius, static_cast<double>(std::numeric_limits<uint32_t>::max()));
+    requiredGuard = std::max(requiredGuard, static_cast<uint32_t>(supportRadius));
+  };
+
+  for (const Z3DGeometryFilter* const filter : m_geometryFilters) {
+    CHECK(filter != nullptr);
+    includeGlowSupport(*filter);
+  }
+  for (const Z3DImgFilter* const filter : m_volumeFilters) {
+    CHECK(filter != nullptr);
+    includeGlowSupport(*filter);
+  }
+  return requiredGuard;
+}
+
 uint64_t Z3DCompositor::lastPublishedRenderFrameToken(Z3DEye eye) const
 {
   const std::scoped_lock lock(m_globalParameters.targetSwitchMutex);

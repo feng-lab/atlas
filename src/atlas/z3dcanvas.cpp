@@ -5,6 +5,7 @@
 #include "zimgdoc.h"
 #include "zlog.h"
 #include "z3drenderingengine.h"
+#include "z3dtiledescriptor.h"
 #include "zneuroglancerprecomputed.h"
 #include "zseedtrace.h"
 #include "zswcdoc.h"
@@ -26,9 +27,11 @@
 #include <QCoreApplication>
 #include <QAction>
 #include <QDir>
+#include <QImage>
 #include <QMenu>
 #include <QPointer>
 #include <QSignalBlocker>
+#include <QThread>
 #include <algorithm>
 #include <cmath>
 #include <limits>
@@ -39,6 +42,10 @@ ABSL_DECLARE_FLAG(bool, atlas_vk_copy_yflip_in_shader);
 namespace nim {
 
 namespace {
+
+#if !defined(ATLAS_USE_OPENGLWIDGET)
+constexpr qreal kRegionalPixmapZValue = 1.0;
+#endif
 
 [[nodiscard]] std::optional<glm::dmat3> tryExtractCoordLinearInvFromView3DJson(const json::object& view3dJson)
 {
@@ -179,13 +186,31 @@ void Z3DCanvas::getGLFocus()
 }
 #endif
 
-void Z3DCanvas::setRenderingEngine(Z3DRenderingEngine* engine)
+void Z3DCanvas::setRenderingEngine(/*nullable*/ Z3DRenderingEngine* engine)
 {
+  CHECK(QThread::currentThread() == thread());
   m_engine = engine;
 #if defined(ATLAS_USE_OPENGLWIDGET)
   m_3dScene->setRenderingEngine(engine);
 #endif
   sceneParaUpdated();
+}
+
+void Z3DCanvas::setRenderingEngine(Z3DRenderingEngine* engine,
+                                   const QSize& initializedLogicalSize,
+                                   qreal initializedDevicePixelRatio)
+{
+  CHECK(engine);
+  CHECK_GT(initializedLogicalSize.width(), 0);
+  CHECK_GT(initializedLogicalSize.height(), 0);
+  CHECK(std::isfinite(initializedDevicePixelRatio));
+  CHECK_GE(initializedDevicePixelRatio, 1.0);
+  setRenderingEngine(engine);
+
+  // Republish only when the canvas changed while the engine was initializing.
+  if (size() != initializedLogicalSize || devicePixelRatio() != initializedDevicePixelRatio) {
+    publishCanvasGeometry(size());
+  }
 }
 
 void Z3DCanvas::toggleFullScreen()
@@ -209,6 +234,12 @@ void Z3DCanvas::sceneParaUpdated()
 
 void Z3DCanvas::renderingFinished()
 {
+#if !defined(ATLAS_USE_OPENGLWIDGET)
+  if (m_regionalPresentationEnabled) {
+    return;
+  }
+#endif
+
   // Engine may have been detached/destroyed while a queued signal is in flight
   if (m_engine && m_engine->hasNewRenderingFlag()) {
     VLOG(1) << "update";
@@ -254,6 +285,104 @@ void Z3DCanvas::renderingFinished()
     VLOG(1) << localBuffer << " " << localBuffer->width << " " << localBuffer->height;
 #endif
   }
+}
+
+void Z3DCanvas::setRegionalPresentationEnabled(bool enabled)
+{
+#if defined(ATLAS_USE_OPENGLWIDGET)
+  CHECK(!enabled) << "Regional Vulkan presentation requires the pixmap canvas";
+#else
+  CHECK(QThread::currentThread() == thread());
+  m_regionalPresentationEnabled = enabled;
+  if (enabled) {
+    return;
+  }
+  for (QGraphicsPixmapItem* const item : m_regionPixmapItems) {
+    CHECK(item != nullptr);
+    item->setVisible(false);
+    item->setPixmap({});
+  }
+#endif
+}
+
+void Z3DCanvas::presentRegionalRendering(Z3DRenderingEngine* sourceEngine,
+                                         size_t regionIndex,
+                                         const Z3DTileDescriptor& region)
+{
+  CHECK(sourceEngine != nullptr);
+  CHECK(QThread::currentThread() == thread());
+
+#if defined(ATLAS_USE_OPENGLWIDGET)
+  Q_UNUSED(region)
+  Q_UNUSED(regionIndex)
+  CHECK(false) << "Regional Vulkan presentation requires the pixmap canvas";
+#else
+  if (!m_regionalPresentationEnabled) {
+    return;
+  }
+
+  const glm::uvec2 origin = region.topLeftAssemblyOrigin();
+  CHECK_LE(origin.x, static_cast<uint32_t>(std::numeric_limits<int>::max()));
+  CHECK_LE(origin.y, static_cast<uint32_t>(std::numeric_limits<int>::max()));
+  const QPoint physicalOrigin(static_cast<int>(origin.x), static_cast<int>(origin.y));
+  const uint32_t guardPixels = region.guardPixels();
+
+  CHECK_LT(regionIndex, m_regionPixmapItems.max_size());
+  while (m_regionPixmapItems.size() <= regionIndex) {
+    auto* item = new QGraphicsPixmapItem();
+    item->setZValue(kRegionalPixmapZValue);
+    m_scene->addItem(item);
+    m_regionPixmapItems.push_back(item);
+  }
+
+  QPixmap pixmap;
+  {
+    const std::scoped_lock lock(sourceEngine->targetSwitchMutex());
+    const Z3DLocalColorBuffer* const buffer = sourceEngine->monoReadyLocalBuffer();
+    CHECK(buffer != nullptr);
+    CHECK(buffer->external != nullptr) << "Regional Vulkan presentation requires a mapped color buffer";
+    const uint64_t guardedPixels = 2u * static_cast<uint64_t>(guardPixels);
+    CHECK_GT(buffer->width, guardedPixels);
+    CHECK_GT(buffer->height, guardedPixels);
+    const size_t validWidth = buffer->width - guardedPixels;
+    const size_t validHeight = buffer->height - guardedPixels;
+    CHECK_LE(validWidth, static_cast<size_t>(std::numeric_limits<int>::max()));
+    CHECK_LE(validHeight, static_cast<size_t>(std::numeric_limits<int>::max()));
+    constexpr size_t kBytesPerPixel = 4u;
+    const size_t stride = buffer->externalStride != 0u ? buffer->externalStride : buffer->width * kBytesPerPixel;
+    CHECK_GE(stride, buffer->width * kBytesPerPixel);
+    CHECK_LE(stride, static_cast<size_t>(std::numeric_limits<int>::max()));
+    const size_t guard = guardPixels;
+    const uint8_t* const validPixels = buffer->external + guard * stride + guard * kBytesPerPixel;
+#if QT_VERSION >= QT_VERSION_CHECK(5, 14, 0)
+    const QImage image(validPixels,
+                       static_cast<int>(validWidth),
+                       static_cast<int>(validHeight),
+                       static_cast<int>(stride),
+                       QImage::Format_RGBA8888_Premultiplied);
+#else
+    const QImage image(validPixels,
+                       static_cast<int>(validWidth),
+                       static_cast<int>(validHeight),
+                       static_cast<int>(stride),
+                       QImage::Format_RGB32);
+#endif
+    CHECK(!image.isNull());
+    pixmap =
+      QPixmap::fromImage(absl::GetFlag(FLAGS_atlas_vk_copy_yflip_in_shader) ? image : image.flipped(Qt::Vertical));
+  }
+
+  CHECK(!pixmap.isNull());
+  const qreal dpr = devicePixelRatio();
+  CHECK(std::isfinite(dpr));
+  CHECK_GE(dpr, 1.0);
+  pixmap.setDevicePixelRatio(dpr);
+  QGraphicsPixmapItem* const item = m_regionPixmapItems[regionIndex];
+  CHECK(item != nullptr);
+  item->setPixmap(std::move(pixmap));
+  item->setPos(physicalOrigin.x() / dpr, physicalOrigin.y() / dpr);
+  item->setVisible(true);
+#endif
 }
 
 void Z3DCanvas::contextMenuEvent(QContextMenuEvent* e)
@@ -1086,6 +1215,22 @@ void Z3DCanvas::pointInVolumeLeftClicked(QPoint,
 //   }
 // }
 
+bool Z3DCanvas::event(QEvent* e)
+{
+  CHECK(e);
+#if !defined(ATLAS_USE_OPENGLWIDGET)
+  if (m_regionalPresentationEnabled && m_engine &&
+      (e->type() == QEvent::FocusOut || e->type() == QEvent::WindowDeactivate || e->type() == QEvent::UngrabMouse)) {
+    QCoreApplication::postEvent(m_engine, new QEvent(e->type()));
+  }
+#endif
+  const bool handled = QGraphicsView::event(e);
+  if (e->type() == QEvent::DevicePixelRatioChange) {
+    publishCanvasGeometry(size());
+  }
+  return handled;
+}
+
 void Z3DCanvas::mousePressEvent(QMouseEvent* e)
 {
   if (m_engine) {
@@ -1156,11 +1301,26 @@ void Z3DCanvas::resizeEvent(QResizeEvent* event)
   m_scene->setSceneRect(QRect(QPoint(0, 0), event->size()));
 #endif
 
-  // VLOG(1) << devicePixelRatio() << " " << event->size() << " " << logicalDpiX() << " " << physicalDpiX();
+  publishCanvasGeometry(event->size());
+}
+
+void Z3DCanvas::publishCanvasGeometry(const QSize& logicalSize)
+{
+  CHECK_GT(logicalSize.width(), 0);
+  CHECK_GT(logicalSize.height(), 0);
   if (m_engine) {
     m_engine->cancelLongRendering();
   }
-  Q_EMIT canvasSizeChanged(event->size().width() * devicePixelRatio(), event->size().height() * devicePixelRatio());
+  const qreal dpr = devicePixelRatio();
+  CHECK(std::isfinite(dpr));
+  CHECK_GE(dpr, 1.0);
+  const size_t logicalWidth = static_cast<size_t>(logicalSize.width());
+  const size_t logicalHeight = static_cast<size_t>(logicalSize.height());
+  Q_EMIT canvasSizeChanged(static_cast<size_t>(logicalWidth * dpr),
+                           static_cast<size_t>(logicalHeight * dpr),
+                           logicalWidth,
+                           logicalHeight,
+                           dpr);
 }
 
 void Z3DCanvas::dragEnterEvent(QDragEnterEvent* event)

@@ -47,6 +47,7 @@ Atlas User Guide
   - [6.4 Global View Settings in 3D](#64-global-view-settings-in-3d)
   - [6.5 Background, Axis, and Shortcuts Reference](#65-background-axis-and-shortcuts-reference)
   - [6.6 The Progress Toolbar and Rendering Queue](#66-the-progress-toolbar-and-rendering-queue)
+  - [6.7 Optional Vulkan Multi-Device Rendering](#67-optional-vulkan-multi-device-rendering)
 - [7. Scene Management](#7-scene-management)
   - [7.1 Saving Your Workspace](#71-saving-your-workspace)
   - [7.2 Loading Scenes Step by Step](#72-loading-scenes-step-by-step)
@@ -718,6 +719,8 @@ The editor has three parts:
 3. Configure separate view settings or animations for the alias.
 4. Use Full Resolution rendering or unique color maps per alias to stage complex scenes.
 
+Aliases remain separate selection targets in 3D even though they share the same underlying data.
+
 ---
 
 ## 5. 2D Workspace Skills
@@ -1270,6 +1273,46 @@ X/Y/Z cut spans clip data globally; they affect all objects in the 3D scene.
 <!-- > 📸 **Screenshot to add:** 3D window with Progress toolbar visible during a render.-->
 ![3D rendering progress toolbar](images/Progress_toolbar.png)
 
+### 6.7 Optional Vulkan Multi-Device Rendering
+
+Vulkan multi-device rendering is disabled by default. To enable it for a 3D window, select Vulkan and provide a nonempty
+device list before opening the window:
+
+```text
+--atlas_default_render_backend=vulkan
+--atlas_vk_device_index=0
+--atlas_vk_multi_device_tile_worker_indices=1
+```
+
+The values are preference-sorted Vulkan device indices. `--atlas_vk_device_index` independently selects the canonical
+rendering and interaction engine. For a Vulkan 3D canvas, Atlas prepends that canonical device when a nonempty multi-device
+list omits it; when the list already contains the canonical device, Atlas preserves the listed order. The resulting set must
+contain at least two distinct compatible physical devices. An empty list keeps direct rendering. Atlas reads and normalizes
+this set when a Vulkan 3D window is created. Switching away from Vulkan releases the pool, and switching back in the same
+open window stays on direct rendering. Close and reopen the 3D window to apply the current interactive device configuration.
+
+Atlas assigns one stable, full-height region to each device in the effective set, in left-to-right order. If Atlas prepends
+an omitted canonical device, it owns the leftmost region; otherwise the user's order is unchanged. A device keeps that
+position while regional presentation is enabled. The canonical engine handles all camera navigation, mouse and keyboard
+gestures, picking, and object editing for the complete view. To answer a positional query, Atlas issues a synchronous,
+read-only hit or depth query against the last completed attachments of the rendering engine that owns the clicked region.
+Atlas maps any device-local handle back to the corresponding canonical handle. A worker-local runtime-mesh hit maps to
+object-level selection on the canonical mesh filter; exact per-mesh selection remains available for document-owned meshes.
+Alias object IDs remain distinct when their rendering payload is shared. Volume interaction uses the rendered volume depth
+from the region under the pointer. While regional results
+are invalidated or no regional frame has completed, picking queries behave as a miss until a fresh result is ready; camera
+navigation remains canonical. Atlas does not perform a separate hidden full-canvas picking render. Regional rendering is
+mono. Stereo rendering uses the canonical direct path instead of splitting eyes between devices. Each region is displayed
+when its device finishes it, so one region may temporarily show a newer progressive result than another. Until a regional
+result arrives, the latest direct full-frame image remains visible underneath it. Atlas schedules another regional update
+when worker-local paging or LOD data becomes ready, and worker diagnostics use the normal 3D rendering error reporting path.
+
+If interactive setup or a worker render fails, Atlas reports the error and resumes canonical direct rendering. That 3D
+window stays on the direct path; close and reopen it to retry after correcting the configuration. Omitting the multi-device
+list preserves ordinary direct rendering, as does OpenGL. Additional devices do not guarantee a speedup: aggregate progress
+and final completion still wait for every region, and heterogeneous devices may also contend for CPU, driver, or
+shared-memory resources. Validate image quality and measure the complete device set on representative scenes.
+
 ---
 
 ## 7. Scene Management
@@ -1440,18 +1483,20 @@ For reproducible still-image capture from saved workspaces:
      --output_tile_border 64 \
      --overwrite
    ```
-   The values are preference-sorted Vulkan device indices and form the complete selected device set. At least two distinct
-   compatible physical devices are required. Invalid, unavailable, incompatible, duplicate-index, or duplicate-device
-   selections fail export without fallback. `--atlas_vk_device_index` selects the canonical engine independently, and the
-   canonical adapter renders tiles only when its index is also in the selected set. The canonical engine owns a private
-   tile-worker pool; each selected noncanonical adapter runs a private render engine on its own rendering thread.
+   The values are preference-sorted Vulkan device indices and form the complete selected device set for this headless
+   fixed-capture command. At least two distinct compatible physical devices are required. Invalid, unavailable,
+   incompatible, duplicate-index, or duplicate-device selections fail export without fallback.
+   `--atlas_vk_device_index` selects the canonical engine independently, and the canonical adapter renders tiles only when
+   its index is explicitly in this headless selected set. The canonical engine owns a private tile-worker pool; each
+   selected noncanonical adapter runs a private render engine on its own rendering thread.
 
-   The private pool is used only when the fixed output is split into more than one tile. An untiled image is captured by the
-   canonical engine and device even when the device-set flag is present, although Atlas still validates and initializes the
-   requested pool before choosing that direct size branch. Omitting the device-set flag avoids tiled-capture device
-   selection and pool construction. This in-process pool does not route interactive rendering or headless animation export;
-   interactive and untiled rendering remain canonical single-device paths. On Linux, the one value accepted by
-   `--use_gpu_devices` for scene export selects the canonical engine and is independent of the tiled-capture device set.
+   Fixed-size scene capture uses the private pool only when the output is split into more than one tile. An untiled image is
+   captured by the canonical engine and device even when the device-set flag is present, although Atlas still validates and
+   initializes the requested pool before choosing that direct size branch. In a Vulkan 3D window, Atlas applies the
+   canvas-specific canonical-device normalization described in Section 6.7 before enabling stable fixed-region
+   presentation. Headless animation export does not use this pool; it assigns adjacent frame ranges to separate Atlas
+   processes. On Linux, the one value accepted by
+   `--use_gpu_devices` for scene export selects the canonical engine and is independent of the in-process device set.
 
    Different adapters or drivers can produce different pixel values, especially with depth- or fragment-order-sensitive
    transparency. Atlas assembles each adapter's tile without cross-device color or transparency reconciliation. Volume
@@ -1625,6 +1670,10 @@ Examples
 # Choose default 3D renderer backend (OpenGL default; Vulkan is experimental)
 --atlas_default_render_backend=vulkan
 
+# Optional Vulkan device list. A Vulkan canvas prepends its canonical device
+# when omitted; headless fixed-size scene capture uses the list exactly.
+--atlas_vk_multi_device_tile_worker_indices=0,1
+
 # Switch remote Neuroglancer HTTP transport for comparison/debugging
 --atlas_http_backend=curl
 
@@ -1682,6 +1731,7 @@ Tips
 | Scene load waits indefinitely | 3D window not ready | Watch logs; ensure 3D window is visible. Use `--atlas_block_scene_3d_apply` only when necessary. |
 | 3D window fails to open | GPU initialization error | Update GPU drivers, verify OpenGL/Vulkan support, and check the startup logs for renderer initialization errors. |
 | Runtime switch to Vulkan reports an initialization error | No compatible Vulkan context or device could be created | Atlas keeps OpenGL active and restores the Render Backend selection; review the reported driver/device error before retrying. |
+| Multi-device Vulkan setup reports an error and the 3D view continues on one device | The selection is invalid, duplicated, incompatible, unavailable, or unsupported by the active canvas build; an interactive worker may also have failed | Check the reported error and the preference-sorted device indices. After changing the device list, close and reopen the 3D window. |
 | Exported animations missing frames | Out-of-disk space or canceled job | Increase disk space, rerun export, check progress log. |
 | Full-resolution render never starts | Insufficient GPU memory or aggressive cuts | Reduce `atlas_image_block_size`, limit visible region, disable other full-res objects. |
 
@@ -1766,7 +1816,7 @@ Use **Help → Shortcuts** in either the 2D or 3D window to open this section di
 | `--limit_memory_usage_in_gb_to` | Set Atlas' host-memory sizing budget in GiB. The default value of zero uses detected-memory sizing in each process. Multi-process animation divides an explicitly supplied total among active render workers. |
 | `--atlas_vk_residency_budget_bytes` | Strict byte cap for Atlas-owned Vulkan device-local residency. When set, Atlas keeps each existing Vulkan pass hot set within the cap by making needed resources resident and evicting cold backing at safe points; paged image caches are sized from the effective Vulkan budget rather than uncapped physical VRAM. If one required pass working set exceeds the cap, export fails with a memory diagnostic instead of allocating past the cap. |
 | `--atlas_vk_device_index` | Prefer a Vulkan adapter by its preference-sorted startup index; `-1` uses automatic selection. Otherwise equal-ranked adapters use device UUID as the stable final tie-break. Atlas uses a compatible preferred adapter exactly. Invalid, out-of-range, or incompatible values log a warning and fall back to the first fully compatible Vulkan adapter. |
-| `--atlas_vk_multi_device_tile_worker_indices` | Comma-separated preference-sorted Vulkan indices for the private, engine-owned pool used by fixed-size tiled headless scene capture, for example `0,1`. The complete list must contain at least two distinct compatible physical devices; invalid or duplicate selections fail without fallback. The canonical adapter renders tiles only when listed; every selected noncanonical adapter uses a private engine on its own rendering thread. Empty keeps direct rendering. Interactive rendering and untiled captures remain on the canonical device, and this flag does not route animation rendering. |
+| `--atlas_vk_multi_device_tile_worker_indices` | Comma-separated preference-sorted Vulkan indices for the canonical engine's optional private multi-device pool, for example `0,1`. A Vulkan 3D window reads the list when that window is created. For this canvas path, a nonempty list that omits the independently selected canonical device is normalized by prepending it; a list already containing it keeps its order. The effective set must contain at least two distinct compatible physical devices and receives one stable mono region per device. Close and reopen the window to apply a changed list. Generic and headless multi-tile fixed-size scene capture keeps the supplied list exact and dynamically distributes export tiles; its canonical adapter participates only when explicitly listed. Unavailable, incompatible, duplicate-index, or duplicate-device selections are rejected, and every noncanonical adapter owns a private engine/rendering thread. Empty keeps direct rendering. The flag does not route animation or OpenGL rendering. |
 | `--atlas_perf_mode` | Vulkan performance collection mode: `off` disables collector timing/scopes/output while retaining the render-frame identity required for resource and presentation ordering; `light` records top-level submission/pass metrics (default), and `full` also records nested GPU scopes. |
 | `--use_gpu_devices` | Specify comma-separated backend device indices, for example `0,1`. Vulkan animation export supports the list on macOS, Windows, and Linux and uses one single-device process per nonempty frame range; multi-range exports launch child processes. Values are preference-sorted Vulkan indices passed as `--atlas_vk_device_index` preferences. Rejected preferences warn and use automatic selection, which can place multiple workers on the same adapter. OpenGL animation values are EGL device IDs and are Linux-only. Scene export keeps its Linux-only, exactly-one-value canonical-device behavior; use `--atlas_vk_multi_device_tile_worker_indices` for the separate in-process Vulkan tiled-capture device set. Empty retains the direct one-process path. |
 | `--animation_gpu_device_frame_weights` | Optional comma-separated positive integer frame shares corresponding one-to-one with `--use_gpu_devices` during multi-process animation export, for example `2,1`. Empty keeps balanced adjacent frame ranges. Each active device still owns one persistent adjacent range; weights do not distribute animation frames through scene tile workers. |

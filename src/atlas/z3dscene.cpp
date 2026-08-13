@@ -65,7 +65,7 @@ void Z3DScene::initPainter()
   LOG(INFO) << "painter inited";
 }
 
-void Z3DScene::setRenderingEngine(Z3DRenderingEngine* engine)
+void Z3DScene::setRenderingEngine(/*nullable*/ Z3DRenderingEngine* engine)
 {
   m_painter->setRenderingEngine(engine);
 }

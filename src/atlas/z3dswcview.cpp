@@ -15,7 +15,7 @@ void Z3DSwcView::docSwcsAdded(const std::vector<size_t>& objs)
 {
   try {
     for (auto id : objs) {
-      auto viewControl = new Z3DSwcFilter(m_engine.globalParas(), this);
+      auto viewControl = new Z3DSwcFilter(m_engine.globalParas(), this, id);
       viewControl->setData(m_doc.swcPack(id));
       viewControl->setSelected(m_doc.isObjSelected(id));
       expandBoundBox(viewControl->axisAlignedBoundBox());
@@ -64,7 +64,7 @@ void Z3DSwcView::docSwcsAdded(const std::vector<size_t>& objs)
 void Z3DSwcView::docSwcAdded(size_t id)
 {
   try {
-    auto viewControl = new Z3DSwcFilter(m_engine.globalParas(), this);
+    auto viewControl = new Z3DSwcFilter(m_engine.globalParas(), this, id);
     viewControl->setData(m_doc.swcPack(id));
     viewControl->setSelected(m_doc.isObjSelected(id));
     expandBoundBox(viewControl->axisAlignedBoundBox());

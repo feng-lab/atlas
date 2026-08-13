@@ -39,6 +39,41 @@ public:
     return m_idToFilter.contains(id);
   }
 
+  [[nodiscard]] std::vector<size_t> objectIds() const override
+  {
+    std::vector<size_t> ids;
+    ids.reserve(m_idToFilter.size());
+    for (const auto& [id, filter] : m_idToFilter) {
+      CHECK(filter);
+      ids.push_back(id);
+    }
+    return ids;
+  }
+
+  [[nodiscard]] bool isObjSelected(size_t id) const override
+  {
+    const auto filter = m_idToFilter.find(id);
+    CHECK(filter != m_idToFilter.end());
+    CHECK(filter->second);
+    return filter->second->isSelected();
+  }
+
+  void setObjSelected(size_t id, bool selected) override
+  {
+    const auto filter = m_idToFilter.find(id);
+    CHECK(filter != m_idToFilter.end());
+    CHECK(filter->second);
+    filter->second->setSelected(selected);
+  }
+
+  [[nodiscard]] Z3DFilter& filterForObject(size_t id) const override
+  {
+    const auto filter = m_idToFilter.find(id);
+    CHECK(filter != m_idToFilter.end());
+    CHECK(filter->second);
+    return *filter->second;
+  }
+
   [[nodiscard]] ZBBox<glm::dvec3> boundBoxOfObj(size_t id) const override
   {
     ZBBox<glm::dvec3> res;
@@ -90,7 +125,7 @@ public:
     return filters;
   }
 
-  const std::map<size_t, std::unique_ptr<FilterType>>& idToFilter()
+  [[nodiscard]] const std::map<size_t, std::unique_ptr<FilterType>>& idToFilter() const
   {
     return m_idToFilter;
   }
@@ -158,9 +193,7 @@ protected:
 
   void onObjSelectedFromView(bool append) override
   {
-    if (!m_engine.permitsDocumentMutationFrom3DView()) {
-      return;
-    }
+    m_engine.checkCanonicalDocumentMutation();
     if (FilterType* filter = qobject_cast<FilterType*>(sender())) {
       for (const auto& idFilter : m_idToFilter) {
         if (idFilter.second.get() == filter) {
@@ -194,9 +227,7 @@ protected:
 
   void onObjDeselectedFromView() override
   {
-    if (!m_engine.permitsDocumentMutationFrom3DView()) {
-      return;
-    }
+    m_engine.checkCanonicalDocumentMutation();
     if (FilterType* filter = qobject_cast<FilterType*>(sender())) {
       for (const auto& idFilter : m_idToFilter) {
         if (idFilter.second.get() == filter) {
@@ -224,13 +255,13 @@ protected:
 
   void onObjVisibleChangedFromView(bool v) override
   {
-    if (!m_engine.permitsDocumentMutationFrom3DView()) {
-      return;
-    }
     if (FilterType* filter = qobject_cast<FilterType*>(sender())) {
       for (const auto& idFilter : m_idToFilter) {
         if (idFilter.second.get() == filter) {
           if (m_docDrivenVisibilitySyncId == idFilter.first) {
+            return;
+          }
+          if (!m_engine.permitsDocumentMutationFrom3DView()) {
             return;
           }
           // View-driven visibility updates originate on the rendering thread, but

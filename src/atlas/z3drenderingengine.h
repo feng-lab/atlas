@@ -4,6 +4,7 @@
 #include "z3dcontext.h"
 #include "z3drenderedtile.h"
 #include "z3drenderglobalstate.h"
+#include "z3dtiledescriptor.h"
 #include "zviewsettinginterface.h"
 #include "zvulkandevicesupport.h"
 #include "zbbox.h"
@@ -23,6 +24,7 @@
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
 class QOffscreenSurface;
@@ -34,6 +36,8 @@ namespace nim {
 enum class ReadbackCompletionPolicy : uint8_t;
 
 class Z3DFilter;
+class Z3DBoundedFilter;
+class Z3DImgFilter;
 class Z3DMeshFilter;
 class Z3DCanvas;
 
@@ -52,7 +56,6 @@ class ZVulkanContext;
 class ZVulkanDevice;
 class ZQtExecutor;
 class ZSwcPack;
-class Z3DTileDescriptor;
 struct ScreenSpaceSufficiencyAudit;
 
 class Z3DRenderingEngine
@@ -71,19 +74,24 @@ public:
   // Return the exact adapter used by this initialized Vulkan engine.
   [[nodiscard]] ZVulkanDeviceSupport::DeviceSelection activeVulkanDeviceSelection() const;
 
-  // Configure the device set used by subsequent tiled Vulkan captures. An
-  // empty set removes the worker pool and leaves every render on this engine.
+  // Install the device set used by fixed-region interaction and tiled
+  // fixed-size capture. An active set cannot be replaced.
   // The canonical engine participates when its adapter is present in the set.
   void configureVulkanTileWorkers(std::span<const ZVulkanDeviceSupport::DeviceSelection> selections);
+
+  // Resolve preference-sorted device indices at the user-input boundary and
+  // install the exact compatible device set. Empty input leaves an
+  // unconfigured engine on the direct path.
+  [[nodiscard]] bool configureVulkanTileWorkersFromPreferenceIndices(std::span<const std::string> indices,
+                                                                     QString& error);
 
   ~Z3DRenderingEngine() override;
 
   [[nodiscard]] const ZDoc& doc() const;
 
-  // Only the canonical engine may propagate view-originated selection and
-  // visibility changes into the shared document. Tile workers consume document
-  // and serialized engine state in one direction.
-  [[nodiscard]] bool permitsDocumentMutationFrom3DView() const;
+  [[nodiscard]] bool permitsDocumentMutationFrom3DView() const noexcept;
+
+  void checkCanonicalDocumentMutation() const;
 
   std::shared_ptr<ZWidgetsGroup> viewSettingWidgetsGroupOf(size_t id) override;
 
@@ -190,7 +198,12 @@ public:
   // for offscreen rendering
   void init();
 
-  void initAndAttachToCanvas(Z3DCanvas* canvas);
+  void initAndAttachToCanvas(Z3DCanvas* canvas,
+                             size_t physicalWidth,
+                             size_t physicalHeight,
+                             size_t logicalWidth,
+                             size_t logicalHeight,
+                             qreal devicePixelRatio);
 
   void detachCanvas();
 
@@ -416,7 +429,11 @@ private:
 
   ZImg localColorBufferToRGBAImg(const Z3DLocalColorBuffer& buffer);
 
-  void onCanvasResized(size_t w, size_t h);
+  void onCanvasResized(size_t physicalWidth,
+                       size_t physicalHeight,
+                       size_t logicalWidth,
+                       size_t logicalHeight,
+                       qreal devicePixelRatio);
 
   void ensureGLContext();
   void recoverFromVulkanInitializationFailure(const QString& error);
@@ -445,6 +462,7 @@ private:
                                                             int width,
                                                             int height,
                                                             Z3DScreenShotType sst,
+                                                            bool allowVulkanWorkerPool,
                                                             bool reportProgress = false,
                                                             folly::CancellationToken cancellationToken = {},
                                                             int tileSize = 0,
@@ -462,7 +480,17 @@ private:
                              bool reportProgress = false,
                              folly::CancellationToken cancellationToken = {});
 
-  void resetOutputSizeToMatchCanvasSize();
+  void resetOutputSizeToMatchCanvasSize() noexcept;
+
+  void configureCanvasVulkanTileWorkersFromFlags();
+  void updateVulkanInteractivePresentation();
+  void handleVulkanTileWorkerNeedsRender();
+  [[nodiscard]] bool shouldUseVulkanTileWorkersForInteractiveRendering(bool stereo) const;
+  void renderVulkanInteractiveFrame(bool finishProgressiveRendering);
+  void prepareCanonicalEngineForNonRegionalRendering();
+  void restoreDirectRenderingConfiguration();
+  void releaseVulkanTileWorkerPool();
+  void releaseVulkanTileWorkerPoolAfterFailure(const char* operation) noexcept;
 
   void handleRenderBackendChanged();
   void applyBackendSwitch();
@@ -500,12 +528,52 @@ private:
 
   struct PendingVulkanTile;
   struct VulkanTileRenderState;
+  struct VulkanRegionalPickingHit
+  {
+    enum class Kind : uint8_t
+    {
+      None,
+      SharedObject,
+      EngineLocalMesh,
+      TransformHandle
+    };
+
+    Kind kind = Kind::None;
+    size_t objectId = 0u;
+    const void* sharedObject = nullptr;
+    uint8_t transformHandleIndex = 0u;
+  };
+
+  struct VulkanRegionalPickingDistance
+  {
+    VulkanRegionalPickingHit hit;
+    uint64_t squaredPhysicalPixelDistance = 0u;
+  };
   [[nodiscard]] std::shared_ptr<const VulkanTileRenderState> publishVulkanTileRenderState() const;
+  [[nodiscard]] std::vector<Z3DObjView*> validateVulkanObjectStateTopology(const VulkanTileRenderState& state,
+                                                                           const char* topologyChangedMessage) const;
   void applyVulkanTileRenderState(const VulkanTileRenderState& state);
+  [[nodiscard]] Z3DFilter& filterForVulkanObject(size_t objectId) const;
+  [[nodiscard]] VulkanRegionalPickingHit classifyVulkanRegionalPickingObject(size_t objectId, const void* object) const;
+  [[nodiscard]] Z3DPickingManager::PickingObject
+  resolveVulkanRegionalPickingHit(const VulkanRegionalPickingHit& hit) const;
+  [[nodiscard]] VulkanRegionalPickingHit queryVulkanRegionalPickingObject(glm::uvec2 attachmentPixel) const;
+  [[nodiscard]] GLfloat queryVulkanRegionalPickingDepth(glm::uvec2 attachmentPixel) const;
+  [[nodiscard]] std::vector<VulkanRegionalPickingDistance>
+  queryVulkanRegionalPickingObjectsByDistance(glm::i64vec2 attachmentReferencePixel,
+                                              glm::uvec4 attachmentSearchRect) const;
+  [[nodiscard]] std::optional<GLfloat> queryVulkanRegionalImageDepth(size_t imageObjectId,
+                                                                     glm::uvec2 attachmentPixel) const;
+  void cancelVulkanInteractiveMouseGestures() noexcept;
   void checkVulkanTileWorkerExecutionContext() const;
   void beginVulkanTileExport(glm::uvec2 fullOutputExtent, folly::CancellationToken cancellationToken = {});
   void endVulkanTileExport();
   void abandonVulkanTileExportAfterFailure();
+  void prepareVulkanInteractiveRegion(const Z3DTileDescriptor& region);
+  [[nodiscard]] FrameProcessResult submitVulkanInteractiveRegion(const Z3DTileDescriptor& region,
+                                                                 folly::CancellationToken cancellationToken = {});
+  void collectVulkanInteractiveRegion(uint64_t renderFrameToken);
+  void abandonPendingVulkanInteractiveRegionAfterFailure();
   [[nodiscard]] uint64_t submitVulkanTile(const Z3DTileDescriptor& tile,
                                           bool renderStereoPair = false,
                                           folly::CancellationToken cancellationToken = {});
@@ -532,6 +600,7 @@ private:
   std::unique_ptr<ZVulkanContext> m_vkContext;
   std::unique_ptr<ZVulkanDevice> m_vkDevice;
   std::unique_ptr<PendingVulkanTile> m_pendingVulkanTile;
+  std::optional<Z3DTileDescriptor> m_vulkanInteractiveRegion;
   std::optional<glm::uvec2> m_vulkanTileExportExtent;
   std::optional<ReadbackCompletionPolicy> m_vulkanTilePreviousReadbackCompletionPolicy;
   std::unique_ptr<ZQtExecutor> m_ownedRenderThreadExecutor;
@@ -540,6 +609,9 @@ private:
   ZDoc& m_doc;
 
   QPointer<Z3DCanvas> m_canvas;
+  glm::uvec2 m_canvasOutputSize{0u, 0u};
+  glm::uvec2 m_canvasLogicalSize{0u, 0u};
+  qreal m_canvasDevicePixelRatio = 1.0;
   bool m_seedTraceToolEnabled = false;
   bool m_seedTraceInProgress = false;
   std::optional<size_t> m_seedTraceSourceImgObjId;
@@ -597,6 +669,8 @@ private:
   std::mutex m_mutex;
 
   double m_progress = 0;
+  bool m_vulkanInteractivePresentationActive = false;
+  QMetaObject::Connection m_vulkanInteractiveInvalidationConnection;
   std::vector<QString> m_deferredRenderingErrors;
   bool m_deferredRenderingErrorFrameActive = false;
 
@@ -614,7 +688,7 @@ private:
   std::unordered_map<size_t, json::object> m_pendingObjViewJson;
   int m_sceneApplyOutstanding = 0;
 
-  // Non-null only for explicitly configured tiled Vulkan worker capture.
+  // Non-null only for an explicitly configured Vulkan worker participant set.
   // Declared last so worker lanes are released before the engine's render
   // resources during normal member destruction.
   std::unique_ptr<ZVulkanTileWorkerPool> m_vulkanTileWorkerPool;

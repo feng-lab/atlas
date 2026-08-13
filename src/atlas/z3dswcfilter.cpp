@@ -5,7 +5,7 @@
 
 namespace nim {
 
-Z3DSwcFilter::Z3DSwcFilter(Z3DGlobalParameters& globalParas, QObject* parent)
+Z3DSwcFilter::Z3DSwcFilter(Z3DGlobalParameters& globalParas, QObject* parent, size_t objectId)
   : Z3DGeometryFilter(globalParas, parent)
   , m_lineRenderer(m_rendererBase)
   , m_coneRenderer(m_rendererBase)
@@ -17,6 +17,7 @@ Z3DSwcFilter::Z3DSwcFilter(Z3DGlobalParameters& globalParas, QObject* parent)
   , m_contextMenuEvent("Context Menu", false)
   , m_dataIsInvalid(false)
   , m_interactionMode(InteractionMode::Select)
+  , m_objectId(objectId)
 {
   // rendering primitive
   m_renderingPrimitive.addOptions("Normal", "Line", "Sphere", "Cylinder");
@@ -98,6 +99,11 @@ Z3DSwcFilter::Z3DSwcFilter(Z3DGlobalParameters& globalParas, QObject* parent)
   m_sphereRendererForCone.setUseDynamicMaterial(true);
 }
 
+Z3DSwcFilter::~Z3DSwcFilter()
+{
+  deregisterPickingObjects();
+}
+
 double Z3DSwcFilter::process(Z3DEye)
 {
   syncRendererState();
@@ -121,31 +127,26 @@ void Z3DSwcFilter::markColorDirty()
 void Z3DSwcFilter::registerPickingObjects()
 {
   if (!m_pickingObjectsRegistered) {
-    pickingManager().registerObject(m_swcPack);
-    for (auto node : m_swcPack->allNodesSet()) {
-      pickingManager().registerObject(node);
-    }
-    m_registeredSwcPack = m_swcPack;
+    CHECK(m_swcPack != nullptr);
+    CHECK(m_swcPickingTokens.empty());
     m_swcPickingColors.clear();
     m_linePickingColors.clear();
     m_pointPickingColors.clear();
-    glm::col4 pickingColor = pickingManager().colorOfObject(m_swcPack);
-    glm::vec4 fPickingColor(pickingColor[0] / 255.f,
-                            pickingColor[1] / 255.f,
-                            pickingColor[2] / 255.f,
-                            pickingColor[3] / 255.f);
+    m_swcPickingTokens.reserve(m_swcPack->decomposedNodes().size() + 1u);
+    const glm::col4 swcToken = pickingManager().registerObject(m_swcPack, m_objectId);
+    m_swcPickingTokens.push_back(swcToken);
+    const glm::vec4 swcPickingColor = glm::vec4(swcToken) / 255.f;
     for (size_t j = 0; j < m_swcPack->decompsedNodePairs().size(); ++j) {
-      m_swcPickingColors.push_back(fPickingColor);
-      m_linePickingColors.push_back(fPickingColor);
-      m_linePickingColors.push_back(fPickingColor);
+      m_swcPickingColors.push_back(swcPickingColor);
+      m_linePickingColors.push_back(swcPickingColor);
+      m_linePickingColors.push_back(swcPickingColor);
     }
     m_sphereForConePickingColors = m_swcPickingColors;
-    m_sphereForConePickingColors.push_back(fPickingColor);
+    m_sphereForConePickingColors.push_back(swcPickingColor);
     for (auto& tn : m_swcPack->decomposedNodes()) {
-      pickingColor = pickingManager().colorOfObject(&tn);
-      fPickingColor =
-        glm::vec4(pickingColor[0] / 255.f, pickingColor[1] / 255.f, pickingColor[2] / 255.f, pickingColor[3] / 255.f);
-      m_pointPickingColors.push_back(fPickingColor);
+      const glm::col4 nodeToken = pickingManager().registerObject(&tn, m_objectId);
+      m_swcPickingTokens.push_back(nodeToken);
+      m_pointPickingColors.push_back(glm::vec4(nodeToken) / 255.f);
     }
 
     m_coneRenderer.setDataPickingColors(&m_swcPickingColors);
@@ -160,16 +161,21 @@ void Z3DSwcFilter::registerPickingObjects()
 void Z3DSwcFilter::deregisterPickingObjects()
 {
   if (m_pickingObjectsRegistered) {
-    if (m_registeredSwcPack) {
-      pickingManager().deregisterObject(m_registeredSwcPack);
+    for (const glm::col4& token : m_swcPickingTokens) {
+      pickingManager().deregisterObject(token);
     }
-    for (auto node : m_swcPack->allNodesSet()) {
-      pickingManager().deregisterObject(node);
-    }
-    m_registeredSwcPack = nullptr;
+    m_swcPickingTokens.clear();
   }
 
   m_pickingObjectsRegistered = false;
+}
+
+bool Z3DSwcFilter::isCurrentPickingObject(const void* object) const noexcept
+{
+  if (object == nullptr || m_swcPack == nullptr) {
+    return false;
+  }
+  return object == m_swcPack || m_swcPack->allNodesSet().contains(static_cast<const ZSwc::SwcTreeNode*>(object));
 }
 
 void Z3DSwcFilter::setData(ZSwcPack& swcPack)
@@ -495,6 +501,8 @@ void Z3DSwcFilter::treeBound(ZSwcPack* swcPack, ZBBox<glm::dvec3>& res) const
 
 void Z3DSwcFilter::updateData()
 {
+  cancelMouseGesture();
+
   m_dataIsInvalid = true;
   m_colorDirty = true;
   invalidateResult();
@@ -666,13 +674,17 @@ void Z3DSwcFilter::prepareColor()
 
 void Z3DSwcFilter::selectSwc(QMouseEvent* e, int w, int h)
 {
-  if (!m_swcPack) {
-    return;
-  }
-
   e->ignore();
   if (e->type() == QEvent::MouseButtonDblClick) {
-    const void* obj = pickingManager().objectAtWidgetPos(glm::ivec2(e->position().x(), e->position().y()));
+    if (!m_swcPack) {
+      return;
+    }
+    const Z3DPickingManager::PickingObject pickingObject =
+      pickingManager().pickingObjectAtWidgetPos(glm::ivec2(e->position().x(), e->position().y()));
+    if (pickingObject.object != nullptr && pickingObject.objectId != m_objectId) {
+      return;
+    }
+    const void* const obj = pickingObject.object;
     bool appending = (e->modifiers() == Qt::ControlModifier);
     if (!obj && !appending && m_isSelected) {
       Q_EMIT objDeselected();
@@ -689,17 +701,21 @@ void Z3DSwcFilter::selectSwc(QMouseEvent* e, int w, int h)
     return;
   }
 
-  if (m_swcPack->isLocked()) {
-    return;
-  }
-
-  e->ignore();
   // Mouse button pressend
   // can not accept the event in button press, because we don't know if it is a selection or interaction
   if (e->type() == QEvent::MouseButtonPress) {
-    m_startCoord.x = e->position().x();
-    m_startCoord.y = e->position().y();
-    const void* obj = pickingManager().objectAtWidgetPos(glm::ivec2(e->position().x(), e->position().y()));
+    m_mousePressStart.reset();
+    m_pressedSwcTreeNode = nullptr;
+    if (!m_swcPack || m_swcPack->isLocked()) {
+      return;
+    }
+    const Z3DPickingManager::PickingObject pickingObject =
+      pickingManager().pickingObjectAtWidgetPos(glm::ivec2(e->position().x(), e->position().y()));
+    if (pickingObject.object != nullptr && pickingObject.objectId != m_objectId) {
+      return;
+    }
+    m_mousePressStart = glm::ivec2(e->position().x(), e->position().y());
+    const void* const obj = pickingObject.object;
     if (!obj) {
       return;
     }
@@ -711,21 +727,36 @@ void Z3DSwcFilter::selectSwc(QMouseEvent* e, int w, int h)
   }
 
   if (e->type() == QEvent::MouseButtonRelease) {
-    if (std::abs(e->position().x() - m_startCoord.x) < 2 && std::abs(m_startCoord.y - e->position().y()) < 2) {
-      if (m_interactionMode == InteractionMode::ConnectSwcNode && m_pressedSwcTreeNode) {
-        Q_EMIT request3dSwcConnectToTarget(m_swcPack, (*m_pressedSwcTreeNode)->id);
+    if (!m_mousePressStart.has_value()) {
+      return;
+    }
+    const glm::ivec2 pressStart = *m_mousePressStart;
+    m_mousePressStart.reset();
+    const ZSwc::SwcTreeNode* const pressedSwcTreeNode = m_pressedSwcTreeNode;
+    m_pressedSwcTreeNode = nullptr;
+    if (!m_swcPack || m_swcPack->isLocked() ||
+        (pressedSwcTreeNode != nullptr && !m_swcPack->allNodesSet().contains(pressedSwcTreeNode))) {
+      return;
+    }
+    if (std::abs(e->position().x() - pressStart.x) < 2 && std::abs(pressStart.y - e->position().y()) < 2) {
+      if (m_interactionMode == InteractionMode::ConnectSwcNode && pressedSwcTreeNode) {
+        Q_EMIT request3dSwcConnectToTarget(m_swcPack, (*pressedSwcTreeNode)->id);
         e->accept();
       } else if ((m_interactionMode == InteractionMode::AddSwcNode ||
                   m_interactionMode == InteractionMode::PlainExtendSwcNode) &&
-                 isNodeRendering() && !m_pressedSwcTreeNode) {
+                 isNodeRendering() && !pressedSwcTreeNode) {
         const glm::ivec2 widgetPos(static_cast<int>(e->position().x()), static_cast<int>(e->position().y()));
 
         const ZSwc::SwcTreeNode* anchorNodePtr = nullptr;
         if (m_interactionMode == InteractionMode::AddSwcNode) {
           // Find the nearest SWC node in screen space to define a depth on the click ray.
-          const std::vector<const void*> objsNear = pickingManager().sortObjectsByDistanceToPos(widgetPos, 100);
-          for (const void* obj : objsNear) {
-            const auto* nodePtr = static_cast<const ZSwc::SwcTreeNode*>(obj);
+          const std::vector<Z3DPickingManager::PickingObject> objsNear =
+            pickingManager().sortPickingObjectsByDistanceToPos(widgetPos, 100);
+          for (const Z3DPickingManager::PickingObject& pickingObject : objsNear) {
+            if (pickingObject.objectId != m_objectId) {
+              continue;
+            }
+            const auto* nodePtr = static_cast<const ZSwc::SwcTreeNode*>(pickingObject.object);
             if (m_swcPack->allNodesSet().contains(nodePtr)) {
               anchorNodePtr = nodePtr;
               break;
@@ -733,9 +764,13 @@ void Z3DSwcFilter::selectSwc(QMouseEvent* e, int w, int h)
           }
 
           if (anchorNodePtr == nullptr) {
-            const std::vector<const void*> objsAll = pickingManager().sortObjectsByDistanceToPos(widgetPos, -1);
-            for (const void* obj : objsAll) {
-              const auto* nodePtr = static_cast<const ZSwc::SwcTreeNode*>(obj);
+            const std::vector<Z3DPickingManager::PickingObject> objsAll =
+              pickingManager().sortPickingObjectsByDistanceToPos(widgetPos, -1);
+            for (const Z3DPickingManager::PickingObject& pickingObject : objsAll) {
+              if (pickingObject.objectId != m_objectId) {
+                continue;
+              }
+              const auto* nodePtr = static_cast<const ZSwc::SwcTreeNode*>(pickingObject.object);
               if (m_swcPack->allNodesSet().contains(nodePtr)) {
                 anchorNodePtr = nodePtr;
                 break;
@@ -775,16 +810,22 @@ void Z3DSwcFilter::selectSwc(QMouseEvent* e, int w, int h)
           e->accept();
         }
       } else {
-        Q_EMIT treeNodeSelected(m_pressedSwcTreeNode,
+        Q_EMIT treeNodeSelected(pressedSwcTreeNode,
                                 e->modifiers() == Qt::ControlModifier,
                                 e->modifiers() == Qt::ShiftModifier);
-        if (m_pressedSwcTreeNode) {
+        if (pressedSwcTreeNode) {
           e->accept();
         }
       }
     }
-    m_pressedSwcTreeNode = nullptr;
   }
+}
+
+void Z3DSwcFilter::cancelMouseGesture() noexcept
+{
+  Z3DBoundedFilter::cancelMouseGesture();
+  m_mousePressStart.reset();
+  m_pressedSwcTreeNode = nullptr;
 }
 
 void Z3DSwcFilter::contextMenuEvent(QContextMenuEvent* e, int, int)
@@ -796,7 +837,12 @@ void Z3DSwcFilter::contextMenuEvent(QContextMenuEvent* e, int, int)
     return;
   }
 
-  const void* obj = pickingManager().objectAtWidgetPos(glm::ivec2(e->x(), e->y()));
+  const Z3DPickingManager::PickingObject pickingObject =
+    pickingManager().pickingObjectAtWidgetPos(glm::ivec2(e->x(), e->y()));
+  if (pickingObject.object != nullptr && pickingObject.objectId != m_objectId) {
+    return;
+  }
+  const void* const obj = pickingObject.object;
   if (!obj) {
     return;
   }

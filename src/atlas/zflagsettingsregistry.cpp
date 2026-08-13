@@ -182,6 +182,12 @@ const std::vector<ZFlagSettingSpec>& atlasFlagSettingSpecs()
                                 ZFlagSettingEditorKind::Auto,
                                 {},
                                 true));
+    allSpecs.push_back(makeSpec("atlas_vk_multi_device_tile_worker_indices",
+                                "Rendering",
+                                "Vulkan multi-device rendering indices",
+                                ZFlagSettingEditorKind::Auto,
+                                {},
+                                true));
     allSpecs.push_back(makeSpec("atlas_mesh_preferred_triangle_budget_per_segment",
                                 "Rendering",
                                 "Mesh preferred triangles per segment",

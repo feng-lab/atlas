@@ -21,7 +21,6 @@
 #include <QFileInfo>
 #include <QThread>
 
-#include <algorithm>
 #include <cstdint>
 #include <limits>
 #include <string>
@@ -29,12 +28,8 @@
 #include <vector>
 
 ABSL_FLAG(bool, run_export_3d_scene, false, "Enable exporting a 3D scene screenshot via command line");
-ABSL_FLAG(std::vector<std::string>,
-          atlas_vk_multi_device_tile_worker_indices,
-          std::vector<std::string>{},
-          "Preference-sorted Vulkan device indices participating in the private tiled-capture pool. "
-          "Specify at least two distinct compatible indices; empty keeps the direct rendering path.");
 
+ABSL_DECLARE_FLAG(std::vector<std::string>, atlas_vk_multi_device_tile_worker_indices);
 ABSL_DECLARE_FLAG(std::string, filename);
 ABSL_DECLARE_FLAG(std::string, output_filename);
 ABSL_DECLARE_FLAG(int32_t, output_width);
@@ -131,63 +126,6 @@ std::pair<int, int> resolveSceneTileSettings()
     return {0, 0};
   }
   return {absl::GetFlag(FLAGS_output_tile_size), absl::GetFlag(FLAGS_output_tile_border)};
-}
-
-bool resolveVulkanTileWorkerSelections(Z3DRenderingEngine& engine,
-                                       std::vector<ZVulkanDeviceSupport::DeviceSelection>& resolvedSelections,
-                                       QString& error)
-{
-  const std::vector<std::string> requestedIndices = absl::GetFlag(FLAGS_atlas_vk_multi_device_tile_worker_indices);
-  if (requestedIndices.empty()) {
-    return true;
-  }
-  if (requestedIndices.size() < 2u) {
-    error = "--atlas_vk_multi_device_tile_worker_indices requires at least two device indices";
-    return false;
-  }
-  if (static_cast<RenderBackend>(engine.globalParas().renderBackend.associatedData()) != RenderBackend::Vulkan) {
-    error = "--atlas_vk_multi_device_tile_worker_indices requires the active Vulkan rendering backend";
-    return false;
-  }
-
-  const auto compatibleSelections = engine.compatibleVulkanTileWorkerSelections();
-  resolvedSelections.reserve(requestedIndices.size());
-  for (const std::string& requestedIndex : requestedIndices) {
-    size_t preferenceIndex = 0u;
-    if (!stringToValueNoThrow(requestedIndex, preferenceIndex)) {
-      error = QString("invalid Vulkan tile-worker device index %1").arg(QString::fromStdString(requestedIndex));
-      return false;
-    }
-
-    const auto selectionIt =
-      std::find_if(compatibleSelections.begin(), compatibleSelections.end(), [preferenceIndex](const auto& selection) {
-        return selection.preferenceIndex == preferenceIndex;
-      });
-    if (selectionIt == compatibleSelections.end()) {
-      error =
-        QString("Vulkan device index %1 is unavailable or incompatible with Atlas tile rendering").arg(preferenceIndex);
-      return false;
-    }
-    const bool duplicateIndex =
-      std::any_of(resolvedSelections.begin(), resolvedSelections.end(), [&](const auto& known) {
-        return known.preferenceIndex == selectionIt->preferenceIndex;
-      });
-    if (duplicateIndex) {
-      error = QString("Vulkan tile-worker device index %1 was specified more than once").arg(preferenceIndex);
-      return false;
-    }
-    const bool duplicateUuid =
-      std::any_of(resolvedSelections.begin(), resolvedSelections.end(), [&](const auto& known) {
-        return known.expectedDeviceUuid == selectionIt->expectedDeviceUuid;
-      });
-    if (duplicateUuid) {
-      error = QString("Vulkan tile-worker device index %1 resolves to an already selected physical device")
-                .arg(preferenceIndex);
-      return false;
-    }
-    resolvedSelections.push_back(*selectionIt);
-  }
-  return true;
 }
 
 bool loadSceneForExport(const QString& filename, ZDoc& doc, ZView& view, Z3DRenderingEngine& engine, QString& error)
@@ -406,19 +344,10 @@ int ZRunExport3DScene::run()
   }
 
   const auto [tileSize, tileBorder] = resolveSceneTileSettings();
-  std::vector<ZVulkanDeviceSupport::DeviceSelection> workerSelections;
-  if (!resolveVulkanTileWorkerSelections(engine, workerSelections, errorMsg)) {
+  const std::vector<std::string> workerIndices = absl::GetFlag(FLAGS_atlas_vk_multi_device_tile_worker_indices);
+  if (!engine.configureVulkanTileWorkersFromPreferenceIndices(workerIndices, errorMsg)) {
     LOG(ERROR) << errorMsg;
     return 1;
-  }
-  if (!workerSelections.empty()) {
-    try {
-      engine.configureVulkanTileWorkers(workerSelections);
-    }
-    catch (const std::exception& e) {
-      LOG(ERROR) << "Vulkan tile-worker configuration failed: " << e.what();
-      return 1;
-    }
   }
   engine.takeFixedSizeScreenShot(outputFilename,
                                  absl::GetFlag(FLAGS_output_width),

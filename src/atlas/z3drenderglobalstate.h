@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <memory>
 #include <mutex>
+#include <optional>
 
 namespace nim {
 
@@ -15,8 +16,12 @@ public:
   static Z3DRenderGlobalState& instance();
 
   bool hasCancellationSource() const;
-  std::shared_ptr<folly::CancellationSource> ensureCancellationSource();
-  void resetCancellationSource();
+  // A checkpoint is available only while the ordinary render domain is idle.
+  // Acquisition fails if cancellation was requested after this observation.
+  std::optional<uint64_t> idleCancellationCheckpoint() const;
+  std::shared_ptr<folly::CancellationSource> tryAcquireCancellationSource(uint64_t checkpoint);
+  // The source pointer is the ownership identity for the active render.
+  void releaseCancellationSource(const std::shared_ptr<folly::CancellationSource>& source);
   void requestCancellation();
   std::shared_ptr<folly::CancellationSource> ensureCaptureCancellationSource();
   void resetCaptureCancellationSource();
@@ -54,6 +59,7 @@ private:
   mutable std::mutex m_cancellationMutex;
   std::shared_ptr<folly::CancellationSource> m_cancellationSource;
   std::shared_ptr<folly::CancellationSource> m_captureCancellationSource;
+  uint64_t m_cancellationRequestGeneration = 0u;
 };
 
 } // namespace nim

@@ -80,6 +80,10 @@ public:
 
   void renderTransparent(Z3DEye eye) override;
 
+  // Sample the most recent Vulkan volume depth using top-left attachment
+  // coordinates. An empty result means no rendered Vulkan depth is available.
+  [[nodiscard]] std::optional<float> vulkanTransparentDepthAt(glm::uvec2 topLeftAttachmentPixel) const;
+
   // get salient 3d position hit by 2d point
   // check success before using the returned value
   // if first hit 3d position is in volume, success will be true,
@@ -111,6 +115,8 @@ Q_SIGNALS:
   void deferredRenderingWarning(const QString& warning) const;
 
 protected:
+  void cancelMouseGesture() noexcept override;
+
   void switchRendererBackend(RenderBackend backend) override
   {
     Z3DBoundedFilter::switchRendererBackend(backend);
@@ -296,7 +302,7 @@ private:
 
   ZEventListenerParameter m_leftMouseButtonPressEvent;
   ZEventListenerParameter m_contextMenuEvent;
-  glm::ivec2 m_startCoord{};
+  std::optional<glm::ivec2> m_mousePressStart;
 
   size_t m_imgObjId = 0;
   bool m_seedTraceToolEnabled = false;

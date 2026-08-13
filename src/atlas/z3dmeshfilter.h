@@ -14,6 +14,7 @@
 #include <QObject>
 #include <QPoint>
 #include <QTimer>
+#include <cstddef>
 #include <map>
 #include <memory>
 #include <optional>
@@ -34,7 +35,8 @@ class Z3DMeshFilter : public Z3DGeometryFilter
 public:
   explicit Z3DMeshFilter(Z3DGlobalParameters& globalParas,
                          const RegionNode* regionNode = nullptr,
-                         QObject* parent = nullptr);
+                         QObject* parent = nullptr,
+                         size_t objectId = 0u);
   ~Z3DMeshFilter() override;
 
   void setMeshColor(const glm::vec4& col)
@@ -77,6 +79,20 @@ public:
 
   [[nodiscard]] bool isReady(Z3DEye eye) const override;
 
+  // This identity is stable for the lifetime of the filter. Regional picking
+  // resolves a worker hit to the corresponding canonical filter before using
+  // the token, so engine-local mesh addresses never cross engine boundaries.
+  [[nodiscard]] const void* regionalPickingToken() const noexcept
+  {
+    return this;
+  }
+
+  // Document-owned meshes are shared by the canonical and worker engines.
+  // Runtime Neuroglancer meshes are filter-local and must use the regional
+  // token instead of crossing an engine boundary by address.
+  [[nodiscard]] bool isDocumentPickingObject(/*nullable*/ const void* object) const noexcept;
+  [[nodiscard]] bool isCurrentPickingObject(/*nullable*/ const void* object) const noexcept;
+
   std::shared_ptr<ZWidgetsGroup> widgetsGroup();
 
   std::shared_ptr<ZWidgetsGroup> widgetsGroupForAnnotationFilter();
@@ -101,6 +117,8 @@ Q_SIGNALS:
   void meshSelected(ZMesh*, bool append);
 
 protected:
+  void cancelMouseGesture() noexcept override;
+
   void prepareColor();
 
   void adjustWidgets();
@@ -130,6 +148,9 @@ protected:
   void updateMeshVisibleState();
 
 private:
+  [[nodiscard]] bool isObjectLevelPickingObject(/*nullable*/ const void* object) const noexcept;
+  [[nodiscard]] ZMesh* resolveExactMeshPickingObject(/*nullable*/ const void* object) const noexcept;
+
   enum class RuntimeNeuroglancerRequestFrontierMode
   {
     None,
@@ -225,17 +246,17 @@ private:
   //  hidden because they are unchecked from the object model. This allows us to control
   //  the visibility of each single punctum.
   std::vector<ZMesh*> m_meshList;
-  std::vector<ZMesh*> m_registeredMeshList; // used for picking
 
   std::vector<glm::vec4> m_meshColors;
   std::vector<glm::vec4> m_meshPickingColors;
+  std::vector<glm::col4> m_meshPickingTokens;
   // Optional per-mesh transforms for the active m_meshList. When populated,
   // these are applied before the renderer's global coordTransform.
   std::vector<glm::mat4> m_meshPosTransforms;
   std::vector<glm::mat3> m_meshPosTransformNormalMatrices;
 
   ZEventListenerParameter m_selectMeshEvent;
-  glm::ivec2 m_startCoord{};
+  std::optional<glm::ivec2> m_mousePressStart;
   ZMesh* m_pressedMesh;
   std::set<ZMesh*>* m_selectedMeshes = nullptr; // point to all selected meshes, managed by other class
 
@@ -283,6 +304,7 @@ private:
   folly::coro::AsyncScope m_runtimeNgTaskScope;
 
   const RegionNode* m_regionNode = nullptr;
+  const size_t m_objectId;
 };
 
 } // namespace nim

@@ -24,7 +24,7 @@ public:
 
   void initPainter();
 
-  void setRenderingEngine(Z3DRenderingEngine* engine);
+  void setRenderingEngine(/*nullable*/ Z3DRenderingEngine* engine);
 
 private:
   bool m_isStereoScene;

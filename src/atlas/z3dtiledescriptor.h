@@ -2,6 +2,7 @@
 
 #include "zglmutils.h"
 
+#include <cstddef>
 #include <cstdint>
 #include <vector>
 
@@ -18,6 +19,8 @@ public:
                     glm::uvec2 validOutputOrigin,
                     glm::uvec2 validOutputExtent,
                     uint32_t guardPixels);
+
+  [[nodiscard]] bool operator==(const Z3DTileDescriptor&) const noexcept = default;
 
   [[nodiscard]] const glm::uvec2& fullOutputExtent() const noexcept
   {
@@ -83,6 +86,22 @@ public:
     return glm::uvec2(m_validOutputOrigin.x, m_fullOutputExtent.y - validOutputEnd().y);
   }
 
+  [[nodiscard]] bool containsTopLeftOutputPixel(glm::uvec2 pixel) const noexcept
+  {
+    const glm::uvec2 origin = topLeftAssemblyOrigin();
+    return pixel.x >= origin.x && pixel.x < origin.x + m_validOutputExtent.x && pixel.y >= origin.y &&
+           pixel.y < origin.y + m_validOutputExtent.y;
+  }
+
+  // Maps an owned top-left-oriented output pixel to this tile's guarded,
+  // top-left-oriented attachment. The first valid output pixel starts after
+  // the leading guard in both dimensions.
+  [[nodiscard]] glm::uvec2 topLeftAttachmentPixel(glm::uvec2 pixel) const
+  {
+    CHECK(containsTopLeftOutputPixel(pixel)) << "Top-left output pixel must belong to this tile";
+    return validAttachmentOrigin() + pixel - topLeftAssemblyOrigin();
+  }
+
 private:
   [[nodiscard]] glm::uvec2 validOutputEnd() const noexcept
   {
@@ -104,5 +123,10 @@ private:
 // Returns every tile exactly once in bottom-row-first serpentine order.
 [[nodiscard]] std::vector<Z3DTileDescriptor>
 makeZ3DTileDescriptors(glm::uvec2 fullOutputExtent, glm::uvec2 tileExtent, uint32_t guardPixels);
+
+// Splits the output into stable, left-to-right vertical regions. Every region
+// spans the full output height and retains the descriptor's normal guard.
+[[nodiscard]] std::vector<Z3DTileDescriptor>
+makeZ3DFixedRegionDescriptors(glm::uvec2 fullOutputExtent, size_t regionCount, uint32_t guardPixels);
 
 } // namespace nim

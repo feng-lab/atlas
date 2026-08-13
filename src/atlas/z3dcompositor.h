@@ -67,6 +67,8 @@ public:
 
   void setRenderingRegion(double left = 0., double right = 1., double bottom = 0., double top = 1.);
 
+  [[nodiscard]] uint32_t requiredScreenSpaceGuardPixels() const;
+
   Z3DRenderTarget* monoReadyTarget() const
   {
     return m_monoReadyTarget->renderTarget;

@@ -6,12 +6,15 @@
 #include <QGraphicsPixmapItem>
 #include <QInputEvent>
 #include <QShortcut>
+#include <QSize>
 #include <QPoint>
 #include <QPointer>
 
+#include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <optional>
+#include <vector>
 
 #ifdef ATLAS_USE_OPENGLWIDGET
 class QOpenGLContext;
@@ -20,6 +23,7 @@ class QOpenGLContext;
 namespace nim {
 
 class Z3DRenderingEngine;
+class Z3DTileDescriptor;
 class ZDoc;
 class ZSwcPack;
 class ZSwcTypeDialog;
@@ -49,7 +53,10 @@ public:
   void getGLFocus();
 #endif
 
-  void setRenderingEngine(Z3DRenderingEngine* engine);
+  void setRenderingEngine(/*nullable*/ Z3DRenderingEngine* engine);
+  void setRenderingEngine(Z3DRenderingEngine* engine,
+                          const QSize& initializedLogicalSize,
+                          qreal initializedDevicePixelRatio);
 
   void setDoc(ZDoc* doc)
   {
@@ -80,6 +87,11 @@ public:
 
   void renderingFinished();
 
+  void setRegionalPresentationEnabled(bool enabled);
+  // UI-thread entry for an attached participant notification. No pixel
+  // ownership crosses from the rendering engine.
+  void presentRegionalRendering(Z3DRenderingEngine* sourceEngine, size_t regionIndex, const Z3DTileDescriptor& region);
+
   // for high dpi support like retina
   glm::uvec2 physicalSize()
   {
@@ -92,8 +104,11 @@ public:
   }
 
 Q_SIGNALS:
-  // w and h is physical size not logical size, opengl works in physical pixel
-  void canvasSizeChanged(size_t w, size_t h);
+  void canvasSizeChanged(size_t physicalWidth,
+                         size_t physicalHeight,
+                         size_t logicalWidth,
+                         size_t logicalHeight,
+                         qreal devicePixelRatio);
 
 #if defined(ATLAS_USE_OPENGLWIDGET)
   void openGLContextInitialized();
@@ -112,6 +127,8 @@ Q_SIGNALS:
   void rotateZM();
 
 protected:
+  bool event(QEvent* e) override;
+
   void contextMenuEvent(QContextMenuEvent* e) override;
 
   //  void enterEvent(QEnterEvent* e) override;
@@ -146,6 +163,8 @@ protected:
 private:
   // double devicePixelRatio();
 
+  void publishCanvasGeometry(const QSize& logicalSize);
+
   void ensure3dSwcNodeActions();
 
   void setActive3dSwcPackForEditing(ZSwcPack* swcPack, int64_t clickedNodeId);
@@ -168,6 +187,8 @@ private:
 #else
   std::unique_ptr<QGraphicsScene> m_scene;
   QGraphicsPixmapItem* m_pixmapItem = nullptr;
+  std::vector<QGraphicsPixmapItem*> m_regionPixmapItems;
+  bool m_regionalPresentationEnabled = false;
 #endif
 
   QShortcut* m_rotateXShortCut = nullptr;
@@ -178,7 +199,7 @@ private:
   QShortcut* m_rotateZMShortCut = nullptr;
 
   ZDoc* m_doc = nullptr;
-  Z3DRenderingEngine* m_engine = nullptr;
+  QPointer<Z3DRenderingEngine> m_engine;
 
   // 3D SWC-node context menu (UI thread ownership).
   QPointer<ZSwcPack> m_active3dSwcPack;

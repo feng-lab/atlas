@@ -151,9 +151,9 @@ Z3DImgFilter::Z3DImgFilter(Z3DGlobalParameters& globalParas, QObject* parent)
     std::make_pair(QStringLiteral("ISO Surface"), static_cast<int>(ImgCompositingMode::IsoSurface)),
     std::make_pair(QStringLiteral("X Ray"), static_cast<int>(ImgCompositingMode::XRay)));
   m_raycasterCompositingMode.select(QStringLiteral("MIP Opaque"));
-  m_raycasterCompositingMode.setDescription(QStringLiteral(
-    "Volume compositing mode. ISO Surface uses 'ISO Value'; MIP/Local MIP emphasize bright voxels;"
-    " Direct Volume Rendering integrates color/opacity; X-Ray is a fast approximant."));
+  m_raycasterCompositingMode.setDescription(
+    QStringLiteral("Volume compositing mode. ISO Surface uses 'ISO Value'; MIP/Local MIP emphasize bright voxels;"
+                   " Direct Volume Rendering integrates color/opacity; X-Ray is a fast approximant."));
 
   updateRaycasterCompositingMode();
   connect(&m_raycasterCompositingMode,
@@ -162,11 +162,10 @@ Z3DImgFilter::Z3DImgFilter(Z3DGlobalParameters& globalParas, QObject* parent)
           &Z3DImgFilter::updateRaycasterCompositingMode);
 
   addParameter(m_stayOnTop);
-  m_stayOnTop.setDescription(QStringLiteral(
-    "Render this volume layer on top of other geometry."));
+  m_stayOnTop.setDescription(QStringLiteral("Render this volume layer on top of other geometry."));
   addParameter(m_fullResolutionRendering);
-  m_fullResolutionRendering.setDescription(QStringLiteral(
-    "Render at full resolution instead of adaptive downsampling (higher quality, slower)."));
+  m_fullResolutionRendering.setDescription(
+    QStringLiteral("Render at full resolution instead of adaptive downsampling (higher quality, slower)."));
   connect(this, &Z3DBoundedFilter::rendererCoordTransformChanged, this, &Z3DImgFilter::changeCoordTransform);
   //  connect(&m_globalParameters.interactionHandler,
   //          &Z3DTrackballInteractionHandler::enterInteractionMode,
@@ -214,7 +213,8 @@ Z3DImgFilter::Z3DImgFilter(Z3DGlobalParameters& globalParas, QObject* parent)
   addParameter(m_obliqueSlice2Normal);
   m_obliqueSlice2Normal.setDescription(QStringLiteral("Second oblique slice plane normal (unit vector)."));
   addParameter(m_obliqueSlice2DistanceToOrigin);
-  m_obliqueSlice2DistanceToOrigin.setDescription(QStringLiteral("Signed distance from origin for second oblique slice plane."));
+  m_obliqueSlice2DistanceToOrigin.setDescription(
+    QStringLiteral("Signed distance from origin for second oblique slice plane."));
   addParameter(m_showXSlice2);
   m_showXSlice2.setDescription(QStringLiteral("Toggle second X slice visibility."));
   addParameter(m_xSlice2Position);
@@ -266,8 +266,8 @@ Z3DImgFilter::Z3DImgFilter(Z3DGlobalParameters& globalParas, QObject* parent)
   addParameter(m_raycasterIsoValue);
   addParameter(m_raycasterLocalMIPThreshold);
   addParameter(m_raycasterSamplingRate);
-  m_raycasterSamplingRate.setDescription(QStringLiteral(
-    "Raymarching step size multiplier. Smaller values improve quality and cost more."));
+  m_raycasterSamplingRate.setDescription(
+    QStringLiteral("Raymarching step size multiplier. Smaller values improve quality and cost more."));
 
   m_imgRaycasterRenderer.setFastRendering(!m_fullResolutionRendering.get());
   m_imgSliceRenderer.setFastRendering(!m_fullResolutionRendering.get());
@@ -295,6 +295,8 @@ Z3DImgFilter::~Z3DImgFilter()
 
 void Z3DImgFilter::setData(const ZImgPack& imgPack)
 {
+  cancelMouseGesture();
+
   if (m_widgetsGroup) {
     for (const auto& para : m_channelVisibleParas) {
       m_widgetsGroup->removeChild(*para);
@@ -350,8 +352,9 @@ void Z3DImgFilter::setData(const ZImgPack& imgPack)
       m_hasAutoVoxelAspectScale && glm::all(glm::epsilonEqual(currentScale, m_autoVoxelAspectScale, 1e-6f));
     if (isDefaultScale || isPreviousAutoScale) {
       const ZImgInfo& info = packFor3D->imgInfo();
-      if (info.voxelSizeUnit != VoxelSizeUnit::none && std::isfinite(info.voxelSizeX) && std::isfinite(info.voxelSizeY) &&
-          std::isfinite(info.voxelSizeZ) && info.voxelSizeX > 0.0 && info.voxelSizeY > 0.0 && info.voxelSizeZ > 0.0) {
+      if (info.voxelSizeUnit != VoxelSizeUnit::none && std::isfinite(info.voxelSizeX) &&
+          std::isfinite(info.voxelSizeY) && std::isfinite(info.voxelSizeZ) && info.voxelSizeX > 0.0 &&
+          info.voxelSizeY > 0.0 && info.voxelSizeZ > 0.0) {
         const double xy = std::max(info.voxelSizeX, info.voxelSizeY);
         const double zOverXY = info.voxelSizeZ / xy;
         if (std::isfinite(zOverXY) && zOverXY > 0.0) {
@@ -359,13 +362,12 @@ void Z3DImgFilter::setData(const ZImgPack& imgPack)
           m_hasAutoVoxelAspectScale = true;
           m_autoVoxelAspectScale = suggestedScale;
           m_rendererParameters.coordTransform.setScale(suggestedScale);
-          LOG(INFO) << fmt::format(
-            "3D: using voxel-size aspect ratio for coordTransform scale: "
-            "voxelSize=({:.6g},{:.6g},{:.6g}) -> scale=(1,1,{:.6g})",
-            info.voxelSizeX,
-            info.voxelSizeY,
-            info.voxelSizeZ,
-            zOverXY);
+          LOG(INFO) << fmt::format("3D: using voxel-size aspect ratio for coordTransform scale: "
+                                   "voxelSize=({:.6g},{:.6g},{:.6g}) -> scale=(1,1,{:.6g})",
+                                   info.voxelSizeX,
+                                   info.voxelSizeY,
+                                   info.voxelSizeZ,
+                                   zOverXY);
         }
       }
     }
@@ -947,17 +949,11 @@ void Z3DImgFilter::fullResolutionRenderingToggled()
 void Z3DImgFilter::leftMouseButtonPressed(QMouseEvent* e, int w, int h)
 {
   CHECK(e);
-  if (!isVisible() || !m_3dImg) {
-    return;
-  }
-
-  if (m_imgObjId == 0) {
-    return;
-  }
-
   if (e->type() == QEvent::MouseButtonPress) {
-    m_startCoord.x = static_cast<int>(e->position().x());
-    m_startCoord.y = static_cast<int>(e->position().y());
+    if (!isVisible() || !m_3dImg || m_imgObjId == 0) {
+      return;
+    }
+    m_mousePressStart = glm::ivec2(static_cast<int>(e->position().x()), static_cast<int>(e->position().y()));
     return;
   }
 
@@ -965,8 +961,18 @@ void Z3DImgFilter::leftMouseButtonPressed(QMouseEvent* e, int w, int h)
     return;
   }
 
-  const int dx = std::abs(static_cast<int>(e->position().x()) - m_startCoord.x);
-  const int dy = std::abs(static_cast<int>(e->position().y()) - m_startCoord.y);
+  if (!m_mousePressStart.has_value()) {
+    return;
+  }
+  const glm::ivec2 pressStart = *m_mousePressStart;
+  m_mousePressStart.reset();
+
+  if (!isVisible() || !m_3dImg || m_imgObjId == 0) {
+    return;
+  }
+
+  const int dx = std::abs(static_cast<int>(e->position().x()) - pressStart.x);
+  const int dy = std::abs(static_cast<int>(e->position().y()) - pressStart.y);
   if (dx >= 2 || dy >= 2) {
     return;
   }
@@ -981,15 +987,16 @@ void Z3DImgFilter::leftMouseButtonPressed(QMouseEvent* e, int w, int h)
     if (m_seedTraceSourceChannel < m_channelVisibleParas.size()) {
       const auto& channelVisiblePara = m_channelVisibleParas[m_seedTraceSourceChannel];
       if (channelVisiblePara && channelVisiblePara->get()) {
-        const glm::ivec2 widgetPos(e->position().toPoint().x(), e->position().toPoint().y());
+        const QPoint widgetPosition = e->position().toPoint();
+        const glm::ivec2 widgetPos(widgetPosition.x(), widgetPosition.y());
         const void* hitObj = m_globalParameters.pickingManager.objectAtWidgetPos(widgetPos);
         if (hitObj == nullptr) {
-          const float dpr = m_globalParameters.devicePixelRatio.get();
+          const float coordinateScale = m_globalParameters.devicePixelRatio.get();
           bool success = false;
-          const glm::vec3 pos3D = getFirstHit3DPosition(static_cast<int>(e->position().x() * dpr),
-                                                        static_cast<int>(e->position().y() * dpr),
-                                                        static_cast<int>(static_cast<float>(w) * dpr),
-                                                        static_cast<int>(static_cast<float>(h) * dpr),
+          const glm::vec3 pos3D = getFirstHit3DPosition(static_cast<int>(e->position().x() * coordinateScale),
+                                                        static_cast<int>(e->position().y() * coordinateScale),
+                                                        static_cast<int>(static_cast<float>(w) * coordinateScale),
+                                                        static_cast<int>(static_cast<float>(h) * coordinateScale),
                                                         success);
           if (success) {
             Q_EMIT pointInVolumeLeftClicked(e->globalPosition().toPoint(),
@@ -1021,19 +1028,21 @@ void Z3DImgFilter::leftMouseButtonPressed(QMouseEvent* e, int w, int h)
     return;
   }
 
-  const glm::ivec2 widgetPos(e->position().toPoint().x(), e->position().toPoint().y());
+  const QPoint widgetPosition = e->position().toPoint();
+  const glm::ivec2 widgetPos(widgetPosition.x(), widgetPosition.y());
   const void* hitObj = m_globalParameters.pickingManager.objectAtWidgetPos(widgetPos);
   if (hitObj != nullptr) {
     return;
   }
 
-  const float dpr = m_globalParameters.devicePixelRatio.get();
+  const float coordinateScale = m_globalParameters.devicePixelRatio.get();
   bool success = false;
-  const glm::vec3 pos3D = getMaxInten3DPositionUnderScreenPoint(static_cast<int>(e->position().x() * dpr),
-                                                                static_cast<int>(e->position().y() * dpr),
-                                                                static_cast<int>(static_cast<float>(w) * dpr),
-                                                                static_cast<int>(static_cast<float>(h) * dpr),
-                                                                success);
+  const glm::vec3 pos3D =
+    getMaxInten3DPositionUnderScreenPoint(static_cast<int>(e->position().x() * coordinateScale),
+                                          static_cast<int>(e->position().y() * coordinateScale),
+                                          static_cast<int>(static_cast<float>(w) * coordinateScale),
+                                          static_cast<int>(static_cast<float>(h) * coordinateScale),
+                                          success);
   if (!success) {
     return;
   }
@@ -1047,14 +1056,21 @@ void Z3DImgFilter::leftMouseButtonPressed(QMouseEvent* e, int w, int h)
                                   pos3D.z);
 }
 
+void Z3DImgFilter::cancelMouseGesture() noexcept
+{
+  Z3DBoundedFilter::cancelMouseGesture();
+  m_mousePressStart.reset();
+}
+
 void Z3DImgFilter::contextMenuEvent(QContextMenuEvent* event, int w, int h)
 {
   if (isVisible() && isSelected() && m_3dImg) {
     bool success = false;
-    auto pos3D = get3DPosition(event->x() * m_globalParameters.devicePixelRatio.get(),
-                               event->y() * m_globalParameters.devicePixelRatio.get(),
-                               w * m_globalParameters.devicePixelRatio.get(),
-                               h * m_globalParameters.devicePixelRatio.get(),
+    const float coordinateScale = m_globalParameters.devicePixelRatio.get();
+    auto pos3D = get3DPosition(event->x() * coordinateScale,
+                               event->y() * coordinateScale,
+                               w * coordinateScale,
+                               h * coordinateScale,
                                success);
 
     bool enter = success;
@@ -1928,6 +1944,23 @@ bool Z3DImgFilter::depthPickAtScreenPoint(int x,
     return false;
   }
 
+  CHECK_GT(width, 0);
+  CHECK_GT(height, 0);
+  if (m_globalParameters.pickingManager.hasQueryOverride()) {
+    CHECK_NE(m_imgObjId, 0u);
+    const std::optional<Z3DPickingManager::ImageDepthSample> sample =
+      m_globalParameters.pickingManager.imageDepthAtPhysicalInput(m_imgObjId, glm::ivec2(x, y));
+    if (!sample.has_value()) {
+      return false;
+    }
+
+    outPos2D = sample->bottomLeftUnprojectionPixel();
+    outTargetWidth = static_cast<int>(sample->fullPhysicalExtent.x);
+    outTargetHeight = static_cast<int>(sample->fullPhysicalExtent.y);
+    outDepth = sample->depth;
+    return true;
+  }
+
   const bool monoValid = m_transparentValid[MonoEye] && static_cast<bool>(m_transparentTargets[MonoEye]);
   const bool rightValid = m_transparentValid[RightEye] && static_cast<bool>(m_transparentTargets[RightEye]);
   if (!monoValid && !rightValid) {
@@ -1976,6 +2009,45 @@ bool Z3DImgFilter::depthPickAtScreenPoint(int x,
 
   outDepth = depth;
   return true;
+}
+
+std::optional<float> Z3DImgFilter::vulkanTransparentDepthAt(glm::uvec2 topLeftAttachmentPixel) const
+{
+  if (!m_imgRaycasterRenderer.hasVisibleRendering() || !m_3dImg) {
+    return std::nullopt;
+  }
+
+  const bool monoValid = m_transparentValid[MonoEye] && static_cast<bool>(m_transparentTargets[MonoEye]);
+  const bool rightValid = m_transparentValid[RightEye] && static_cast<bool>(m_transparentTargets[RightEye]);
+  if (!monoValid && !rightValid) {
+    return std::nullopt;
+  }
+
+  const Z3DScratchResourcePool::RenderTargetLease& lease =
+    monoValid ? m_transparentTargets[MonoEye] : m_transparentTargets[RightEye];
+  if (!lease.hasVulkanImage()) {
+    return std::nullopt;
+  }
+
+  ZVulkanTexture* const depthTexture = lease.depthAttachmentTexture();
+  if (depthTexture == nullptr) {
+    return std::nullopt;
+  }
+
+  CHECK_GT(lease.descriptor.size.x, 0u);
+  CHECK_GT(lease.descriptor.size.y, 0u);
+  CHECK_LT(topLeftAttachmentPixel.x, lease.descriptor.size.x);
+  CHECK_LT(topLeftAttachmentPixel.y, lease.descriptor.size.y);
+
+  float depth = 1.0f;
+  const uint32_t attachmentY = lease.descriptor.size.y - 1u - topLeftAttachmentPixel.y;
+  depthTexture->downloadSubImage(
+    &depth,
+    sizeof(depth),
+    vk::Offset3D{static_cast<int32_t>(topLeftAttachmentPixel.x), static_cast<int32_t>(attachmentY), 0},
+    vk::Extent3D{1u, 1u, 1u},
+    vk::ImageAspectFlagBits::eDepth);
+  return depth;
 }
 
 bool Z3DImgFilter::unprojectDepthToImageCoordRounded(const glm::ivec2& pos2D,

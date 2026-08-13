@@ -65,18 +65,30 @@ bool Z3DRenderGlobalState::hasCancellationSource() const
   return static_cast<bool>(m_cancellationSource);
 }
 
-std::shared_ptr<folly::CancellationSource> Z3DRenderGlobalState::ensureCancellationSource()
+std::optional<uint64_t> Z3DRenderGlobalState::idleCancellationCheckpoint() const
 {
   const std::scoped_lock lock(m_cancellationMutex);
-  if (!m_cancellationSource) {
-    m_cancellationSource = std::make_shared<folly::CancellationSource>();
+  if (m_cancellationSource) {
+    return std::nullopt;
   }
+  return m_cancellationRequestGeneration;
+}
+
+std::shared_ptr<folly::CancellationSource> Z3DRenderGlobalState::tryAcquireCancellationSource(uint64_t checkpoint)
+{
+  const std::scoped_lock lock(m_cancellationMutex);
+  if (m_cancellationSource || m_cancellationRequestGeneration != checkpoint) {
+    return nullptr;
+  }
+  m_cancellationSource = std::make_shared<folly::CancellationSource>();
   return m_cancellationSource;
 }
 
-void Z3DRenderGlobalState::resetCancellationSource()
+void Z3DRenderGlobalState::releaseCancellationSource(const std::shared_ptr<folly::CancellationSource>& source)
 {
+  CHECK(source);
   const std::scoped_lock lock(m_cancellationMutex);
+  CHECK(m_cancellationSource == source) << "Only the render that acquired a cancellation source may release it";
   m_cancellationSource.reset();
 }
 
@@ -85,6 +97,9 @@ void Z3DRenderGlobalState::requestCancellation()
   std::shared_ptr<folly::CancellationSource> source;
   {
     const std::scoped_lock lock(m_cancellationMutex);
+    CHECK_LT(m_cancellationRequestGeneration, std::numeric_limits<uint64_t>::max())
+      << "Render cancellation request generation exhausted";
+    ++m_cancellationRequestGeneration;
     source = m_cancellationSource;
   }
   if (source) {

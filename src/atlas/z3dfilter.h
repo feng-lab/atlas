@@ -125,6 +125,8 @@ Q_SIGNALS:
   void invalidated();
 
 protected:
+  virtual void cancelMouseGesture() noexcept;
+
   // mark that the output of current filter for certain eye is valid.
   // if process function (e.g. prepare data) is not related to stereo view or mono view, you should rewrite this
   // function in subclass and set the invalidstate to VALID to avoid being executed again for

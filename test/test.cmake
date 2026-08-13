@@ -132,7 +132,10 @@ add_gtest_executable(ztupleliketest)
 add_atlas_gtest_executable(zcurlruntimetest)
 add_atlas_gtest_executable(z3drenderglobalstatetest)
 add_atlas_gtest_executable(z3dtiledescriptortest)
-add_atlas_gtest_executable(zvulkantileworkerpooltest)
+add_executable(zvulkantileworkerpooltest
+               ${CMAKE_CURRENT_LIST_DIR}/zvulkantileworkerpooltest.cpp)
+target_link_libraries(zvulkantileworkerpooltest
+                      PRIVATE atlas_test_main atlas_lib)
 if (APPLE)
   set(_atlas_vulkan_tile_worker_test_spv_dir
       "$<TARGET_FILE_DIR:zvulkantileworkerpooltest>/../Resources/shader/vulkan/spv")
@@ -162,6 +165,7 @@ add_atlas_gtest_executable(zimgometiffpacktest)
 # Consolidate the heaviest Atlas-linked tests into a single executable to avoid paying
 # the large atlas_lib link cost multiple times. This currently includes:
 # - Block-ID collector generated-input regression coverage
+# - Picking-query override routing and lifetime tests
 # - Neuroglancer precomputed integration tests
 # - Neuroglancer state/share-link parsing tests
 # - ROI mask rasterization integration tests (historically `zroimaskrastertest`)
@@ -176,6 +180,7 @@ endif ()
 add_executable(
   zatlasheavytest
   ${CMAKE_CURRENT_LIST_DIR}/z3dglobalparameterstest.cpp
+  ${CMAKE_CURRENT_LIST_DIR}/z3dpickingmanagertest.cpp
   ${CMAKE_CURRENT_LIST_DIR}/z3dperfcollectortest.cpp
   ${CMAKE_CURRENT_LIST_DIR}/z3dblockidcollectortest.cpp
   ${CMAKE_CURRENT_LIST_DIR}/zroimaskrastertest.cpp

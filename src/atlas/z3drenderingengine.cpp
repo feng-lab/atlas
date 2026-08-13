@@ -30,7 +30,9 @@
 #include "z3dshadermanager.h"
 #include "z3dgpuinfo.h"
 #include "z3dgl.h"
+#include "z3dboundedfilter.h"
 #include "z3dfilter.h"
+#include "z3dimgfilter.h"
 #include "z3dmeshfilter.h"
 #include "zcancellation.h"
 #include "zcpuinfo.h"
@@ -42,6 +44,7 @@
 #include "zabslflagtypes.h"
 #include "zqtexecutor.h"
 #include "zrenderthreadexecutor_tls.h"
+#include "zstringutils.h"
 #include <folly/OperationCancelled.h>
 #include <folly/executors/GlobalExecutor.h>
 #include <folly/coro/BlockingWait.h>
@@ -50,12 +53,15 @@
 #include <glbinding/glbinding.h>
 #include <glbinding-aux/Meta.h>
 #include <QCoreApplication>
+#include <QContextMenuEvent>
 #include <QOffscreenSurface>
 #include <QStringList>
 
 ABSL_DECLARE_FLAG(bool, atlas_enable_benchmark_raw_mip_export);
 ABSL_DECLARE_FLAG(bool, atlas_enable_benchmark_screen_space_sufficiency_audit);
 #include <QMetaObject>
+#include <QMouseEvent>
+#include <QSignalBlocker>
 #include <QTimer>
 #include <QThread>
 #include <algorithm>
@@ -109,6 +115,14 @@ ABSL_FLAG(bool,
           atlas_log_benchmark_render_timings,
           false,
           "Log simple deterministic benchmark timings at fast-preview and final-render completion.");
+
+ABSL_FLAG(
+  std::vector<std::string>,
+  atlas_vk_multi_device_tile_worker_indices,
+  std::vector<std::string>{},
+  "Preference-sorted Vulkan device indices participating in engine-owned multi-device rendering. "
+  "A Vulkan 3D canvas prepends its canonical device when omitted; exact headless configuration requires at least "
+  "two distinct compatible indices. Empty keeps direct rendering.");
 
 ABSL_DECLARE_FLAG(std::string, output_image_name_prefix);
 ABSL_DECLARE_FLAG(int32_t, output_image_name_field_width);
@@ -532,6 +546,7 @@ struct Z3DRenderingEngine::VulkanTileRenderState
   {
     size_t objectId;
     json::object state;
+    bool selected;
   };
 
   json::object generalState;
@@ -700,6 +715,9 @@ Z3DRenderingEngine::Z3DRenderingEngine(ZDoc& doc,
                                                          QEvent::Wheel,
                                                          QEvent::KeyPress,
                                                          QEvent::KeyRelease,
+                                                         QEvent::FocusOut,
+                                                         QEvent::WindowDeactivate,
+                                                         QEvent::UngrabMouse,
                                                          QEvent::UpdateRequest,
                                                          QEvent::LayoutRequest};
 
@@ -771,12 +789,140 @@ void Z3DRenderingEngine::configureVulkanTileWorkers(std::span<const ZVulkanDevic
   CHECK(m_role == Role::Canonical);
   CHECK(QThread::currentThread() == thread())
     << "Vulkan tile workers must be configured on the canonical engine thread";
-  m_vulkanTileWorkerPool.reset();
+  CHECK(m_vulkanTileWorkerPool == nullptr) << "An active Vulkan device set cannot be replaced";
+  CHECK(!m_vulkanInteractivePresentationActive);
   if (selections.empty()) {
     return;
   }
 
   m_vulkanTileWorkerPool = std::make_unique<ZVulkanTileWorkerPool>(*this, selections);
+  if (!m_canvas) {
+    return;
+  }
+  m_vulkanInteractiveInvalidationConnection =
+    connect(m_compositor.get(), &Z3DCompositor::sceneParaUpdated, this, [this]() {
+      CHECK(m_vulkanTileWorkerPool != nullptr);
+      m_vulkanTileWorkerPool->invalidateInteractiveQueries();
+    });
+  updateVulkanInteractivePresentation();
+  if (m_canvas && m_vulkanInteractivePresentationActive) {
+    QCoreApplication::postEvent(this, new QEvent(QEvent::UpdateRequest), Qt::LowEventPriority);
+  }
+}
+
+void Z3DRenderingEngine::releaseVulkanTileWorkerPool()
+{
+  CHECK(QThread::currentThread() == thread());
+  if (m_vulkanTileWorkerPool == nullptr) {
+    CHECK(!m_vulkanInteractivePresentationActive);
+    return;
+  }
+
+  // Restoration can allocate canonical-device targets and therefore fail.
+  // Always detach presentation and destroy every worker before propagating
+  // that failure.
+  auto releaseGuard = folly::makeGuard([this]() {
+    QObject::disconnect(m_vulkanInteractiveInvalidationConnection);
+    m_vulkanInteractiveInvalidationConnection = {};
+    if (m_vulkanInteractivePresentationActive && m_canvas) {
+      const QPointer<Z3DCanvas> canvas = m_canvas;
+      const bool queued = QMetaObject::invokeMethod(
+        canvas,
+        [canvas]() {
+          if (canvas) {
+            canvas->setRegionalPresentationEnabled(false);
+          }
+        },
+        Qt::QueuedConnection);
+      CHECK(queued) << "Failed to disable regional presentation during Vulkan worker release";
+    }
+    m_vulkanInteractivePresentationActive = false;
+    m_vulkanInteractiveRegion.reset();
+    m_progress = 0.0;
+    m_vulkanTileWorkerPool.reset();
+  });
+  restoreDirectRenderingConfiguration();
+}
+
+void Z3DRenderingEngine::releaseVulkanTileWorkerPoolAfterFailure(const char* operation) noexcept
+{
+  CHECK(operation != nullptr);
+  try {
+    releaseVulkanTileWorkerPool();
+  }
+  catch (const std::exception& cleanupError) {
+    LOG(ERROR) << "Failed to restore canonical direct rendering after " << operation << ": " << cleanupError.what();
+  }
+  catch (...) {
+    LOG(ERROR) << "Failed to restore canonical direct rendering after " << operation << " with an unknown exception";
+  }
+}
+
+bool Z3DRenderingEngine::configureVulkanTileWorkersFromPreferenceIndices(std::span<const std::string> indices,
+                                                                         QString& error)
+{
+  CHECK(m_role == Role::Canonical);
+  CHECK(QThread::currentThread() == thread())
+    << "Vulkan tile-worker device indices must be resolved on the canonical engine thread";
+  CHECK(m_vulkanTileWorkerPool == nullptr) << "An active Vulkan device set cannot be replaced";
+  error.clear();
+
+  if (indices.empty()) {
+    return true;
+  }
+  if (indices.size() < 2u) {
+    error = "--atlas_vk_multi_device_tile_worker_indices requires at least two device indices";
+    return false;
+  }
+  if (static_cast<RenderBackend>(m_globalParas->renderBackend.associatedData()) != RenderBackend::Vulkan ||
+      m_compositor->rendererBase().activeBackend() != RenderBackend::Vulkan) {
+    error = "--atlas_vk_multi_device_tile_worker_indices requires the active Vulkan rendering backend";
+    return false;
+  }
+
+  const auto compatibleSelections = compatibleVulkanTileWorkerSelections();
+  std::vector<ZVulkanDeviceSupport::DeviceSelection> resolvedSelections;
+  resolvedSelections.reserve(indices.size());
+  for (const std::string& indexText : indices) {
+    size_t preferenceIndex = 0u;
+    if (!stringToValueNoThrow(indexText, preferenceIndex)) {
+      error = QString("invalid Vulkan tile-worker device index %1").arg(QString::fromStdString(indexText));
+      return false;
+    }
+
+    const auto selectionIt =
+      std::find_if(compatibleSelections.begin(), compatibleSelections.end(), [preferenceIndex](const auto& selection) {
+        return selection.preferenceIndex == preferenceIndex;
+      });
+    if (selectionIt == compatibleSelections.end()) {
+      error =
+        QString("Vulkan device index %1 is unavailable or incompatible with Atlas tile rendering").arg(preferenceIndex);
+      return false;
+    }
+    if (std::ranges::any_of(resolvedSelections, [&](const auto& known) {
+          return known.preferenceIndex == selectionIt->preferenceIndex;
+        })) {
+      error = QString("Vulkan tile-worker device index %1 was specified more than once").arg(preferenceIndex);
+      return false;
+    }
+    if (std::ranges::any_of(resolvedSelections, [&](const auto& known) {
+          return known.expectedDeviceUuid == selectionIt->expectedDeviceUuid;
+        })) {
+      error = QString("Vulkan tile-worker device index %1 resolves to an already selected physical device")
+                .arg(preferenceIndex);
+      return false;
+    }
+    resolvedSelections.push_back(*selectionIt);
+  }
+
+  try {
+    configureVulkanTileWorkers(resolvedSelections);
+  }
+  catch (const std::exception& e) {
+    error = QString::fromStdString(fmt::format("Vulkan tile-worker configuration failed: {}", e.what()));
+    return false;
+  }
+  return true;
 }
 
 Z3DRenderingEngine::~Z3DRenderingEngine()
@@ -784,11 +930,13 @@ Z3DRenderingEngine::~Z3DRenderingEngine()
   VLOG(1) << "in engine destructor";
   CHECK(QThread::currentThread() == this->thread()) << "Z3DRenderingEngine must be destroyed on its owning thread";
   m_shuttingDown = true;
+  detachCanvas();
+  VLOG(1) << "canvas detached";
+  QObject::disconnect(m_vulkanInteractiveInvalidationConnection);
+  m_vulkanInteractiveInvalidationConnection = {};
   m_vulkanTileWorkerPool.reset();
   stopVulkanCompletionPolling();
   drainVulkanFrameExecutorForTeardown();
-  detachCanvas();
-  VLOG(1) << "canvas detached";
 
   if (m_context) {
     getGLFocus();
@@ -808,9 +956,14 @@ const ZDoc& Z3DRenderingEngine::doc() const
   return m_doc;
 }
 
-bool Z3DRenderingEngine::permitsDocumentMutationFrom3DView() const
+bool Z3DRenderingEngine::permitsDocumentMutationFrom3DView() const noexcept
 {
   return m_role == Role::Canonical;
+}
+
+void Z3DRenderingEngine::checkCanonicalDocumentMutation() const
+{
+  CHECK(permitsDocumentMutationFrom3DView()) << "Only the canonical engine may originate document mutations";
 }
 
 ZQtExecutor& Z3DRenderingEngine::renderThreadExecutor()
@@ -967,12 +1120,14 @@ Z3DRenderingEngine::publishVulkanTileRenderState() const
   CHECK(state->generalState.contains("Compositor"));
   CHECK(state->generalState.contains("Global"));
 
-  for (const size_t objectId : doc().objs()) {
-    json::object objectState;
-    write(objectId, objectState);
-    CHECK(objectState.empty() || objectState.contains("ViewObjType"));
-    if (!objectState.empty()) {
-      state->objectStates.push_back(VulkanTileRenderState::ObjectState{objectId, std::move(objectState)});
+  for (const auto& objectView : m_3dObjViews) {
+    CHECK(objectView);
+    for (const size_t objectId : objectView->objectIds()) {
+      json::object objectState;
+      write(objectId, objectState);
+      CHECK(objectState.contains("ViewObjType"));
+      state->objectStates.push_back(
+        VulkanTileRenderState::ObjectState{objectId, std::move(objectState), objectView->isObjSelected(objectId)});
     }
   }
 
@@ -981,27 +1136,246 @@ Z3DRenderingEngine::publishVulkanTileRenderState() const
   return state;
 }
 
+std::vector<Z3DObjView*> Z3DRenderingEngine::validateVulkanObjectStateTopology(const VulkanTileRenderState& state,
+                                                                               const char* topologyChangedMessage) const
+{
+  CHECK(topologyChangedMessage != nullptr);
+  size_t localObjectCount = 0u;
+  for (const auto& objectView : m_3dObjViews) {
+    CHECK(objectView);
+    localObjectCount += objectView->objectIds().size();
+  }
+  if (localObjectCount != state.objectStates.size()) {
+    throw ZCancellationException(topologyChangedMessage);
+  }
+
+  std::vector<Z3DObjView*> owningViews;
+  owningViews.reserve(state.objectStates.size());
+  std::unordered_set<size_t> validatedObjectIds;
+  for (const auto& object : state.objectStates) {
+    CHECK(object.state.contains("ViewObjType"));
+    CHECK(validatedObjectIds.insert(object.objectId).second)
+      << "A Vulkan state publication contains a duplicate object ID";
+
+    Z3DObjView* owningView = nullptr;
+    for (const auto& objectView : m_3dObjViews) {
+      CHECK(objectView);
+      if (!objectView->hasObj(object.objectId)) {
+        continue;
+      }
+      CHECK(owningView == nullptr) << "A Vulkan object ID belongs to more than one view";
+      owningView = objectView.get();
+    }
+    if (owningView == nullptr) {
+      throw ZCancellationException(topologyChangedMessage);
+    }
+
+    if (asQString(object.state.at("ViewObjType")) != owningView->doc().typeName()) {
+      throw ZCancellationException(topologyChangedMessage);
+    }
+    owningViews.push_back(owningView);
+  }
+  return owningViews;
+}
+
 void Z3DRenderingEngine::applyVulkanTileRenderState(const VulkanTileRenderState& state)
 {
   checkVulkanTileWorkerExecutionContext();
   CHECK(m_role == Role::VulkanTileWorker);
   CHECK(m_pendingVulkanTile == nullptr);
   CHECK(!m_vulkanTileExportExtent.has_value());
+  const QSignalBlocker workerFeedbackBlocker(this);
 
-  for (const auto& object : state.objectStates) {
-    json::object workerObjectState;
-    write(object.objectId, workerObjectState);
-    CHECK(workerObjectState.contains("ViewObjType"))
-      << "A Vulkan tile worker is missing object view " << object.objectId;
-    CHECK(workerObjectState.at("ViewObjType") == object.state.at("ViewObjType"))
-      << "Canonical and worker object-view types differ for object " << object.objectId;
+  CHECK(state.generalState.contains("Compositor"));
+  CHECK(state.generalState.contains("Global"));
+  const auto owningViews =
+    validateVulkanObjectStateTopology(state,
+                                      "Vulkan tile-worker object topology changed before batch state application");
+
+  for (size_t objectIndex = 0u; objectIndex < state.objectStates.size(); ++objectIndex) {
+    const auto& object = state.objectStates[objectIndex];
     read(object.objectId, object.state);
+    owningViews[objectIndex]->setObjSelected(object.objectId, object.selected);
   }
 
   globalParas().setDevicePixelRatio(state.devicePixelRatio);
   read(state.generalState);
   CHECK(static_cast<RenderBackend>(globalParas().renderBackend.associatedData()) == RenderBackend::Vulkan);
   camera().set(state.camera);
+  m_vulkanInteractiveRegion.reset();
+}
+
+Z3DFilter& Z3DRenderingEngine::filterForVulkanObject(size_t objectId) const
+{
+  Z3DFilter* filter = nullptr;
+  for (const auto& objectView : m_3dObjViews) {
+    CHECK(objectView);
+    if (!objectView->hasObj(objectId)) {
+      continue;
+    }
+    CHECK(filter == nullptr) << "A Vulkan object ID belongs to more than one view";
+    filter = &objectView->filterForObject(objectId);
+  }
+  if (filter == nullptr) {
+    throw ZCancellationException("Vulkan interactive object topology changed before a picking query completed");
+  }
+  return *filter;
+}
+
+Z3DRenderingEngine::VulkanRegionalPickingHit
+Z3DRenderingEngine::classifyVulkanRegionalPickingObject(size_t objectId, const void* object) const
+{
+  checkVulkanTileWorkerExecutionContext();
+  if (object == nullptr) {
+    return {};
+  }
+
+  if (objectId == 0u) {
+    // Transform handles are registered by the engine-local bounded filter and
+    // therefore cannot share a document object ID.
+    std::optional<VulkanRegionalPickingHit> handle;
+    for (const auto& objectView : m_3dObjViews) {
+      CHECK(objectView);
+      for (const size_t candidateId : objectView->objectIds()) {
+        if (const auto* boundedFilter =
+              dynamic_cast<const Z3DBoundedFilter*>(&objectView->filterForObject(candidateId))) {
+          const int handleIndex = boundedFilter->transformHandlePickingIndex(object);
+          if (handleIndex != 0) {
+            CHECK(!handle.has_value()) << "A Vulkan transform handle belongs to more than one filter";
+            CHECK_LE(handleIndex, static_cast<int>(std::numeric_limits<uint8_t>::max()));
+            handle = VulkanRegionalPickingHit{VulkanRegionalPickingHit::Kind::TransformHandle,
+                                              candidateId,
+                                              nullptr,
+                                              static_cast<uint8_t>(handleIndex)};
+          }
+        }
+      }
+    }
+    CHECK(handle.has_value()) << "A Vulkan picking attachment returned an unclassified engine-local identity";
+    return *handle;
+  }
+
+  // This pair came from this engine's picking-color registry. The object ID
+  // selects one filter, so its type determines how the registered payload can
+  // cross the engine boundary.
+  Z3DFilter& filter = filterForVulkanObject(objectId);
+  if (const auto* meshFilter = dynamic_cast<const Z3DMeshFilter*>(&filter)) {
+    if (meshFilter->isDocumentPickingObject(object)) {
+      return VulkanRegionalPickingHit{VulkanRegionalPickingHit::Kind::SharedObject, objectId, object};
+    }
+    if (!meshFilter->isCurrentPickingObject(object)) {
+      throw ZCancellationException("Vulkan interactive mesh topology changed before a picking query completed");
+    }
+    return VulkanRegionalPickingHit{VulkanRegionalPickingHit::Kind::EngineLocalMesh, objectId};
+  }
+  if (dynamic_cast<const Z3DSwcFilter*>(&filter) != nullptr) {
+    return VulkanRegionalPickingHit{VulkanRegionalPickingHit::Kind::SharedObject, objectId, object};
+  }
+  if (dynamic_cast<const Z3DPunctaFilter*>(&filter) != nullptr) {
+    return VulkanRegionalPickingHit{VulkanRegionalPickingHit::Kind::SharedObject, objectId, object};
+  }
+  throw ZCancellationException("Vulkan interactive object topology changed before a picking query completed");
+}
+
+Z3DPickingManager::PickingObject
+Z3DRenderingEngine::resolveVulkanRegionalPickingHit(const VulkanRegionalPickingHit& hit) const
+{
+  checkVulkanTileWorkerExecutionContext();
+  switch (hit.kind) {
+    case VulkanRegionalPickingHit::Kind::None:
+      return {};
+    case VulkanRegionalPickingHit::Kind::SharedObject: {
+      CHECK(hit.sharedObject != nullptr);
+      Z3DFilter& filter = filterForVulkanObject(hit.objectId);
+      if (const auto* meshFilter = dynamic_cast<const Z3DMeshFilter*>(&filter)) {
+        if (!meshFilter->isCurrentPickingObject(hit.sharedObject)) {
+          throw ZCancellationException("Vulkan interactive mesh topology changed before a picking query completed");
+        }
+        return Z3DPickingManager::PickingObject{hit.objectId, hit.sharedObject};
+      }
+      if (const auto* swcFilter = dynamic_cast<const Z3DSwcFilter*>(&filter)) {
+        if (!swcFilter->isCurrentPickingObject(hit.sharedObject)) {
+          throw ZCancellationException("Vulkan interactive SWC topology changed before a picking query completed");
+        }
+        return Z3DPickingManager::PickingObject{hit.objectId, hit.sharedObject};
+      }
+      if (const auto* punctaFilter = dynamic_cast<const Z3DPunctaFilter*>(&filter)) {
+        if (!punctaFilter->isCurrentPickingObject(hit.sharedObject)) {
+          throw ZCancellationException("Vulkan interactive puncta topology changed before a picking query completed");
+        }
+        return Z3DPickingManager::PickingObject{hit.objectId, hit.sharedObject};
+      }
+      throw ZCancellationException("Vulkan interactive object type changed before a picking query completed");
+    }
+    case VulkanRegionalPickingHit::Kind::EngineLocalMesh: {
+      auto* meshFilter = dynamic_cast<Z3DMeshFilter*>(&filterForVulkanObject(hit.objectId));
+      if (meshFilter == nullptr) {
+        throw ZCancellationException("Vulkan interactive mesh topology changed before a picking query completed");
+      }
+      return Z3DPickingManager::PickingObject{hit.objectId, meshFilter->regionalPickingToken()};
+    }
+    case VulkanRegionalPickingHit::Kind::TransformHandle: {
+      auto* boundedFilter = dynamic_cast<Z3DBoundedFilter*>(&filterForVulkanObject(hit.objectId));
+      if (boundedFilter == nullptr) {
+        throw ZCancellationException("Vulkan interactive transform topology changed before a picking query completed");
+      }
+      return Z3DPickingManager::PickingObject{hit.objectId,
+                                              boundedFilter->transformHandlePickingObject(hit.transformHandleIndex)};
+    }
+  }
+  CHECK(false) << "Unknown Vulkan regional picking hit kind";
+  return {};
+}
+
+Z3DRenderingEngine::VulkanRegionalPickingHit
+Z3DRenderingEngine::queryVulkanRegionalPickingObject(glm::uvec2 attachmentPixel) const
+{
+  checkVulkanTileWorkerExecutionContext();
+  const auto object = m_globalParas->pickingManager.objectAtVulkanAttachmentPixel(glm::ivec2(attachmentPixel));
+  return classifyVulkanRegionalPickingObject(object.objectId, object.object);
+}
+
+GLfloat Z3DRenderingEngine::queryVulkanRegionalPickingDepth(glm::uvec2 attachmentPixel) const
+{
+  checkVulkanTileWorkerExecutionContext();
+  return m_globalParas->pickingManager.depthAtVulkanAttachmentPixel(glm::ivec2(attachmentPixel));
+}
+
+std::vector<Z3DRenderingEngine::VulkanRegionalPickingDistance>
+Z3DRenderingEngine::queryVulkanRegionalPickingObjectsByDistance(glm::i64vec2 attachmentReferencePixel,
+                                                                glm::uvec4 attachmentSearchRect) const
+{
+  checkVulkanTileWorkerExecutionContext();
+  std::vector<VulkanRegionalPickingDistance> result;
+  const auto objects =
+    m_globalParas->pickingManager.objectsNearVulkanAttachmentReference(attachmentReferencePixel, attachmentSearchRect);
+  result.reserve(objects.size());
+  for (const auto& object : objects) {
+    result.push_back(VulkanRegionalPickingDistance{classifyVulkanRegionalPickingObject(object.objectId, object.object),
+                                                   object.squaredPhysicalPixelDistance});
+  }
+  return result;
+}
+
+std::optional<GLfloat> Z3DRenderingEngine::queryVulkanRegionalImageDepth(size_t imageObjectId,
+                                                                         glm::uvec2 attachmentPixel) const
+{
+  checkVulkanTileWorkerExecutionContext();
+  auto* imageFilter = dynamic_cast<Z3DImgFilter*>(&filterForVulkanObject(imageObjectId));
+  if (imageFilter == nullptr) {
+    throw ZCancellationException("Vulkan interactive image topology changed before a depth query completed");
+  }
+  return imageFilter->vulkanTransparentDepthAt(attachmentPixel);
+}
+
+void Z3DRenderingEngine::cancelVulkanInteractiveMouseGestures() noexcept
+{
+  CHECK(m_role == Role::Canonical);
+  CHECK(QThread::currentThread() == thread());
+  for (Z3DFilter* const filter : m_pipeline) {
+    CHECK(filter != nullptr);
+    filter->cancelMouseGesture();
+  }
 }
 
 void Z3DRenderingEngine::zoomIn()
@@ -1072,12 +1446,17 @@ void Z3DRenderingEngine::takeFixedSizeScreenShotImpl(const QString& filename,
     Z3DRenderGlobalState::instance().resetCaptureCancellationSource();
   });
   try {
+    prepareCanonicalEngineForNonRegionalRendering();
+    if (m_canvas && m_vulkanInteractivePresentationActive) {
+      QCoreApplication::postEvent(this, new QEvent(QEvent::UpdateRequest), Qt::LowEventPriority);
+    }
     const auto token = captureCancellationSource->getToken();
     takeFixedSizeScreenShotWithoutResetCanvasSizePrivate(filename,
                                                          width,
                                                          height,
                                                          sst,
-                                                         true,
+                                                         /*allowVulkanWorkerPool=*/true,
+                                                         /*reportProgress=*/true,
                                                          token,
                                                          tileSize,
                                                          tileBorder);
@@ -1091,6 +1470,16 @@ void Z3DRenderingEngine::takeFixedSizeScreenShotImpl(const QString& filename,
   }
   catch (const ZException& e) {
     auto errorMsg = fmt::format("takeFixedSizeScreenShot error: {}", e.what());
+    LOG(ERROR) << errorMsg;
+    reportRenderingError(errorMsg);
+  }
+  catch (const std::exception& e) {
+    const auto errorMsg = fmt::format("takeFixedSizeScreenShot error: {}", e.what());
+    LOG(ERROR) << errorMsg;
+    reportRenderingError(errorMsg);
+  }
+  catch (...) {
+    constexpr const char* errorMsg = "takeFixedSizeScreenShot failed with an unknown exception";
     LOG(ERROR) << errorMsg;
     reportRenderingError(errorMsg);
   }
@@ -1119,6 +1508,7 @@ void Z3DRenderingEngine::beginVulkanTileExport(glm::uvec2 fullOutputExtent, foll
   CHECK(!m_vulkanTilePreviousReadbackCompletionPolicy.has_value());
   CHECK_GT(fullOutputExtent.x, 0u);
   CHECK_GT(fullOutputExtent.y, 0u);
+  m_vulkanInteractiveRegion.reset();
   m_globalParas->camera.viewportChanged(fullOutputExtent);
   auto preparationGuard = folly::makeGuard([this]() {
     finishMeshFiltersForExport();
@@ -1163,6 +1553,7 @@ void Z3DRenderingEngine::abandonVulkanTileExportAfterFailure()
   // from the abandoned attempt before releasing its engine-side batch state.
   m_compositor->invalidatePendingVulkanFinalReadbacks();
   m_pendingVulkanTile.reset();
+  m_vulkanInteractiveRegion.reset();
   m_globalParas->camera.setTileFrustum();
   m_compositor->setRenderingRegion();
   finishMeshFiltersForExport();
@@ -1171,8 +1562,98 @@ void Z3DRenderingEngine::abandonVulkanTileExportAfterFailure()
 void Z3DRenderingEngine::clearVulkanTileRegion()
 {
   checkVulkanTileWorkerExecutionContext();
+  m_vulkanInteractiveRegion.reset();
   m_globalParas->camera.setTileFrustum();
   m_compositor->setRenderingRegion();
+}
+
+void Z3DRenderingEngine::prepareVulkanInteractiveRegion(const Z3DTileDescriptor& region)
+{
+  checkVulkanTileWorkerExecutionContext();
+  CHECK(m_pendingVulkanTile == nullptr);
+  CHECK(!m_vulkanTileExportExtent.has_value());
+  // Region geometry is engine-internal render state. Preserve the invalidation
+  // it causes inside this engine without publishing a new external render
+  // request for the same preparation.
+  const QSignalBlocker engineFeedbackBlocker(this);
+
+  const glm::uvec2 fullOutputExtent = region.fullOutputExtent();
+  const glm::uvec2 attachmentExtent = region.attachmentExtent();
+  CHECK_GT(fullOutputExtent.x, 0u);
+  CHECK_GT(fullOutputExtent.y, 0u);
+  CHECK_GT(attachmentExtent.x, 0u);
+  CHECK_GT(attachmentExtent.y, 0u);
+
+  setOutputSize(attachmentExtent);
+  m_globalParas->camera.viewportChanged(fullOutputExtent);
+  m_globalParas->camera.setTileFrustum(region.normalizedLeft(),
+                                       region.normalizedRight(),
+                                       region.normalizedBottom(),
+                                       region.normalizedTop());
+  m_compositor->setRenderingRegion(region.normalizedLeft(),
+                                   region.normalizedRight(),
+                                   region.normalizedBottom(),
+                                   region.normalizedTop());
+  m_vulkanInteractiveRegion = region;
+}
+
+Z3DRenderingEngine::FrameProcessResult
+Z3DRenderingEngine::submitVulkanInteractiveRegion(const Z3DTileDescriptor& region,
+                                                  folly::CancellationToken cancellationToken)
+{
+  checkVulkanTileWorkerExecutionContext();
+  CHECK(!m_vulkanTileExportExtent.has_value());
+  CHECK(m_vulkanInteractiveRegion.has_value()) << "An interactive Vulkan region must be prepared before submission";
+  CHECK(*m_vulkanInteractiveRegion == region)
+    << "An interactive Vulkan lane may render only its persistent assigned region";
+  CHECK(m_pendingVulkanTile == nullptr) << "An interactive Vulkan lane accepts one outstanding frame";
+
+  m_vkDevice->ensureSubmissionUsable();
+  maybeCancel(cancellationToken);
+  const bool startedDeferredErrorFrame = beginDeferredRenderingErrorFrame();
+  auto deferredErrorFrameGuard = folly::makeGuard([this, startedDeferredErrorFrame]() {
+    endDeferredRenderingErrorFrame(startedDeferredErrorFrame);
+  });
+
+  FrameProcessResult result = processFrameWithIdentity(false, true, cancellationToken);
+  CHECK_GT(result.renderFrameToken, 0u);
+
+  auto pendingRegion = std::make_unique<PendingVulkanTile>(region, false);
+  pendingRegion->renderFrameToken = result.renderFrameToken;
+  m_pendingVulkanTile = std::move(pendingRegion);
+  auto pendingRegionFailureGuard = folly::makeGuard([this]() {
+    m_compositor->invalidatePendingVulkanFinalReadbacks();
+    m_pendingVulkanTile.reset();
+  });
+  if (!m_deferredRenderingErrors.empty()) {
+    throw ZException(
+      fmt::format("Interactive Vulkan regional rendering failed: {}", takeDeferredRenderingErrors().toStdString()));
+  }
+  pendingRegionFailureGuard.dismiss();
+  return result;
+}
+
+void Z3DRenderingEngine::collectVulkanInteractiveRegion(uint64_t renderFrameToken)
+{
+  checkVulkanTileWorkerExecutionContext();
+  CHECK(!m_vulkanTileExportExtent.has_value());
+  CHECK(m_pendingVulkanTile != nullptr);
+  CHECK(!m_pendingVulkanTile->renderStereoPair);
+  CHECK_EQ(renderFrameToken, m_pendingVulkanTile->renderFrameToken);
+  CHECK(pendingVulkanTilePublished());
+
+  auto pendingRegion = std::move(m_pendingVulkanTile);
+  CHECK(pendingRegion->tile == *m_vulkanInteractiveRegion);
+}
+
+void Z3DRenderingEngine::abandonPendingVulkanInteractiveRegionAfterFailure()
+{
+  checkVulkanTileWorkerExecutionContext();
+  CHECK(!m_vulkanTileExportExtent.has_value());
+  if (m_pendingVulkanTile != nullptr) {
+    m_compositor->invalidatePendingVulkanFinalReadbacks();
+    m_pendingVulkanTile.reset();
+  }
 }
 
 bool Z3DRenderingEngine::pendingVulkanTilePublished() const
@@ -1321,6 +1802,10 @@ void Z3DRenderingEngine::takeScreenShot(const QString& filename, Z3DScreenShotTy
     Z3DRenderGlobalState::instance().resetCaptureCancellationSource();
   });
   try {
+    prepareCanonicalEngineForNonRegionalRendering();
+    if (m_canvas && m_vulkanInteractivePresentationActive) {
+      QCoreApplication::postEvent(this, new QEvent(QEvent::UpdateRequest), Qt::LowEventPriority);
+    }
     const auto token = captureCancellationSource->getToken();
     takeScreenShotPrivate(filename, sst, true, token);
   }
@@ -1332,6 +1817,16 @@ void Z3DRenderingEngine::takeScreenShot(const QString& filename, Z3DScreenShotTy
   }
   catch (const ZException& e) {
     auto errorMsg = fmt::format("takeScreenShot error: {}", e.what());
+    LOG(ERROR) << errorMsg;
+    reportRenderingError(errorMsg);
+  }
+  catch (const std::exception& e) {
+    const auto errorMsg = fmt::format("takeScreenShot error: {}", e.what());
+    LOG(ERROR) << errorMsg;
+    reportRenderingError(errorMsg);
+  }
+  catch (...) {
+    constexpr const char* errorMsg = "takeScreenShot failed with an unknown exception";
     LOG(ERROR) << errorMsg;
     reportRenderingError(errorMsg);
   }
@@ -1437,6 +1932,10 @@ void Z3DRenderingEngine::exportFixedSize3DAnimation(const ZAnimation* animation,
   }
 
   try {
+    prepareCanonicalEngineForNonRegionalRendering();
+    if (m_canvas && m_vulkanInteractivePresentationActive) {
+      QCoreApplication::postEvent(this, new QEvent(QEvent::UpdateRequest), Qt::LowEventPriority);
+    }
     auto captureCancellationSource = Z3DRenderGlobalState::instance().ensureCaptureCancellationSource();
     CHECK(captureCancellationSource);
     auto captureCancellationGuard = folly::makeGuard([]() {
@@ -1483,7 +1982,8 @@ void Z3DRenderingEngine::exportFixedSize3DAnimation(const ZAnimation* animation,
                                                              width,
                                                              height,
                                                              sst,
-                                                             false,
+                                                             /*allowVulkanWorkerPool=*/false,
+                                                             /*reportProgress=*/false,
                                                              token,
                                                              tileSize,
                                                              tileBorder);
@@ -1629,6 +2129,15 @@ void Z3DRenderingEngine::exportFixedSize3DAnimation(const ZAnimation* animation,
   catch (const ZException& e) {
     LOG(ERROR) << e.what();
     reportRenderingError(e.what());
+  }
+  catch (const std::exception& e) {
+    LOG(ERROR) << e.what();
+    reportRenderingError(e.what());
+  }
+  catch (...) {
+    constexpr const char* error = "3D animation export failed with an unknown exception";
+    LOG(ERROR) << error;
+    reportRenderingError(error);
   }
 }
 
@@ -1842,10 +2351,12 @@ void Z3DRenderingEngine::init()
   Q_EMIT progressChanged(20);
 
   // packages
-  connect(&m_doc,
-          &ZDoc::requestToAdjustViewToPosition,
-          this,
-          qOverload<double, double, double, double>(&Z3DRenderingEngine::cameraFocusesOn));
+  if (m_role == Role::Canonical) {
+    connect(&m_doc,
+            &ZDoc::requestToAdjustViewToPosition,
+            this,
+            qOverload<double, double, double, double>(&Z3DRenderingEngine::cameraFocusesOn));
+  }
   for (auto objDoc : m_doc.objDocs()) {
     if (auto imgDoc = qobject_cast<ZImgDoc*>(objDoc)) {
       auto imgView = new Z3DImgView(*imgDoc, *this);
@@ -1923,17 +2434,37 @@ void Z3DRenderingEngine::init()
   });
 }
 
-void Z3DRenderingEngine::initAndAttachToCanvas(Z3DCanvas* canvas)
+void Z3DRenderingEngine::initAndAttachToCanvas(Z3DCanvas* canvas,
+                                               size_t physicalWidth,
+                                               size_t physicalHeight,
+                                               size_t logicalWidth,
+                                               size_t logicalHeight,
+                                               qreal devicePixelRatio)
 {
   CHECK(m_role == Role::Canonical) << "A Vulkan tile worker cannot attach to a canvas";
   CHECK(canvas);
+  CHECK(QThread::currentThread() == thread());
+  CHECK_GT(physicalWidth, 0u);
+  CHECK_GT(physicalHeight, 0u);
+  CHECK_GT(logicalWidth, 0u);
+  CHECK_GT(logicalHeight, 0u);
+  CHECK_LE(physicalWidth, static_cast<size_t>(std::numeric_limits<int>::max()));
+  CHECK_LE(physicalHeight, static_cast<size_t>(std::numeric_limits<int>::max()));
+  CHECK_LE(logicalWidth, static_cast<size_t>(std::numeric_limits<int>::max()));
+  CHECK_LE(logicalHeight, static_cast<size_t>(std::numeric_limits<int>::max()));
+  CHECK(std::isfinite(devicePixelRatio));
+  CHECK_GE(devicePixelRatio, 1.0);
+
   m_canvas = canvas;
+  m_canvasOutputSize = glm::uvec2(physicalWidth, physicalHeight);
+  m_canvasLogicalSize = glm::uvec2(logicalWidth, logicalHeight);
+  m_canvasDevicePixelRatio = devicePixelRatio;
+  connect(m_canvas, &Z3DCanvas::canvasSizeChanged, this, &Z3DRenderingEngine::onCanvasResized);
   init();
 
-  m_globalParas->setDevicePixelRatio(m_canvas->devicePixelRatio());
-  setOutputSize(m_canvas->physicalSize());
+  m_globalParas->setDevicePixelRatio(static_cast<float>(m_canvasDevicePixelRatio));
+  setOutputSize(m_canvasOutputSize);
 
-  connect(m_canvas, &Z3DCanvas::canvasSizeChanged, this, &Z3DRenderingEngine::onCanvasResized);
   connect(m_canvas, &Z3DCanvas::rotateX, this, &Z3DRenderingEngine::rotateX);
   connect(m_canvas, &Z3DCanvas::rotateY, this, &Z3DRenderingEngine::rotateY);
   connect(m_canvas, &Z3DCanvas::rotateZ, this, &Z3DRenderingEngine::rotateZ);
@@ -1952,7 +2483,24 @@ void Z3DRenderingEngine::initAndAttachToCanvas(Z3DCanvas* canvas)
           &Z3DTrackballInteractionHandler::objectsMoved,
           m_canvas,
           &Z3DCanvas::on3dObjectsMoved);
-  m_canvas->setRenderingEngine(this);
+  const QPointer<Z3DCanvas> attachedCanvas = m_canvas;
+  const QPointer<Z3DRenderingEngine> attachedEngine = this;
+  const QSize initializedLogicalSize(static_cast<int>(logicalWidth), static_cast<int>(logicalHeight));
+  const qreal initializedDevicePixelRatio = devicePixelRatio;
+  const bool queued = QMetaObject::invokeMethod(
+    attachedCanvas.data(),
+    [attachedCanvas, attachedEngine, initializedLogicalSize, initializedDevicePixelRatio]() {
+      if (attachedCanvas && attachedEngine) {
+        attachedCanvas->setRenderingEngine(attachedEngine.data(), initializedLogicalSize, initializedDevicePixelRatio);
+      }
+    },
+    Qt::QueuedConnection);
+  CHECK(queued) << "Failed to attach the rendering engine to its canvas";
+  // The flag is sampled only during Vulkan canvas initialization. If this pool
+  // is later released, the open canvas remains on direct rendering.
+  if (static_cast<RenderBackend>(m_globalParas->renderBackend.associatedData()) == RenderBackend::Vulkan) {
+    configureCanvasVulkanTileWorkersFromFlags();
+  }
 }
 
 void Z3DRenderingEngine::drainVulkanFrameExecutorForTeardown()
@@ -2012,16 +2560,110 @@ void Z3DRenderingEngine::detachCanvas()
 {
   // Disconnect UI first to avoid any queued signal posting back to engine/canvas during teardown
   if (m_canvas) {
+    const QPointer<Z3DCanvas> detachedCanvas = m_canvas;
     m_canvas->disconnect(this);
     disconnect(m_canvas);
-    m_canvas->setRenderingEngine(nullptr);
+    const bool queued = QMetaObject::invokeMethod(
+      detachedCanvas.data(),
+      [detachedCanvas]() {
+        if (detachedCanvas) {
+          detachedCanvas->setRegionalPresentationEnabled(false);
+          detachedCanvas->setRenderingEngine(nullptr);
+        }
+      },
+      Qt::QueuedConnection);
+    CHECK(queued) << "Failed to detach the rendering engine from its canvas";
     m_canvas.clear();
   }
-
+  m_vulkanInteractivePresentationActive = false;
+  m_canvasOutputSize = glm::uvec2(0u);
+  m_canvasLogicalSize = glm::uvec2(0u);
   // Now safe to update DPI etc. without waking the canvas
   if (m_globalParas) {
     m_globalParas->setDevicePixelRatio(1);
   }
+  m_canvasDevicePixelRatio = 1.0;
+}
+
+void Z3DRenderingEngine::configureCanvasVulkanTileWorkersFromFlags()
+{
+  CHECK(QThread::currentThread() == thread());
+  CHECK(m_role == Role::Canonical);
+  CHECK(m_canvas);
+  CHECK(m_vulkanTileWorkerPool == nullptr);
+  CHECK(static_cast<RenderBackend>(m_globalParas->renderBackend.associatedData()) == RenderBackend::Vulkan);
+  CHECK(m_compositor->rendererBase().activeBackend() == RenderBackend::Vulkan);
+
+  std::vector<std::string> indices = absl::GetFlag(FLAGS_atlas_vk_multi_device_tile_worker_indices);
+  if (indices.empty()) {
+    return;
+  }
+
+#if defined(ATLAS_USE_OPENGLWIDGET)
+  reportRenderingError(
+    "Interactive Vulkan fixed-region rendering requires the default pixmap canvas; ATLAS_USE_OPENGLWIDGET is enabled");
+#else
+  const size_t canonicalIndex = activeVulkanDeviceSelection().preferenceIndex;
+  bool canonicalIncluded = false;
+  for (const std::string& indexText : indices) {
+    size_t preferenceIndex = 0u;
+    if (stringToValueNoThrow(indexText, preferenceIndex) && preferenceIndex == canonicalIndex) {
+      canonicalIncluded = true;
+      break;
+    }
+  }
+  if (!canonicalIncluded) {
+    indices.insert(indices.begin(), std::to_string(canonicalIndex));
+  }
+
+  QString error;
+  if (!configureVulkanTileWorkersFromPreferenceIndices(indices, error)) {
+    reportRenderingError(error);
+    return;
+  }
+  CHECK(m_vulkanTileWorkerPool != nullptr);
+  CHECK(m_vulkanTileWorkerPool->canonicalParticipates())
+    << "Canvas Vulkan device configuration must include the canonical engine";
+#endif
+}
+
+void Z3DRenderingEngine::updateVulkanInteractivePresentation()
+{
+  CHECK(QThread::currentThread() == thread());
+  CHECK(m_role == Role::Canonical);
+  const bool active = m_canvas && m_vulkanTileWorkerPool != nullptr &&
+                      m_vulkanTileWorkerPool->canonicalParticipates() &&
+                      m_vulkanTileWorkerPool->participantCount() >= 2u &&
+                      m_canvasOutputSize.x >= m_vulkanTileWorkerPool->participantCount();
+  if (active == m_vulkanInteractivePresentationActive) {
+    return;
+  }
+
+  m_vulkanInteractivePresentationActive = active;
+  const QPointer<Z3DCanvas> canvas = m_canvas;
+  if (!canvas) {
+    CHECK(!active);
+    return;
+  }
+  const bool queued = QMetaObject::invokeMethod(
+    canvas.data(),
+    [canvas, active]() {
+      if (canvas) {
+        canvas->setRegionalPresentationEnabled(active);
+      }
+    },
+    Qt::QueuedConnection);
+  CHECK(queued) << "Failed to update regional Vulkan presentation";
+}
+
+void Z3DRenderingEngine::handleVulkanTileWorkerNeedsRender()
+{
+  CHECK(QThread::currentThread() == thread());
+  if (m_vulkanTileWorkerPool == nullptr || !m_vulkanInteractivePresentationActive) {
+    return;
+  }
+  m_vulkanTileWorkerPool->invalidateInteractiveQueries();
+  Q_EMIT sceneParaUpdated();
 }
 
 void Z3DRenderingEngine::setSeedTraceUiState(bool enabled, bool inProgress, std::optional<size_t> sourceImgObjId)
@@ -2512,9 +3154,53 @@ std::vector<ZParameter*> Z3DRenderingEngine::parametersOfViewSetting(size_t id)
   return res;
 }
 
-void Z3DRenderingEngine::onCanvasResized(size_t w, size_t h)
+void Z3DRenderingEngine::onCanvasResized(size_t physicalWidth,
+                                         size_t physicalHeight,
+                                         size_t logicalWidth,
+                                         size_t logicalHeight,
+                                         qreal devicePixelRatio)
 {
-  setOutputSize(glm::uvec2(w, h));
+  CHECK(std::isfinite(devicePixelRatio));
+  CHECK_GE(devicePixelRatio, 1.0);
+  CHECK_GT(physicalWidth, 0u);
+  CHECK_GT(physicalHeight, 0u);
+  CHECK_GT(logicalWidth, 0u);
+  CHECK_GT(logicalHeight, 0u);
+  CHECK_LE(physicalWidth, std::numeric_limits<uint32_t>::max());
+  CHECK_LE(physicalHeight, std::numeric_limits<uint32_t>::max());
+  CHECK_LE(logicalWidth, std::numeric_limits<uint32_t>::max());
+  CHECK_LE(logicalHeight, std::numeric_limits<uint32_t>::max());
+  CHECK_LE(physicalWidth, static_cast<size_t>(std::numeric_limits<int>::max()));
+  CHECK_LE(physicalHeight, static_cast<size_t>(std::numeric_limits<int>::max()));
+  CHECK_LE(logicalWidth, static_cast<size_t>(std::numeric_limits<int>::max()));
+  CHECK_LE(logicalHeight, static_cast<size_t>(std::numeric_limits<int>::max()));
+  m_canvasOutputSize = glm::uvec2(physicalWidth, physicalHeight);
+  m_canvasLogicalSize = glm::uvec2(logicalWidth, logicalHeight);
+  m_canvasDevicePixelRatio = devicePixelRatio;
+  m_globalParas->setDevicePixelRatio(static_cast<float>(devicePixelRatio));
+  if (m_vulkanTileWorkerPool == nullptr) {
+    setOutputSize(m_canvasOutputSize);
+    return;
+  }
+  if (static_cast<RenderBackend>(m_globalParas->renderBackend.associatedData()) == RenderBackend::Vulkan) {
+    const bool wasPresentingRegions = m_vulkanInteractivePresentationActive;
+    if (wasPresentingRegions) {
+      cancelVulkanInteractiveMouseGestures();
+    }
+    prepareCanonicalEngineForNonRegionalRendering();
+    updateVulkanInteractivePresentation();
+    if (m_vulkanInteractivePresentationActive) {
+      QCoreApplication::postEvent(this, new QEvent(QEvent::UpdateRequest), Qt::LowEventPriority);
+      return;
+    }
+    if (wasPresentingRegions) {
+      QCoreApplication::postEvent(this, new QEvent(QEvent::UpdateRequest), Qt::LowEventPriority);
+    }
+    setOutputSize(m_canvasOutputSize);
+    return;
+  }
+  restoreDirectRenderingConfiguration();
+  setOutputSize(m_canvasOutputSize);
 }
 
 void Z3DRenderingEngine::ensureGLContext()
@@ -2669,13 +3355,61 @@ bool Z3DRenderingEngine::event(QEvent* e)
       e->accept();
       return true;
     }
+
     auto outputSize = m_outputSize;
-    int w = outputSize.x;
-    int h = outputSize.y;
+    int w = static_cast<int>(outputSize.x);
+    int h = static_cast<int>(outputSize.y);
     if (m_canvas) {
-      w = m_canvas->width();
-      h = m_canvas->height();
+      CHECK_LE(m_canvasLogicalSize.x, static_cast<uint32_t>(std::numeric_limits<int>::max()));
+      CHECK_LE(m_canvasLogicalSize.y, static_cast<uint32_t>(std::numeric_limits<int>::max()));
+      w = static_cast<int>(m_canvasLogicalSize.x);
+      h = static_cast<int>(m_canvasLogicalSize.y);
     }
+
+    if (shouldUseVulkanTileWorkersForInteractiveRendering(false)) {
+      CHECK(m_vulkanTileWorkerPool != nullptr);
+      CHECK(m_compositor != nullptr);
+      CHECK_GT(w, 0);
+      CHECK_GT(h, 0);
+      try {
+        if (e->type() == QEvent::FocusOut || e->type() == QEvent::WindowDeactivate ||
+            e->type() == QEvent::UngrabMouse) {
+          cancelVulkanInteractiveMouseGestures();
+        }
+        m_vulkanTileWorkerPool->dispatchCanonicalInteractiveEvent(e, w, h, m_canvasDevicePixelRatio);
+      }
+      catch (const ZCancellationException&) {
+        m_vulkanTileWorkerPool->invalidateInteractiveRegions();
+        e->ignore();
+        QCoreApplication::postEvent(this, new QEvent(QEvent::UpdateRequest), Qt::LowEventPriority);
+        return true;
+      }
+      catch (const std::exception& error) {
+        const QString message =
+          QString::fromStdString(fmt::format("Interactive Vulkan input dispatch failed: {}", error.what()));
+        LOG(ERROR) << message;
+        releaseVulkanTileWorkerPoolAfterFailure("a Vulkan input-dispatch failure");
+        reportRenderingError(message);
+        e->ignore();
+        QCoreApplication::postEvent(this, new QEvent(QEvent::UpdateRequest), Qt::LowEventPriority);
+        return true;
+      }
+      catch (...) {
+        const QString message = QStringLiteral("Interactive Vulkan input dispatch failed with an unknown exception");
+        LOG(ERROR) << message;
+        releaseVulkanTileWorkerPoolAfterFailure("a Vulkan input-dispatch failure");
+        reportRenderingError(message);
+        e->ignore();
+        QCoreApplication::postEvent(this, new QEvent(QEvent::UpdateRequest), Qt::LowEventPriority);
+        return true;
+      }
+
+      if (e->isAccepted()) {
+        QCoreApplication::postEvent(this, new QEvent(QEvent::UpdateRequest), Qt::LowEventPriority);
+      }
+      return true;
+    }
+
     for (auto listener : m_listeners) {
       listener->onEvent(e, w, h);
       if (e->isAccepted()) {
@@ -2695,11 +3429,205 @@ void Z3DRenderingEngine::getGLFocus()
   m_context->makeCurrent();
 }
 
+bool Z3DRenderingEngine::shouldUseVulkanTileWorkersForInteractiveRendering(bool stereo) const
+{
+  if (m_vulkanTileWorkerPool == nullptr || !m_vulkanInteractivePresentationActive || !m_canvas) {
+    return false;
+  }
+  const auto configuredBackend = static_cast<RenderBackend>(m_globalParas->renderBackend.associatedData());
+  if (configuredBackend != RenderBackend::Vulkan ||
+      m_compositor->rendererBase().activeBackend() != RenderBackend::Vulkan) {
+    return false;
+  }
+  if (stereo) {
+    return false;
+  }
+  return true;
+}
+
+void Z3DRenderingEngine::restoreDirectRenderingConfiguration()
+{
+  CHECK(QThread::currentThread() == thread());
+  CHECK(m_pendingVulkanTile == nullptr);
+
+  prepareCanonicalEngineForNonRegionalRendering();
+  if (m_vulkanInteractivePresentationActive && m_canvas) {
+    const QPointer<Z3DCanvas> canvas = m_canvas;
+    const bool queued = QMetaObject::invokeMethod(
+      canvas.data(),
+      [canvas]() {
+        if (canvas) {
+          canvas->setRegionalPresentationEnabled(false);
+        }
+      },
+      Qt::QueuedConnection);
+    CHECK(queued) << "Failed to disable regional Vulkan presentation";
+  }
+  m_vulkanInteractivePresentationActive = false;
+}
+
+void Z3DRenderingEngine::prepareCanonicalEngineForNonRegionalRendering()
+{
+  CHECK(QThread::currentThread() == thread());
+  CHECK(m_pendingVulkanTile == nullptr);
+  if (m_vulkanTileWorkerPool == nullptr && !m_vulkanInteractivePresentationActive &&
+      !m_vulkanInteractiveRegion.has_value()) {
+    return;
+  }
+
+  // Participant notifications borrow their engine's current ready buffer.
+  // Detach notifications using the old geometry before reusing those buffers.
+  if (m_vulkanTileWorkerPool != nullptr) {
+    if (m_vulkanInteractivePresentationActive || m_vulkanInteractiveRegion.has_value()) {
+      m_vulkanTileWorkerPool->detachRegionalPresentationSources();
+    }
+    m_vulkanTileWorkerPool->invalidateInteractiveRegions();
+  }
+  const bool hadInteractiveRegion = m_vulkanInteractiveRegion.has_value();
+  m_vulkanInteractiveRegion.reset();
+  if ((hadInteractiveRegion || m_vulkanInteractivePresentationActive) && m_globalParas && m_compositor) {
+    clearNewRenderingFlag();
+    m_globalParas->camera.setTileFrustum();
+    m_compositor->setRenderingRegion();
+  }
+  if (m_canvas) {
+    CHECK_GT(m_canvasOutputSize.x, 0u);
+    CHECK_GT(m_canvasOutputSize.y, 0u);
+    setOutputSize(m_canvasOutputSize);
+  }
+  m_progress = 0.0;
+}
+
+void Z3DRenderingEngine::renderVulkanInteractiveFrame(bool finishProgressiveRendering)
+{
+  CHECK(QThread::currentThread() == thread());
+  CHECK(shouldUseVulkanTileWorkersForInteractiveRendering(false));
+
+  auto& globalRenderState = Z3DRenderGlobalState::instance();
+  const auto cancellationCheckpoint = globalRenderState.idleCancellationCheckpoint();
+  if (!cancellationCheckpoint.has_value()) {
+    globalRenderState.requestCancellation();
+    QCoreApplication::postEvent(this, new QEvent(QEvent::UpdateRequest), Qt::LowEventPriority);
+    return;
+  }
+  if (shouldDeferVulkanNetworkProcessing()) {
+    deferRenderUntilVulkanIdle(QEvent::UpdateRequest);
+    return;
+  }
+
+  const auto benchmarkStart = std::chrono::steady_clock::now();
+  Q_EMIT progressChanged(10);
+
+  QString failure;
+  bool cancelled = false;
+  try {
+    const size_t participantCount = m_vulkanTileWorkerPool->participantCount();
+    CHECK_GE(participantCount, 2u);
+    CHECK_GE(m_canvasOutputSize.x, participantCount);
+
+    const uint32_t guardPixels = m_compositor->requiredScreenSpaceGuardPixels();
+    if (m_vulkanInteractiveRegion.has_value() && (m_vulkanInteractiveRegion->fullOutputExtent() != m_canvasOutputSize ||
+                                                  m_vulkanInteractiveRegion->guardPixels() != guardPixels)) {
+      // Queued UI conversions borrow the current ready target. Finish conversions
+      // described by the old region geometry before reusing that target with a
+      // different attachment extent.
+      m_vulkanTileWorkerPool->detachRegionalPresentationSources();
+    }
+    const auto regions = makeZ3DFixedRegionDescriptors(m_canvasOutputSize, participantCount, guardPixels);
+    m_vulkanTileWorkerPool->beginInteractiveRegions(regions);
+    m_progress = 0.0;
+
+    // Applying a worker snapshot and preparing fixed region geometry
+    // intentionally invalidates each participant. Keep the source absent so
+    // controlled preparation cannot cancel itself. A real cancellation request
+    // changes the checkpoint and prevents this prepared state from rendering.
+    auto cancellationSource = globalRenderState.tryAcquireCancellationSource(*cancellationCheckpoint);
+    if (!cancellationSource) {
+      globalRenderState.requestCancellation();
+      cancelled = true;
+    } else {
+      auto cancellationGuard = folly::makeGuard([&globalRenderState, &cancellationSource]() {
+        globalRenderState.releaseCancellationSource(cancellationSource);
+      });
+      const folly::CancellationToken token = cancellationSource->getToken();
+
+      do {
+        maybeCancel(token);
+        CHECK(m_canvas);
+        m_progress = m_vulkanTileWorkerPool->renderInteractiveRegions(token, *m_canvas);
+        clearNewRenderingFlag();
+        Q_EMIT progressChanged(std::clamp<int>(m_progress * 100., 0, 100));
+      } while (finishProgressiveRendering && m_progress < 1.0);
+    }
+  }
+  catch (const ZCancellationException&) {
+    cancelled = true;
+  }
+  catch (const folly::OperationCancelled&) {
+    cancelled = true;
+  }
+  catch (const std::exception& e) {
+    failure = QString::fromStdString(fmt::format("Interactive Vulkan regional rendering failed: {}", e.what()));
+  }
+  catch (...) {
+    failure = QStringLiteral("Interactive Vulkan regional rendering failed with an unknown exception");
+  }
+
+  if (!failure.isEmpty()) {
+    m_progress = 0.0;
+    releaseVulkanTileWorkerPoolAfterFailure("a Vulkan regional failure");
+    LOG(ERROR) << failure;
+    reportRenderingError(failure);
+    Q_EMIT progressChanged(100);
+    QCoreApplication::postEvent(this, new QEvent(QEvent::UpdateRequest), Qt::LowEventPriority);
+    return;
+  }
+  if (cancelled) {
+    m_progress = 0.0;
+    Q_EMIT progressChanged(100);
+    QCoreApplication::postEvent(this, new QEvent(QEvent::UpdateRequest), Qt::LowEventPriority);
+    return;
+  }
+
+  if (m_progress < 1.0) {
+    QCoreApplication::postEvent(this, new QEvent(QEvent::LayoutRequest), Qt::LowEventPriority - 1);
+  } else {
+    Q_EMIT progressChanged(100);
+  }
+  if (absl::GetFlag(FLAGS_atlas_log_benchmark_render_timings)) {
+    const double elapsedMs =
+      std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - benchmarkStart).count();
+    if (!finishProgressiveRendering) {
+      LOG(INFO) << "ATLAS_BENCHMARK_FAST_PREVIEW_DONE"
+                << " elapsed_ms=" << elapsedMs << " progress=" << m_progress;
+    }
+    if (m_progress >= 1.0) {
+      LOG(INFO) << "ATLAS_BENCHMARK_RENDER_FINISHED"
+                << " elapsed_ms=" << elapsedMs << " progress=" << m_progress << " source=vulkan_fixed_regions";
+    }
+  }
+}
+
 void Z3DRenderingEngine::renderFast(bool stereo)
 {
+  if (m_vulkanTileWorkerPool != nullptr) {
+    if (stereo && m_vulkanInteractivePresentationActive) {
+      restoreDirectRenderingConfiguration();
+      QCoreApplication::postEvent(this, new QEvent(QEvent::UpdateRequest), Qt::LowEventPriority);
+    } else if (!stereo && !m_vulkanInteractivePresentationActive) {
+      updateVulkanInteractivePresentation();
+    }
+    if (shouldUseVulkanTileWorkersForInteractiveRendering(stereo)) {
+      renderVulkanInteractiveFrame(false);
+      return;
+    }
+  }
+
   const auto benchmarkStart = std::chrono::steady_clock::now();
-  if (Z3DRenderGlobalState::instance().hasCancellationSource()) {
-    Z3DRenderGlobalState::instance().requestCancellation();
+  auto& renderState = Z3DRenderGlobalState::instance();
+  const auto cancellationCheckpoint = renderState.idleCancellationCheckpoint();
+  if (!cancellationCheckpoint.has_value()) {
+    renderState.requestCancellation();
     LOG(INFO) << "cancel rendering, schedule a update later";
     QCoreApplication::postEvent(this, new QEvent(QEvent::UpdateRequest), Qt::LowEventPriority);
     return;
@@ -2715,11 +3643,16 @@ void Z3DRenderingEngine::renderFast(bool stereo)
   VLOG(1) << "renderFast";
   Q_EMIT progressChanged(10);
 
-  auto& renderState = Z3DRenderGlobalState::instance();
-  auto cancellationSource = renderState.ensureCancellationSource();
-  CHECK(cancellationSource);
-  auto cancellationGuard = folly::makeGuard([&renderState]() {
-    renderState.resetCancellationSource();
+  auto cancellationSource = renderState.tryAcquireCancellationSource(*cancellationCheckpoint);
+  if (!cancellationSource) {
+    renderState.requestCancellation();
+    LOG(INFO) << "cancel rendering, schedule a update later";
+    QCoreApplication::postEvent(this, new QEvent(QEvent::UpdateRequest), Qt::LowEventPriority);
+    Q_EMIT progressChanged(100);
+    return;
+  }
+  auto cancellationGuard = folly::makeGuard([&renderState, &cancellationSource]() {
+    renderState.releaseCancellationSource(cancellationSource);
   });
   const bool startedDeferredErrorFrame = beginDeferredRenderingErrorFrame();
   auto deferredErrorFrameGuard = folly::makeGuard([this, startedDeferredErrorFrame]() {
@@ -2779,8 +3712,36 @@ void Z3DRenderingEngine::renderFast(bool stereo)
 
 void Z3DRenderingEngine::render(bool stereo)
 {
+  if (m_vulkanTileWorkerPool != nullptr) {
+    if (stereo && m_vulkanInteractivePresentationActive) {
+      restoreDirectRenderingConfiguration();
+      QCoreApplication::postEvent(this, new QEvent(QEvent::UpdateRequest), Qt::LowEventPriority);
+    } else if (!stereo && !m_vulkanInteractivePresentationActive) {
+      updateVulkanInteractivePresentation();
+    }
+    if (shouldUseVulkanTileWorkersForInteractiveRendering(stereo)) {
+      renderVulkanInteractiveFrame(true);
+      return;
+    }
+  }
+
   const auto benchmarkStart = std::chrono::steady_clock::now();
-  CHECK(!Z3DRenderGlobalState::instance().hasCancellationSource());
+  auto& renderState = Z3DRenderGlobalState::instance();
+  const auto cancellationCheckpoint = renderState.idleCancellationCheckpoint();
+  if (!cancellationCheckpoint.has_value()) {
+    renderState.requestCancellation();
+    QCoreApplication::postEvent(this, new QEvent(QEvent::UpdateRequest), Qt::LowEventPriority);
+    return;
+  }
+  auto cancellationSource = renderState.tryAcquireCancellationSource(*cancellationCheckpoint);
+  if (!cancellationSource) {
+    renderState.requestCancellation();
+    QCoreApplication::postEvent(this, new QEvent(QEvent::UpdateRequest), Qt::LowEventPriority);
+    return;
+  }
+  auto cancellationGuard = folly::makeGuard([&renderState, &cancellationSource]() {
+    renderState.releaseCancellationSource(cancellationSource);
+  });
   bool renderFailed = false;
 
   VLOG(1) << "render";
@@ -2794,8 +3755,6 @@ void Z3DRenderingEngine::render(bool stereo)
     endDeferredRenderingErrorFrame(startedDeferredErrorFrame);
   });
   try {
-    auto cancellationSource = Z3DRenderGlobalState::instance().ensureCancellationSource();
-    CHECK(cancellationSource);
     while (m_progress < 1.0) {
       auto token = cancellationSource->getToken();
       m_progress = processFrame(stereo, true, token);
@@ -2828,7 +3787,6 @@ void Z3DRenderingEngine::render(bool stereo)
   if (!renderFailed && startedDeferredErrorFrame && m_progress >= 1.0) {
     reportDeferredRenderingErrorsIfAny();
   }
-  Z3DRenderGlobalState::instance().resetCancellationSource();
 }
 
 Z3DLocalColorBuffer* Z3DRenderingEngine::monoReadyLocalBuffer() const
@@ -2851,6 +3809,7 @@ void Z3DRenderingEngine::takeFixedSizeScreenShotWithoutResetCanvasSizePrivate(
   int width,
   int height,
   Z3DScreenShotType sst,
+  bool allowVulkanWorkerPool,
   bool reportProgress,
   folly::CancellationToken cancellationToken,
   int tileSize,
@@ -2868,7 +3827,7 @@ void Z3DRenderingEngine::takeFixedSizeScreenShotWithoutResetCanvasSizePrivate(
   const int resolvedTileSize = tileSize > 0 ? tileSize : kDefaultTileSize;
   const int resolvedTileBorder = (tileSize > 0 || tileBorder > 0) ? tileBorder : kDefaultTileBorder;
   const auto backend = static_cast<RenderBackend>(m_globalParas->renderBackend.associatedData());
-  if (m_vulkanTileWorkerPool != nullptr) {
+  if (allowVulkanWorkerPool && m_vulkanTileWorkerPool != nullptr) {
     CHECK(backend == RenderBackend::Vulkan) << "Vulkan tile workers require the canonical Vulkan backend";
   }
 
@@ -2887,7 +3846,7 @@ void Z3DRenderingEngine::takeFixedSizeScreenShotWithoutResetCanvasSizePrivate(
     takeScreenShotPrivate(filename, sst, reportProgress, cancellationToken);
   } else {
     m_globalParas->camera.viewportChanged(glm::uvec2(width, height));
-    const bool useWorkerPool = m_vulkanTileWorkerPool != nullptr;
+    const bool useWorkerPool = allowVulkanWorkerPool && m_vulkanTileWorkerPool != nullptr;
     const bool logVulkanTiledCapture =
       backend == RenderBackend::Vulkan && sst == Z3DScreenShotType::MonoView && VLOG_IS_ON(1);
     const auto tilePhaseStart =
@@ -2939,8 +3898,9 @@ void Z3DRenderingEngine::takeFixedSizeScreenShotWithoutResetCanvasSizePrivate(
         catch (...) {
           // A failed batch is never reused: worker engines can have submitted
           // device-local work or partially applied a new state publication.
-          m_vulkanTileWorkerPool.reset();
-          throw;
+          const std::exception_ptr batchFailure = std::current_exception();
+          releaseVulkanTileWorkerPoolAfterFailure("a Vulkan tile-batch failure");
+          std::rethrow_exception(batchFailure);
         }
       }();
       img = std::move(frame.primaryColor);
@@ -3260,10 +4220,26 @@ void Z3DRenderingEngine::saveCurrentFrameDepth(const QString& filename, Z3DEye e
   m_compositor->saveOutputDepthToImage(filename, eye);
 }
 
-void Z3DRenderingEngine::resetOutputSizeToMatchCanvasSize()
+void Z3DRenderingEngine::resetOutputSizeToMatchCanvasSize() noexcept
 {
-  if (m_canvas) {
-    setOutputSize(m_canvas->physicalSize());
+  if (!m_canvas) {
+    return;
+  }
+
+  CHECK_GT(m_canvasOutputSize.x, 0u);
+  CHECK_GT(m_canvasOutputSize.y, 0u);
+  try {
+    setOutputSize(m_canvasOutputSize);
+  }
+  catch (const std::exception& error) {
+    const auto message = fmt::format("Failed to restore the 3D canvas output size after capture: {}", error.what());
+    LOG(ERROR) << message;
+    reportRenderingError(message);
+  }
+  catch (...) {
+    constexpr const char* message = "Failed to restore the 3D canvas output size after capture";
+    LOG(ERROR) << message;
+    reportRenderingError(message);
   }
 }
 
@@ -3271,9 +4247,6 @@ void Z3DRenderingEngine::handleRenderBackendChanged()
 {
   CHECK(m_role == Role::Canonical) << "A Vulkan tile worker has immutable Vulkan backend affinity";
   VLOG(1) << "Render backend configuration changed";
-  if (static_cast<RenderBackend>(m_globalParas->renderBackend.associatedData()) != RenderBackend::Vulkan) {
-    m_vulkanTileWorkerPool.reset();
-  }
   if (Z3DRenderGlobalState::instance().hasCancellationSource()) {
     Z3DRenderGlobalState::instance().requestCancellation();
     VLOG(1) << "Active render detected; queuing backend switch after cancellation.";
@@ -3318,7 +4291,6 @@ void Z3DRenderingEngine::applyBackendSwitch()
   });
 
   const auto backend = static_cast<RenderBackend>(m_globalParas->renderBackend.associatedData());
-  std::unique_lock lock(targetSwitchMutex());
   const RenderBackend sourceBackend = m_compositor->rendererBase().activeBackend();
   CHECK(backend == RenderBackend::OpenGL || backend == RenderBackend::Vulkan);
   CHECK(sourceBackend == RenderBackend::OpenGL || sourceBackend == RenderBackend::Vulkan);
@@ -3330,6 +4302,12 @@ void Z3DRenderingEngine::applyBackendSwitch()
     QCoreApplication::postEvent(this, new QEvent(QEvent::UpdateRequest), Qt::LowEventPriority);
     return;
   }
+
+  if (sourceBackend == RenderBackend::Vulkan && m_vulkanTileWorkerPool != nullptr) {
+    releaseVulkanTileWorkerPool();
+  }
+
+  std::unique_lock lock(targetSwitchMutex());
 
   stopVulkanCompletionPolling();
   // Deferred render requests are tied to the previous Vulkan backend state.

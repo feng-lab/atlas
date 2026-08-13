@@ -5,6 +5,8 @@
 #include "zoptionparameter.h"
 #include "zparameter.h"
 
+#include <QScopedValueRollback>
+
 namespace nim {
 
 class Z3DCameraParameter : public ZSingleValueParameter<Z3DCamera>
@@ -81,7 +83,13 @@ public:
                       double normalizedTop = 1.0)
   {
     m_value.setTileFrustum(normalizedLeft, normalizedRight, normalizedBottom, normalizedTop);
+    const QScopedValueRollback<bool> applyingRenderRegionFrustum(m_applyingRenderRegionFrustum, true);
     Q_EMIT valueChanged();
+  }
+
+  [[nodiscard]] bool isApplyingRenderRegionFrustum() const noexcept
+  {
+    return m_applyingRenderRegionFrustum;
   }
 
   void flipViewDirection();
@@ -257,6 +265,7 @@ protected:
 
 private:
   bool m_blockSubParameterSignals = false;
+  bool m_applyingRenderRegionFrustum = false;
   ZStringIntOptionParameter m_projectionType;
   ZVec3Parameter m_eye;
   ZVec3Parameter m_center;

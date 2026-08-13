@@ -12,8 +12,10 @@
 #include "zswccolorparameters.h"
 #include <QPoint>
 #include <QObject>
+#include <cstddef>
 #include <cstdint>
 #include <map>
+#include <optional>
 #include <utility>
 #include <vector>
 
@@ -33,11 +35,14 @@ public:
     SmartExtendSwcNode
   };
 
-  explicit Z3DSwcFilter(Z3DGlobalParameters& globalParas, QObject* parent = nullptr);
+  explicit Z3DSwcFilter(Z3DGlobalParameters& globalParas, QObject* parent = nullptr, size_t objectId = 0u);
+  ~Z3DSwcFilter() override;
 
   void setData(ZSwcPack& swcPack);
 
   bool isReady(Z3DEye eye) const override;
+
+  [[nodiscard]] bool isCurrentPickingObject(/*nullable*/ const void* object) const noexcept;
 
   std::shared_ptr<ZWidgetsGroup> widgetsGroup();
 
@@ -90,6 +95,8 @@ Q_SIGNALS:
   void showSwcNodeContextMenu(QPoint globalPos, ZSwcPack* swcPack, int64_t clickedNodeId);
 
 protected:
+  void cancelMouseGesture() noexcept override;
+
   void prepareColor();
 
   void selectSwc(QMouseEvent* e, int w, int h);
@@ -149,7 +156,7 @@ private:
   ZEventListenerParameter m_selectSwcEvent;
   ZEventListenerParameter m_deleteSelectedNodesEvent;
   ZEventListenerParameter m_contextMenuEvent;
-  glm::ivec2 m_startCoord{};
+  std::optional<glm::ivec2> m_mousePressStart;
   ZSwc* m_pressedSwc = nullptr;
   const ZSwc::SwcTreeNode* m_pressedSwcTreeNode = nullptr;
 
@@ -171,9 +178,10 @@ private:
   bool m_colorDirty = true;
 
   ZSwcPack* m_swcPack = nullptr;
-  ZSwcPack* m_registeredSwcPack = nullptr;
+  std::vector<glm::col4> m_swcPickingTokens;
 
   InteractionMode m_interactionMode;
+  const size_t m_objectId;
 };
 
 } // namespace nim

@@ -43,6 +43,11 @@ public:
 
   void onEvent(QEvent* e, int w, int h);
 
+  void cancelMouseGesture() noexcept
+  {
+    setState(State::None);
+  }
+
 Q_SIGNALS:
   void cameraMoved();
 

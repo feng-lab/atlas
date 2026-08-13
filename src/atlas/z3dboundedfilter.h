@@ -49,6 +49,7 @@ public:
   };
 
   explicit Z3DBoundedFilter(Z3DGlobalParameters& globalPara, QObject* parent = nullptr);
+  ~Z3DBoundedFilter() override;
 
   void setVisible(bool v)
   {
@@ -71,6 +72,13 @@ public:
   {
     return m_transformEnabled;
   }
+
+  // Transform-handle identities are local to one rendering engine. Regional
+  // picking transports the stable 1-based index and resolves it in the
+  // canonical filter before dispatching the input event.
+  [[nodiscard]] int transformHandlePickingIndex(/*nullable*/ const void* object) const noexcept;
+
+  [[nodiscard]] const void* transformHandlePickingObject(int handleIndex) const;
 
   virtual void setViewport(glm::uvec2 viewport)
   {
@@ -295,6 +303,8 @@ Q_SIGNALS:
   void rendererSizeScaleChanged();
 
 protected:
+  void cancelMouseGesture() noexcept override;
+
   void pushRendererParametersToBase();
 
   void updateBoundBox();
@@ -377,7 +387,7 @@ private:
 
   void registerHandlePickingColors();
 
-  int selectedHandle(const void* obj) const;
+  int selectedHandle(/*nullable*/ const void* obj) const noexcept;
 
   void updateSelectedHandle(int handleIdx);
 
@@ -472,6 +482,7 @@ protected:
   std::vector<glm::vec4> m_handleArrowheadPosAndHeadRadius;
   std::vector<glm::vec4> m_handleArrowColors;
   std::vector<glm::vec4> m_handleArrowPickingColors;
+  std::array<glm::col4, 4> m_handlePickingTokens{};
 
   bool m_clipPlanesDirty = true;
   bool m_canUpdateClipPlane;

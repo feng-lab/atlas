@@ -34,6 +34,7 @@
 #include <QDesktopServices>
 #include <QFile>
 #include <QMetaObject>
+#include <QPointer>
 #include <QSignalBlocker>
 #include "zservicemanager.h"
 
@@ -769,7 +770,25 @@ QWidget* Z3DMainWindow::createCaptureWidget() const
 
 void Z3DMainWindow::initRenderingEngine()
 {
-  QMetaObject::invokeMethod(m_engine, &Z3DRenderingEngine::initAndAttachToCanvas, m_canvas);
+  CHECK(QThread::currentThread() == m_canvas->thread());
+  const glm::uvec2 physicalSize = m_canvas->physicalSize();
+  const glm::uvec2 logicalSize = m_canvas->logicalSize();
+  const qreal devicePixelRatio = m_canvas->devicePixelRatio();
+  const QPointer<Z3DCanvas> canvas = m_canvas;
+  const bool queued = QMetaObject::invokeMethod(
+    m_engine,
+    [engine = m_engine, canvas, physicalSize, logicalSize, devicePixelRatio]() {
+      if (canvas) {
+        engine->initAndAttachToCanvas(canvas,
+                                      physicalSize.x,
+                                      physicalSize.y,
+                                      logicalSize.x,
+                                      logicalSize.y,
+                                      devicePixelRatio);
+      }
+    },
+    Qt::QueuedConnection);
+  CHECK(queued) << "Failed to queue 3D rendering-engine initialization";
 }
 
 void Z3DMainWindow::onRenderingError(const QString& error)

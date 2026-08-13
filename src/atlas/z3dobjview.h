@@ -29,6 +29,15 @@ public:
 
   [[nodiscard]] virtual bool hasObj(size_t id) const = 0;
 
+  [[nodiscard]] virtual std::vector<size_t> objectIds() const = 0;
+
+  [[nodiscard]] virtual bool isObjSelected(size_t id) const = 0;
+
+  virtual void setObjSelected(size_t id, bool selected) = 0;
+
+  // Return the filter that owns an existing document object ID.
+  [[nodiscard]] virtual Z3DFilter& filterForObject(size_t id) const = 0;
+
   // return default ZBBox if object id is not the current type
   [[nodiscard]] virtual ZBBox<glm::dvec3> boundBoxOfObj(size_t id) const = 0;
 
