@@ -15,19 +15,9 @@ files_to_download = [
         "filename": "highway-1.4.0.tar.gz",
     },
     {
-        "expected_size": 1882762,
-        "expected_sha256": "ab38928f7f6248e2a98cc184956021acb927b16a0dee71b4d260dc040a4320ea",
-        "filename": "libjxl-0.11.2.tar.gz",
-    },
-    {
-        "expected_size": 61687836,
-        "expected_sha256": "487ad434d8b121ae3902d5ad9cb830cd8e1f75fefad6e2ba80f89d60e3db95d7",
-        "filename": "OpenJDK25U-jre_x64_linux_hotspot_25.0.3_9.tar.gz",
-    },
-    {
-        "expected_size": 2528617,
-        "expected_sha256": "ecae8008e2cc9ade2f2c1bb9d5e6d4fb73e7c433866a056bd82980741571a022",
-        "filename": "libjpeg-turbo-3.1.4.1.tar.gz",
+        "expected_size": 42131403,
+        "expected_sha256": "1a1ab8209b35586fbc1aa279ba76d102130b95badcb20ca329587219112d8c16",
+        "filename": "hdf5-2.2.0.tar.gz",
     },
     {
         "expected_size": 1616754,
@@ -50,29 +40,34 @@ files_to_download = [
         "filename": "jansson-2.14.1.tar.bz2",
     },
     {
+        "expected_size": 2537858,
+        "expected_sha256": "6f30092cef9fb839779646608f4ee14ae3cbac989c47fa05e841b0841f09878e",
+        "filename": "libjpeg-turbo-3.2.0.tar.gz",
+    },
+    {
         "expected_size": 2492624,
         "expected_sha256": "1048d084b89ac1587e3b0dca00b863a757fed2bc1804c6355eb4bce9090356b7",
         "filename": "openjpeg-2.5.4.zip",
     },
     {
-        "expected_size": 447175,
-        "expected_sha256": "be7ffbd057cadebe2aa144542fd90c6838c6a083b5e8a9048b8ee3b66b29d5fb",
-        "filename": "giflib-5.2.2.tar.gz",
+        "expected_size": 56207717,
+        "expected_sha256": "bc5c721d4475b328e50cc0fbbe3319773db374716836e7caa8fb4398c1f90eba",
+        "filename": "OpenJDK25U-jre_aarch64_mac_hotspot_25.0.4_7.tar.gz",
     },
     {
-        "expected_size": 64009719,
-        "expected_sha256": "791ae3604841ca03cb3889a3ad89165346e4b180ae3448efd4b0caa9ef46d245",
-        "filename": "cmake-4.3.2-linux-x86_64.tar.gz",
+        "expected_size": 54405968,
+        "expected_sha256": "e8139d85b3813bc38833142ae1940472e9a587e9b5d2718ac1804c60f4e57a64",
+        "filename": "cmake-4.4.2-windows-x86_64.zip",
     },
     {
-        "expected_size": 2667714,
-        "expected_sha256": "c866b7477cbb7512ab6863a685027adbb1bb8da8fc3bab7429ed43d3281d5aa9",
-        "filename": "nghttp2-1.69.0.tar.gz",
+        "expected_size": 610162,
+        "expected_sha256": "627928088300ecde6ca91ffd202e189203f04ad61ad12f0fe9dc57b9a7a0fb3c",
+        "filename": "LibRaw-0.22.2.tar.gz",
     },
     {
-        "expected_size": 594502,
-        "expected_sha256": "e0ba5157007abc7b1a65118a96657a961ddf55f7e3f632ee035366dfce039ca4",
-        "filename": "nasm-3.01-win64.zip",
+        "expected_size": 61714730,
+        "expected_sha256": "aed3915f8facc0c80733ab2448bb0df4b494a36a2c5759e9a6e1eb979720f2b3",
+        "filename": "OpenJDK25U-jre_x64_linux_hotspot_25.0.4_7.tar.gz",
     },
     {
         "expected_size": 314009,
@@ -80,14 +75,9 @@ files_to_download = [
         "filename": "ninja-mac.zip",
     },
     {
-        "expected_size": 410916,
-        "expected_sha256": "e8b798272b9282045cb83577dcf7bd7fcd22bb3a43aec0eb1a24f675b4cef0b8",
-        "filename": "nghttp3-1.17.0.tar.xz",
-    },
-    {
-        "expected_size": 150157261,
-        "expected_sha256": "9446c37fd86fecd95254ebe5d368a66ef9b09cec4592b2746979076657e24e65",
-        "filename": "boost_1_91_0.7z",
+        "expected_size": 58474646,
+        "expected_sha256": "5b0d58f043f762fa3ee6cc12b6774b59b245cafdcb357e45ce61f822aa9a56cb",
+        "filename": "OpenJDK25U-jre_x64_windows_hotspot_25.0.4_7.zip",
     },
     {
         "expected_size": 8595539,
@@ -95,14 +85,14 @@ files_to_download = [
         "filename": "neurolabi-internal-src.zip",
     },
     {
-        "expected_size": 56464762,
-        "expected_sha256": "287cc80077dc2ffd0e5733ba238f92206a84c26bef33e6881a23c213e4c35af4",
-        "filename": "OpenJDK25U-jre_aarch64_mac_hotspot_25.0.3_9.tar.gz",
-    },
-    {
         "expected_size": 289808,
         "expected_sha256": "26a40fa8595694dec2fad4911e62d29e10525d2133c9a4230b66397774ae25bf",
         "filename": "ninja-win.zip",
+    },
+    {
+        "expected_size": 8627816,
+        "expected_sha256": "0c119d394bab91ecd97b64791f24bddc247d08840431e0045bcb92bba3275665",
+        "filename": "curl-8.21.0_6-win64-mingw.zip",
     },
     {
         "expected_size": 1448542,
@@ -110,19 +100,19 @@ files_to_download = [
         "filename": "gawk-3.1.6-1-bin.zip",
     },
     {
-        "expected_size": 87444418,
-        "expected_sha256": "808ab43a0db04c8eec9ed7db12b90d7be1c8e2e75f4a060724d604a2043ccaf7",
-        "filename": "cmake-4.3.2-macos-universal.tar.gz",
-    },
-    {
-        "expected_size": 1746114,
-        "expected_sha256": "400b797db8fc7cb7046db0dda996fbae779f388869db39896f82cfac0534e94c",
-        "filename": "nasm-3.01-macosx.zip",
-    },
-    {
         "expected_size": 140303220,
         "expected_sha256": "c403b53a4950ccd0d5d6d8738b06fa4b9a7aaaa529bdc80cda6ca73d1fddb5cd",
         "filename": "ffmpeg-n8.1-latest-linux64-gpl-8.1.tar.xz",
+    },
+    {
+        "expected_size": 56024439,
+        "expected_sha256": "5af7221be05bbe69d7ec4eb74b5656c6d15b8d1a332410d6af937b1df48647c0",
+        "filename": "OpenImageIO-3.1.16.0.tar.gz",
+    },
+    {
+        "expected_size": 10061309,
+        "expected_sha256": "08c45dff8ede1b56a6e7d1e9fdaf113dd91ab28ddcbcf696229b683e5e9af45a",
+        "filename": "skcms-2025_09_16.tar.gz",
     },
     {
         "expected_size": 53153930,
@@ -130,14 +120,24 @@ files_to_download = [
         "filename": "openssl-3.5.7.tar.gz",
     },
     {
+        "expected_size": 641314,
+        "expected_sha256": "161d0bfaff53c2f9e9f3e69fd0672323ebabafd1268976a5cec11be92a19aee7",
+        "filename": "nasm-3.02-win64.zip",
+    },
+    {
         "expected_size": 2882336,
         "expected_sha256": "aa1b66a70eace83dc624508745646c08ae561de512ab403adffb93ac87fc72e6",
         "filename": "curl-8.21.0.tar.xz",
     },
     {
-        "expected_size": 52961068,
-        "expected_sha256": "83d20c23f5c5f64b3b328785e35b23c532e33057a97ed6294acaca3781b78a01",
-        "filename": "cmake-4.3.2-windows-x86_64.zip",
+        "expected_size": 410868,
+        "expected_sha256": "aad782c23d3f01bd4bb52c8bac7a553b631ef8115fd1612703df6183449fef19",
+        "filename": "nghttp3-1.18.0.tar.xz",
+    },
+    {
+        "expected_size": 1698757,
+        "expected_sha256": "03e9be69a30be4011f559da75328b6d7cea8ad921fabfbd551ce10bf45cdc992",
+        "filename": "libjxl-0.12.0.tar.gz",
     },
     {
         "expected_size": 134048,
@@ -145,29 +145,24 @@ files_to_download = [
         "filename": "ninja-linux.zip",
     },
     {
-        "expected_size": 22547387,
-        "expected_sha256": "ebb82529562b71170807bbc6b0e7eb4f0b13af8cbb0e085bb9e8f6fe709598ad",
-        "filename": "ffmpeg81arm.zip",
+        "expected_size": 22608364,
+        "expected_sha256": "d0c06c5c68ce48af3143b262f7a9118a7c9f67de1e237fcc24ffb14df9c67af9",
+        "filename": "ffmpeg9arm.zip",
     },
     {
-        "expected_size": 44689164,
-        "expected_sha256": "41512eb079d9637bf0d89d5893f060d8593491b3a48d61d23cede135ada11f11",
-        "filename": "hdf5-2.1.1.zip",
+        "expected_size": 1831782,
+        "expected_sha256": "4c1bbb09853f5f5ffc9b7832cbc9366c4761bc79ce7ffb148b0e427e5f3fa114",
+        "filename": "nasm-3.02-macosx.zip",
     },
     {
-        "expected_size": 42429998,
-        "expected_sha256": "594bf4e7d15b622157a54915de7e458c208e3363d61a5e488d8abfbda9aff3e5",
-        "filename": "OpenJDK25U-jre_x64_mac_hotspot_25.0.3_9.tar.gz",
+        "expected_size": 144300348,
+        "expected_sha256": "57f2ded2390068a44d88748425067e01a8c285257a4d9611d04ade9d8ec68615",
+        "filename": "boost_1_92_0.7z",
     },
     {
-        "expected_size": 55378445,
-        "expected_sha256": "747341fd98f10d82868ec7663f1f3763cf6fb9acf8a2ed81fc3f25256ef019be",
-        "filename": "OpenImageIO-3.1.14.1.tar.gz",
-    },
-    {
-        "expected_size": 17845221,
-        "expected_sha256": "07fa0fb57f28427f9d38ed43c37448df0da1f205c939bab36b50980378ad86a5",
-        "filename": "ffmpeg-8.1intel.7z",
+        "expected_size": 18068408,
+        "expected_sha256": "8a3f123570e3af4f6ac9d1d9152bdb108d25dbe89235cb2584c59827affa7b3d",
+        "filename": "ffmpeg-9.0.1intel.7z",
     },
     {
         "expected_size": 85375520,
@@ -175,9 +170,9 @@ files_to_download = [
         "filename": "oneapi-mkl-2023.2.0-macos-x64.tar.xz",
     },
     {
-        "expected_size": 702424,
-        "expected_sha256": "7fa5ec2be0f0cbed8bc4ec89c0787dfa9d8ce678f1ed9477c52f30eb1a591207",
-        "filename": "ngtcp2-1.24.0.tar.xz",
+        "expected_size": 709136,
+        "expected_sha256": "2a34d2484ba17847a5d11965704e9dd0fac4c6d8efc75ffe1ec7de66d8c6b6fb",
+        "filename": "ngtcp2-1.25.0.tar.xz",
     },
     {
         "expected_size": 1653271,
@@ -185,14 +180,19 @@ files_to_download = [
         "filename": "libsodium-1.0.22.tar.bz2",
     },
     {
-        "expected_size": 58466005,
-        "expected_sha256": "a183e7280220ad5f6fe94ecbf025a5f10fc5797a0b18c600ed8f813c8158c530",
-        "filename": "OpenJDK25U-jre_x64_windows_hotspot_25.0.3_9.zip",
-    },
-    {
         "expected_size": 3833512,
         "expected_sha256": "93a852c2b3efafee3723efd4636de855b46f9fe1efddd607e1f42f60fc8f2136",
         "filename": "libwebp-1.6.0.tar.gz",
+    },
+    {
+        "expected_size": 64872648,
+        "expected_sha256": "3ada9a3f5d8a85413579bdd0ea6aa8e8da86efdd6d15c91a1afa517f2021956c",
+        "filename": "cmake-4.4.2-linux-x86_64.tar.gz",
+    },
+    {
+        "expected_size": 89450384,
+        "expected_sha256": "800fc86838e913fff969b499886c80baeb4ccfd00f0e39906b34aa334f39ab6c",
+        "filename": "cmake-4.4.2-macos-universal.tar.gz",
     },
     {
         "expected_size": 105431,
@@ -200,19 +200,19 @@ files_to_download = [
         "filename": "gperf-3.0.1-bin.zip",
     },
     {
-        "expected_size": 10054247,
-        "expected_sha256": "25672da9917e84f22712b55850997296fe0a1a8a519859c7ad3c624a310edc48",
-        "filename": "skcms-b2e692629c1fb19342517d7fb61f1cf83d075492.tar.gz",
+        "expected_size": 470579,
+        "expected_sha256": "b65b66b99f0424b93525f987386f22fc5efb9da2bfc92ad4a532249aaffbab0e",
+        "filename": "giflib-6.1.3.tar.gz",
     },
     {
-        "expected_size": 1682411,
-        "expected_sha256": "a789dc4e2409e2901d93793a4e0b80c7b49d0d97cf6ad71c850eb7616acfd786",
-        "filename": "LibRaw-0.22.1.tar.gz",
+        "expected_size": 2018996,
+        "expected_sha256": "e05cb1388eaca3830aded4ccf20044b6e1ac1a61411dcca11b0437c4285c8bc2",
+        "filename": "nghttp2-1.70.0.tar.xz",
     },
     {
-        "expected_size": 8623093,
-        "expected_sha256": "2a3e951f522be7d9a3a964be57e74ee15d19dd970bcc7b7843445089901a3ed4",
-        "filename": "curl-8.21.0_2-win64-mingw.zip",
+        "expected_size": 42133365,
+        "expected_sha256": "1603a51392d6e4aa66dea50f60cc725d40ed77c05bf7557096e5003807236296",
+        "filename": "OpenJDK25U-jre_x64_mac_hotspot_25.0.4_7.tar.gz",
     },
     {
         "expected_size": 53843906,

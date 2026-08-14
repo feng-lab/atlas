@@ -5,6 +5,7 @@ import json
 import logging
 import os
 import re
+import shlex
 import shutil
 import stat
 import subprocess
@@ -638,6 +639,13 @@ _THIRD_PARTY_LICENSE_SEARCH_SUBDIRS: tuple[str, ...] = (
     "release",
 )
 
+# Extra notices for code vendored inside a dependency rather than represented
+# by its own top-level source component. ITKCommon directly links and uses its
+# bundled double-conversion implementation.
+_THIRD_PARTY_LICENSE_EXTRA_FILES: dict[str, tuple[str, ...]] = {
+    "ITK": ("Modules/ThirdParty/DoubleConversion/src/LICENSE",),
+}
+
 _THIRD_PARTY_LICENSE_SOURCE_SKIP_DIRS: frozenset[str] = frozenset(
     {
         "build",
@@ -656,7 +664,7 @@ def _is_third_party_license_filename(name: str) -> bool:
 
 
 def _collect_third_party_license_files_for_component(
-    component_dir: str,
+    component_name: str, component_dir: str
 ) -> list[tuple[str, str]]:
     results: dict[str, str] = {}
     for subdir in _THIRD_PARTY_LICENSE_SEARCH_SUBDIRS:
@@ -671,6 +679,13 @@ def _collect_third_party_license_files_for_component(
                 continue
             rel_path = os.path.relpath(src_path, component_dir)
             results.setdefault(rel_path, src_path)
+    for rel_path in _THIRD_PARTY_LICENSE_EXTRA_FILES.get(component_name, ()):
+        src_path = os.path.join(component_dir, rel_path)
+        if not os.path.isfile(src_path):
+            raise RuntimeError(
+                f"required third-party license file is missing: {src_path}"
+            )
+        results.setdefault(rel_path, src_path)
     return [(src, rel) for rel, src in sorted(results.items())]
 
 
@@ -683,7 +698,9 @@ def copy_third_party_license_files(component_name: str, component_dir: str) -> N
         )
         return
 
-    license_files = _collect_third_party_license_files_for_component(component_dir)
+    license_files = _collect_third_party_license_files_for_component(
+        component_name, component_dir
+    )
     dst_component_dir = os.path.join(third_party_license_bundle_dir(), component_name)
     shutil.rmtree(dst_component_dir, ignore_errors=True)
     if not license_files:
@@ -1485,6 +1502,7 @@ def build_boost(src_dir: str, install_dir: str):
                 "--with-program_options",
                 "--with-thread",
                 "--with-charconv",
+                "--with-regex",
             ]
             if use_clang_cl():
                 clang_win_user_config = os.path.join(
@@ -1519,7 +1537,7 @@ def build_boost(src_dir: str, install_dir: str):
                 subprocess.run(
                     [
                         "./bootstrap.sh",
-                        "--with-libraries=headers,context,filesystem,program_options,thread,charconv",
+                        "--with-libraries=headers,context,filesystem,program_options,thread,charconv,regex",
                         "--without-icu",
                         "--prefix=" + install_dir,
                     ],
@@ -1560,7 +1578,7 @@ def build_boost(src_dir: str, install_dir: str):
                 subprocess.run(
                     [
                         "./bootstrap.sh",
-                        "--with-libraries=headers,context,filesystem,program_options,thread,charconv",
+                        "--with-libraries=headers,context,filesystem,program_options,thread,charconv,regex",
                         "--without-icu",
                         "--prefix=" + arm64_install_dir,
                     ],
@@ -1601,7 +1619,7 @@ def build_boost(src_dir: str, install_dir: str):
                 [
                     "./bootstrap.sh",
                     "--with-toolset=clang" if use_clang_in_linux() else "",
-                    "--with-libraries=headers,context,filesystem,program_options,thread,charconv",
+                    "--with-libraries=headers,context,filesystem,program_options,thread,charconv,regex",
                     "--without-icu",
                     "--prefix=" + install_dir,
                 ],
@@ -1656,29 +1674,14 @@ def build_tbb(src_dir: str, install_dir: str):
 def build_eigen(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
 
-    patches = [
-        FilePatcher(
-            orig_file=os.path.join(src_dir, "CMakeLists.txt"),
-            from_texts=[
-                r"add_subdirectory(blas",
-                r"add_subdirectory(lapack",
-            ],
-            to_texts=[
-                r"set(blas",
-                r"set(lapack",
-            ],
-        ),
-    ]
-    patch_manager = PatchManager(patches)
-
     try:
-        patch_manager.apply_patches()
-
         cmakecmd = get_cmake_cmd_common_part(install_dir, universal=True)
 
         cmakecmd.extend(
             [
                 "-DBUILD_TESTING:BOOL=OFF",
+                "-DEIGEN_BUILD_BLAS:BOOL=OFF",
+                "-DEIGEN_BUILD_LAPACK:BOOL=OFF",
                 "-DEIGEN_BUILD_DOC:BOOL=OFF",
             ]
         )
@@ -1687,7 +1690,6 @@ def build_eigen(src_dir: str, install_dir: str):
         build_and_install_cmakecmd(cmakecmd, build_dir)
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
-        patch_manager.restore_files()
 
 
 def build_pocketfft(src_dir: str, install_dir: str):
@@ -1810,6 +1812,7 @@ def build_glm(src_dir: str, install_dir: str):
 		}
 	};""",
             ],
+            keep_bak_file=False,
         )
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
@@ -1933,7 +1936,6 @@ def build_benchmark(src_dir: str, install_dir: str):
         cmakecmd.extend(
             [
                 "-DBENCHMARK_ENABLE_TESTING:BOOL=OFF",
-                "-DBENCHMARK_ENABLE_GTEST_TESTS:BOOL=OFF",
             ]
         )
 
@@ -1973,7 +1975,7 @@ def build_openssl(src_dir: str, install_dir: str, nasm_dir: str):
                     "no-shared",
                     "no-tests",
                     "no-ui-console",
-                    # 'no-legacy',
+                    "no-legacy",
                     "--prefix=" + install_dir,
                     "--openssldir=" + os.path.join(install_dir, "ssl"),
                 ],
@@ -1994,7 +1996,7 @@ def build_openssl(src_dir: str, install_dir: str, nasm_dir: str):
                     "no-shared",
                     "no-tests",
                     "no-ui-console",
-                    # 'no-legacy',
+                    "no-legacy",
                     "--prefix=" + install_dir,
                     "--openssldir=" + os.path.join(install_dir, "ssl"),
                 ],
@@ -2025,7 +2027,7 @@ def build_openssl(src_dir: str, install_dir: str, nasm_dir: str):
                         "no-shared",
                         "no-tests",
                         "no-ui-console",
-                        # 'no-legacy',
+                        "no-legacy",
                         "--prefix=" + arm64_install_dir,
                         "--openssldir=" + os.path.join(arm64_install_dir, "ssl"),
                     ],
@@ -2060,7 +2062,7 @@ def build_openssl(src_dir: str, install_dir: str, nasm_dir: str):
                     "no-shared",
                     "no-tests",
                     "no-ui-console",
-                    # 'no-legacy',
+                    "no-legacy",
                     "--prefix=" + install_dir,
                     "--openssldir=" + os.path.join(install_dir, "ssl"),
                 ],
@@ -2072,19 +2074,12 @@ def build_openssl(src_dir: str, install_dir: str, nasm_dir: str):
             subprocess.run(
                 ["nmake", "install_sw"], cwd=src_dir, shell=True, check=True, env=env
             )
+
+        # `no-legacy` prevents new provider modules, but an incremental rebuild
+        # may share a prefix with an older configuration that installed one.
+        glob_remove(os.path.join(install_dir, "lib", "ossl-modules", "legacy.*"))
     finally:
         logger.info("done")
-
-
-def build_double_conversion(src_dir: str, install_dir: str):
-    build_dir = create_build_dir(src_dir)
-
-    try:
-        cmakecmd = get_cmake_cmd_common_part(install_dir, universal=True)
-        cmakecmd.extend(["-DBUILD_TESTING:BOOL=OFF", src_dir])
-        build_and_install_cmakecmd(cmakecmd, build_dir)
-    finally:
-        shutil.rmtree(build_dir, ignore_errors=False)
 
 
 def build_lz4(src_dir: str, install_dir: str):
@@ -2133,10 +2128,11 @@ def build_xz(src_dir: str, install_dir: str):
         cmakecmd.extend(
             [
                 "-DBUILD_SHARED_LIBS:BOOL=OFF",
-                "-DCREATE_XZ_SYMLINKS:BOOL=OFF",
-                "-DCREATE_LZMA_SYMLINKS:BOOL=OFF",
+                "-DBUILD_TESTING:BOOL=OFF",
+                "-DXZ_TOOL_SYMLINKS:BOOL=OFF",
+                "-DXZ_TOOL_SYMLINKS_LZMA:BOOL=OFF",
                 "-DXZ_NLS:BOOL=OFF",
-                "-DENABLE_SMALL:BOOL=OFF",
+                "-DXZ_SMALL:BOOL=OFF",
                 src_dir,
             ]
         )
@@ -2151,10 +2147,11 @@ def build_xz(src_dir: str, install_dir: str):
                 cmakecmd.extend(
                     [
                         "-DBUILD_SHARED_LIBS:BOOL=OFF",
-                        "-DCREATE_XZ_SYMLINKS:BOOL=OFF",
-                        "-DCREATE_LZMA_SYMLINKS:BOOL=OFF",
+                        "-DBUILD_TESTING:BOOL=OFF",
+                        "-DXZ_TOOL_SYMLINKS:BOOL=OFF",
+                        "-DXZ_TOOL_SYMLINKS_LZMA:BOOL=OFF",
                         "-DXZ_NLS:BOOL=OFF",
-                        "-DENABLE_SMALL:BOOL=OFF",
+                        "-DXZ_SMALL:BOOL=OFF",
                         src_dir,
                     ]
                 )
@@ -2162,6 +2159,7 @@ def build_xz(src_dir: str, install_dir: str):
                 create_universal_binaries(arm64_install_dir, install_dir)
             finally:
                 rm_tree(arm64_install_dir)
+
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
         patch_manager.restore_files()
@@ -2519,6 +2517,13 @@ def build_highway(src_dir: str, install_dir: str):
             cmakecmd = get_cmake_cmd_common_part(
                 active_install_dir, arm64_only=arm64_only
             )
+            if arm64_only:
+                # Highway runs hwy_list_targets after linking even with tests
+                # disabled. The helper cannot run while cross-compiling arm64
+                # on an Intel macOS host, and its output is diagnostic only.
+                cmakecmd.append(
+                    "-DCMAKE_CROSSCOMPILING_EMULATOR:FILEPATH=/usr/bin/true"
+                )
             cmakecmd.extend(
                 [
                     "-DBUILD_SHARED_LIBS:BOOL=OFF",
@@ -2566,15 +2571,15 @@ def build_libevent(src_dir: str, install_dir: str):
                 "-DEVENT__DISABLE_OPENSSL:BOOL=ON",
                 "-DEVENT__DISABLE_BENCHMARK:BOOL=ON",
                 "-DEVENT__DISABLE_TESTS:BOOL=ON",
-                "-DEVENT__DISABLE_REGRESS:BOOL=ON",
                 "-DEVENT__DISABLE_SAMPLES:BOOL=ON",
                 "-DEVENT__DISABLE_MBEDTLS:BOOL=ON",
-                "-DEVENT__MSVC_STATIC_RUNTIME:BOOL=OFF",
                 "-DEVENT__DOXYGEN:BOOL=OFF",
                 "-DEVENT__LIBRARY_TYPE=STATIC",
-                src_dir,
             ]
         )
+        if is_windows():
+            cmakecmd.append("-DEVENT__MSVC_STATIC_RUNTIME:BOOL=OFF")
+        cmakecmd.append(src_dir)
         build_and_install_cmakecmd(cmakecmd, build_dir)
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
@@ -2640,6 +2645,7 @@ def build_snappy(src_dir: str, install_dir: str):
                 create_universal_binaries(arm64_install_dir, install_dir)
             finally:
                 rm_tree(arm64_install_dir)
+
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
         patch_manager.restore_files()
@@ -2826,7 +2832,6 @@ def build_folly(src_dir: str, install_dir: str, use_asan: bool = False):
         ["folly", "cli", "Args.cpp"],
         ["folly", "concurrency", "CacheLocality.cpp"],
         ["folly", "detail", "IPAddressSource.h"],
-        ["folly", "fibers", "detail", "AtomicBatchDispatcher.cpp"],
         ["folly", "futures", "detail", "Core.cpp"],
         ["folly", "io", "async", "fdsock", "AsyncFdSocket.cpp"],
         ["folly", "IPAddress.cpp"],
@@ -2863,39 +2868,6 @@ find_dependency(gflags CONFIG)
 find_dependency(glog CONFIG)""",
                 r"""# Set FOLLY_LIBRARIES from our Folly::folly target
 set(FOLLY_LIBRARIES Folly::folly)""",
-            ],
-        ),
-        FilePatcher(
-            orig_file=os.path.join(src_dir, "CMake", "folly-config.cmake.in"),
-            from_texts=[
-                r"""find_package(Boost 1.69.0 REQUIRED
-  COMPONENTS
-    context
-    filesystem
-    program_options
-    regex
-    thread
-)""",
-            ],
-            to_texts=[
-                r"""find_package(Boost 1.69.0 REQUIRED
-  COMPONENTS
-    context
-    filesystem
-    program_options
-    thread
-)
-if (NOT TARGET Boost::regex)
-  if (TARGET Boost::headers)
-    add_library(Boost::regex INTERFACE IMPORTED)
-    target_link_libraries(Boost::regex INTERFACE Boost::headers)
-  elseif (TARGET Boost::boost)
-    add_library(Boost::regex INTERFACE IMPORTED)
-    target_link_libraries(Boost::regex INTERFACE Boost::boost)
-  else()
-    message(FATAL_ERROR "Boost::regex target missing after Boost discovery")
-  endif()
-endif()""",
             ],
         ),
         FilePatcher(
@@ -2942,51 +2914,6 @@ endif()""",
                 r"find_package(LIBURING)",
                 r"find_package(LIBUNWIND)",
                 r"set(FOLLY_USE_SYMBOLIZER OFF)",
-            ],
-        ),
-        FilePatcher(
-            orig_file=os.path.join(src_dir, "CMake", "folly-deps.cmake"),
-            from_texts=[
-                r"""set(FOLLY_BOOST_COMPONENTS
-    context
-    filesystem
-    program_options
-    regex
-)
-if(WIN32)
-  list(APPEND FOLLY_BOOST_COMPONENTS thread)
-endif()
-
-find_package(Boost 1.69.0 REQUIRED
-  COMPONENTS
-    ${FOLLY_BOOST_COMPONENTS}
-)""",
-            ],
-            to_texts=[
-                r"""set(FOLLY_BOOST_COMPONENTS
-    context
-    filesystem
-    program_options
-)
-if(WIN32)
-  list(APPEND FOLLY_BOOST_COMPONENTS thread)
-endif()
-
-find_package(Boost 1.69.0 REQUIRED
-  COMPONENTS
-    ${FOLLY_BOOST_COMPONENTS}
-)
-if (NOT TARGET Boost::regex)
-  if (TARGET Boost::headers)
-    add_library(Boost::regex INTERFACE IMPORTED)
-    target_link_libraries(Boost::regex INTERFACE Boost::headers)
-  elseif (TARGET Boost::boost)
-    add_library(Boost::regex INTERFACE IMPORTED)
-    target_link_libraries(Boost::regex INTERFACE Boost::boost)
-  else()
-    message(FATAL_ERROR "Boost::regex target missing after Boost discovery")
-  endif()
-endif()""",
             ],
         ),
         FilePatcher(
@@ -3446,6 +3373,18 @@ include(libs)""",
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
         patch_manager.restore_files()
+        # FilePatcher backups are needed while CMake configures SuiteSparse,
+        # but its install rules also copy those temporary files. They are not
+        # part of the consumer package.
+        for backup_name in (
+            "SuiteSparseBLAS.cmake.bak",
+            "SuiteSparse__blas_threading.cmake.bak",
+        ):
+            backup_path = os.path.join(
+                install_dir, "lib", "cmake", "SuiteSparse", backup_name
+            )
+            if os.path.exists(backup_path):
+                os.remove(backup_path)
         os.remove(
             os.path.join(src_dir, "SuiteSparse_config", "cmake_modules", "libs.cmake")
         )
@@ -3457,38 +3396,150 @@ def build_ceres_solver(src_dir: str, install_dir: str):
 
     patches = [
         FilePatcher(
-            orig_file=os.path.join(src_dir, "cmake", "FindSuiteSparse.cmake"),
+            orig_file=os.path.join(src_dir, "CMakeLists.txt"),
             from_texts=[
-                r"${LAPACK_LIBRARIES}",
-                r"${BLAS_LIBRARIES}",
-                r"find_package(BLAS QUIET)",
-                r"find_package(LAPACK QUIET)",
-                r"find_package (METIS)",
-                r"check_symbol_exists (cholmod_metis cholmod.h SuiteSparse_CHOLMOD_USES_METIS)",
-                r'set(CMAKE_FIND_LIBRARY_PREFIXES "lib" "" "${CMAKE_FIND_LIBRARY_PREFIXES}")',
+                r"find_package(METIS)",
+                r"""if (NOT _Ceres_FEATURE_ACCELERATE)
+  list(APPEND CERES_COMPILE_OPTIONS CERES_NO_ACCELERATE_SPARSE)
+  mark_as_advanced(FORCE AccelerateSparse_INCLUDE_DIR
+                         AccelerateSparse_LIBRARY)
+endif()""",
             ],
             to_texts=[
-                r" ",
-                r" ",
-                r'set(BLAS_FOUND ON CACHE BOOL "")',
-                r'set(LAPACK_FOUND ON CACHE BOOL "")',
-                r"add_library (METIS::METIS IMPORTED INTERFACE)",
-                r"set(SuiteSparse_CHOLMOD_USES_METIS 1)",
-                'set(CMAKE_FIND_LIBRARY_PREFIXES "lib" "" "${CMAKE_FIND_LIBRARY_PREFIXES}")\n'
-                r'set(CMAKE_FIND_LIBRARY_SUFFIXES "_static.lib" "${CMAKE_FIND_LIBRARY_SUFFIXES}")',
+                r"""if (WITH_EIGENMETIS)
+  find_package(METIS)
+endif()""",
+                r"""if (_Ceres_FEATURE_ACCELERATE)
+  # The static Ceres export links this imported target. Install Ceres's find
+  # module and recreate the target before CeresTargets.cmake is included.
+  set(AccelerateSparse_DEPENDENCY "find_dependency(AccelerateSparse)")
+  list(APPEND _Ceres_CONFIG_DEPENDENCY_MODULES
+    ${Ceres_SOURCE_DIR}/cmake/FindAccelerateSparse.cmake)
+else()
+  list(APPEND CERES_COMPILE_OPTIONS CERES_NO_ACCELERATE_SPARSE)
+  mark_as_advanced(FORCE AccelerateSparse_INCLUDE_DIR
+                         AccelerateSparse_LIBRARY)
+endif()""",
             ],
         ),
         FilePatcher(
-            # we build ceres as static lib, so no point to hard link lapack now as we might link to mkl later
-            orig_file=os.path.join(src_dir, "internal", "ceres", "CMakeLists.txt"),
+            orig_file=os.path.join(src_dir, "cmake", "CeresConfig.cmake.in"),
             from_texts=[
-                r" ${LAPACK_LIBRARIES}",
-                r'add_definitions(-DCERES_SUITESPARSE_VERSION="${SuiteSparse_VERSION}")',
+                r"""@METIS_DEPENDENCY@
+@SuiteSparse_DEPENDENCY@
+@CUDAToolkit_DEPENDENCY@"""
             ],
             to_texts=[
-                r" ",
-                'add_definitions(-DCERES_SUITESPARSE_VERSION="${SuiteSparse_VERSION}")\n'
-                'add_definitions(-DCERES_METIS_VERSION="${METIS_VERSION}")',
+                r"""@METIS_DEPENDENCY@
+@SuiteSparse_DEPENDENCY@
+@AccelerateSparse_DEPENDENCY@
+@CUDAToolkit_DEPENDENCY@"""
+            ],
+        ),
+        # SuiteSparse 7.13 compiles its namespaced METIS copy directly into
+        # CHOLMOD's Partition module, so there is no standalone METIS package
+        # or METIS::METIS target for Ceres to find. Probe CHOLMOD by itself
+        # first, then retain Ceres's external-METIS fallback for other builds.
+        FilePatcher(
+            orig_file=os.path.join(src_dir, "cmake", "FindSuiteSparse.cmake"),
+            from_texts=[
+                r"""if (TARGET SuiteSparse::CHOLMOD)
+  # NOTE If SuiteSparse was compiled as a static library we'll need to link
+  # against METIS already during the check. Otherwise, the check can fail due to
+  # undefined references even though SuiteSparse was compiled with METIS.
+  if (NOT DEFINED METIS_FOUND)
+    find_package (METIS)
+  endif()
+
+  if (TARGET METIS::METIS)
+    cmake_push_check_state (RESET)
+    set (CMAKE_REQUIRED_LIBRARIES SuiteSparse::CHOLMOD METIS::METIS)
+    check_symbol_exists (cholmod_metis cholmod.h SuiteSparse_CHOLMOD_USES_METIS)
+    cmake_pop_check_state ()
+
+    if (SuiteSparse_CHOLMOD_USES_METIS)
+      set_property (TARGET SuiteSparse::CHOLMOD APPEND PROPERTY
+        INTERFACE_LINK_LIBRARIES $<LINK_ONLY:METIS::METIS>)
+
+      # Provide the SuiteSparse::Partition component whose availability indicates
+      # that CHOLMOD was compiled with the Partition module.
+      if (NOT TARGET SuiteSparse::Partition)
+        add_library (SuiteSparse::Partition IMPORTED INTERFACE)
+      endif (NOT TARGET SuiteSparse::Partition)
+
+      set_property (TARGET SuiteSparse::Partition APPEND PROPERTY
+        INTERFACE_LINK_LIBRARIES SuiteSparse::CHOLMOD)
+    endif (SuiteSparse_CHOLMOD_USES_METIS)
+  endif (TARGET METIS::METIS)
+endif (TARGET SuiteSparse::CHOLMOD)"""
+            ],
+            to_texts=[
+                r"""if (TARGET SuiteSparse::CHOLMOD)
+  # SuiteSparse 7.13 embeds a namespaced METIS copy directly in CHOLMOD.
+  # Probe that self-contained form before looking for an external METIS target.
+  cmake_push_check_state (RESET)
+  set (CMAKE_REQUIRED_LIBRARIES SuiteSparse::CHOLMOD)
+  check_symbol_exists (cholmod_metis cholmod.h SuiteSparse_CHOLMOD_EMBEDS_METIS)
+  cmake_pop_check_state ()
+
+  if (SuiteSparse_CHOLMOD_EMBEDS_METIS)
+    set (SuiteSparse_CHOLMOD_USES_METIS TRUE)
+    if (NOT METIS_VERSION)
+      set (METIS_VERSION "SuiteSparse-embedded")
+    endif ()
+  else ()
+    # Older/static SuiteSparse packages may require a separately linked METIS.
+    if (NOT DEFINED METIS_FOUND)
+      find_package (METIS)
+    endif()
+    if (TARGET METIS::METIS)
+      cmake_push_check_state (RESET)
+      set (CMAKE_REQUIRED_LIBRARIES SuiteSparse::CHOLMOD METIS::METIS)
+      check_symbol_exists (cholmod_metis cholmod.h SuiteSparse_CHOLMOD_USES_METIS)
+      cmake_pop_check_state ()
+      if (SuiteSparse_CHOLMOD_USES_METIS)
+        set_property (TARGET SuiteSparse::CHOLMOD APPEND PROPERTY
+          INTERFACE_LINK_LIBRARIES $<LINK_ONLY:METIS::METIS>)
+      endif ()
+    endif ()
+  endif ()
+
+  if (SuiteSparse_CHOLMOD_USES_METIS)
+    # Partition is a CHOLMOD feature, not a separate installed library.
+    if (NOT TARGET SuiteSparse::Partition)
+      add_library (SuiteSparse::Partition IMPORTED INTERFACE)
+    endif ()
+    set_property (TARGET SuiteSparse::Partition APPEND PROPERTY
+      INTERFACE_LINK_LIBRARIES SuiteSparse::CHOLMOD)
+  endif ()
+endif ()"""
+            ],
+        ),
+        FilePatcher(
+            orig_file=os.path.join(src_dir, "internal", "ceres", "CMakeLists.txt"),
+            from_texts=[
+                r"""if (_Ceres_FEATURE_CHOLMOD_PARTITION OR _Ceres_FEATURE_EIGEN_METIS)
+  # Define version information for use in Solver::FullReport.
+  add_definitions(-DCERES_METIS_VERSION="${METIS_VERSION}")
+  list(APPEND CERES_LIBRARY_PRIVATE_DEPENDENCIES METIS::METIS)
+endif (_Ceres_FEATURE_CHOLMOD_PARTITION OR _Ceres_FEATURE_EIGEN_METIS)""",
+                r"""if (_Ceres_FEATURE_LAPACK)
+  list(APPEND CERES_LIBRARY_PRIVATE_DEPENDENCIES ${LAPACK_LIBRARIES})
+endif ()""",
+            ],
+            to_texts=[
+                r"""if (_Ceres_FEATURE_CHOLMOD_PARTITION OR _Ceres_FEATURE_EIGEN_METIS)
+  # Define version information for use in Solver::FullReport.
+  add_definitions(-DCERES_METIS_VERSION="${METIS_VERSION}")
+  # SuiteSparse may embed METIS inside CHOLMOD instead of exporting a
+  # standalone METIS target. Only link the latter when it actually exists.
+  if (TARGET METIS::METIS)
+    list(APPEND CERES_LIBRARY_PRIVATE_DEPENDENCIES METIS::METIS)
+  endif ()
+endif (_Ceres_FEATURE_CHOLMOD_PARTITION OR _Ceres_FEATURE_EIGEN_METIS)""",
+                """# Atlas links the selected static LAPACK implementation at the
+# final application link. Keep LAPACK functionality enabled without exporting
+# the configure host's LAPACK libraries from the static Ceres target.""",
             ],
         ),
     ]
@@ -3505,10 +3556,13 @@ def build_ceres_solver(src_dir: str, install_dir: str):
         cmakecmd = get_cmake_cmd_common_part(install_dir)
         cmakecmd_options = [
             "-DBUILD_TESTING:BOOL=OFF",
-            "-DSUITESPARSE:BOOL=ON",
-            "-DACCELERATESPARSE:BOOL=" + ("ON" if is_mac() else "OFF"),
-            "-DUSE_CUDA:BOOL=OFF",
-            "-DEIGENMETIS:BOOL=OFF",
+            "-DWITH_SUITESPARSE:BOOL=ON",
+            "-DWITH_ACCELERATESPARSE:BOOL=" + ("ON" if is_mac() else "OFF"),
+            "-DWITH_CUDA:STRING=OFF",
+            "-DWITH_EIGENMETIS:BOOL=OFF",
+            # Preserve Ceres's LAPACK-backed solver capabilities. Disabling
+            # this option would compile LAPACK support out.
+            "-DWITH_LAPACK:BOOL=ON",
             "-DBUILD_EXAMPLES:BOOL=OFF",
             "-DBUILD_BENCHMARKS:BOOL=OFF",
             "-DBUILD_SHARED_LIBS:BOOL=OFF",
@@ -3536,19 +3590,6 @@ def build_ceres_solver(src_dir: str, install_dir: str):
             finally:
                 rm_tree(arm64_install_dir)
 
-        # on linux, cmake complains about could not find the fake target SuiteSparse::Partition
-        orig_file3 = os.path.join(
-            install_dir, "lib", "cmake", "Ceres", "CeresTargets.cmake"
-        )
-        patch_file(
-            orig_file3,
-            from_texts=[
-                r";\$<LINK_ONLY:SuiteSparse::Partition>;\$<LINK_ONLY:METIS::METIS>",
-            ],
-            to_texts=[
-                r"",
-            ],
-        )
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
         os.rename(
@@ -3559,8 +3600,7 @@ def build_ceres_solver(src_dir: str, install_dir: str):
         cleanup_git_submodule(src_dir)
 
 
-def build_grpc(src_dir: str, install_dir: str, nasm_dir: str):
-    logger.info(f"nasm_dir: {nasm_dir}")
+def build_grpc(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
 
     patches = [
@@ -3591,9 +3631,10 @@ def build_grpc(src_dir: str, install_dir: str, nasm_dir: str):
                 "-DgRPC_CARES_PROVIDER=module",
                 "-DgRPC_SSL_PROVIDER=package",
                 f"-DOPENSSL_ROOT_DIR:PATH={install_dir}",
-                "-DgRPC_BENCHMARK_PROVIDER:STRING=package",
                 "-DgRPC_ABSL_PROVIDER:STRING=module",
                 "-DgRPC_RE2_PROVIDER:STRING=module",
+                "-DgRPC_USE_SYSTEMD:STRING=OFF",
+                "-DgRPC_DOWNLOAD_ARCHIVES:BOOL=OFF",
             ]
         )
 
@@ -3634,6 +3675,9 @@ def build_libjpeg(src_dir: str, install_dir: str, nasm_dir: str):
             cmakecmd.extend(
                 [
                     "-DENABLE_SHARED:BOOL=OFF",
+                    "-DENABLE_STATIC:BOOL=ON",
+                    "-DWITH_TOOLS:BOOL=OFF",
+                    "-DWITH_SYSTEM_ZLIB:BOOL=ON",
                     "-DCMAKE_ASM_NASM_COMPILER:FILEPATH=" + nasm_dir + "\\nasm.exe",
                     "-DWITH_CRT_DLL:BOOL=ON",
                     src_dir,
@@ -3643,6 +3687,9 @@ def build_libjpeg(src_dir: str, install_dir: str, nasm_dir: str):
             cmakecmd.extend(
                 [
                     "-DENABLE_SHARED:BOOL=OFF",
+                    "-DENABLE_STATIC:BOOL=ON",
+                    "-DWITH_TOOLS:BOOL=OFF",
+                    "-DWITH_SYSTEM_ZLIB:BOOL=ON",
                     "-DCMAKE_ASM_NASM_COMPILER:FILEPATH=nasm",
                     src_dir,
                 ]
@@ -3651,6 +3698,9 @@ def build_libjpeg(src_dir: str, install_dir: str, nasm_dir: str):
             cmakecmd.extend(
                 [
                     "-DENABLE_SHARED:BOOL=OFF",
+                    "-DENABLE_STATIC:BOOL=ON",
+                    "-DWITH_TOOLS:BOOL=OFF",
+                    "-DWITH_SYSTEM_ZLIB:BOOL=ON",
                     "-DCMAKE_ASM_NASM_COMPILER:FILEPATH=" + nasm_dir + "/nasm",
                     src_dir,
                 ]
@@ -3668,6 +3718,9 @@ def build_libjpeg(src_dir: str, install_dir: str, nasm_dir: str):
             cmakecmd.extend(
                 [
                     "-DENABLE_SHARED:BOOL=OFF",
+                    "-DENABLE_STATIC:BOOL=ON",
+                    "-DWITH_TOOLS:BOOL=OFF",
+                    "-DWITH_SYSTEM_ZLIB:BOOL=ON",
                     "-DCMAKE_ASM_NASM_COMPILER:FILEPATH=" + nasm_dir + "/nasm",
                     src_dir,
                 ]
@@ -3681,6 +3734,27 @@ def build_libjpeg(src_dir: str, install_dir: str, nasm_dir: str):
             rm_tree(arm64_install_dir)
 
         build_macos_libturbojpeg_dylib(src_dir, install_dir, nasm_dir)
+
+    # WITH_SYSTEM_ZLIB keeps libturbojpeg from embedding a second, reduced
+    # zlib implementation. Make the resulting exported static target usable
+    # without requiring consumers to discover ZLIB first by accident.
+    patch_file(
+        orig_file=os.path.join(
+            install_dir,
+            "lib",
+            "cmake",
+            "libjpeg-turbo",
+            "libjpeg-turboConfig.cmake",
+        ),
+        from_texts=['include("${CMAKE_CURRENT_LIST_DIR}/libjpeg-turboTargets.cmake")'],
+        to_texts=[
+            """include(CMakeFindDependencyMacro)
+find_dependency(ZLIB)
+
+include("${CMAKE_CURRENT_LIST_DIR}/libjpeg-turboTargets.cmake")"""
+        ],
+        keep_bak_file=False,
+    )
 
 
 def build_macos_libturbojpeg_dylib(src_dir: str, install_dir: str, nasm_dir: str):
@@ -3712,6 +3786,7 @@ def build_macos_libturbojpeg_dylib(src_dir: str, install_dir: str, nasm_dir: str
                     "-DENABLE_STATIC:BOOL=OFF",
                     "-DWITH_TESTS:BOOL=OFF",
                     "-DWITH_TOOLS:BOOL=OFF",
+                    "-DWITH_SYSTEM_ZLIB:BOOL=ON",
                 ]
             )
             if not arm64_only:
@@ -3757,12 +3832,6 @@ def build_libpng(src_dir: str, install_dir: str):
             ],
             to_texts=[r"                && 0)"],
         ),
-        FilePatcher(
-            orig_file=os.path.join(src_dir, "pngpriv.h"),
-            from_texts=[r"#if PNG_ZLIB_VERNUM != 0 && PNG_ZLIB_VERNUM != ZLIB_VERNUM"],
-            to_texts=[r"#if 0"],
-            patch_condition=lambda: is_mac() and os.path.exists("/usr/include"),
-        ),
     ]
     patch_manager = PatchManager(patches)
 
@@ -3772,6 +3841,7 @@ def build_libpng(src_dir: str, install_dir: str):
         libpng_cmake_options = [
             "-DPNG_TESTS:BOOL=OFF",
             "-DPNG_SHARED:BOOL=OFF",
+            "-DPNG_STATIC:BOOL=ON",
             "-DPNG_FRAMEWORK:BOOL=OFF",
         ]
 
@@ -3801,20 +3871,7 @@ def build_libpng(src_dir: str, install_dir: str):
 def build_openjpeg(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
 
-    patches = [
-        FilePatcher(
-            orig_file=os.path.join(src_dir, "src", "lib", "openjp2", "openjpeg.h"),
-            from_texts=[r"#define OPENJPEG_H"],
-            to_texts=[
-                "#define OPENJPEG_H\n#ifndef OPJ_STATIC\n#define OPJ_STATIC\n#endif\n"
-            ],
-        ),
-    ]
-    patch_manager = PatchManager(patches)
-
     try:
-        patch_manager.apply_patches()
-
         cmakecmd = get_cmake_cmd_common_part(install_dir, universal=True)
 
         cmakecmd.extend(
@@ -3830,11 +3887,11 @@ def build_openjpeg(src_dir: str, install_dir: str):
         build_and_install_cmakecmd(cmakecmd, build_dir)
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
-        patch_manager.restore_files()
 
 
 def build_libwebp(src_dir: str, install_dir: str):
     cmakecmd_options = [
+        "-DBUILD_SHARED_LIBS:BOOL=OFF",
         "-DWEBP_BUILD_ANIM_UTILS:BOOL=OFF",
         "-DWEBP_BUILD_CWEBP:BOOL=OFF",
         "-DWEBP_BUILD_DWEBP:BOOL=OFF",
@@ -3843,6 +3900,7 @@ def build_libwebp(src_dir: str, install_dir: str):
         "-DWEBP_BUILD_VWEBP:BOOL=OFF",
         "-DWEBP_BUILD_WEBPINFO:BOOL=OFF",
         "-DWEBP_BUILD_WEBPMUX:BOOL=OFF",
+        "-DWEBP_BUILD_LIBWEBPMUX:BOOL=ON",
         "-DWEBP_BUILD_EXTRAS:BOOL=OFF",
         "-DWEBP_BUILD_WEBP_JS:BOOL=OFF",
     ]
@@ -3869,27 +3927,42 @@ def build_libwebp(src_dir: str, install_dir: str):
             shutil.rmtree(build_dir, ignore_errors=False)
             rm_tree(arm64_install_dir)
 
-    orig_file = os.path.join(install_dir, "share", "WebP", "cmake", "WebPConfig.cmake")
-    patch_file(
-        orig_file,
-        from_texts=[
-            r"check_required_components(WebP)",
-        ],
-        to_texts=[
-            r"#check_required_components(WebP)",
-        ],
-    )
-
 
 def populate_libjxl_skcms(src_dir: str, skcms_package: str):
     skcms_dir = os.path.join(src_dir, "third_party", "skcms")
     rm_tree(skcms_dir)
-    os.makedirs(skcms_dir)
-    unpack_file_to_folder(skcms_package, skcms_dir)
+    with tempfile.TemporaryDirectory(
+        dir=os.path.join(src_dir, "third_party"), prefix="__skcms_"
+    ) as staging_dir:
+        unpack_file_to_folder(skcms_package, staging_dir)
+        package_root = get_package_top_level_folder(skcms_package)
+        unpacked_dir = (
+            os.path.join(staging_dir, package_root) if package_root else staging_dir
+        )
+        shutil.copytree(unpacked_dir, skcms_dir)
 
 
 def build_libjxl(src_dir: str, install_dir: str, skcms_package: str):
     populate_libjxl_skcms(src_dir, skcms_package)
+
+    patches = [
+        # libjxl 0.12 keys skcms' x86-only source flags off the host processor.
+        # In an x86_64 macOS process CMake still reports x86_64 while compiling
+        # the arm64 slice, which adds invalid -march=x86-64 flags. Require the
+        # selected macOS target architecture to be x86_64 as well.
+        FilePatcher(
+            orig_file=os.path.join(src_dir, "third_party", "skcms.cmake"),
+            from_texts=[
+                '  if (CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64" AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")'
+            ],
+            to_texts=[
+                """  if (CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64" AND
+      CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND
+      (NOT APPLE OR CMAKE_OSX_ARCHITECTURES STREQUAL "x86_64"))"""
+            ],
+        ),
+    ]
+    patch_manager = PatchManager(patches)
 
     def build_arch(active_install_dir: str, *, arm64_only: bool):
         build_dir = create_build_dir(src_dir)
@@ -3905,14 +3978,9 @@ def build_libjxl(src_dir: str, install_dir: str, skcms_package: str):
                 [
                     "-DBUILD_SHARED_LIBS:BOOL=OFF",
                     "-DBUILD_TESTING:BOOL=OFF",
-                    "-DHWY_DIR:PATH="
-                    + os.path.join(install_dir, "lib", "cmake", "hwy"),
                     "-DJPEGXL_ENABLE_FUZZERS:BOOL=OFF",
                     "-DJPEGXL_ENABLE_DEVTOOLS:BOOL=OFF",
                     "-DJPEGXL_ENABLE_TOOLS:BOOL=OFF",
-                    "-DJPEGXL_ENABLE_JPEGLI:BOOL=OFF",
-                    "-DJPEGXL_ENABLE_JPEGLI_LIBJPEG:BOOL=OFF",
-                    "-DJPEGXL_INSTALL_JPEGLI_LIBJPEG:BOOL=OFF",
                     "-DJPEGXL_ENABLE_DOXYGEN:BOOL=OFF",
                     "-DJPEGXL_ENABLE_MANPAGES:BOOL=OFF",
                     "-DJPEGXL_ENABLE_BENCHMARK:BOOL=OFF",
@@ -3920,7 +3988,6 @@ def build_libjxl(src_dir: str, install_dir: str, skcms_package: str):
                     "-DJPEGXL_BUNDLE_LIBPNG:BOOL=OFF",
                     "-DJPEGXL_ENABLE_JNI:BOOL=OFF",
                     "-DJPEGXL_ENABLE_SJPEG:BOOL=OFF",
-                    "-DJPEGXL_ENABLE_OPENEXR:BOOL=OFF",
                     "-DJPEGXL_ENABLE_SKCMS:BOOL=ON",
                     "-DJPEGXL_ENABLE_VIEWERS:BOOL=OFF",
                     "-DJPEGXL_ENABLE_PLUGINS:BOOL=OFF",
@@ -3928,7 +3995,6 @@ def build_libjxl(src_dir: str, install_dir: str, skcms_package: str):
                     "-DJPEGXL_ENABLE_TRANSCODE_JPEG:BOOL=OFF",
                     "-DJPEGXL_ENABLE_BOXES:BOOL=ON",
                     "-DJPEGXL_FORCE_SYSTEM_BROTLI:BOOL=ON",
-                    "-DJPEGXL_FORCE_SYSTEM_GTEST:BOOL=ON",
                     "-DJPEGXL_FORCE_SYSTEM_HWY:BOOL=ON",
                     src_dir,
                 ]
@@ -3937,7 +4003,11 @@ def build_libjxl(src_dir: str, install_dir: str, skcms_package: str):
         finally:
             shutil.rmtree(build_dir, ignore_errors=False)
 
-    build_macos_split_or_single(src_dir, install_dir, build_arch)
+    try:
+        patch_manager.apply_patches()
+        build_macos_split_or_single(src_dir, install_dir, build_arch)
+    finally:
+        patch_manager.restore_files()
 
 
 def build_libraw(libraw_src_dir: str, libraw_cmake_src_dir: str, install_dir: str):
@@ -4005,11 +4075,12 @@ def build_libtiff(src_dir: str, install_dir: str):
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
 
-    # Upstream installs TiffConfig.cmake. Some consumers, including OIIO's
-    # checked_find_package(TIFF), look for the all-caps package spelling first.
+    # The static exported target needs its codec dependencies recreated before
+    # tiff-targets.cmake is loaded. libtiff 4.7.2 deliberately installs the
+    # lowercase package filename, which CMake accepts for every TIFF spelling.
     cmake_dir = os.path.join(install_dir, "lib", "cmake", "tiff")
     patch_file(
-        os.path.join(cmake_dir, "TiffConfig.cmake"),
+        os.path.join(cmake_dir, "tiff-config.cmake"),
         from_texts=[
             """if(NOT "OFF")
     # TODO: import dependencies
@@ -4064,25 +4135,10 @@ if(NOT TARGET WebP::webp)
     find_dependency(WebP CONFIG)
 endif()
 
-if(NOT TARGET CMath::CMath)
-    add_library(CMath::CMath INTERFACE IMPORTED)
-    find_library(CMATH_LIBRARY m)
-    if(CMATH_LIBRARY)
-        set_property(TARGET CMath::CMath PROPERTY
-                     INTERFACE_LINK_LIBRARIES "${CMATH_LIBRARY}")
-    endif()
-endif()
 """
         ],
         keep_bak_file=False,
     )
-    for stem in ("Config", "ConfigVersion"):
-        mixed_case = os.path.join(cmake_dir, f"Tiff{stem}.cmake")
-        upper_case = os.path.join(cmake_dir, f"TIFF{stem}.cmake")
-        if os.path.exists(mixed_case):
-            if os.path.exists(upper_case) and os.path.samefile(mixed_case, upper_case):
-                continue
-            shutil.copy2(mixed_case, upper_case)
 
 
 def build_openimageio(src_dir: str, install_dir: str):
@@ -4565,7 +4621,9 @@ endif ()
         FilePatcher(
             orig_file=os.path.join(src_dir, "src", "cmake", "dependency_utils.cmake"),
             from_texts=[
-                """    if (CMAKE_IGNORE_PATH)
+                """    # Make sure to inherit CMAKE_IGNORE_PATH
+    set(_pkg_CMAKE_ARGS ${_pkg_CMAKE_ARGS} ${_pkg_CMAKE_ARGS})
+    if (CMAKE_IGNORE_PATH)
         string(REPLACE ";" "\\\\;" CMAKE_IGNORE_PATH_ESCAPED "${CMAKE_IGNORE_PATH}")
         list(APPEND _pkg_CMAKE_ARGS "-DCMAKE_IGNORE_PATH=${CMAKE_IGNORE_PATH_ESCAPED}")
     endif()
@@ -4581,7 +4639,9 @@ include_directories(BEFORE ${${PROJECT_NAME}_LOCAL_DEPS_ROOT}/include)
 """,
             ],
             to_texts=[
-                """    set(_pkg_INHERITED_CMAKE_ARGS)
+                """    # Local dependency configures must inherit the parent toolchain,
+    # architecture, and package-search policy as intact command-line arguments.
+    set(_pkg_INHERITED_CMAKE_ARGS)
     if (CMAKE_GENERATOR)
         list(APPEND _pkg_INHERITED_CMAKE_ARGS "-G" "${CMAKE_GENERATOR}")
     endif()
@@ -4621,7 +4681,7 @@ include_directories(BEFORE ${${PROJECT_NAME}_LOCAL_DEPS_ROOT}/include)
             list(APPEND _pkg_INHERITED_CMAKE_ARGS "-D${_pkg_INHERITED_CMAKE_VAR}=${_pkg_INHERITED_CMAKE_VALUE}")
         endif()
     endforeach()
-    set(_pkg_CMAKE_ARGS ${_pkg_INHERITED_CMAKE_ARGS} ${_pkg_CMAKE_ARGS})
+    list(PREPEND _pkg_CMAKE_ARGS "${_pkg_INHERITED_CMAKE_ARGS}")
 
     if (CMAKE_IGNORE_PATH)
         string(REPLACE ";" "\\\\;" CMAKE_IGNORE_PATH_ESCAPED "${CMAKE_IGNORE_PATH}")
@@ -4767,20 +4827,6 @@ include_directories(BEFORE ${${PROJECT_NAME}_LOCAL_DEPS_INSTALL_DIR}/include)
 """
             ],
             patch_condition=use_windows_clang_cl,
-        ),
-        FilePatcher(
-            orig_file=os.path.join(src_dir, "src", "tiff.imageio", "CMakeLists.txt"),
-            from_texts=[
-                """add_oiio_plugin (tiffinput.cpp tiffoutput.cpp
-                 LINK_LIBRARIES TIFF::TIFF
-"""
-            ],
-            to_texts=[
-                """add_oiio_plugin (tiffinput.cpp tiffoutput.cpp
-                 INCLUDE_DIRS ${TIFF_INCLUDE_DIRS}
-                 LINK_LIBRARIES TIFF::TIFF
-"""
-            ],
         ),
         FilePatcher(
             orig_file=os.path.join(src_dir, "src", "jpegxl.imageio", "CMakeLists.txt"),
@@ -4942,6 +4988,7 @@ endif ()
 def build_jxrlib(src_dir: str, install_dir: str):
     try:
         orig_file = os.path.join(src_dir, "Makefile")
+        make_python = shlex.quote(sys.executable)
         from_texts = [
             r"CFLAGS=-I. -Icommon/include -I$(DIR_SYS) "
             r"$(ENDIANFLAG) -D__ANSI__ -DDISABLE_PERF_MEASUREMENT -w $(PICFLAG) -O",
@@ -4950,28 +4997,69 @@ def build_jxrlib(src_dir: str, install_dir: str):
         if is_linux():
             to_texts = [
                 r"CFLAGS=-I. -Icommon/include -I$(DIR_SYS) "
-                r"$(ENDIANFLAG) -D__ANSI__ -DDISABLE_PERF_MEASUREMENT -w $(PICFLAG) -O3 -fPIC -mavx "
-                r"-Wno-error=implicit-function-declaration ",
-                r"cp $< $@ # @python -c ",
+                r"$(ENDIANFLAG) -D__ANSI__ -DDISABLE_PERF_MEASUREMENT -w $(PICFLAG) -O3 -fPIC -mavx ",
+                f"@{make_python} -c ",
             ]
         else:
             to_texts = [
                 r"CFLAGS=-arch x86_64 -arch arm64 -I. -Icommon/include -I$(DIR_SYS) "
                 r"$(ENDIANFLAG) -D__ANSI__ -DDISABLE_PERF_MEASUREMENT -w $(PICFLAG) -O3 -mavx -mcpu=apple-m1 "
-                r"-Wno-error=implicit-function-declaration "
                 r"-mmacosx-version-min={0}".format(macos_min_version()),
-                r"cp $< $@ # @python -c ",
+                f"@{make_python} -c ",
             ]
         patch_file(orig_file, from_texts=from_texts, to_texts=to_texts)
+
+        patch_file(
+            os.path.join(src_dir, "jxrgluelib", "JXRGlueJxr.c"),
+            from_texts=[r"#include <limits.h>"],
+            to_texts=[
+                r"""#include <limits.h>
+#include <wchar.h>"""
+            ],
+        )
+
+        patch_file(
+            os.path.join(src_dir, "image", "sys", "windowsmediaphoto.h"),
+            from_texts=[
+                r"EXTERN_C ERR CreateWS_File(struct WMPStream** ppWS, const char* szFilename, const char* szMode);"
+            ],
+            to_texts=[
+                r"""EXTERN_C ERR CreateWS_File(struct WMPStream** ppWS, const char* szFilename, const char* szMode);
+EXTERN_C ERR CreateWS_FileTemp(struct WMPStream** ppWS, char* szFilename, const char* szMode);"""
+            ],
+        )
 
         # Security policy: upstream JXR's ANSI temp-file path uses tmpnam()
         # followed by fopen(), which is race-prone. Add a mkstemp-backed stream
         # helper and route non-Windows encoder temp files through it below.
+        if not is_windows():
+            patch_file(
+                os.path.join(src_dir, "image", "sys", "strcodec.h"),
+                from_texts=[
+                    r"""// bit I/O
+//================================================================
+Int allocateBitIOInfo(CWMImageStrCodec*);"""
+                ],
+                to_texts=[
+                    r"""// bit I/O
+//================================================================
+U32 _byteswap_ulong(U32 bits);
+Int allocateBitIOInfo(CWMImageStrCodec*);"""
+                ],
+            )
+
         orig_file = os.path.join(src_dir, "image", "sys", "strcodec.c")
         patch_file(
             orig_file,
-            from_texts=[r"ERR CloseWS_File(struct WMPStream** ppWS)"],
+            from_texts=[
+                r'#include "perfTimer.h"',
+                r"ERR CloseWS_File(struct WMPStream** ppWS)",
+            ],
             to_texts=[
+                r"""#include "perfTimer.h"
+#ifndef WIN32
+#include <unistd.h>
+#endif""",
                 r"""ERR CreateWS_FileTemp(struct WMPStream** ppWS, char* szFilename, const char* szMode)
 {
 #ifdef WIN32
@@ -4979,6 +5067,7 @@ def build_jxrlib(src_dir: str, install_dir: str):
 #else
     ERR err = WMP_errSuccess;
     struct WMPStream* pWS = NULL;
+    int fd = -1;
 
     Call(WMPAlloc((void** )ppWS, sizeof(**ppWS)));
     pWS = *ppWS;
@@ -4993,17 +5082,26 @@ def build_jxrlib(src_dir: str, install_dir: str):
     pWS->SetPos = SetPosWS_File;
     pWS->GetPos = GetPosWS_File;
 
-    int fd = mkstemp(szFilename);
+    fd = mkstemp(szFilename);
     FailIf(-1 == fd, WMP_errFileIO);
     pWS->state.file.pFile = fdopen(fd, szMode);
     FailIf(NULL == pWS->state.file.pFile, WMP_errFileIO);
+    fd = -1;
 #endif
 
 Cleanup:
+#ifndef WIN32
+    if (Failed(err)) {
+        if (-1 != fd) {
+            close(fd);
+        }
+        WMPFree((void**)ppWS);
+    }
+#endif
     return err;
 }
 
-ERR CloseWS_File(struct WMPStream** ppWS)"""
+ERR CloseWS_File(struct WMPStream** ppWS)""",
             ],
         )
 
@@ -5231,24 +5329,15 @@ def build_assimp(src_dir: str, install_dir: str):
                 r"#define AI_MAX_ALLOC(type) ((size_t(256) * 1024 * 1024 * 1024) / sizeof(type))"
             ],
         ),
-        FilePatcher(
-            orig_file=os.path.join(src_dir, "code", "CMakeLists.txt"),
-            from_texts=[r"-Werror", r"/WX"],
-            to_texts=[r" ", r" "],
-        ),
         # Draco policy: Assimp forces the glTF-only Draco bitstream profile for
         # its importer, but Atlas links Draco directly for Neuroglancer
         # precomputed meshes. Keep full Draco features enabled.
         FilePatcher(
             orig_file=os.path.join(src_dir, "CMakeLists.txt"),
             from_texts=[
-                r" /WX",
-                r"ADD_COMPILE_OPTIONS(/source-charset:utf-8)",
                 r'SET(DRACO_GLTF_BITSTREAM ON CACHE BOOL "" FORCE)',
             ],
             to_texts=[
-                r" ",
-                r"",
                 r'SET(DRACO_GLTF_BITSTREAM OFF CACHE BOOL "" FORCE)',
             ],
         ),
@@ -5270,6 +5359,7 @@ def build_assimp(src_dir: str, install_dir: str):
                 "-DASSIMP_BUILD_ZLIB:BOOL=OFF",
                 "-DASSIMP_HUNTER_ENABLED:BOOL=OFF",
                 "-DASSIMP_BUILD_DRACO_STATIC:BOOL=ON",
+                "-DASSIMP_WARNINGS_AS_ERRORS:BOOL=OFF",
             ]
         )
 
@@ -5337,6 +5427,7 @@ def build_hdf5(src_dir: str, install_dir: str):
             [
                 "-DBUILD_TESTING:BOOL=OFF",
                 "-DBUILD_SHARED_LIBS:BOOL=OFF",
+                "-DBUILD_STATIC_LIBS:BOOL=ON",
                 "-DHDF5_ENABLE_DEPRECATED_SYMBOLS:BOOL=ON",
                 "-DHDF5_ENABLE_ZLIB_SUPPORT:BOOL=ON",
                 "-DHDF5_USE_ZLIB_STATIC:BOOL=ON",
@@ -5347,18 +5438,13 @@ def build_hdf5(src_dir: str, install_dir: str):
                 # '-DHDF5_ENABLE_SZIP_SUPPORT:BOOL=ON',
                 "-DHDF5_ENABLE_THREADSAFE:BOOL=OFF",
                 "-DHDF5_BUILD_EXAMPLES:BOOL=OFF",
+                "-DHDF5_BUILD_TOOLS:BOOL=OFF",
                 "-DHDF5_BUILD_CPP_LIB:BOOL=ON",
             ]
         )
 
         cmakecmd.extend([src_dir])
         build_and_install_cmakecmd(cmakecmd, build_dir)
-
-        patch_file(
-            os.path.join(install_dir, "cmake", "hdf5-targets.cmake"),
-            from_texts=[r";\$<LINK_ONLY:ZLIB::ZLIB>"],
-            to_texts=[r""],
-        )
     finally:
         print()
         shutil.rmtree(build_dir, ignore_errors=False)
@@ -5368,133 +5454,68 @@ def build_itk(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
 
     patches = [
-        FilePatcher(
-            orig_file=os.path.join(
-                src_dir,
-                "Modules",
-                "ThirdParty",
-                "NIFTI",
-                "src",
-                "nifti",
-                "niftilib",
-                "nifti1_io.c",
-            ),
-            from_texts=[r"#include <limits.h>"],
-            to_texts=["#include <limits.h>\n#include <stdint.h>"],
-        ),
+        # ITK's system-Eigen refactor stopped recording Eigen's include path in
+        # its legacy module metadata.  Modules which reach ITKCommon through a
+        # COMPILE_DEPENDS edge therefore see itkMathSVD.h but not Eigen/Dense.
+        # Restore the target-derived include path until upstream propagates it.
         FilePatcher(
             orig_file=os.path.join(
                 src_dir, "Modules", "ThirdParty", "Eigen3", "CMakeLists.txt"
             ),
-            from_texts=[r"set(_Eigen3_min_version 3.3)"],
-            to_texts=[r"set(_Eigen3_min_version 5)"],
+            from_texts=[
+                """  set(ITKEigen3_LIBRARIES Eigen3::Eigen)
+
+  set(ITKEigen3_NO_SRC 1)
+"""
+            ],
+            to_texts=[
+                """  set(ITKEigen3_LIBRARIES Eigen3::Eigen)
+  get_target_property(
+    ITKEigen3_INCLUDE_DIRS
+    Eigen3::Eigen
+    INTERFACE_INCLUDE_DIRECTORIES
+  )
+
+  set(ITKEigen3_NO_SRC 1)
+"""
+            ],
         ),
+        # ITK exports TBB's configured include directory and TBB_DIR as
+        # builder-specific absolute paths. TBB::tbb already carries its own
+        # include usage requirement, so keep only the target dependency and
+        # discover TBB downstream only when the consumer has not done so.
         FilePatcher(
             orig_file=os.path.join(
-                src_dir,
-                "Modules",
-                "Numerics",
-                "Optimizers",
-                "src",
-                "itkEigenLevenbergMarquardtEngine.cxx",
+                src_dir, "Modules", "ThirdParty", "TBB", "CMakeLists.txt"
             ),
             from_texts=[
-                """#include "itk_eigen.h"
-#include "itkeigen/Eigen/Core"
-#include "itkeigen/unsupported/Eigen/NonLinearOptimization"
-#include "itkeigen/unsupported/Eigen/NumericalDiff"
-"""
+                """set(ITKTBB_SYSTEM_INCLUDE_DIRS ${TBB_INCLUDE_DIRS})
+""",
+                r"""set(TBB_DIR \"${TBB_DIR}\")
+find_package(Threads REQUIRED)
+find_package(TBB REQUIRED CONFIG)
+""",
+                r"""if(NOT ITK_BINARY_DIR)
+  set(TBB_DIR \"${TBB_DIR}\")
+  find_package(Threads REQUIRED)
+  find_package(TBB REQUIRED CONFIG)
+endif()
+""",
             ],
             to_texts=[
-                """#include "itk_eigen.h"
-#include ITK_EIGEN(Core)
-#include ITK_EIGEN(../unsupported/Eigen/NonLinearOptimization)
-#include ITK_EIGEN(../unsupported/Eigen/NumericalDiff)
-"""
-            ],
-        ),
-        FilePatcher(
-            orig_file=os.path.join(
-                src_dir,
-                "Modules",
-                "ThirdParty",
-                "VNL",
-                "itk-module.cmake",
-            ),
-            from_texts=[r'itk_module(ITKVNL DESCRIPTION "${DOCUMENTATION}")'],
-            to_texts=[
-                r'itk_module(ITKVNL DEPENDS ITKEigen3 DESCRIPTION "${DOCUMENTATION}")'
-            ],
-        ),
-        FilePatcher(
-            orig_file=os.path.join(
-                src_dir,
-                "Modules",
-                "ThirdParty",
-                "VNL",
-                "src",
-                "vxl",
-                "core",
-                "vnl",
-                "algo",
-                "vnl_levenberg_marquardt.cxx",
-            ),
-            from_texts=[
-                """#include "itkeigen/unsupported/Eigen/NonLinearOptimization"
-#include "itkeigen/unsupported/Eigen/NumericalDiff"
-"""
-            ],
-            to_texts=[
-                """#include "itk_eigen.h"
-#include ITK_EIGEN(../unsupported/Eigen/NonLinearOptimization)
-#include ITK_EIGEN(../unsupported/Eigen/NumericalDiff)
-"""
-            ],
-        ),
-        FilePatcher(
-            orig_file=os.path.join(
-                src_dir,
-                "Modules",
-                "ThirdParty",
-                "VNL",
-                "src",
-                "vxl",
-                "core",
-                "vnl",
-                "algo",
-                "CMakeLists.txt",
-            ),
-            from_texts=[
-                """# Eigen-backed vnl_levenberg_marquardt needs the vendored Eigen headers (private, header-only).
-target_include_directories( itkvnl_algo
-  PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../../../../../Eigen3/src )
-"""
-            ],
-            to_texts=[
-                """# Eigen-backed vnl_levenberg_marquardt uses ITK's Eigen module interface.
-target_link_libraries(itkvnl_algo PRIVATE ITK::ITKEigen3Module)
-"""
-            ],
-        ),
-        FilePatcher(
-            orig_file=os.path.join(
-                src_dir,
-                "Modules",
-                "Core",
-                "Common",
-                "include",
-                "itkMatrixExponential.h",
-            ),
-            from_texts=[
-                """// Eigen's matrix exponential lives in the unsupported MatrixFunctions module.
-#include "itkeigen/unsupported/Eigen/MatrixFunctions"
-"""
-            ],
-            to_texts=[
-                """// Eigen's matrix exponential lives in the unsupported MatrixFunctions module.
-#include "itk_eigen.h"
-#include ITK_EIGEN(../unsupported/Eigen/MatrixFunctions)
-"""
+                "",
+                """find_package(Threads REQUIRED)
+if(NOT TARGET TBB::tbb)
+  find_package(TBB REQUIRED CONFIG)
+endif()
+""",
+                """if(NOT ITK_BINARY_DIR)
+  find_package(Threads REQUIRED)
+  if(NOT TARGET TBB::tbb)
+    find_package(TBB REQUIRED CONFIG)
+  endif()
+endif()
+""",
             ],
         ),
         FilePatcher(
@@ -5502,10 +5523,10 @@ target_link_libraries(itkvnl_algo PRIVATE ITK::ITKEigen3Module)
                 src_dir, "Modules", "ThirdParty", "PNG", "itk-module.cmake"
             ),
             from_texts=[
-                r'itk_module(ITKPNG DEPENDS ITKZLIB DESCRIPTION "${DOCUMENTATION}")'
+                r'itk_module(ITKPNG PRIVATE_DEPENDS ITKZLIB DESCRIPTION "${DOCUMENTATION}")'
             ],
             to_texts=[
-                r'itk_module(ITKPNG EXCLUDE_FROM_DEFAULT DEPENDS ITKZLIB DESCRIPTION "${DOCUMENTATION}")'
+                r'itk_module(ITKPNG EXCLUDE_FROM_DEFAULT PRIVATE_DEPENDS ITKZLIB DESCRIPTION "${DOCUMENTATION}")'
             ],
         ),
         FilePatcher(
@@ -5574,15 +5595,15 @@ target_link_libraries(itkvnl_algo PRIVATE ITK::ITKEigen3Module)
             ),
             from_texts=[
                 """itk_module(
-  ITKTIFF
-  DEPENDS
+    ITKTIFF
+    PRIVATE_DEPENDS
 """
             ],
             to_texts=[
                 """itk_module(
-  ITKTIFF
-  EXCLUDE_FROM_DEFAULT
-  DEPENDS
+    ITKTIFF
+    EXCLUDE_FROM_DEFAULT
+    PRIVATE_DEPENDS
 """
             ],
         ),
@@ -5650,17 +5671,12 @@ target_link_libraries(itkvnl_algo PRIVATE ITK::ITKEigen3Module)
                 """    ITKIOTIFF
     ITKIOVTK
 """,
-                """    ITKIOLSM
-    ITKRegistrationCommon
-""",
             ],
             to_texts=[
                 """    ITKIONRRD
     ITKIORAW
 """,
                 """    ITKIOVTK
-""",
-                """    ITKRegistrationCommon
 """,
             ],
         ),
@@ -5683,7 +5699,9 @@ target_link_libraries(itkvnl_algo PRIVATE ITK::ITKEigen3Module)
                 "-DModule_ITKReview:BOOL=ON",
                 "-DModule_ITKTBB:BOOL=ON",
                 "-DTBB_DIR:PATH=" + tbb_dir(),
-                "-DITK_USE_SYSTEM_DOUBLECONVERSION:BOOL=ON",
+                # ITK carries and installs its own namespaced copy. Keeping it
+                # bundled avoids a standalone dependency that Atlas does not use.
+                "-DITK_USE_SYSTEM_DOUBLECONVERSION:BOOL=OFF",
                 "-DITK_USE_SYSTEM_EIGEN:BOOL=ON",
                 "-DITK_USE_SYSTEM_HDF5:BOOL=ON",
                 "-DITK_USE_SYSTEM_JPEG:BOOL=ON",
@@ -5693,40 +5711,8 @@ target_link_libraries(itkvnl_algo PRIVATE ITK::ITKEigen3Module)
             ],
         )
 
-        if is_windows():
-            cmakecmd.extend(
-                [
-                    # '-DZLIB_INCLUDE_DIR:PATH=' + ext_dir() + '\\zlib\\include',
-                    # '-DZLIB_LIBRARY_RELEASE:FILEPATH=' + ext_dir() + '\\zlib\\lib\\zlibstatic.lib',
-                    "-DHDF5_DIR:PATH=" + ext_build_dir() + "/share/cmake",
-                ]
-            )
-        # else:
-        #     cmakecmd.extend(['-DHDF5_DIR:PATH=' + ext_dir() + '/hdf5/share/cmake/hdf5',
-        #                      ])
-
         cmakecmd.extend([src_dir])
         build_and_install_cmakecmd(cmakecmd, build_dir)
-
-        # duplicated call to find_package cause cmake error
-        # remove tbb from itk interface to make it work with conda tbb
-        patch_file(
-            os.path.join(
-                install_dir, "lib", "cmake", "ITK-6.0", "Modules", "ITKTBB.cmake"
-            ),
-            from_texts=[
-                r"find_package(TBB REQUIRED CONFIG)",
-                r"set(ITKTBB_INCLUDE_DIRS",
-                r"set(ITKTBB_LIBRARIES",
-                r"set(TBB_DIR",
-            ],
-            to_texts=[
-                r"#find_package(TBB REQUIRED CONFIG)",
-                r"#set(ITKTBB_INCLUDE_DIRS",
-                r"#set(ITKTBB_LIBRARIES",
-                r"#set(TBB_DIR",
-            ],
-        )
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
         patch_manager.restore_files()
@@ -5736,19 +5722,6 @@ def build_vtk(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
 
     patches = [
-        FilePatcher(
-            orig_file=os.path.join(
-                src_dir, "ThirdParty", "eigen", "vtkeigen", "CMakeLists.txt"
-            ),
-            from_texts=[
-                r"-std=c++11",
-                r"set(CMAKE_CXX_STANDARD 11)",
-            ],
-            to_texts=[
-                f"-std=c++{cpp_standard()}",
-                f"set(CMAKE_CXX_STANDARD {cpp_standard()})",
-            ],
-        ),
         FilePatcher(
             orig_file=os.path.join(
                 src_dir, "ThirdParty", "libproj", "vtklibproj", "CMakeLists.txt"
@@ -5884,8 +5857,6 @@ void vtkBoundingBox::ComputeBounds(
         cmakecmd.extend(
             [
                 "-DVTK_BUILD_EXAMPLES:BOOL=OFF",
-                "-DBUILD_TESTING:BOOL=OFF",
-                "-DBUILD_SHARED_LIBS:BOOL=OFF",
                 "-DVTK_BUILD_TESTING:STRING=OFF",
                 "-DBUILD_SHARED_LIBS:BOOL=OFF",
                 # Keep VTK's broad default groups, but reject VTK::tiff. Modules
@@ -5898,10 +5869,8 @@ void vtkBoundingBox::ComputeBounds(
                 + ("ON" if vtk_expat_use_static_names else "OFF"),
                 "-DVTK_MODULE_USE_EXTERNAL_VTK_hdf5:BOOL="
                 + ("ON" if vtk_use_external_hdf5 else "OFF"),
-                "-DVTK_MODULE_USE_EXTERNAL_VTK_jpeg:BOOL=ON",
                 "-DVTK_MODULE_USE_EXTERNAL_VTK_lz4:BOOL=ON",
                 "-DVTK_MODULE_USE_EXTERNAL_VTK_lzma:BOOL=ON",
-                "-DVTK_MODULE_USE_EXTERNAL_VTK_png:BOOL=ON",
                 "-DVTK_MODULE_USE_EXTERNAL_VTK_zlib:BOOL=ON",
                 "-DVTK_MODULE_ENABLE_VTK_IOADIOS2:STRING=NO",
                 "-DVTK_MODULE_ENABLE_VTK_diy2:STRING=NO",
@@ -5938,7 +5907,7 @@ void vtkBoundingBox::ComputeBounds(
         patch_manager.restore_files()
 
 
-def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str):
+def build_opencv(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
     opencv_install_namespace = "opencv5"
 
@@ -5947,12 +5916,10 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str):
             orig_file=os.path.join(src_dir, "cmake", "OpenCVFindMKL.cmake"),
             from_texts=[
                 r"macro(mkl_fail)",
-                r"set(mkl_lib_find_paths ${MKL_LIB_FIND_PATHS} ${MKL_ROOT_DIR}/lib)",
             ],
             to_texts=[
                 "set(CMAKE_FIND_LIBRARY_SUFFIXES .lib .a ${CMAKE_FIND_LIBRARY_SUFFIXES})\n"
                 "macro(mkl_fail)\n",
-                r"set(mkl_lib_find_paths ${MKL_LIB_FIND_PATHS} ${MKL_ROOT_DIR}/lib ${MKL_ROOT_DIR}/../tbb/lib ${MKL_ROOT_DIR}/../tbb/lib/intel64/gcc4.8 ${MKL_ROOT_DIR}/../tbb/lib/intel64/vc14)",
             ],
         ),
         FilePatcher(
@@ -5964,6 +5931,26 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str):
             orig_file=os.path.join(src_dir, "modules", "geometry", "CMakeLists.txt"),
             from_texts=[r"${LAPACK_LIBRARIES}"],
             to_texts=[r""],
+        ),
+        FilePatcher(
+            # The HarfBuzz implementation opens namespace cv inside its
+            # enabled branch, but the fallback branch forgot to do so.
+            orig_file=os.path.join(
+                src_dir, "modules", "imgproc", "src", "drawing_text.cpp"
+            ),
+            from_texts=[
+                """#else // HAVE_HARFBUZZ
+
+// Text rendering is implemented entirely on top of HarfBuzz."""
+            ],
+            to_texts=[
+                """#else // HAVE_HARFBUZZ
+
+namespace cv
+{
+
+// Text rendering is implemented entirely on top of HarfBuzz."""
+            ],
         ),
     ]
     patch_manager = PatchManager(patches)
@@ -6234,17 +6221,18 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str):
                 "-DBUILD_JASPER:BOOL=OFF",
                 "-DBUILD_JPEG:BOOL=OFF",
                 "-DBUILD_PNG:BOOL=OFF",
-                "-DBUILD_OPENEXR:BOOL=OFF",
                 "-DBUILD_WEBP:BOOL=OFF",
                 "-DBUILD_OPENJPEG:BOOL=OFF",
                 "-DBUILD_PROTOBUF:BOOL=OFF",
+                "-DBUILD_HARFBUZZ:BOOL=OFF",
                 "-DWITH_1394:BOOL=OFF",
-                "-DWITH_ADE:BOOL=OFF",
                 "-DWITH_VTK:BOOL=OFF",
                 "-DWITH_CUDA:BOOL=OFF",
                 "-DWITH_EIGEN:BOOL=ON",
                 "-DWITH_FFMPEG:BOOL=ON",
                 "-DWITH_GSTREAMER:BOOL=OFF",
+                "-DWITH_HARFBUZZ:BOOL=OFF",
+                "-DWITH_UNIFONT:BOOL=OFF",
                 "-DWITH_JASPER:BOOL=OFF",
                 "-DWITH_OPENJPEG:BOOL=ON",
                 "-DWITH_JPEG:BOOL=ON",
@@ -6270,7 +6258,6 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str):
                 # mkl_tbb link with static run lib (/MT)
                 "-DMKL_WITH_OPENMP:BOOL=OFF",
                 "-DWITH_PROTOBUF:BOOL=ON",
-                "-DWITH_QUIRC:BOOL=OFF",
                 "-DBUILD_SHARED_LIBS:BOOL=OFF",
                 "-DBUILD_opencv_apps:BOOL=OFF",
                 "-DBUILD_opencv_highgui:BOOL=OFF",
@@ -6290,7 +6277,6 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str):
                 "-DBUILD_opencv_python3:BOOL=OFF",
                 "-DPYTHON3_EXECUTABLE=" + sys.executable,
                 "-DBUILD_opencv_java:BOOL=OFF",
-                "-DBUILD_opencv_stereo:BOOL=OFF",
                 "-DHIGHGUI_ENABLE_PLUGINS:BOOL=OFF",
             ]
 
@@ -6392,6 +6378,7 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str):
             to_texts=[
                 r"",
             ],
+            keep_bak_file=False,
         )
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
@@ -6642,10 +6629,10 @@ if (NOT TARGET fizz::fizz)""",
             ],
             to_texts=[
                 r"""~AsyncFizzClientT() override {
-    // Prevent the underlying AsyncSocket from invoking connect callbacks into a
+    // Prevent the underlying socket transport from invoking connect callbacks into a
     // dying object if the socket connect is still in-flight.
     if (auto* sock =
-            transport_ ? transport_->getUnderlyingTransport<folly::AsyncSocket>()
+            transport_ ? transport_->getUnderlyingTransport<folly::AsyncSocketTransport>()
                        : nullptr) {
       sock->cancelConnect();
     }
@@ -6741,7 +6728,7 @@ if (NOT TARGET fizz::fizz)""",
   connectGuard_ = nullptr;
 
   if (auto* sock =
-          transport_ ? transport_->getUnderlyingTransport<folly::AsyncSocket>()
+          transport_ ? transport_->getUnderlyingTransport<folly::AsyncSocketTransport>()
                      : nullptr) {
     sock->cancelConnect();
   }
@@ -6822,9 +6809,11 @@ void AsyncFizzClientT<SM>::close() {
         cmakecmd = get_cmake_cmd_common_part(install_dir, universal=True)
         cmakecmd.extend(
             [
-                "-DFIZZ_BUILD_AEGIS:BOOL=OFF",
+                "-DBUILD_SHARED_LIBS:BOOL=OFF",
                 "-DBUILD_TESTS:BOOL=OFF",
                 "-DBUILD_EXAMPLES:BOOL=OFF",
+                "-Dsodium_USE_STATIC_LIBS:BOOL=ON",
+                "-DCMAKE_DISABLE_FIND_PACKAGE_aegis:BOOL=ON",
             ]
         )
 
@@ -6840,6 +6829,14 @@ def build_mvfst(src_dir: str, install_dir: str):
 
     try:
         cmakecmd = get_cmake_cmd_common_part(install_dir, universal=True)
+        cmakecmd.extend(
+            [
+                "-DBUILD_SHARED_LIBS:BOOL=OFF",
+                "-DBUILD_TESTS:BOOL=OFF",
+                "-DBUILD_SAMPLES:BOOL=OFF",
+                "-DBUILD_TOOLS:BOOL=OFF",
+            ]
+        )
 
         cmakecmd.extend([src_dir])
         build_and_install_cmakecmd(cmakecmd, build_dir)
@@ -6854,7 +6851,9 @@ def build_wangle(src_dir: str, install_dir: str):
         cmakecmd = get_cmake_cmd_common_part(install_dir, universal=True)
         cmakecmd.extend(
             [
+                "-DBUILD_SHARED_LIBS:BOOL=OFF",
                 "-DBUILD_TESTS:BOOL=OFF",
+                "-DBUILD_EXAMPLES:BOOL=OFF",
             ]
         )
 
@@ -6871,14 +6870,12 @@ def build_proxygen(src_dir: str, install_dir: str):
         FilePatcher(
             orig_file=os.path.join(src_dir, "CMakeLists.txt"),
             from_texts=[
-                r"find_program(PROXYGEN_PYTHON python3)",
                 r"-Wextra",
                 r"""find_package(Threads)
 find_package(Cares REQUIRED)
 find_package(Glog REQUIRED)""",
             ],
             to_texts=[
-                r"find_program(PROXYGEN_PYTHON python)",
                 r"",
                 r"""find_package(Threads)
 find_package(c-ares CONFIG REQUIRED)
@@ -6932,7 +6929,8 @@ endif()""",
             ],
         ),
         # Cancellation / timeout safety:
-        # `TimedBaton::wait()` can complete with `cancelled` / `timedout`. Without
+        # `TimedCancellableBaton::wait()` can complete with `cancelled` /
+        # `timedout`. Without
         # explicitly cancelling the underlying connect/handshake, the platform
         # socket layer may still invoke completion callbacks into a destroyed
         # ConnectCB / coroutine frame (observed on Windows, but correctness is
@@ -6948,7 +6946,7 @@ endif()""",
                 "HTTPCoroConnector.cpp",
             ),
             from_texts=[
-                r"""  co_await cb.baton.wait();
+                r"""  co_await cb.event.wait();
   co_await folly::coro::co_safe_point;
   if (cb.exception) {
     co_yield co_error(*cb.exception);
@@ -6956,13 +6954,13 @@ endif()""",
   if (connParams.congestionFlavor) {
     asyncSocket->setCongestionFlavor(*connParams.congestionFlavor);
   }""",
-                r"""  co_await cb.baton.wait();
+                r"""  co_await cb.event.wait();
   co_await folly::coro::co_safe_point;
   if (cb.exception) {
     co_yield co_error(*cb.exception);
   }
   initTransportInfoFromFizz(tinfo, *fizzClient);""",
-                r"""    co_await cb.baton.wait();
+                r"""    co_await cb.event.wait();
     co_await folly::coro::co_safe_point;
     if (cb.exception) {
       co_yield co_error(*cb.exception);
@@ -6970,14 +6968,14 @@ endif()""",
     initTransportInfoFromSSLSocket(tinfo, *sslSock);""",
             ],
             to_texts=[
-                r"""  auto batonStatus = co_await cb.baton.wait();
+                r"""  auto batonStatus = co_await cb.event.wait();
   if (batonStatus != TimedBaton::Status::signalled) {
     asyncSocket->cancelConnect();
     if (batonStatus == TimedBaton::Status::timedout) {
       co_yield co_error(folly::AsyncSocketException(
           folly::AsyncSocketException::TIMED_OUT, "Connect timed out"));
     }
-    co_yield folly::coro::co_cancelled;
+    co_yield folly::coro::co_stopped_may_throw;
   }
   co_await folly::coro::co_safe_point;
   if (cb.exception) {
@@ -6986,9 +6984,10 @@ endif()""",
   if (connParams.congestionFlavor) {
     asyncSocket->setCongestionFlavor(*connParams.congestionFlavor);
   }""",
-                r"""  auto batonStatus = co_await cb.baton.wait();
+                r"""  auto batonStatus = co_await cb.event.wait();
   if (batonStatus != TimedBaton::Status::signalled) {
-    if (auto* sock = fizzClient->getUnderlyingTransport<folly::AsyncSocket>()) {
+    if (auto* sock =
+            fizzClient->getUnderlyingTransport<folly::AsyncSocketTransport>()) {
       sock->cancelConnect();
     }
     fizzClient->closeNow();
@@ -6996,21 +6995,21 @@ endif()""",
       co_yield co_error(folly::AsyncSocketException(
           folly::AsyncSocketException::TIMED_OUT, "Connect timed out"));
     }
-    co_yield folly::coro::co_cancelled;
+    co_yield folly::coro::co_stopped_may_throw;
   }
   co_await folly::coro::co_safe_point;
   if (cb.exception) {
     co_yield co_error(*cb.exception);
   }
   initTransportInfoFromFizz(tinfo, *fizzClient);""",
-                r"""    auto batonStatus = co_await cb.baton.wait();
+                r"""    auto batonStatus = co_await cb.event.wait();
     if (batonStatus != TimedBaton::Status::signalled) {
       sslSock->cancelConnect();
       if (batonStatus == TimedBaton::Status::timedout) {
         co_yield co_error(folly::AsyncSocketException(
             folly::AsyncSocketException::TIMED_OUT, "Connect timed out"));
       }
-      co_yield folly::coro::co_cancelled;
+      co_yield folly::coro::co_stopped_may_throw;
     }
     co_await folly::coro::co_safe_point;
     if (cb.exception) {
@@ -7019,8 +7018,8 @@ endif()""",
     initTransportInfoFromSSLSocket(tinfo, *sslSock);""",
             ],
         ),
-        # CONNECT tunnels must retain a keepalive on the underlying proxy
-        # session for the full tunnel lifetime, regardless of whether the
+        # CONNECT tunnels must retain the underlying proxy session handle for
+        # the full tunnel lifetime, regardless of whether the
         # stream uniquely owns that session. Without this keepalive, pooled
         # proxied HTTPS can tear down the proxy session while the tunneled TLS
         # transport is still draining, which later crashes in
@@ -7037,12 +7036,11 @@ endif()""",
                 "HTTPConnectStream.h",
             ),
             from_texts=[
-                r"""  HTTPCoroSession* session_{nullptr};
+                r"""  CoroSessionHandle session_{nullptr};
   folly::EventBase* eventBase_;""",
             ],
             to_texts=[
-                r"""  HTTPCoroSession* session_{nullptr};
-  HTTPSessionContextPtr sessionCtx_;
+                r"""  CoroSessionHandle session_{nullptr};
   bool ownsSession_{false};
   folly::EventBase* eventBase_;""",
             ],
@@ -7058,13 +7056,9 @@ endif()""",
                 "HTTPConnectStream.cpp",
             ),
             from_texts=[
-                r"""    : session_(ownership == Ownership::Unique ? session : nullptr),
+                r"""    : session_(ownership == Ownership::Unique ? session
+                                              : CoroSessionHandle(nullptr)),
       eventBase_(session->getEventBase()),""",
-                r"""  egressSource_->setHeapAllocated();
-  if (session_) {
-    session_->addLifecycleObserver(this);
-  }
-}""",
                 r"""  if (session_) {
     session_->removeLifecycleObserver(this);
     session_->initiateDrain();
@@ -7072,12 +7066,8 @@ endif()""",
             ],
             to_texts=[
                 r"""    : session_(session),
-      sessionCtx_(session->acquireKeepAlive()),
       ownsSession_(ownership == Ownership::Unique),
       eventBase_(session->getEventBase()),""",
-                r"""  egressSource_->setHeapAllocated();
-  session_->addLifecycleObserver(this);
-}""",
                 r"""  if (session_) {
     session_->removeLifecycleObserver(this);
     if (ownsSession_) {
@@ -7146,12 +7136,40 @@ endif()""",
                 src_dir, "proxygen", "lib", "services", "RequestWorkerThread.cpp"
             ),
             from_texts=[
-                r"sigset_t ss;",
-                r"PCHECK(pthread_sigmask(SIG_BLOCK, &ss, nullptr) == 0);",
+                r"""    sigset_t ss;
+
+    // Ignore some signals
+    sigemptyset(&ss);
+    sigaddset(&ss, SIGHUP);
+    sigaddset(&ss, SIGINT);
+    sigaddset(&ss, SIGQUIT);
+    sigaddset(&ss, SIGUSR1);
+    sigaddset(&ss, SIGUSR2);
+    sigaddset(&ss, SIGPIPE);
+    sigaddset(&ss, SIGALRM);
+    sigaddset(&ss, SIGTERM);
+    sigaddset(&ss, SIGCHLD);
+    sigaddset(&ss, SIGIO);
+    PCHECK(pthread_sigmask(SIG_BLOCK, &ss, nullptr) == 0);""",
             ],
             to_texts=[
-                "#ifndef _MSC_VER\nsigset_t ss;",
-                "PCHECK(pthread_sigmask(SIG_BLOCK, &ss, nullptr) == 0);\n#endif",
+                r"""#ifndef _WIN32
+    sigset_t ss;
+
+    // Ignore some signals
+    sigemptyset(&ss);
+    sigaddset(&ss, SIGHUP);
+    sigaddset(&ss, SIGINT);
+    sigaddset(&ss, SIGQUIT);
+    sigaddset(&ss, SIGUSR1);
+    sigaddset(&ss, SIGUSR2);
+    sigaddset(&ss, SIGPIPE);
+    sigaddset(&ss, SIGALRM);
+    sigaddset(&ss, SIGTERM);
+    sigaddset(&ss, SIGCHLD);
+    sigaddset(&ss, SIGIO);
+    PCHECK(pthread_sigmask(SIG_BLOCK, &ss, nullptr) == 0);
+#endif""",
             ],
             patch_condition=is_windows,
         ),
@@ -7162,11 +7180,16 @@ endif()""",
         patch_manager.apply_patches()
 
         cmakecmd = get_cmake_cmd_common_part(install_dir, universal=True)
+        cmakecmd.extend(
+            [
+                "-DBUILD_SHARED_LIBS:BOOL=OFF",
+                "-DBUILD_SAMPLES:BOOL=OFF",
+            ]
+        )
         if is_windows():
             cmakecmd.extend(
                 [
                     f"-DCMAKE_PROGRAM_PATH={get_gperf_dir()};{os.path.dirname(sys.executable)}",
-                    "-DBUILD_SAMPLES:BOOL=OFF",
                 ]
             )
         else:
@@ -7477,10 +7500,6 @@ def build_libs(libs: OrderedDict, use_asan: bool):
                 nasm_dir = ""  # does not need
             build_openssl(src_dir, ext_build_dir(), nasm_dir=nasm_dir)
 
-        if lib_name == "double-conversion":
-            dc_src_dir = os.path.join(ext_dir(), "double-conversion")
-            build_double_conversion(dc_src_dir, ext_build_dir())
-
         if lib_name == "lz4":
             lz4_src_dir = os.path.join(ext_dir(), "lz4")
             build_lz4(lz4_src_dir, ext_build_dir())
@@ -7616,13 +7635,7 @@ def build_libs(libs: OrderedDict, use_asan: bool):
 
         if lib_name == "grpc":
             src_dir = os.path.join(ext_dir(), "grpc")
-            if is_windows():
-                nasm_dir = unpack_tool_to_target_dir(
-                    src_package_dir(), "nasm*win64*", "nasm-*"
-                )
-            else:
-                nasm_dir = ""  # does not need
-            build_grpc(src_dir, ext_build_dir(), nasm_dir=nasm_dir)
+            build_grpc(src_dir, ext_build_dir())
 
         if lib_name == "glbinding":
             src_dir = os.path.join(ext_dir(), "glbinding")
@@ -7807,8 +7820,7 @@ def build_libs(libs: OrderedDict, use_asan: bool):
 
         if lib_name == "opencv":
             src_dir = os.path.join(ext_dir(), "opencv")
-            src_contrib_dir = os.path.join(ext_dir(), "opencv_contrib")
-            build_opencv(src_dir, src_contrib_dir, ext_build_dir())
+            build_opencv(src_dir, ext_build_dir())
 
         if lib_name == "neuTube":
             if is_windows():
@@ -7931,7 +7943,6 @@ def parse_inputs(argv: list):
         "glog",
         "benchmark",
         "openssl",
-        "double-conversion",
         "lz4",
         "xz",
         "zstd",
@@ -7996,6 +8007,7 @@ def parse_inputs(argv: list):
         "libpng": ["openimageio", "opencv", "itk", "vtk"],
         "libjpeg": ["libtiff", "libraw", "openimageio", "opencv", "itk", "vtk"],
         "zlib": [
+            "libjpeg",
             "libpng",
             "libtiff",
             "libraw",
@@ -8015,13 +8027,13 @@ def parse_inputs(argv: list):
         "gflags": ["glog", "folly"],
         "glog": ["folly"],
         "benchmark": ["grpc"],
+        # gRPC installs the c-ares package that Proxygen consumes directly.
+        "grpc": ["proxygen"],
         "openssl": ["grpc", "folly", "ngtcp2", "curl"],
         "hdf5": ["itk", "vtk"],
         "suitesparse": ["ceres-solver"],
-        "ceres-solver": ["opencv"],  # only if we need opencv sfm
         "boost": ["folly"],
         "libevent": ["folly"],
-        "double-conversion": ["folly", "itk", "vtk"],
         "lz4": ["vtk", "folly", "rocksdb"],
         "xz": ["libtiff", "vtk", "folly"],
         "zstd": ["libtiff", "folly", "rocksdb", "curl"],
@@ -8044,7 +8056,7 @@ def parse_inputs(argv: list):
         "wangle": ["proxygen"],
         "mvfst": ["proxygen"],
         "gperf": ["proxygen"],
-        "fizz": ["mvfst"],
+        "fizz": ["mvfst", "wangle"],
     }
 
     logger.info(f"current interpreter: {sys.executable}")
@@ -8152,7 +8164,9 @@ python build_ext_libs.py [all or libs...] [--exclude-libs] [libs...] [--start-fr
     # "all" (even with exclusions). Avoid cleaning when using --start-from
     # because that flag implies continuing from an existing build.
     if build_all or (requested_all and args.start_from is None):
-        shutil.rmtree(ext_build_dir(), ignore_errors=True)
+        build_prefix = ext_build_dir()
+        if os.path.exists(build_prefix):
+            shutil.rmtree(build_prefix, ignore_errors=False)
 
     return libs, args.use_asan
 

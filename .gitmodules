@@ -45,7 +45,7 @@
 [submodule "src/3rdparty/ITK"]
 	path = src/3rdparty/ITK
 	url = https://github.com/InsightSoftwareConsortium/ITK.git
-	branch = master
+	branch = main
 [submodule "src/3rdparty/vtk"]
 	path = src/3rdparty/vtk
 	url = https://gitlab.kitware.com/vtk/vtk.git
@@ -54,17 +54,9 @@
 	path = src/3rdparty/opencv
 	url = https://github.com/opencv/opencv.git
 	branch = 5.x
-[submodule "src/3rdparty/opencv_contrib"]
-	path = src/3rdparty/opencv_contrib
-	url = https://github.com/opencv/opencv_contrib.git
-	branch = 5.x
 [submodule "src/3rdparty/grpc"]
 	path = src/3rdparty/grpc
 	url = https://github.com/grpc/grpc.git
-	branch = master
-[submodule "src/3rdparty/double-conversion"]
-	path = src/3rdparty/double-conversion
-	url = https://github.com/google/double-conversion.git
 	branch = master
 [submodule "src/3rdparty/fmt"]
 	path = src/3rdparty/fmt

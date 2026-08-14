@@ -148,8 +148,7 @@ endif (WIN32)
 message(STATUS "JPEGXR_INCLUDE_DIRS: ${JPEGXR_INCLUDE_DIRS}")
 message(STATUS "JPEGXR_LIBRARIES: ${JPEGXR_LIBRARIES}")
 
-find_package(WebP REQUIRED
-             COMPONENTS webp
+find_package(WebP CONFIG REQUIRED
              PATHS ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build NO_DEFAULT_PATH)
 print_target_properties(WebP::webp)
 
@@ -163,14 +162,6 @@ find_package(zstd REQUIRED
 print_target_properties(zstd::libzstd_static)
 if (TARGET zstd::libzstd_static AND NOT TARGET ZSTD::ZSTD)
   add_library(ZSTD::ZSTD ALIAS zstd::libzstd_static)
-endif ()
-
-if (NOT TARGET CMath::CMath)
-  add_library(CMath::CMath INTERFACE IMPORTED)
-  find_library(CMATH_LIBRARY m)
-  if (CMATH_LIBRARY)
-    set_property(TARGET CMath::CMath PROPERTY INTERFACE_LINK_LIBRARIES "${CMATH_LIBRARY}")
-  endif ()
 endif ()
 
 find_package(Tiff CONFIG REQUIRED
@@ -249,7 +240,7 @@ print_target_properties(glm::glm-header-only)
 
 find_package(HDF5 REQUIRED
              COMPONENTS C CXX static
-             PATHS ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/share NO_DEFAULT_PATH)
+             PATHS ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build NO_DEFAULT_PATH)
 print_target_properties(hdf5_cpp-static)
 print_target_properties(hdf5-static)
 

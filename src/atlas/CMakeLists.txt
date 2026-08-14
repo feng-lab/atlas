@@ -494,14 +494,15 @@ add_custom_target(vulkan_shaders ALL DEPENDS ${ATLAS_VK_SPV_OUTPUTS})
 # upstream CMake, which also builds example/program targets and tweaks global flags.
 set(CSVPARSERDIR ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/csv-parser)
 set(CSVPARSER_SOURCES
-    ${CSVPARSERDIR}/include/internal/basic_csv_parser.cpp
-    ${CSVPARSERDIR}/include/internal/basic_csv_parser_guessing.cpp
     ${CSVPARSERDIR}/include/internal/col_names.cpp
     ${CSVPARSERDIR}/include/internal/csv_format.cpp
     ${CSVPARSERDIR}/include/internal/csv_reader.cpp
     ${CSVPARSERDIR}/include/internal/csv_reader_iterator.cpp
     ${CSVPARSERDIR}/include/internal/csv_row.cpp
     ${CSVPARSERDIR}/include/internal/csv_utility.cpp
+    ${CSVPARSERDIR}/include/internal/parser/driver.cpp
+    ${CSVPARSERDIR}/include/internal/parser/guessing.cpp
+    ${CSVPARSERDIR}/include/internal/parser/mmap.cpp
 )
 source_group(csv-parser FILES ${CSVPARSER_SOURCES})
 
