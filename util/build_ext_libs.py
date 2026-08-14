@@ -5509,6 +5509,31 @@ def build_itk(src_dir: str, install_dir: str):
 """
             ],
         ),
+        # GDCM's gdcmCommon target compiles and publicly exposes its deflate
+        # stream, but its zlib link is commented out upstream.  Link the ITK
+        # zlib module on the target that consumes it so ZLIB::ZLIB supplies
+        # zlib.h during compilation and remains part of the public contract.
+        FilePatcher(
+            orig_file=os.path.join(
+                src_dir,
+                "Modules",
+                "ThirdParty",
+                "GDCM",
+                "src",
+                "gdcm",
+                "Source",
+                "Common",
+                "CMakeLists.txt",
+            ),
+            from_texts=[
+                """#target_link_libraries(gdcmCommon ${GDCM_ZLIB_LIBRARIES}) # ${GDCM_POLARSSL_LIBRARIES})
+"""
+            ],
+            to_texts=[
+                """target_link_libraries(gdcmCommon LINK_PUBLIC ${GDCM_ZLIB_LIBRARIES})
+"""
+            ],
+        ),
         # ITK exports TBB's configured include directory and TBB_DIR as
         # builder-specific absolute paths. TBB::tbb already carries its own
         # include usage requirement, so keep only the target dependency and
