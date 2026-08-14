@@ -3398,30 +3398,78 @@ def build_ceres_solver(src_dir: str, install_dir: str):
         FilePatcher(
             orig_file=os.path.join(src_dir, "CMakeLists.txt"),
             from_texts=[
+                r"""find_package(BLAS)
+find_package(LAPACK)""",
                 r"find_package(METIS)",
-                r"""if (NOT _Ceres_FEATURE_ACCELERATE)
-  list(APPEND CERES_COMPILE_OPTIONS CERES_NO_ACCELERATE_SPARSE)
-  mark_as_advanced(FORCE AccelerateSparse_INCLUDE_DIR
-                         AccelerateSparse_LIBRARY)
+                r"""set(_Ceres_FEATURE_LAPACK OFF)
+if (WITH_LAPACK AND LAPACK_FOUND)
+  set(_Ceres_FEATURE_LAPACK ON)
+endif()
+
+set(_Ceres_FEATURE_SUITESPARSE OFF)
+if (WITH_SUITESPARSE AND SuiteSparse_FOUND)
+  set(_Ceres_FEATURE_SUITESPARSE ON)
+endif()""",
+                r"""set(_Ceres_FEATURE_CHOLMOD_PARTITION OFF)
+if (_Ceres_FEATURE_SUITESPARSE AND SuiteSparse_Partition_FOUND)
+  set(_Ceres_FEATURE_CHOLMOD_PARTITION ON)
 endif()""",
             ],
             to_texts=[
+                r"""if (APPLE AND CMAKE_OSX_ARCHITECTURES STREQUAL "arm64")
+  # Intel's macOS oneMKL package is x86_64-only. Preserve Atlas's existing
+  # arm64 provider choice and give Ceres's link validation the concrete library.
+  find_library(ATLAS_ACCELERATE_LIBRARY NAMES Accelerate REQUIRED)
+  set(BLAS_LIBRARIES ${ATLAS_ACCELERATE_LIBRARY})
+  set(LAPACK_LIBRARIES ${ATLAS_ACCELERATE_LIBRARY})
+else ()
+  # Preserve Atlas's existing TBB-threaded oneMKL selection on Windows, Linux,
+  # and macOS x86_64. FindBLAS does not model this link combination.
+  include("${Ceres_SOURCE_DIR}/../suitesparse-cmake/libs.cmake")
+endif ()
+if (NOT BLAS_LIBRARIES OR NOT LAPACK_LIBRARIES)
+  message(FATAL_ERROR
+    "Atlas's BLAS/LAPACK provider did not supply link libraries.")
+endif ()
+set(BLAS_FOUND ON)
+set(LAPACK_FOUND ON)""",
                 r"""if (WITH_EIGENMETIS)
   find_package(METIS)
 endif()""",
-                r"""if (_Ceres_FEATURE_ACCELERATE)
-  # The static Ceres export links this imported target. Install Ceres's find
-  # module and recreate the target before CeresTargets.cmake is included.
-  set(AccelerateSparse_DEPENDENCY "find_dependency(AccelerateSparse)")
-  list(APPEND _Ceres_CONFIG_DEPENDENCY_MODULES
-    ${Ceres_SOURCE_DIR}/cmake/FindAccelerateSparse.cmake)
-else()
-  list(APPEND CERES_COMPILE_OPTIONS CERES_NO_ACCELERATE_SPARSE)
-  mark_as_advanced(FORCE AccelerateSparse_INCLUDE_DIR
-                         AccelerateSparse_LIBRARY)
+                r"""set(_Ceres_FEATURE_LAPACK OFF)
+if (WITH_LAPACK AND LAPACK_FOUND)
+  set(_Ceres_FEATURE_LAPACK ON)
+endif()
+if (WITH_LAPACK AND NOT _Ceres_FEATURE_LAPACK)
+  message(FATAL_ERROR
+    "Atlas requires Ceres to be built with LAPACK support.")
+endif()
+
+set(_Ceres_FEATURE_SUITESPARSE OFF)
+if (WITH_SUITESPARSE AND SuiteSparse_FOUND)
+  set(_Ceres_FEATURE_SUITESPARSE ON)
+endif()
+if (WITH_SUITESPARSE AND NOT _Ceres_FEATURE_SUITESPARSE)
+  message(FATAL_ERROR
+    "Atlas requires Ceres to be built with SuiteSparse support.")
+endif()
+if (WITH_ACCELERATESPARSE AND NOT _Ceres_FEATURE_ACCELERATE)
+  message(FATAL_ERROR
+    "Atlas requires Ceres to be built with AccelerateSparse support on macOS.")
+endif()""",
+                r"""set(_Ceres_FEATURE_CHOLMOD_PARTITION OFF)
+if (_Ceres_FEATURE_SUITESPARSE AND SuiteSparse_Partition_FOUND)
+  set(_Ceres_FEATURE_CHOLMOD_PARTITION ON)
+endif()
+if (WITH_SUITESPARSE AND NOT _Ceres_FEATURE_CHOLMOD_PARTITION)
+  message(FATAL_ERROR
+    "Atlas requires Ceres to be built with CHOLMOD Partition support.")
 endif()""",
             ],
         ),
+        # Atlas installs Ceres only as a static library and supplies its private
+        # SuiteSparse/BLAS dependencies at the final application link. Do not
+        # make every consumer configure and probe those dependencies again.
         FilePatcher(
             orig_file=os.path.join(src_dir, "cmake", "CeresConfig.cmake.in"),
             from_texts=[
@@ -3431,18 +3479,19 @@ endif()""",
             ],
             to_texts=[
                 r"""@METIS_DEPENDENCY@
-@SuiteSparse_DEPENDENCY@
-@AccelerateSparse_DEPENDENCY@
 @CUDAToolkit_DEPENDENCY@"""
             ],
         ),
-        # SuiteSparse 7.13 compiles its namespaced METIS copy directly into
-        # CHOLMOD's Partition module, so there is no standalone METIS package
-        # or METIS::METIS target for Ceres to find. Probe CHOLMOD by itself
-        # first, then retain Ceres's external-METIS fallback for other builds.
+        # SuiteSparse uses *_static.lib names for MSVC static builds. Its 7.13
+        # namespaced METIS copy is also compiled directly into CHOLMOD's
+        # Partition module, so probe CHOLMOD by itself before retaining Ceres's
+        # external-METIS fallback for other builds.
         FilePatcher(
             orig_file=os.path.join(src_dir, "cmake", "FindSuiteSparse.cmake"),
             from_texts=[
+                r"""  suitesparse_find_component(${component}
+    FILES ${component_header}
+    LIBRARIES ${component_library})""",
                 r"""if (TARGET SuiteSparse::CHOLMOD)
   # NOTE If SuiteSparse was compiled as a static library we'll need to link
   # against METIS already during the check. Otherwise, the check can fail due to
@@ -3471,9 +3520,14 @@ endif()""",
         INTERFACE_LINK_LIBRARIES SuiteSparse::CHOLMOD)
     endif (SuiteSparse_CHOLMOD_USES_METIS)
   endif (TARGET METIS::METIS)
-endif (TARGET SuiteSparse::CHOLMOD)"""
+endif (TARGET SuiteSparse::CHOLMOD)""",
             ],
             to_texts=[
+                r"""  # SuiteSparse appends _static to static-library names on MSVC.
+  # Keep both forms for shared builds and Unix static builds.
+  suitesparse_find_component(${component}
+    FILES ${component_header}
+    LIBRARIES ${component_library} ${component_library}_static)""",
                 r"""if (TARGET SuiteSparse::CHOLMOD)
   # SuiteSparse 7.13 embeds a namespaced METIS copy directly in CHOLMOD.
   # Probe that self-contained form before looking for an external METIS target.
@@ -3512,31 +3566,64 @@ endif (TARGET SuiteSparse::CHOLMOD)"""
     set_property (TARGET SuiteSparse::Partition APPEND PROPERTY
       INTERFACE_LINK_LIBRARIES SuiteSparse::CHOLMOD)
   endif ()
-endif ()"""
+endif ()""",
             ],
         ),
         FilePatcher(
             orig_file=os.path.join(src_dir, "internal", "ceres", "CMakeLists.txt"),
             from_texts=[
+                r"""if (_Ceres_FEATURE_SUITESPARSE)
+  # Define version information for use in Solver::FullReport.
+  add_definitions(-DCERES_SUITESPARSE_VERSION="${SuiteSparse_VERSION}")
+  list(APPEND CERES_LIBRARY_PRIVATE_DEPENDENCIES SuiteSparse::CHOLMOD
+    SuiteSparse::SPQR)
+
+  if (SuiteSparse_Partition_FOUND)
+    list(APPEND CERES_LIBRARY_PRIVATE_DEPENDENCIES SuiteSparse::Partition)
+  endif (SuiteSparse_Partition_FOUND)
+endif (_Ceres_FEATURE_SUITESPARSE)""",
                 r"""if (_Ceres_FEATURE_CHOLMOD_PARTITION OR _Ceres_FEATURE_EIGEN_METIS)
   # Define version information for use in Solver::FullReport.
   add_definitions(-DCERES_METIS_VERSION="${METIS_VERSION}")
   list(APPEND CERES_LIBRARY_PRIVATE_DEPENDENCIES METIS::METIS)
 endif (_Ceres_FEATURE_CHOLMOD_PARTITION OR _Ceres_FEATURE_EIGEN_METIS)""",
+                r"""if (_Ceres_FEATURE_ACCELERATE)
+  list(APPEND CERES_LIBRARY_PRIVATE_DEPENDENCIES AccelerateSparse::Accelerate)
+endif()""",
                 r"""if (_Ceres_FEATURE_LAPACK)
   list(APPEND CERES_LIBRARY_PRIVATE_DEPENDENCIES ${LAPACK_LIBRARIES})
 endif ()""",
             ],
             to_texts=[
+                r"""if (_Ceres_FEATURE_SUITESPARSE)
+  # Define version information for use in Solver::FullReport.
+  add_definitions(-DCERES_SUITESPARSE_VERSION="${SuiteSparse_VERSION}")
+  # Atlas consumes this static package and owns the final dependency link.
+  # Keep these targets in the Ceres build without exporting them to consumers.
+  list(APPEND CERES_LIBRARY_PRIVATE_DEPENDENCIES
+    $<BUILD_INTERFACE:SuiteSparse::CHOLMOD>
+    $<BUILD_INTERFACE:SuiteSparse::SPQR>)
+
+  if (SuiteSparse_Partition_FOUND)
+    list(APPEND CERES_LIBRARY_PRIVATE_DEPENDENCIES
+      $<BUILD_INTERFACE:SuiteSparse::Partition>)
+  endif (SuiteSparse_Partition_FOUND)
+endif (_Ceres_FEATURE_SUITESPARSE)""",
                 r"""if (_Ceres_FEATURE_CHOLMOD_PARTITION OR _Ceres_FEATURE_EIGEN_METIS)
   # Define version information for use in Solver::FullReport.
   add_definitions(-DCERES_METIS_VERSION="${METIS_VERSION}")
   # SuiteSparse may embed METIS inside CHOLMOD instead of exporting a
   # standalone METIS target. Only link the latter when it actually exists.
   if (TARGET METIS::METIS)
-    list(APPEND CERES_LIBRARY_PRIVATE_DEPENDENCIES METIS::METIS)
+    list(APPEND CERES_LIBRARY_PRIVATE_DEPENDENCIES
+      $<BUILD_INTERFACE:METIS::METIS>)
   endif ()
 endif (_Ceres_FEATURE_CHOLMOD_PARTITION OR _Ceres_FEATURE_EIGEN_METIS)""",
+                r"""if (_Ceres_FEATURE_ACCELERATE)
+  # Accelerate is supplied by Atlas's final static link on macOS.
+  list(APPEND CERES_LIBRARY_PRIVATE_DEPENDENCIES
+    $<BUILD_INTERFACE:AccelerateSparse::Accelerate>)
+endif()""",
                 """# Atlas links the selected static LAPACK implementation at the
 # final application link. Keep LAPACK functionality enabled without exporting
 # the configure host's LAPACK libraries from the static Ceres target.""",
@@ -5745,6 +5832,10 @@ endif()
             [
                 "-DBUILD_EXAMPLES:BOOL=OFF",
                 "-DBUILD_TESTING:BOOL=OFF",
+                # ITK has no C++ modules. CMake 4.4 added clang-cl dependency
+                # scanning, and ITKReview's aggregate include list makes the
+                # generated scan command exceed cmd.exe's command-line limit.
+                "-DCMAKE_CXX_SCAN_FOR_MODULES:BOOL=OFF",
                 "-DITK_USE_64BITS_IDS:BOOL=ON",
                 "-DITK_FUTURE_LEGACY_REMOVE:BOOL=ON",
                 "-DITK_LEGACY_REMOVE:BOOL=ON",

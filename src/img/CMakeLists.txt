@@ -422,7 +422,8 @@ set(ATLAS_IMG_FORMAT_LINK_LIBRARIES
         OpenImageIO::OpenImageIO)
 
 target_link_libraries(${LIBRARY_NAME} PUBLIC ${ITK_INTERFACE_LIBRARIES} cpuinfo::cpuinfo hwy::hwy
-        hdf5_cpp-static hdf5-static Ceres::ceres Folly::folly Eigen3::Eigen
+        hdf5_cpp-static hdf5-static Ceres::ceres ${SUITESPARSE_LIBRARIES}
+        Folly::folly Eigen3::Eigen
         Boost::headers Boost::charconv
         absl::bits absl::int128
         absl::flags_parse absl::flags_reflection absl::flags_usage

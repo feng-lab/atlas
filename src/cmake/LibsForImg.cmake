@@ -78,6 +78,33 @@ print_target_properties(TBB::tbb)
 message(STATUS "MKL_INCLUDE_DIRS: ${MKL_INCLUDE_DIRS}")
 message(STATUS "MKL_LIBRARIES: ${MKL_LIBRARIES}")
 
+if (WIN32)
+  set(_ATLAS_SUITESPARSE_LIBRARY_PREFIX "")
+  set(_ATLAS_SUITESPARSE_LIBRARY_SUFFIX "_static.lib")
+else ()
+  set(_ATLAS_SUITESPARSE_LIBRARY_PREFIX "lib")
+  set(_ATLAS_SUITESPARSE_LIBRARY_SUFFIX ".a")
+endif ()
+
+# Atlas owns the final link for its static Ceres package. Resolve the exact
+# SuiteSparse archives directly instead of making Ceres rediscover and probe
+# private dependencies whenever the package is loaded.
+set(SUITESPARSE_LIBRARIES)
+foreach (_ATLAS_SUITESPARSE_COMPONENT
+         spqr cholmod amd camd ccolamd colamd suitesparseconfig)
+  set(_ATLAS_SUITESPARSE_LIBRARY
+      "${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/lib/${_ATLAS_SUITESPARSE_LIBRARY_PREFIX}${_ATLAS_SUITESPARSE_COMPONENT}${_ATLAS_SUITESPARSE_LIBRARY_SUFFIX}")
+  if (NOT EXISTS "${_ATLAS_SUITESPARSE_LIBRARY}")
+    message(FATAL_ERROR
+            "Atlas's static SuiteSparse library is missing: ${_ATLAS_SUITESPARSE_LIBRARY}")
+  endif ()
+  list(APPEND SUITESPARSE_LIBRARIES "${_ATLAS_SUITESPARSE_LIBRARY}")
+endforeach ()
+unset(_ATLAS_SUITESPARSE_COMPONENT)
+unset(_ATLAS_SUITESPARSE_LIBRARY)
+unset(_ATLAS_SUITESPARSE_LIBRARY_PREFIX)
+unset(_ATLAS_SUITESPARSE_LIBRARY_SUFFIX)
+
 find_package(cpuinfo REQUIRED PATHS ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build NO_DEFAULT_PATH)
 print_target_properties(cpuinfo::cpuinfo)
 
