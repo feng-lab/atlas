@@ -3666,6 +3666,35 @@ def build_glbinding(src_dir: str, install_dir: str):
         shutil.rmtree(build_dir, ignore_errors=False)
 
 
+def build_and_install_libjpeg_cmakecmd(src_dir: str, cmakecmd: list, build_dir: str):
+    # libjpeg-turbo 3.2 creates its bundled spng OBJECT library before finding
+    # a system ZLIB package.  It links ZLIB::ZLIB only to the final TurboJPEG
+    # target, which is too late to provide zlib.h while spng.c is compiled.
+    patch_manager = PatchManager(
+        [
+            FilePatcher(
+                orig_file=os.path.join(src_dir, "CMakeLists.txt"),
+                from_texts=[
+                    """    find_package(ZLIB REQUIRED)
+    unset(ZLIB_STATIC_SOURCES)"""
+                ],
+                to_texts=[
+                    """    find_package(ZLIB REQUIRED)
+    if(WITH_SYSTEM_ZLIB AND TARGET spng-static)
+      target_link_libraries(spng-static PRIVATE ZLIB::ZLIB)
+    endif()
+    unset(ZLIB_STATIC_SOURCES)"""
+                ],
+            )
+        ]
+    )
+    try:
+        patch_manager.apply_patches()
+        build_and_install_cmakecmd(cmakecmd, build_dir)
+    finally:
+        patch_manager.restore_files()
+
+
 def build_libjpeg(src_dir: str, install_dir: str, nasm_dir: str):
     build_dir = create_build_dir(src_dir)
 
@@ -3705,7 +3734,7 @@ def build_libjpeg(src_dir: str, install_dir: str, nasm_dir: str):
                     src_dir,
                 ]
             )
-        build_and_install_cmakecmd(cmakecmd, build_dir)
+        build_and_install_libjpeg_cmakecmd(src_dir, cmakecmd, build_dir)
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
 
@@ -3725,7 +3754,7 @@ def build_libjpeg(src_dir: str, install_dir: str, nasm_dir: str):
                     src_dir,
                 ]
             )
-            build_and_install_cmakecmd(cmakecmd, build_dir)
+            build_and_install_libjpeg_cmakecmd(src_dir, cmakecmd, build_dir)
             create_universal_binaries(
                 arm64_install_dir=arm64_install_dir, final_install_dir=install_dir
             )
@@ -3794,7 +3823,7 @@ def build_macos_libturbojpeg_dylib(src_dir: str, install_dir: str, nasm_dir: str
                     "-DCMAKE_ASM_NASM_COMPILER:FILEPATH=" + nasm_dir + "/nasm"
                 )
             cmakecmd.append(src_dir)
-            build_and_install_cmakecmd(cmakecmd, build_dir)
+            build_and_install_libjpeg_cmakecmd(src_dir, cmakecmd, build_dir)
         finally:
             shutil.rmtree(build_dir, ignore_errors=False)
 
