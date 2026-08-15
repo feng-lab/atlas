@@ -3343,6 +3343,8 @@ include(libs)""",
             "-DSUITESPARSE_USE_STRICT:BOOL=ON",
             "-DBUILD_SHARED_LIBS:BOOL=OFF",
             "-DBUILD_STATIC_LIBS:BOOL=ON",
+            "-DCHOLMOD_PARTITION:BOOL=ON",
+            "-DCHOLMOD_SUPERNODAL:BOOL=ON",
             "-DBLA_STATIC:BOOL=ON",
             "-DSUITESPARSE_USE_64BIT_BLAS:BOOL=OFF",
             "-DSUITESPARSE_USE_FORTRAN:BOOL=OFF",
@@ -3482,16 +3484,21 @@ endif()""",
 @CUDAToolkit_DEPENDENCY@"""
             ],
         ),
-        # SuiteSparse uses *_static.lib names for MSVC static builds. Its 7.13
-        # namespaced METIS copy is also compiled directly into CHOLMOD's
-        # Partition module, so probe CHOLMOD by itself before retaining Ceres's
-        # external-METIS fallback for other builds.
+        # SuiteSparse uses *_static.lib names for MSVC static builds. Atlas
+        # builds SuiteSparse and Ceres as static archives, then supplies their
+        # private dependency closure at the final application link. Ceres's
+        # standalone SuiteSparse link probes do not model that link and must
+        # not decide which features are compiled into the Ceres archive.
         FilePatcher(
             orig_file=os.path.join(src_dir, "cmake", "FindSuiteSparse.cmake"),
             from_texts=[
                 r"""  suitesparse_find_component(${component}
     FILES ${component_header}
     LIBRARIES ${component_library})""",
+                r"""check_library_exists(rt shm_open "" HAVE_LIBRT)""",
+                r"""if (SuiteSparse_FOUND AND SuiteSparse_LINK_TARGET)
+  get_target_property(SuiteSparse_ORIGINAL_CONFIG_LINK
+    SuiteSparse::Config INTERFACE_LINK_LIBRARIES)""",
                 r"""if (TARGET SuiteSparse::CHOLMOD)
   # NOTE If SuiteSparse was compiled as a static library we'll need to link
   # against METIS already during the check. Otherwise, the check can fail due to
@@ -3528,44 +3535,31 @@ endif (TARGET SuiteSparse::CHOLMOD)""",
   suitesparse_find_component(${component}
     FILES ${component_header}
     LIBRARIES ${component_library} ${component_library}_static)""",
+                r"""if (NOT ATLAS_CERES_SKIP_SUITESPARSE_LINK_CHECK)
+  check_library_exists(rt shm_open "" HAVE_LIBRT)
+endif ()""",
+                r"""# Atlas links SuiteSparse's private static dependencies at the final
+# application link. Ceres's configure-time executable does not reproduce that
+# link policy (including GNU archive rescanning), so retain component discovery
+# but skip Ceres's optional-dependency link validation for the Atlas static build.
+if (SuiteSparse_FOUND AND SuiteSparse_LINK_TARGET AND
+    NOT ATLAS_CERES_SKIP_SUITESPARSE_LINK_CHECK)
+  get_target_property(SuiteSparse_ORIGINAL_CONFIG_LINK
+    SuiteSparse::Config INTERFACE_LINK_LIBRARIES)""",
                 r"""if (TARGET SuiteSparse::CHOLMOD)
-  # SuiteSparse 7.13 embeds a namespaced METIS copy directly in CHOLMOD.
-  # Probe that self-contained form before looking for an external METIS target.
-  cmake_push_check_state (RESET)
-  set (CMAKE_REQUIRED_LIBRARIES SuiteSparse::CHOLMOD)
-  check_symbol_exists (cholmod_metis cholmod.h SuiteSparse_CHOLMOD_EMBEDS_METIS)
-  cmake_pop_check_state ()
+  # Atlas builds its pinned SuiteSparse 7.13 with CHOLMOD's Partition module
+  # enabled. That module compiles SuiteSparse's namespaced
+  # METIS directly into CHOLMOD, so no external METIS target is required.
+  set (SuiteSparse_CHOLMOD_EMBEDS_METIS TRUE)
+  set (SuiteSparse_CHOLMOD_USES_METIS TRUE)
+  set (METIS_VERSION "SuiteSparse-embedded")
 
-  if (SuiteSparse_CHOLMOD_EMBEDS_METIS)
-    set (SuiteSparse_CHOLMOD_USES_METIS TRUE)
-    if (NOT METIS_VERSION)
-      set (METIS_VERSION "SuiteSparse-embedded")
-    endif ()
-  else ()
-    # Older/static SuiteSparse packages may require a separately linked METIS.
-    if (NOT DEFINED METIS_FOUND)
-      find_package (METIS)
-    endif()
-    if (TARGET METIS::METIS)
-      cmake_push_check_state (RESET)
-      set (CMAKE_REQUIRED_LIBRARIES SuiteSparse::CHOLMOD METIS::METIS)
-      check_symbol_exists (cholmod_metis cholmod.h SuiteSparse_CHOLMOD_USES_METIS)
-      cmake_pop_check_state ()
-      if (SuiteSparse_CHOLMOD_USES_METIS)
-        set_property (TARGET SuiteSparse::CHOLMOD APPEND PROPERTY
-          INTERFACE_LINK_LIBRARIES $<LINK_ONLY:METIS::METIS>)
-      endif ()
-    endif ()
+  # Partition is a CHOLMOD feature, not a separate installed library.
+  if (NOT TARGET SuiteSparse::Partition)
+    add_library (SuiteSparse::Partition IMPORTED INTERFACE)
   endif ()
-
-  if (SuiteSparse_CHOLMOD_USES_METIS)
-    # Partition is a CHOLMOD feature, not a separate installed library.
-    if (NOT TARGET SuiteSparse::Partition)
-      add_library (SuiteSparse::Partition IMPORTED INTERFACE)
-    endif ()
-    set_property (TARGET SuiteSparse::Partition APPEND PROPERTY
-      INTERFACE_LINK_LIBRARIES SuiteSparse::CHOLMOD)
-  endif ()
+  set_property (TARGET SuiteSparse::Partition APPEND PROPERTY
+    INTERFACE_LINK_LIBRARIES SuiteSparse::CHOLMOD)
 endif ()""",
             ],
         ),
@@ -3647,6 +3641,9 @@ endif()""",
             "-DWITH_ACCELERATESPARSE:BOOL=" + ("ON" if is_mac() else "OFF"),
             "-DWITH_CUDA:STRING=OFF",
             "-DWITH_EIGENMETIS:BOOL=OFF",
+            # Atlas owns the dependency closure for its static Ceres archive.
+            # The final application link is the authoritative validation.
+            "-DATLAS_CERES_SKIP_SUITESPARSE_LINK_CHECK:BOOL=ON",
             # Preserve Ceres's LAPACK-backed solver capabilities. Disabling
             # this option would compile LAPACK support out.
             "-DWITH_LAPACK:BOOL=ON",
