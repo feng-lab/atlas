@@ -112,6 +112,13 @@ find_package(hwy CONFIG REQUIRED
              PATHS ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build NO_DEFAULT_PATH)
 print_target_properties(hwy::hwy)
 
+# Our vendored zlib build is static-only. On Windows upstream zlib names that
+# archive `zs.lib`, which CMake's FindZLIB searches only in static mode. Create
+# ZLIB::ZLIB before importing packages whose static interfaces reference it.
+set(ZLIB_USE_STATIC_LIBS ON)
+find_package(ZLIB MODULE REQUIRED)
+print_target_properties(ZLIB::ZLIB)
+
 set(JPEGTURBO_INCLUDE_DIRS ${JPEGTURBO_INCLUDE_DIRS}
     ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/include)
 find_package(libjpeg-turbo CONFIG REQUIRED
@@ -136,12 +143,6 @@ endif (WIN32)
 message(STATUS "JPEGTURBO_INCLUDE_DIRS: ${JPEGTURBO_INCLUDE_DIRS}")
 message(STATUS "JPEGTURBO_LIBRARIES: ${JPEGTURBO_LIBRARIES}")
 print_target_properties(libjpeg-turbo::jpeg)
-
-# Our vendored zlib build is static-only. On Windows upstream zlib names that
-# archive `zs.lib`, which CMake's FindZLIB searches only in static mode.
-set(ZLIB_USE_STATIC_LIBS ON)
-find_package(ZLIB MODULE REQUIRED)
-print_target_properties(ZLIB::ZLIB)
 
 # libpng16.cmake does not provide include dir, so we have to create it, note PNG_INCLUDE_DIRS will only used by 1 file
 include(${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/lib/libpng/libpng16.cmake)

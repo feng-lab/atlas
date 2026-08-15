@@ -3848,27 +3848,6 @@ def build_libjpeg(src_dir: str, install_dir: str, nasm_dir: str):
 
         build_macos_libturbojpeg_dylib(src_dir, install_dir, nasm_dir)
 
-    # WITH_SYSTEM_ZLIB keeps libturbojpeg from embedding a second, reduced
-    # zlib implementation. Make the resulting exported static target usable
-    # without requiring consumers to discover ZLIB first by accident.
-    patch_file(
-        orig_file=os.path.join(
-            install_dir,
-            "lib",
-            "cmake",
-            "libjpeg-turbo",
-            "libjpeg-turboConfig.cmake",
-        ),
-        from_texts=['include("${CMAKE_CURRENT_LIST_DIR}/libjpeg-turboTargets.cmake")'],
-        to_texts=[
-            """include(CMakeFindDependencyMacro)
-find_dependency(ZLIB)
-
-include("${CMAKE_CURRENT_LIST_DIR}/libjpeg-turboTargets.cmake")"""
-        ],
-        keep_bak_file=False,
-    )
-
 
 def build_macos_libturbojpeg_dylib(src_dir: str, install_dir: str, nasm_dir: str):
     assert is_mac()
