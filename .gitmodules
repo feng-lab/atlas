@@ -21,7 +21,7 @@
 [submodule "src/3rdparty/gflags"]
 	path = src/3rdparty/gflags
 	url = https://github.com/gflags/gflags.git
-	branch = master
+	branch = main
 [submodule "src/3rdparty/glog"]
 	path = src/3rdparty/glog
 	url = https://github.com/google/glog.git
@@ -61,8 +61,7 @@
 [submodule "src/3rdparty/fmt"]
 	path = src/3rdparty/fmt
 	url = https://github.com/fmtlib/fmt.git
-	branch = master
-	ignore = dirty
+	branch = main
 [submodule "src/3rdparty/libevent"]
 	path = src/3rdparty/libevent
 	url = https://github.com/libevent/libevent.git
@@ -96,7 +95,7 @@
 	branch = cpp
 [submodule "src/3rdparty/oneTBB"]
 	path = src/3rdparty/oneTBB
-	url = https://github.com/oneapi-src/oneTBB.git
+	url = https://github.com/uxlfoundation/oneTBB.git
 [submodule "src/3rdparty/SuiteSparse"]
 	path = src/3rdparty/SuiteSparse
 	url = https://github.com/DrTimothyAldenDavis/SuiteSparse.git

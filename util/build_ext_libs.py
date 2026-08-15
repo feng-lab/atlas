@@ -4168,7 +4168,7 @@ def build_libtiff(src_dir: str, install_dir: str):
         shutil.rmtree(build_dir, ignore_errors=False)
 
     # The static exported target needs its codec dependencies recreated before
-    # tiff-targets.cmake is loaded. libtiff 4.7.2 deliberately installs the
+    # tiff-targets.cmake is loaded. libtiff deliberately installs the
     # lowercase package filename, which CMake accepts for every TIFF spelling.
     cmake_dir = os.path.join(install_dir, "lib", "cmake", "tiff")
     patch_file(
