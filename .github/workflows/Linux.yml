@@ -250,7 +250,9 @@ jobs:
           set -euo pipefail
           python --version
           python -m pip install --upgrade pip
-          python -m pip install --no-cache-dir aqtinstall requests packaging build twine boto3 auditwheel
+          python -m pip install --no-cache-dir \
+            aqtinstall requests packaging build twine boto3 \
+            auditwheel patchelf
 
       - name: Cache Vulkan SDK (installed)
         uses: actions/cache@v5

@@ -1,6 +1,6 @@
 param(
-  [string]$LlvmVersion = '22.1.7',
-  [string]$LlvmWin64TarXzSha256 = '3b568b5be1443d1a04c63261fa3a7aed16e126a8ed2196a1032aa8ed602144bd'
+  [string]$LlvmVersion = '22.1.8',
+  [string]$LlvmWin64TarXzSha256 = 'd96c2cc1736f4eb7fa43cb9bbdf56d93551a9ae0a9aadb9c99c3c3b2b712a234'
 )
 
 Set-StrictMode -Version Latest

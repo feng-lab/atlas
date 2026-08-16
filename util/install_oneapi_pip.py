@@ -8,7 +8,7 @@ from logger import setup_logger
 logger = setup_logger(name=__name__)
 
 
-MKL_STATIC_VERSION = "2026.0.0"
+MKL_STATIC_VERSION = "2026.1.0"
 PACKAGES = (f"mkl-static=={MKL_STATIC_VERSION}",)
 
 
