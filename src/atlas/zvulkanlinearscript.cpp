@@ -1025,6 +1025,19 @@ std::vector<ZVulkanTexture*> ZVulkanLinearScript::collectTexturePointersForNodes
   return textures;
 }
 
+void ZVulkanLinearScript::discardUnsubmittedWork()
+{
+  CHECK(!m_frameOpen) << "Cannot discard a ZVulkanLinearScript after opening its Vulkan frame";
+  CHECK(!m_renderer.isVulkanFrameActive())
+    << "Cannot discard a ZVulkanLinearScript while its renderer has an active Vulkan frame";
+
+  // Destroy pending consumers before releasing the resources retained for them.
+  m_nodes.clear();
+  m_preRecordNodes.clear();
+  m_keepAlives.clear();
+  m_pendingSubmissionHasGpuNodes = false;
+}
+
 void ZVulkanLinearScript::flushNodes(std::string_view reason,
                                      /*nullable*/ const ReadbackBufferSpec* readback,
                                      bool waitForCompletion)
@@ -1036,8 +1049,15 @@ void ZVulkanLinearScript::flushNodes(std::string_view reason,
 
   // This is the last cancellation boundary before persistent one-shot backend
   // hints are populated and command-buffer setup can begin. Recording callbacks
-  // do not poll cancellation.
-  maybeCancel(Z3DRenderGlobalState::instance().currentCancellationToken());
+  // do not poll cancellation. At this point all pending work is still CPU-only,
+  // so a cancelled attempt can release it without abandoning an active frame.
+  try {
+    maybeCancel(Z3DRenderGlobalState::instance().currentCancellationToken());
+  }
+  catch (const ZCancellationException&) {
+    discardUnsubmittedWork();
+    throw;
+  }
 
   std::string firstLabelStorage;
   if (!m_nodes.empty()) {

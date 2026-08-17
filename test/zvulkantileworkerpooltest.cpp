@@ -1,13 +1,21 @@
+#include "z3dcompositor.h"
+#include "z3drendererbase.h"
+#include "z3drenderervulkanbackend.h"
+#include "z3drenderglobalstate.h"
 #include "z3drenderingengine.h"
 #include "z3dtiledescriptor.h"
+#include "zcancellation.h"
 #include "zcommandlineflags.h"
 #include "zdoc.h"
 #include "zjson.h"
+#include "zlog.h"
 #include "zrenderthreadexecutor_tls.h"
 #include "zswc.h"
 #include "zswcdoc.h"
+#include "zvulkanlinearscript.h"
 
 #include <absl/flags/flag.h>
+#include <folly/ScopeGuard.h>
 #include <gtest/gtest.h>
 
 #include <QApplication>
@@ -16,11 +24,13 @@
 
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
 #include <memory>
 #include <span>
+#include <string>
 #include <string_view>
 #include <utility>
 #include <vector>
@@ -56,11 +66,130 @@ std::unique_ptr<QApplication> makeSmokeTestApplicationIfNeeded()
   return std::make_unique<QApplication>(argc, argv);
 }
 
+class DroppedUnflushedNodesWarningCapture final : public absl::LogSink
+{
+public:
+  DroppedUnflushedNodesWarningCapture()
+  {
+    addLogSink(this);
+  }
+
+  ~DroppedUnflushedNodesWarningCapture() override
+  {
+    removeLogSink(this);
+  }
+
+  void Send(const absl::LogEntry& entry) override
+  {
+    static constexpr std::string_view kWarning =
+      "ZVulkanLinearScript dropping unflushed nodes during exception unwinding";
+    if (entry.log_severity() >= absl::LogSeverity::kWarning &&
+        std::string(entry.text_message_with_prefix()).find(kWarning) != std::string::npos) {
+      m_count.fetch_add(1u, std::memory_order_relaxed);
+    }
+  }
+
+  [[nodiscard]] size_t count() const
+  {
+    return m_count.load(std::memory_order_relaxed);
+  }
+
+private:
+  std::atomic<size_t> m_count = 0u;
+};
+
+void runCancelledLinearScriptFlush(Z3DRendererBase& renderer,
+                                   Z3DRendererVulkanBackend& backend,
+                                   bool& preRecordRan,
+                                   bool& commandRan,
+                                   std::weak_ptr<int>& keepAliveSentinel,
+                                   bool& keepAliveReleasedBeforeUnwind)
+{
+  ZVulkanLinearScript script(renderer, backend, "cancelled_pre_frame_test");
+  script.preRecord("cancelled_pre_record", {}, [&](Z3DRendererVulkanBackend&, Z3DRendererBase&) {
+    preRecordRan = true;
+  });
+  script.commandsInSubmission("cancelled_deferred_commands", {}, [&](Z3DRendererVulkanBackend&) {
+    commandRan = true;
+  });
+
+  auto sentinel = std::make_shared<int>(1);
+  keepAliveSentinel = sentinel;
+  script.keepAlive(std::move(sentinel));
+
+  Z3DRenderGlobalState::instance().requestCancellation();
+  try {
+    // Ordinary commands are an immediate safe-point flush, matching the
+    // compositor readback enqueue path that exposed the misleading warning.
+    script.commands("cancelled_command_flush", {}, [](Z3DRendererVulkanBackend&) {});
+  }
+  catch (const ZCancellationException&) {
+    keepAliveReleasedBeforeUnwind = keepAliveSentinel.expired();
+    throw;
+  }
+}
+
 enum class WorkerExecution
 {
   SameAdapterBatch,
   DistinctDevicesBatch
 };
+
+TEST(ZVulkanLinearScriptTest, CancelledPreFrameFlushDiscardsPendingWorkWithoutWarning)
+{
+  if (!vulkanSmokeEnabled()) {
+    GTEST_SKIP() << "Set ATLAS_ENABLE_VULKAN_SMOKE_TEST=1 with a Vulkan ICD to run the linear-script smoke";
+  }
+
+  auto ownedApplication = makeSmokeTestApplicationIfNeeded();
+
+  absl::FlagSaver flagSaver;
+  absl::SetFlag(&FLAGS_atlas_default_render_backend, RenderBackend::Vulkan);
+
+  ZDoc doc;
+  auto canonical = std::make_unique<Z3DRenderingEngine>(doc);
+  canonical->init();
+
+  auto& renderer = canonical->compositor().rendererBase();
+  auto* backend = dynamic_cast<Z3DRendererVulkanBackend*>(renderer.backend());
+  ASSERT_NE(backend, nullptr);
+  ASSERT_FALSE(renderer.isVulkanFrameActive());
+
+  auto& globalState = Z3DRenderGlobalState::instance();
+  const auto checkpoint = globalState.idleCancellationCheckpoint();
+  ASSERT_TRUE(checkpoint.has_value());
+  auto cancellationSource = globalState.tryAcquireCancellationSource(*checkpoint);
+  ASSERT_NE(cancellationSource, nullptr);
+  auto releaseCancellationSource = folly::makeGuard([&]() {
+    globalState.releaseCancellationSource(cancellationSource);
+  });
+
+  bool preRecordRan = false;
+  bool commandRan = false;
+  std::weak_ptr<int> keepAliveSentinel;
+  bool keepAliveReleasedBeforeUnwind = false;
+  DroppedUnflushedNodesWarningCapture warningCapture;
+
+  EXPECT_THROW(runCancelledLinearScriptFlush(renderer,
+                                             *backend,
+                                             preRecordRan,
+                                             commandRan,
+                                             keepAliveSentinel,
+                                             keepAliveReleasedBeforeUnwind),
+               ZCancellationException);
+
+  EXPECT_FALSE(preRecordRan);
+  EXPECT_FALSE(commandRan);
+  EXPECT_TRUE(keepAliveReleasedBeforeUnwind);
+  EXPECT_TRUE(keepAliveSentinel.expired());
+  EXPECT_FALSE(renderer.isVulkanFrameActive());
+  EXPECT_EQ(warningCapture.count(), 0u);
+
+  globalState.releaseCancellationSource(cancellationSource);
+  releaseCancellationSource.dismiss();
+  canonical.reset();
+  EXPECT_EQ(currentRenderThreadExecutorOrNull(), nullptr);
+}
 
 void runPpllTileWorkerSmoke(WorkerExecution execution)
 {

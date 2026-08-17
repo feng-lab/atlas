@@ -366,14 +366,16 @@ Testing (Linking Atlas Code)
   or CPU software ICD. The tests verify context, logical-device, VMA startup, and device-owned bindless slot/retirement
   lifetimes. This is an explicit local correctness check; normal platform CI remains limited to its existing build and
   packaging workflow. Do not put performance assertions in this smoke test.
-- `zvulkantileworkerpooltest` is an opt-in Vulkan smoke executable. Both
+- `zvulkantileworkerpooltest` is an opt-in Vulkan smoke executable. Its linear-script cancellation regression and the
   `CanonicalAdapterPpllBatchPreservesParityAndCanonicalEngine` and
-  `DistinctPhysicalDevicesCompleteBatchAndPreserveCanonicalEngine` require
+  `DistinctPhysicalDevicesCompleteBatchAndPreserveCanonicalEngine` worker cases require
   `ATLAS_ENABLE_VULKAN_SMOKE_TEST=1`; each test checks that gate before constructing `QApplication`, a rendering engine, or
-  a `ZVulkanContext`. The executable is built but is not registered with CTest. With the variable unset, an explicit run
-  requires no Vulkan ICD or physical device and both cases report skipped. The distinct-device case also skips unless the
-  canonical engine exposes at least two planning-compatible physical-device UUIDs. The runtime gate does not remove Atlas's
-  Vulkan SDK and shader-compiler build prerequisites.
+  a `ZVulkanContext`. `CancelledPreFrameFlushDiscardsPendingWorkWithoutWarning` verifies that expected pre-frame
+  cancellation releases deferred CPU work without opening a Vulkan frame or emitting the unexpected-abandonment warning.
+  The executable is built but is not registered with CTest. With the variable unset, an explicit run requires no Vulkan ICD
+  or physical device and all cases report skipped. The distinct-device case also skips unless the canonical engine exposes
+  at least two planning-compatible physical-device UUIDs. The runtime gate does not remove Atlas's Vulkan SDK and
+  shader-compiler build prerequisites.
 - `z3drenderglobalstatetest` is CPU-only. It verifies independent thread-local frame-token sequences, render/performance
   context, cancellation checkpoints, and exclusive cancellation-source ownership without constructing a Vulkan context or
   logical device.

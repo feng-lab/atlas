@@ -375,6 +375,7 @@ private:
   void flushNodes(std::string_view reason,
                   /*nullable*/ const ReadbackBufferSpec* readback,
                   bool waitForCompletion = false);
+  void discardUnsubmittedWork();
   void drainNodesIntoExecutionOrder(std::vector<Node>& out);
   void executeNodes(std::span<Node> nodes);
   [[nodiscard]] std::vector<Z3DScratchResourcePool::VulkanScratchTextureUse>
